@@ -17,8 +17,8 @@ This is Step 3 of the AI-Driven Engineering workflow. The progress file provides
 
 ## Prerequisites
 
-- `docs/aide/vision.md` must exist (created by `/speckit.aide.create-vision`)
-- `docs/aide/roadmap.md` must exist (created by `/speckit.aide.create-roadmap`)
+- `docs/aide/vision.md` must exist (created by `/speckit-aide-create-vision`)
+- `docs/aide/roadmap.md` must exist (created by `/speckit-aide-create-roadmap`)
 
 ## Instructions
 
@@ -51,4 +51,4 @@ Save the completed progress file to `docs/aide/progress.md`.
 
 ## Next Step
 
-After reviewing the progress file, start a **new chat session** and run `/speckit.aide.create-queue` to generate the first batch of prioritized work items.
+After reviewing the progress file, start a **new chat session** and run `/speckit-aide-create-queue` to generate the first batch of prioritized work items.
