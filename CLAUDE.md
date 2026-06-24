@@ -43,8 +43,12 @@ that everyone touches — they are the main conflict hotspots. Conventions:
 
 - **One person owns a work item at a time.** Each `docs/aide/items/NNN-*.md`
   has its own file, so two people working different items rarely collide.
-- **Branch per work item.** `git switch -c aide/NNN-short-name`, do the item on
-  that branch, open a PR. Don't commit AIDE work directly to `main`.
+- **Branch per work item, pushed immediately.** `git switch -c aide/NNN-short-name`,
+  then `git push -u origin aide/NNN-short-name` **before doing real work** — the
+  pushed branch is the shared "in progress" signal (see *Claiming a work item*
+  below). Do the item on that branch; once it's green you may merge it **straight
+  to `main` with no PR** (see *Merge policy* below). Don't work directly on `main`
+  itself.
 - **Pull before you start, and before `execute-item` writes `progress.md`.**
   Always `git pull --rebase` first so progress edits stack cleanly.
 - **Keep `progress.md` edits scoped to your item's rows.** If two PRs both
@@ -52,8 +56,62 @@ that everyone touches — they are the main conflict hotspots. Conventions:
   rewrite).
 - **Regenerate the queue from `main`, not a stale branch** (`create-queue`
   reads vision/roadmap/progress, so it must see the latest committed state).
-- **Vision / roadmap / constitution changes go through their own PR** and
-  should be agreed by the team, since they cascade into every future queue.
+- **Framework / process changes require a reviewed PR** — vision, roadmap,
+  constitution, `CLAUDE.md`, skills, and AIDE commands. They cascade into every
+  future queue, so they need team agreement before landing (see *Merge policy*
+  below).
+
+### Claiming a work item (how "in progress" is signalled)
+
+`progress.md` is **not** a reliable mid-flight status board: its `📋 → 🚧`
+edit is made on your feature branch and stays invisible on `main` until the PR
+merges, and it tracks stage deliverables rather than individual items. The
+reliable, shared "this item is taken" signal is therefore the **pushed
+`aide/NNN-*` branch** (and its open/draft PR). Protocol — follow it whenever you
+pick up an item (i.e. at `create-item` / `execute-item`):
+
+1. **Before you pick, sync and check what's already claimed:**
+   - `git fetch --all --prune`
+   - `git branch -r | grep aide/` — remote work-item branches
+   - `gh pr list --state open` — open/draft PRs (if using a GitHub remote)
+
+   If a branch or PR already exists for that item number, it's claimed — pick
+   another item or coordinate with the owner.
+2. **Claim by pushing the branch *before* real work:**
+   `git switch -c aide/NNN-short-name && git push -u origin aide/NNN-short-name`
+   (an empty/WIP commit is fine). Now anyone who fetches sees the item is owned.
+   Opening a **draft PR** at this point is encouraged — it makes the claim more
+   visible and shows mergeable status.
+3. **Do the work on that branch**, then merge it to `main` — a work item may
+   merge directly, no PR required (see *Merge policy* below).
+4. **Release / hand off:** if you abandon an item, delete the remote branch
+   (`git push origin --delete aide/NNN-short-name`) and close its PR so the item
+   returns to the pool.
+
+> ⚠️ A branch only signals ownership **after you push it and others fetch**.
+> Push at the *start*, not the end, and always `git fetch` before picking — a
+> local-only branch tells collaborators nothing.
+
+### Merge policy: PR vs. direct merge
+
+Two categories, two rules:
+
+- **Framework / process changes require a reviewed PR** (team agreement). These
+  change *how everyone works* and cascade into every future queue and item:
+  `docs/aide/vision.md`, `docs/aide/roadmap.md`,
+  `.specify/memory/constitution.md`, `CLAUDE.md`, `.claude/skills/`, and the
+  `.specify/extensions/` AIDE commands. Put them on their own branch and merge
+  **only after PR review**.
+- **Work-item execution may merge straight to `main` — no PR**, to keep the loop
+  streamlined. The code, tests, the item spec (`docs/aide/items/NNN-*.md`), and
+  your scoped `progress.md` status edits for a single item can be merged directly
+  into `main` once green (`git switch main && git pull --rebase && git merge
+  aide/NNN-short-name && git push`). You still **branch per item** (`aide/NNN-*`,
+  pushed immediately) for the claim signal and isolation — direct merge relaxes
+  the *review gate*, not the branch.
+
+> Rule of thumb: if the change would alter a *future* queue or item (process,
+> docs, commands), it needs a PR. If it only *executes* the current item, merge it.
 
 ### Shared vs. personal
 

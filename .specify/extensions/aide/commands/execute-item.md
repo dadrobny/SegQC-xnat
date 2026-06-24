@@ -25,6 +25,24 @@ If `$ARGUMENTS` is empty, automatically pick the next item:
 2. Select the first work item whose status in `docs/aide/progress.md` is 📋 (Planned) — i.e., it has a spec but hasn't been started yet
 3. Tell the user which item was auto-selected before proceeding
 
+### Claim the Item Before Implementing (distributed safety)
+
+Because `progress.md`'s `🚧` mark lives on your branch and is invisible to
+collaborators on `main`, the shared "in progress" signal is the **pushed
+`aide/NNN-*` branch** (see *Claiming a work item* in `CLAUDE.md`). Before writing
+any code:
+
+1. `git fetch --all --prune`, then check no one else has claimed this item:
+   `git branch -r | grep aide/` and (with a GitHub remote) `gh pr list --state open`.
+   If another collaborator's branch/PR already exists for this item number, stop
+   and coordinate rather than duplicating work.
+2. Ensure you are on `aide/NNN-short-name` and **push it now** so the claim is
+   visible: `git switch -c aide/NNN-short-name` (if not already created) then
+   `git push -u origin aide/NNN-short-name` (a WIP/empty commit is fine). A draft
+   PR at this point is encouraged.
+3. `git pull --rebase` before the first `progress.md` edit so status lines stack
+   cleanly.
+
 ### During Implementation
 
 1. **Follow the specification** — implement exactly what the work item describes
