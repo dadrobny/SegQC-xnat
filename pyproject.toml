@@ -1,0 +1,58 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "segqc"
+description = "Automated quality-control for vertebra instance segmentations of spine imaging."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "David Drobny", email = "david.drobny@kcl.ac.uk" },
+]
+keywords = ["segmentation", "quality-control", "spine", "vertebra", "xnat", "medical-imaging"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+# Core scientific stack. Lower-bound pins are chosen for Python 3.9
+# compatibility; exact reproducibility pins belong in the deployable container's
+# lockfile/constraints (Stage 9), not in library metadata. See item 001.
+dependencies = [
+    "numpy>=1.21",
+    "scipy>=1.7",
+    "scikit-image>=0.19",
+    "nibabel>=4.0",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+]
+
+[project.urls]
+Homepage = "https://github.com/dadrobny/SegQC-xnat"
+Repository = "https://github.com/dadrobny/SegQC-xnat"
+
+[project.scripts]
+segqc = "segqc.cli:main"
+
+[tool.hatch.version]
+path = "src/segqc/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/segqc"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

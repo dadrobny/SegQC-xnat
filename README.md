@@ -50,3 +50,35 @@ We use TotalSegmentator as a pre-trained model for vertebra segmentation
 ## GitHub Repository
 
 https://github.com/dadrobny/SegQC-xnat
+
+## Development setup
+
+`segqc` is a Python 3.9+ package using a `src/` layout and a `pyproject.toml`
+build (hatchling). Develop against a clean virtual environment:
+
+```bash
+# 1. Create and activate a virtual environment
+python -m venv .venv
+#   Windows (PowerShell):
+.\.venv\Scripts\Activate.ps1
+#   macOS / Linux:
+source .venv/bin/activate
+
+# 2. Install the package in editable mode with the dev extras (pytest)
+pip install -e .[dev]
+
+# 3. Run the test suite
+pytest
+```
+
+After installing, the `segqc` console script is available:
+
+```bash
+segqc --help          # top-level usage, lists the `run` subcommand
+segqc --version       # print the package version
+segqc run --help      # usage for `run` (--scan / --seg / --out)
+```
+
+> Note: `segqc run` is currently a scaffold stub — it parses its arguments and
+> exits without performing any I/O. The QC pipeline is wired up in later work
+> items (see `docs/aide/`).
