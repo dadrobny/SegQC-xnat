@@ -43,8 +43,11 @@ that everyone touches — they are the main conflict hotspots. Conventions:
 
 - **One person owns a work item at a time.** Each `docs/aide/items/NNN-*.md`
   has its own file, so two people working different items rarely collide.
-- **Branch per work item.** `git switch -c aide/NNN-short-name`, do the item on
-  that branch, open a PR. Don't commit AIDE work directly to `main`.
+- **Branch per work item, pushed immediately.** `git switch -c aide/NNN-short-name`,
+  then `git push -u origin aide/NNN-short-name` **before doing real work** — the
+  pushed branch (and its PR) is the shared "in progress" signal (see *Claiming a
+  work item* below). Do the item on that branch and open a PR. Don't commit AIDE
+  work directly to `main`.
 - **Pull before you start, and before `execute-item` writes `progress.md`.**
   Always `git pull --rebase` first so progress edits stack cleanly.
 - **Keep `progress.md` edits scoped to your item's rows.** If two PRs both
@@ -54,6 +57,36 @@ that everyone touches — they are the main conflict hotspots. Conventions:
   reads vision/roadmap/progress, so it must see the latest committed state).
 - **Vision / roadmap / constitution changes go through their own PR** and
   should be agreed by the team, since they cascade into every future queue.
+
+### Claiming a work item (how "in progress" is signalled)
+
+`progress.md` is **not** a reliable mid-flight status board: its `📋 → 🚧`
+edit is made on your feature branch and stays invisible on `main` until the PR
+merges, and it tracks stage deliverables rather than individual items. The
+reliable, shared "this item is taken" signal is therefore the **pushed
+`aide/NNN-*` branch** (and its open/draft PR). Protocol — follow it whenever you
+pick up an item (i.e. at `create-item` / `execute-item`):
+
+1. **Before you pick, sync and check what's already claimed:**
+   - `git fetch --all --prune`
+   - `git branch -r | grep aide/` — remote work-item branches
+   - `gh pr list --state open` — open/draft PRs (if using a GitHub remote)
+
+   If a branch or PR already exists for that item number, it's claimed — pick
+   another item or coordinate with the owner.
+2. **Claim by pushing the branch *before* real work:**
+   `git switch -c aide/NNN-short-name && git push -u origin aide/NNN-short-name`
+   (an empty/WIP commit is fine). Now anyone who fetches sees the item is owned.
+   Opening a **draft PR** at this point is encouraged — it makes the claim more
+   visible and shows mergeable status.
+3. **Do the work on that branch**, then mark the PR ready and merge.
+4. **Release / hand off:** if you abandon an item, delete the remote branch
+   (`git push origin --delete aide/NNN-short-name`) and close its PR so the item
+   returns to the pool.
+
+> ⚠️ A branch only signals ownership **after you push it and others fetch**.
+> Push at the *start*, not the end, and always `git fetch` before picking — a
+> local-only branch tells collaborators nothing.
 
 ### Shared vs. personal
 

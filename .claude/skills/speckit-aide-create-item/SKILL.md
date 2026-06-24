@@ -31,6 +31,23 @@ If `$ARGUMENTS` is empty, automatically pick the next item:
 3. Select the first item from the queue that does **not** already have a corresponding work item file in `docs/aide/items/`. A ✅ or 🚧 mark in progress.md alone is NOT sufficient to skip an item — the work item file must also exist. If progress.md shows ✅ but no work item file exists, flag this to the user as a potential inconsistency before proceeding.
 4. Tell the user which item was auto-selected before proceeding
 
+### Claim Check (distributed safety)
+
+Picking an item is a **claim**, so before selecting or writing the spec, confirm
+no collaborator already owns it (see *Claiming a work item* in `CLAUDE.md`):
+
+1. `git fetch --all --prune`
+2. Check for an existing remote branch or open PR for this item number:
+   `git branch -r | grep aide/` and (if a GitHub remote is configured)
+   `gh pr list --state open`.
+3. If a branch or PR for this item number already exists, it is **already
+   claimed** — stop and tell the user (suggest a different item or coordinating
+   with the owner) rather than creating a duplicate item file.
+
+After the spec is written, the chosen item should be claimed by pushing its
+branch (`git switch -c aide/NNN-... && git push -u origin aide/NNN-...`) before
+real work begins — `execute-item` re-checks this.
+
 ### Work Item Creation
 
 Create a comprehensive work item specification for the selected item and save it to `docs/aide/items/NNN-descriptive-name.md`.
