@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Claude Code / spec-kit
+#   Share the framework (.claude/skills, .claude/commands, .claude/settings.json,
+#   .specify/) but keep per-machine settings and credentials out of git.
+.claude/settings.local.json
+.claude/*.local.json
+.claude/.credentials.json
+.claude/credentials.json
