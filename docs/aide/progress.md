@@ -61,7 +61,7 @@ instance label map, normalises labels, and exits cleanly.
 - ✅ Python package `segqc/` targeting Python 3.9+; `pyproject.toml` with pinned
   core deps (NumPy, SciPy, scikit-image, NiBabel and/or SimpleITK). *(Item 001)*
 - 📋 CLI entry point: `segqc run --scan <nii> --seg <nii> --out <dir>`.
-- 📋 NIfTI loader for scan + label map, preserving spacing/affine, handling anisotropy.
+- ✅ NIfTI loader for scan + label map, preserving spacing/affine, handling anisotropy. *(Item 003)*
 - 📋 Label-convention module: integer label ↔ anatomical vertebra, configurable,
   with a default TotalSegmentator/VerSe mapping.
 - 📋 Structured logging + versioned heuristic-config scaffold (YAML/JSON).
