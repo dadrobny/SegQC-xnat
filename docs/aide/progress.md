@@ -65,7 +65,7 @@ instance label map, normalises labels, and exits cleanly.
 - 📋 Label-convention module: integer label ↔ anatomical vertebra, configurable,
   with a default TotalSegmentator/VerSe mapping.
 - 📋 Structured logging + versioned heuristic-config scaffold (YAML/JSON).
-- 📋 `pytest` harness + tiny synthetic NIfTI fixtures.
+- ✅ `pytest` harness + tiny synthetic NIfTI fixtures. *(Item 002)*
 
 **Acceptance.**
 - [ ] `segqc run` on a fixture loads both volumes, prints labelled inventory, writes a stub JSON.

@@ -82,3 +82,49 @@ segqc run --help      # usage for `run` (--scan / --seg / --out)
 > Note: `segqc run` is currently a scaffold stub — it parses its arguments and
 > exits without performing any I/O. The QC pipeline is wired up in later work
 > items (see `docs/aide/`).
+
+## Testing & synthetic fixtures
+
+Tests use small, deterministic, in-memory **synthetic NIfTI** volumes so no real
+imaging data is needed. The builders live in
+[`tests/synthetic.py`](tests/synthetic.py) (plain functions — importable from
+ad-hoc scripts too) and are exposed to test modules as pytest fixtures via
+[`tests/conftest.py`](tests/conftest.py). Reuse these in new test modules rather
+than rolling your own test data.
+
+**Builder functions** (`from synthetic import ...`):
+
+- `affine_from_spacing(spacing)` — 4×4 diagonal affine (voxel sizes on the
+  diagonal, identity rotation, zero origin).
+- `make_scan(shape, spacing=(1,1,1), *, dtype=int16, fill=0, gradient=False)` —
+  intensity volume as a `Nifti1Image`.
+- `make_labelmap(shape, blocks, spacing=(1,1,1))` — paints integer `blocks`
+  (`{label: ((x0,x1),(y0,y1),(z0,z1))}`, half-open boxes; later boxes win on
+  overlap) into a zero `uint16` volume.
+- `write_nifti(img, path)` — save a `.nii` / `.nii.gz` (extension picks
+  compression); returns the `Path`.
+- Canonical cases returning a `SyntheticCase` bundle: `labelled_blocks_case()`
+  (≥3 separated labels, isotropic 1 mm), `empty_case()` (all-zero label map),
+  `anisotropic_case()` (non-uniform `(1,1,3)` mm spacing). `CANONICAL_CASES`
+  maps names → builders.
+
+**`SyntheticCase`** bundles `scan_img`, `seg_img` (`Nifti1Image`s) with
+known-good metadata: `expected_labels`, `voxel_counts` (`{label: n_voxels}`),
+`spacing`, `shape`. `case.write(dir, suffix=".nii.gz")` materialises it and
+returns `(scan_path, seg_path)`.
+
+**Pytest fixtures** (`conftest.py`): in-memory `labelled_blocks`,
+`empty_labelmap`, `anisotropic` (yield a `SyntheticCase`); on-disk
+`labelled_blocks_files`, `empty_labelmap_files`, `anisotropic_files` (write under
+`tmp_path`, yield `(scan_path, seg_path)`).
+
+```python
+def test_example(labelled_blocks):
+    assert labelled_blocks.expected_labels == {1, 2, 3}
+    assert labelled_blocks.voxel_counts == {1: 64, 2: 64, 3: 64}
+```
+
+> Scope: these are **well-formed, happy-path** volumes (plus one empty case).
+> The deliberately-broken failure corpus is Stage 5. The affine is a minimal
+> diagonal one — faithful/oblique real-world affines are the loader item's (003)
+> concern.
