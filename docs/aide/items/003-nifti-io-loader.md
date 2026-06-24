@@ -194,39 +194,53 @@ fixture builder and is claimed by another collaborator — **not yet merged to
 
 ## Decisions & Trade-offs
 
-Open implementation choices for this item, with recommendations. Record the final
-decision and rationale here during execution.
+Open implementation choices for this item, with recommendations. **Final
+decisions recorded below** (executed 2026-06-24).
 
-*To be updated during implementation.*
+1. **NIfTI library — NiBabel (chosen) vs SimpleITK.** ✅ **NiBabel**, as declared
+   in Item 001. No NiBabel limitation surfaced for this item's scope (load,
+   affine, spacing, gzip), so SimpleITK remains deferred. Used
+   `nibabel.affines.voxel_sizes` for spacing and `nibabel.load` for reading.
+2. **Scan dtype — `get_fdata()` (float64) vs `dataobj` (native).** ✅ **Split by
+   an `integer_labels` flag on a single `load_volume`** rather than a separate
+   `load_label_map`. Scan: `get_fdata(dtype=np.float64)` (float, for Stage 8
+   intensity features). Segmentation: `np.asarray(img.dataobj)` cast to `int64`,
+   so label values are never silently floated. A defensive `np.rint` guards the
+   case where labels are stored in a float-typed header. One function with a flag
+   keeps the surface small while honouring the float-scan / integer-label split.
+3. **Background label.** ✅ **`0` treated as background and excluded** from
+   `label_inventory`. Total foreground voxel count is additionally exposed as
+   `Case.foreground_voxels` (Item 007 needs it). The inventory does *not*
+   optionally include `0` — a dedicated field is clearer than an inventory whose
+   key set changes by flag; if a consumer needs the zero count it can derive it
+   from `data.size - foreground_voxels`.
+4. **Affine/spacing compatibility in `load_case` — strict vs tolerant.** ✅
+   **Tolerant `np.allclose`** with `rtol=1e-5, atol=1e-4` (module constants
+   `_AFFINE_RTOL`/`_AFFINE_ATOL`). Spacing is derived from the affine, so the
+   single affine check covers spacing too. **Shape mismatch always errors**
+   (hard, names both shapes). The error message prints both affines and the
+   tolerance used.
+5. **Representation type — frozen `@dataclass` vs `NamedTuple` vs dict.** ✅
+   **Frozen dataclasses** (`Volume`, `Case`) — immutable, clearly typed, and
+   tolerant of numpy-array fields (a `NamedTuple` of an ndarray invites accidental
+   elementwise `==`). Note: `frozen=True` blocks attribute *rebinding*, not
+   in-place mutation of the contained ndarray; see Decision 7 for the array-copy
+   safeguard.
+6. **Module name — `io.py` vs `loaders.py`.** ✅ **`segqc.io`** kept (matches the
+   item's proposed API). `from __future__ import annotations` + fully-qualified
+   internal use means the stdlib `io` is never shadowed in practice.
+7. **Lazy vs eager array read.** ✅ **Eager** — returns a concrete in-memory
+   `np.ndarray`. To honour the "does not mutate the caller's arrays / safe to
+   read" criterion, when the read returns a non-owning view (e.g. a memmap onto
+   the file) the loader copies it via `np.array(...)` so the returned array owns
+   its data and outlives the file handle. Memory implication for very large
+   volumes is noted as a future concern (these are small QC volumes).
 
-1. **NIfTI library — NiBabel (recommended) vs SimpleITK.** Item 001 already chose
-   NiBabel as the sole declared NIfTI dependency. *Recommendation: NiBabel.*
-   Revisit only if a concrete NiBabel limitation appears (e.g. an orientation or
-   compression case it mishandles).
-2. **Scan dtype — `get_fdata()` (float64, recommended for the scan) vs
-   `dataobj` (native dtype).** Intensity scans benefit from float for later
-   intensity features (Stage 8); **label maps must stay integer**. *Recommended:
-   float for the scan, native-integer for the segmentation (an `integer_labels`
-   flag, or a dedicated `load_label_map`).*
-3. **Background label.** Treat `0` as background and exclude it from the label
-   inventory. *Recommended: yes* — but expose total foreground voxel count too
-   (Item 007 needs it). Confirm whether the inventory should optionally include
-   `0`.
-4. **Affine/spacing compatibility policy in `load_case` — strict equality vs
-   tolerant (recommended).** Real scan/seg pairs can carry tiny float
-   differences. *Recommended: compare within an absolute+relative tolerance
-   (`np.allclose`), error only on meaningful divergence; always error on shape
-   mismatch.* Document the tolerance.
-5. **Representation type — frozen `@dataclass` (recommended) vs `NamedTuple` vs
-   dict.** *Recommended: frozen dataclass* for immutability + clear typing while
-   allowing numpy-array fields.
-6. **Module name — `io.py` vs `loaders.py`.** `io` shadows the stdlib module name
-   *as a submodule* (`segqc.io` is unambiguous, but some find it confusing).
-   *Recommendation: confirm `segqc.io` is acceptable, else `segqc.loaders`.*
-7. **Lazy vs eager array read.** `img.dataobj` defers I/O; `get_fdata()` reads
-   eagerly and caches. For small QC volumes eager is simplest. *Recommended:
-   eager read, returning a concrete `np.ndarray`* (downstream code expects a real
-   array). Note memory implications for very large volumes as a future concern.
+### Known follow-up
+
+- Tests use inline `tmp_path` NIfTI volumes (Item 002's canonical fixture builder
+  is on a parallel branch, not yet merged). When Item 002 lands, a follow-up may
+  migrate `tests/test_io.py` onto the shared builder. Non-blocking.
 
 ---
 
@@ -285,19 +299,26 @@ template; services first appear in Stage 9 XNAT/Docker work.)
 
 ## Validation Results
 
-> To be completed during execution (record OS, Python version, and `pytest`
-> summary).
+Executed 2026-06-24 on **Windows 11**, **Python 3.11.4** (Anaconda).
 
-- [ ] Service started: N/A (no services)
-- [ ] Application started successfully: `import segqc.io` clean; `segqc --help`
+- [x] Service started: N/A (no services)
+- [x] Application started successfully: `import segqc.io` clean; `segqc --help`
       still exits `0`
-- [ ] Database tables verified: N/A
-- [ ] Seed data verified: N/A
-- [ ] API endpoints verified: N/A
-- [ ] Screenshots captured: N/A (no UI)
-- [ ] `pip install -e .[dev]` clean install: _TBD_
-- [ ] `pytest` green: _TBD_ (expect `tests/test_io.py` + existing smoke tests)
-- [ ] Verified on OS: _TBD_
+- [x] Database tables verified: N/A
+- [x] Seed data verified: N/A
+- [x] API endpoints verified: N/A
+- [x] Screenshots captured: N/A (no UI)
+- [x] `pip install -e .[dev]` clean install: **clean** (pulled NiBabel 5.4.2).
+- [x] `pytest` green: **21 passed in 0.50s** (12 new `tests/test_io.py` +
+      existing smoke tests).
+- [x] Verified on OS: **Windows 11**. NiBabel is pure-Python and all volumes are
+      generated in-process to `tmp_path`, so macOS/Linux behaviour is identical
+      (no platform-specific code).
+
+REPL feature/data check (anisotropic case): `load_case` on inline `(0.5, 0.5,
+3.0)`-spaced volumes returned `scan.spacing == seg.spacing == (0.5, 0.5, 3.0)`,
+`affine` round-tripped (`np.allclose` True), `seg` dtype integer,
+`label_inventory == {1: 3, 7: 2}`, `foreground_voxels == 5`.
 
 ---
 
