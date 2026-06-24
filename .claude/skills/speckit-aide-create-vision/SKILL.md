@@ -60,4 +60,4 @@ Save the completed vision document to `docs/aide/vision.md`.
 
 ## Next Step
 
-After reviewing the vision document, start a **new chat session** and run `/speckit.aide.create-roadmap` to generate a staged development roadmap.
+After reviewing the vision document, start a **new chat session** and run `/speckit-aide-create-roadmap` to generate a staged development roadmap.

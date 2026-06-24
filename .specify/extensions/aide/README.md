@@ -26,25 +26,25 @@ specify extension add aide
 
 | Command | Purpose |
 |---------|---------|
-| `/speckit.aide.create-vision` | Create a comprehensive vision document for a new project |
-| `/speckit.aide.create-roadmap` | Generate a staged development roadmap from the vision |
-| `/speckit.aide.create-progress` | Create a progress tracking file from the vision and roadmap |
-| `/speckit.aide.create-queue` | Generate a prioritized queue of ~10 work items |
-| `/speckit.aide.create-item` | Create a detailed work item specification from a queue item |
-| `/speckit.aide.execute-item` | Implement a work item and update progress tracking |
-| `/speckit.aide.feedback-loop` | Analyze issues and suggest process improvements |
+| `/speckit-aide-create-vision` | Create a comprehensive vision document for a new project |
+| `/speckit-aide-create-roadmap` | Generate a staged development roadmap from the vision |
+| `/speckit-aide-create-progress` | Create a progress tracking file from the vision and roadmap |
+| `/speckit-aide-create-queue` | Generate a prioritized queue of ~10 work items |
+| `/speckit-aide-create-item` | Create a detailed work item specification from a queue item |
+| `/speckit-aide-execute-item` | Implement a work item and update progress tracking |
+| `/speckit-aide-feedback-loop` | Analyze issues and suggest process improvements |
 
 ## Usage
 
 ### Quick Start
 
 ```
-1. /speckit.aide.create-vision "describe your project idea here"
-2. [NEW CHAT] /speckit.aide.create-roadmap
-3. [NEW CHAT] /speckit.aide.create-progress
-4. [NEW CHAT] /speckit.aide.create-queue
-5. [NEW CHAT] /speckit.aide.create-item        (auto-picks next item, or pass a number)
-6. [NEW CHAT] /speckit.aide.execute-item        (auto-picks next item, or pass a number)
+1. /speckit-aide-create-vision "describe your project idea here"
+2. [NEW CHAT] /speckit-aide-create-roadmap
+3. [NEW CHAT] /speckit-aide-create-progress
+4. [NEW CHAT] /speckit-aide-create-queue
+5. [NEW CHAT] /speckit-aide-create-item        (auto-picks next item, or pass a number)
+6. [NEW CHAT] /speckit-aide-execute-item        (auto-picks next item, or pass a number)
 7. Repeat steps 5-6 until queue is empty, then repeat from step 4
 ```
 
@@ -53,7 +53,7 @@ specify extension add aide
 ### Example
 
 ```
-/speckit.aide.create-vision "a web-hosted platform for personal health tracking
+/speckit-aide-create-vision "a web-hosted platform for personal health tracking
 with public blog content and private health metrics, meal planning, and recipes.
 Multi-user with preference-based personalization. Built with .NET Core on Linux,
 PostgreSQL, hosted on Azure App Service."

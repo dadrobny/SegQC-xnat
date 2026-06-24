@@ -17,7 +17,7 @@ This is Step 2 of the AI-Driven Engineering workflow. The roadmap breaks the vis
 
 ## Prerequisites
 
-- `docs/aide/vision.md` must exist (created by `/speckit.aide.create-vision`)
+- `docs/aide/vision.md` must exist (created by `/speckit-aide-create-vision`)
 
 ## Instructions
 
@@ -55,4 +55,4 @@ Save the completed roadmap to `docs/aide/roadmap.md`.
 
 ## Next Step
 
-After reviewing the roadmap, start a **new chat session** and run `/speckit.aide.create-progress` to create the progress tracking file.
+After reviewing the roadmap, start a **new chat session** and run `/speckit-aide-create-progress` to create the progress tracking file.

@@ -65,10 +65,10 @@ any code:
 
 If you encounter problems (unclear requirements, blocked, need help):
 - Document the issue in the work item
-- Tell the user to run `/speckit.aide.feedback-loop` to adjust the process
+- Tell the user to run `/speckit-aide-feedback-loop` to adjust the process
 
 ## Next Step
 
-- **More items in queue?** Start a **new chat session** and run `/speckit.aide.create-item` for the next queue item, then `/speckit.aide.execute-item` to implement it.
-- **Queue exhausted?** Start a **new chat session** and run `/speckit.aide.create-queue` to generate the next batch.
+- **More items in queue?** Start a **new chat session** and run `/speckit-aide-create-item` for the next queue item, then `/speckit-aide-execute-item` to implement it.
+- **Queue exhausted?** Start a **new chat session** and run `/speckit-aide-create-queue` to generate the next batch.
 - **All stages complete?** The project is done!

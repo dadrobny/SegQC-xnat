@@ -49,4 +49,4 @@ Save the queue to `docs/aide/queue/queue-NNN.md` (where NNN is the next sequenti
 
 ## Next Step
 
-Select an item from the queue and start a **new chat session**. Run `/speckit.aide.create-item` with the item description to create a detailed work item specification.
+Select an item from the queue and start a **new chat session**. Run `/speckit-aide-create-item` with the item description to create a detailed work item specification.
