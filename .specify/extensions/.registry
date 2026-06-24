@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "extensions": {
+    "agent-context": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:9a1dc02d2d0139bb03860392ecacef79183be2c442feda2f9ccaa4e5907b1e47",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "speckit.agent-context.update"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-06-24T11:30:41.971481+00:00"
+    },
+    "aide": {
+      "version": "1.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:13ce845240ea2bdd47c60ad819dd65df8c8987541fc4c0a7a7aebfc66102c184",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "speckit.aide.create-vision",
+          "speckit.aide.create-roadmap",
+          "speckit.aide.create-progress",
+          "speckit.aide.create-queue",
+          "speckit.aide.create-item",
+          "speckit.aide.execute-item",
+          "speckit.aide.feedback-loop"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-06-24T12:30:27.625039+00:00"
+    }
+  }
+}
