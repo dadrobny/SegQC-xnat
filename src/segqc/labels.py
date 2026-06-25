@@ -36,6 +36,7 @@ Public API
 
 from __future__ import annotations
 
+import numbers
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Dict, List, Mapping, Optional, Tuple
@@ -303,6 +304,61 @@ class InventorySummary:
         return [name for _value, name, _count in self.recognised]
 
 
+def _as_int_label(raw: object) -> Optional[int]:
+    """Coerce an integral numeric to a Python ``int``, else return ``None``.
+
+    Strict/non-coercing in the same spirit as the :meth:`LabelConvention`
+    write-/read-side guards (Decision 6), but tolerant of the numpy integer
+    types a *direct* caller may key an inventory with — ``Case.label_inventory``
+    is already pure Python ``int`` (the loader calls ``int()``), yet a caller can
+    pass a numpy-backed mapping straight in. ``isinstance(np.int64(1), int)`` is
+    ``False``, so the bare ``int`` check the read-side lookups use would wrongly
+    reject those; we therefore accept any :class:`numbers.Integral` (covers
+    ``int`` and numpy integer types) and any other numeric only when it is
+    *exactly* integral (e.g. ``5.0`` but not ``1.9``), normalising the result to
+    a Python ``int``.
+
+    ``bool`` is an ``int`` subclass but is not a meaningful label value, so it is
+    rejected — consistent with ``from_mapping``/``name_of``/``is_known``. A
+    genuinely non-integral value (``1.9``), a non-numeric value (``"C1"``,
+    ``"5"``, ``None``, ``"lots"``), or anything whose conversion would itself
+    raise yields ``None`` rather than a coerced/leaked result.
+    """
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, numbers.Integral):
+        return int(raw)
+    if isinstance(raw, numbers.Real):
+        # A real that is exactly integral (5.0) is an acceptable integer; a
+        # fractional one (1.9, 5.7) is malformed input, never silently truncated.
+        try:
+            if float(raw).is_integer():
+                return int(raw)
+        except (ValueError, TypeError, OverflowError):
+            return None
+    return None
+
+
+def _unknown_sort_key(value: object) -> Tuple[int, float, str]:
+    """A total, type-tolerant ordering key for the ``unknown`` bucket.
+
+    The bucket can mix valid integer label values with malformed raw keys
+    (``"C1"``, ``None``, ``1.9``), so sorting by the raw value directly would
+    leak a ``TypeError`` from comparing, say, a ``str`` with an ``int``. This key
+    orders integer-valued entries ascending and by their numeric value, then
+    every non-comparable key after them by its ``repr`` — deterministic and never
+    raising. The numeric ``float`` slot keeps integer labels in true value order.
+    """
+    if isinstance(value, bool):
+        return (1, 0.0, repr(value))
+    if isinstance(value, numbers.Real):
+        try:
+            return (0, float(value), "")
+        except (ValueError, TypeError, OverflowError):
+            return (1, 0.0, repr(value))
+    return (1, 0.0, repr(value))
+
+
 def summarise_inventory(
     inventory: Mapping[int, int],
     convention: Optional[LabelConvention] = None,
@@ -316,12 +372,28 @@ def summarise_inventory(
     never raising — so out-of-range, negative, or unmapped integers are handled
     gracefully.
 
+    Reading the inventory is **strict/non-coercing** (Decision 6), symmetric
+    with :meth:`LabelConvention.from_mapping`/:meth:`name_of`. The previous bare
+    ``int(raw_value)`` / ``int(raw_count)`` is deliberately NOT used: it would
+    silently truncate a non-integral key (``1.9 -> C1``) or count (``5.7 -> 5``),
+    parse a string (``"5" -> C5``), collapse distinct keys into one value, or
+    leak a raw ``ValueError`` / ``TypeError`` on a non-numeric key/count —
+    corrupting the inventory or breaking the "never raising" contract. Instead a
+    key or count is accepted only when it is an *integral* numeric (an ``int``, a
+    numpy integer type via :class:`numbers.Integral`, or a ``float``/other real
+    that is exactly integral such as ``5.0``); ``bool`` is excluded. A genuinely
+    non-integral or non-numeric **key** is surfaced as an **unknown** label
+    (never recognised), and an entry with a non-integral/non-numeric **count** is
+    likewise routed to ``unknown`` rather than fabricating or truncating a count
+    — both safe, non-raising outcomes.
+
     Parameters
     ----------
     inventory:
         ``{label_value: voxel_count}`` over present labels, e.g. the loader's
-        :attr:`segqc.io.Case.label_inventory`. An empty mapping yields empty
-        recognised/unknown lists.
+        :attr:`segqc.io.Case.label_inventory` (whose keys/counts are already pure
+        Python ``int``). A direct caller may also pass a numpy-keyed inventory.
+        An empty mapping yields empty recognised/unknown lists.
     convention:
         The :class:`LabelConvention` to name labels with. Defaults to the shipped
         TotalSegmentator / VerSe convention.
@@ -336,13 +408,21 @@ def summarise_inventory(
     recognised: List[Tuple[int, str, int]] = []
     unknown: List[Tuple[int, int]] = []
     for raw_value, raw_count in inventory.items():
-        value = int(raw_value)
-        count = int(raw_count)
-        if convention.is_known(value):
+        value = _as_int_label(raw_value)
+        count = _as_int_label(raw_count)
+        if value is None or count is None:
+            # A non-integral/non-numeric key or count is malformed input. Surface
+            # it as unknown (keeping the raw key for visibility) instead of
+            # truncating, parsing, or leaking a raw int() exception.
+            unknown.append((raw_value, raw_count))
+        elif convention.is_known(value):
             recognised.append((value, convention.name_of(value), count))
         else:
             unknown.append((value, count))
 
     recognised.sort(key=lambda triple: _order_key(triple[1]))
-    unknown.sort(key=lambda pair: pair[0])
+    # The unknown bucket can hold non-int raw keys (malformed input), so sort
+    # by a total, type-tolerant key rather than the raw value directly — comparing
+    # e.g. a str key with an int key would otherwise leak a TypeError.
+    unknown.sort(key=lambda pair: _unknown_sort_key(pair[0]))
     return InventorySummary(recognised=recognised, unknown=unknown)

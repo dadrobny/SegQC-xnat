@@ -294,7 +294,39 @@ decisions recorded below** (executed 2026-06-25).
    (`name_of(1.9)` → `UNKNOWN`, never the wrong vertebra `"C1"`). Covered by round-2
    validator tests `test_name_of_non_numeric_str_does_not_leak`,
    `test_is_known_none_does_not_leak`, and
-   `test_name_of_non_integral_float_not_silently_truncated`.
+   `test_name_of_non_integral_float_not_silently_truncated`. **Round-3 (D5):**
+   `summarise_inventory` was the last member of this defect class still using the
+   bare `int(raw_value)` / `int(raw_count)` coercion in its loop, so it silently
+   truncated a non-integral key/count (`{1.9: 10}` → `C1`, `{1: 5.7}` → count `5`),
+   parsed string keys (`{"5": 10}` → `C5`), collapsed `{1: …, 1.9: …}` into one
+   vertebra, and leaked a raw `ValueError`/`TypeError` on a non-numeric key/count
+   (`{"C1": 10}`, `{None: 10}`, `{1: "lots"}`) — violating its own "never raising"
+   docstring and Decision 6. Reading the inventory is now **strict/non-coercing**
+   via a shared `_as_int_label` helper: a key or count is accepted only when it is
+   an *integral* numeric, and is normalised to a Python `int`. To accept the
+   read-side numpy nuance the validator flagged (`isinstance(np.int64(1), int)` is
+   `False`, so the bare `int` check would wrongly reject a numpy-keyed inventory a
+   *direct* caller may pass — `Case.label_inventory` is already pure-Python `int`
+   because the loader calls `int()`), the helper accepts any `numbers.Integral`
+   (covers `int` **and** numpy integer types) plus any other real that is *exactly*
+   integral (`5.0` via `float.is_integer()`, but **not** `1.9`); `bool` is excluded,
+   consistent with `from_mapping`/`name_of`. A genuinely non-integral/non-numeric
+   **key** is surfaced as an **unknown** label (never recognised) and an entry with
+   a bad **count** is likewise routed to `unknown` — both safe, non-raising outcomes
+   the round-3 tests accept (they also accept a typed `SegQCInputError`). The
+   `unknown` bucket can now hold non-int raw keys, so it is sorted by a total,
+   type-tolerant `_unknown_sort_key` (integral values ascending by value, then
+   everything else by `repr`) rather than the raw value, so a mixed bucket never
+   leaks a comparison `TypeError`. Covered by round-3 validator tests
+   `test_summarise_non_integral_float_key_not_silently_truncated`,
+   `test_summarise_string_integer_key_not_silently_parsed`,
+   `test_summarise_non_numeric_key_does_not_leak`,
+   `test_summarise_none_key_does_not_leak`,
+   `test_summarise_float_keys_cannot_silently_collide`,
+   `test_summarise_non_integral_float_count_not_silently_truncated`, and
+   `test_summarise_non_numeric_count_does_not_leak`, with the real loader path
+   (`test_summarise_loader_case_inventory`) and `test_summarise_large_inventory`
+   kept green (no regression).
 7. **Name normalisation — case-insensitive, whitespace-stripped.** ✅ Canonical
    names are stored **verbatim** (`"C1"`, `"T12"`, `"S"`, `"Cocygis"`); lookup
    keys are normalised with `strip().upper()`, so `" l1 "` and `"c1"` resolve.
