@@ -116,7 +116,54 @@ Two categories, two rules:
 ### Shared vs. personal
 
 - **Shared (committed):** `.specify/`, `.claude/skills/`, `.claude/commands/`,
-  `.claude/settings.json`, `CLAUDE.md`, `docs/aide/`, `specs/`,
-  `.specify/memory/constitution.md`.
+  `.claude/agents/`, `.claude/settings.json`, `CLAUDE.md`, `docs/aide/`,
+  `specs/`, `.specify/memory/constitution.md`.
 - **Personal (git-ignored):** `.claude/settings.local.json`, any
   `.claude/*.local.*`, and credential files. Never commit credentials.
+
+## Model routing, approval policy & queue runner
+
+These three pieces tune *how* the agent works on this repo. They live in shared,
+committed config so the whole team gets them.
+
+### Model routing by task complexity (`.claude/agents/`)
+
+Two committed subagents split work by cost/capability:
+
+- **`scout` (Sonnet)** — light, **read-only** recon: finding code, reading specs,
+  checking queue/progress state, listing branch/PR claims, running pre-approved
+  read-only shell commands. Never edits, commits, or pushes.
+- **`builder` (Opus)** — heavy work: implementing items, writing/restructuring
+  pipeline code, writing tests, non-trivial debugging and refactors.
+
+Delegate "where is X / what's the current state" to `scout`; keep code, tests,
+and structural work on `builder` (or the main thread when it's already Opus).
+Claude Code does **not** auto-detect complexity and swap the main model — routing
+happens by delegating to these agents (and by your own `/model` choice).
+
+### Approval policy (`.claude/settings.json` permissions)
+
+- **Auto-approved (no prompt):** read-only shell (git status/log/diff/show/branch,
+  ls/grep/find), `pytest`, `pip install`, `python`, and routine git writes —
+  `add`, `commit`, `switch`/`checkout`, `merge`, `pull`, and (non-force) `push`.
+- **Always prompts (`ask`):** opening a **PR** (`gh pr …`), **force-push** /
+  `reset --hard` / `rebase` (history rewrite), and **edits to framework/process
+  files** — `CLAUDE.md`, `docs/aide/vision.md`, `docs/aide/roadmap.md`,
+  `.specify/memory/constitution.md`, and everything under `.claude/skills`,
+  `.claude/commands`, `.claude/agents`, `.specify/extensions`.
+- **Default mode is `default`** — anything not explicitly allowed still prompts,
+  so novel/major actions are gated by default.
+
+Rule of thumb: *executing* a work item (code, tests, commit, direct-merge) flows
+without prompts; anything that changes *how everyone works*, or touches the
+remote in a hard-to-reverse way, asks first.
+
+### Running the whole queue (`/aide-run-queue`)
+
+`/aide-run-queue [NNN]` drives the AIDE loop over **every remaining 📋 item** in
+the queue in one session — claim → (create-item if needed) → implement+test via
+`builder` → commit → direct-merge → next — looping until the queue is empty. It
+delegates recon to `scout`, commits and direct-merges green items automatically,
+and **pauses for your approval only at PRs and major structural changes**. Use it
+when you want the batch run unattended; use the per-step `/speckit-aide-*`
+commands (fresh chat each) when you want tighter control.
