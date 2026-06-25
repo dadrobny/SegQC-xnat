@@ -236,48 +236,66 @@ module — but defining the on-disk config schema is item 005's job, not this on
 ## Decisions & Trade-offs
 
 Open implementation choices for this item, with recommendations. **Final
-decisions recorded here during implementation.**
-
-To be updated during implementation.
-
-Proposed (to be confirmed/edited as work proceeds):
+decisions recorded below** (executed 2026-06-25).
 
 1. **Type shape — frozen `@dataclass` `LabelConvention` vs a bare dict + module
-   functions.** *Lean:* a small frozen dataclass holding `value_to_name` with a
-   derived reverse map — immutable, carries its override, mirrors `io.py`'s
-   dataclass style. A module-level `default()` / `DEFAULT` keeps the common path
-   one call away.
-2. **Exact default TotalSegmentator/VerSe integer↔name table** — to be pinned in
-   code and reproduced here (the load-bearing data of this item). *Lean:* the
-   VerSe/TotalSegmentator vertebra numbering — C1–C7 = 1–7, T1–T12 = 8–19,
-   L1–L5 = 20–24, sacrum = 25, cocygis = 26, **T13 = 28**, **L6 = 29** (the
-   transitional vertebrae occupy the high end of the range, after the sacrum/
-   coccyx) — confirm the exact integers against the convention and record the
-   final table verbatim here.
-3. **`value_of` on unknown name — return `None` vs raise.** *Lean:* return `None`
-   for symmetry with `name_of`'s `UNKNOWN` sentinel (both lookups total and
-   non-throwing); reserve raising for *programmer* errors (a malformed override),
-   not *data* questions.
-4. **Unknown-value outcome — sentinel string `UNKNOWN` vs `None`.** *Lean:* a
-   module constant `UNKNOWN = "unknown"` so `name_of` always returns a `str`
-   (simpler for the CLI/report formatting in item 006), with `is_known()` for the
-   boolean test.
-5. **Override semantics — replace vs layer-over-default.** *Lean:* `from_mapping`
-   *replaces* (the user mapping is authoritative); offer an optional `base=`/
-   layering only if a test motivates it. A full replace is the least surprising
-   for a "use my segmenter's numbering" override.
-6. **Exception type — new `LabelConventionError` vs reuse `io.SegQCInputError`.*
-   *Lean:* reuse `SegQCInputError` so callers (CLI in item 006) catch one input
-   exception type for both load and label-convention problems; revisit if the
-   coupling feels wrong.
-7. **Name normalisation — case-insensitive, whitespace-stripped.** *Lean:* store
-   canonical names verbatim (e.g. `"C1"`, `"T12"`, `"S"`); normalise lookup keys by
-   `strip().upper()` so `" c1 "` resolves. Record the canonical spelling of the
-   sacrum (`"S"` vs `"sacrum"`) and any coccyx entry.
-8. **Summariser input — plain `{label: count}` only vs also accept a `Case`.**
-   *Lean:* take the plain mapping as the primary signature (keeps `labels.py` free
-   of an `io` import); add a thin `Case`-accepting convenience only if ergonomic,
-   importing `segqc.io` lazily.
+   functions.** ✅ **Frozen `@dataclass` `LabelConvention`** holding the
+   authoritative `value_to_name` plus a precomputed reverse map (`_name_to_value`,
+   keyed by the *normalised* name). Immutable, carries its override, mirrors
+   `io.py`'s dataclass style. `LabelConvention.default()` returns the shipped
+   default; `from_mapping(...)` builds a custom one. The reverse map is built once
+   at construction in `from_mapping` (and copied with `dict(...)`) so lookups are
+   O(1) and external mutation can't leak in.
+2. **Exact default TotalSegmentator/VerSe integer↔name table** — ✅ pinned in
+   `DEFAULT_LABEL_MAP`. Final table: C1–C7 = **1–7**, T1–T12 = **8–19**,
+   L1–L5 = **20–24**, sacrum `S` = **25**, coccyx `Cocygis` = **26**, and the two
+   transitional vertebrae at the high end — **T13 = 28**, **L6 = 29** (value `27`
+   is intentionally left unmapped, matching the gap in the TotalSegmentator/VerSe
+   numbering). Integer order therefore does **not** equal anatomical order (T13 is
+   value 28 but sits between T12 and L1); `CANONICAL_ORDER` is the source of truth
+   for ordering, and a test asserts `T12 < T13 < L1` and `L5 < L6 < S` in that
+   tuple. The default is asserted to be a bijection (unique values, unique names).
+3. **`value_of` on unknown name — return `None` vs raise.** ✅ **Return `None`**,
+   for symmetry with `name_of`'s `UNKNOWN` sentinel — both lookups are total and
+   non-throwing. Raising is reserved for *programmer* errors (a malformed
+   override), not *data* questions about a missing name.
+4. **Unknown-value outcome — sentinel string `UNKNOWN` vs `None`.** ✅ Module
+   constant **`UNKNOWN = "unknown"`** so `name_of` always returns a `str` (simpler
+   for CLI/report formatting in item 006), with `is_known()` as the boolean test.
+5. **Override semantics — replace vs layer-over-default.** ✅ **`from_mapping`
+   replaces** — the user mapping is fully authoritative (default values no longer
+   resolve under an override). No `base=`/layering parameter was added; no test
+   motivated it, and a clean replace is least surprising for "use my segmenter's
+   numbering". (Layering remains an easy future addition if needed.)
+6. **Exception type — new `LabelConventionError` vs reuse `io.SegQCInputError`.**
+   ✅ **Reuse `segqc.io.SegQCInputError`** so callers (the CLI in item 006) catch
+   one input-error type for both load and label-convention problems. Raised on a
+   duplicate name in an override and on a non-integer key.
+7. **Name normalisation — case-insensitive, whitespace-stripped.** ✅ Canonical
+   names are stored **verbatim** (`"C1"`, `"T12"`, `"S"`, `"Cocygis"`); lookup
+   keys are normalised with `strip().upper()`, so `" l1 "` and `"c1"` resolve.
+   Duplicate-name detection runs on the *normalised* key, so `"C1"` and `"c1"` in
+   one override collide (tested). Sacrum is spelled **`"S"`**; the coccyx entry is
+   **`"Cocygis"`** (matching the TotalSegmentator label name).
+8. **Summariser input — plain `{label: count}` only vs also accept a `Case`.** ✅
+   **Plain `Mapping[int, int]` only.** This keeps `labels.py` free of any
+   `Case`/NIfTI dependency at the summariser boundary — the loader already exposes
+   `Case.label_inventory` as exactly this shape, so a caller passes
+   `summarise_inventory(case.label_inventory)` (covered by an integration test
+   that round-trips through `load_case`). `labels.py` imports only
+   `SegQCInputError` from `segqc.io` (a cheap exception class), so the import stays
+   light. No `Case` convenience overload was added.
+
+### Implementation notes
+
+- New file `src/segqc/labels.py`; tests in `tests/test_labels.py` (no edits to
+  `io.py` or `cli.py`). The summariser orders unknown labels by ascending value
+  and recognised labels by `CANONICAL_ORDER` (custom-override names not in the
+  canonical tuple sort after the canonical ones, then by name — so a custom
+  convention never crashes the summariser).
+- `InventorySummary` exposes `recognised` (`(value, name, count)` triples) and
+  `unknown` (`(value, count)` pairs) plus convenience properties `n_recognised`,
+  `n_unknown`, and `present_levels`.
 
 ### Known follow-up
 
@@ -345,17 +363,29 @@ work.)
 
 ## Validation Results
 
-_To be completed during execution._
+Executed 2026-06-25 on **Windows 11** (builder implementation; final sign-off and
+merge performed by a separate validator per `CLAUDE.md`).
 
-- [ ] Service started: N/A (no services)
-- [ ] Application started successfully
-- [ ] Database tables verified: N/A
-- [ ] Seed data verified: N/A
-- [ ] API endpoints verified: N/A
-- [ ] Screenshots captured: N/A (no UI)
-- [ ] `pip install -e .[dev]` clean install
-- [ ] `pytest` green
-- [ ] Verified on OS: _____
+- [x] Service started: N/A (no services)
+- [x] Application started successfully: `import segqc.labels` clean; `segqc --help`
+      still exits `0` (unaffected by this item)
+- [x] Database tables verified: N/A
+- [x] Seed data verified: N/A
+- [x] API endpoints verified: N/A
+- [x] Screenshots captured: N/A (no UI)
+- [x] `pip install -e .[dev]`: package already installed editable; `segqc.labels`
+      imports with no new dependency
+- [x] `pytest` green: **64 passed in 0.47s** (new `tests/test_labels.py` plus the
+      existing item 001–003 suites)
+- [x] Verified on OS: **Windows 11**, Python 3.11. The module is pure-Python
+      (stdlib + typing; only a `SegQCInputError` import from `segqc.io`), with no
+      platform-specific code — macOS/Linux behaviour is identical.
+
+REPL feature/data check: `LabelConvention.default().name_of(1) == "C1"`,
+`value_of("L1") == 20`, `name_of(9999) == "unknown"`;
+`summarise_inventory({1:64,2:64,3:64,999:5})` → `recognised == [(1,'C1',64),
+(2,'C2',64),(3,'C3',64)]`, `unknown == [(999,5)]`, `present_levels ==
+['C1','C2','C3']`.
 
 ---
 

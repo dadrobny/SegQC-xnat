@@ -62,8 +62,8 @@ instance label map, normalises labels, and exits cleanly.
   core deps (NumPy, SciPy, scikit-image, NiBabel and/or SimpleITK). *(Item 001)*
 - 📋 CLI entry point: `segqc run --scan <nii> --seg <nii> --out <dir>`.
 - ✅ NIfTI loader for scan + label map, preserving spacing/affine, handling anisotropy. *(Item 003)*
-- 📋 Label-convention module: integer label ↔ anatomical vertebra, configurable,
-  with a default TotalSegmentator/VerSe mapping.
+- 🚧 Label-convention module: integer label ↔ anatomical vertebra, configurable,
+  with a default TotalSegmentator/VerSe mapping. *(Item 004 — in progress)*
 - 📋 Structured logging + versioned heuristic-config scaffold (YAML/JSON).
 - ✅ `pytest` harness + tiny synthetic NIfTI fixtures. *(Item 002)*
 
