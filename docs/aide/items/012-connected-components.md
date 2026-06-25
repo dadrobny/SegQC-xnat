@@ -125,7 +125,33 @@ connectivity was used.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+1. **scipy.ndimage.label with default structuring element** — The default 3-D
+   cross-shaped structuring element implements 6-connectivity (face-neighbours
+   only) exactly as required. No explicit `structure` argument is needed,
+   keeping the call simple and avoiding ambiguity. A public `CONNECTIVITY = 6`
+   constant documents the choice for callers.
+
+2. **np.bincount for component-size counting** — After `ndimage.label`, voxel
+   counts per component are extracted with `np.bincount(labelled.ravel())`,
+   which is O(n_voxels) and avoids repeated boolean masking per component.
+   Component 0 (background) is sliced off (`counts[1:]`), and the result is
+   sorted descending via `np.sort(...)[:: -1]`.
+
+3. **Lazy scipy import** — `scipy.ndimage.label` is imported inside
+   `compute_components` (same pattern as other lazy imports in this codebase)
+   to avoid a hard startup cost when the module is merely imported.
+
+4. **`small_fragments` as a `List[int]`** — A list (not a set) preserves
+   duplicate sizes (two components of the same sub-threshold size both appear),
+   matching the test assertions for `len(result.small_fragments) == 5` on
+   all-disconnected fixtures. Order is determined by `component_sizes` order
+   (descending), which is deterministic.
+
+5. **`HeuristicConfig` extended with `min_fragment_voxels: int = 0`** —
+   Added to both `_DEFAULTS` and the dataclass with a default of `0` (no
+   fragment flagging by default). The field is appended last in the dataclass
+   with a default value so that it does not break existing construction calls
+   that pass positional arguments for the earlier three fields.
 
 ---
 

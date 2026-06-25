@@ -71,6 +71,10 @@ _DEFAULTS: Dict[str, Any] = {
     # Default ``0`` means "no threshold applied" (every map passes).
     "min_foreground_voxels": 0,
     "min_label_count": 0,
+    # Connected-components threshold (item 012).  Components with strictly fewer
+    # voxels than this value are flagged as small fragments.  Default ``0`` means
+    # no component is ever flagged (nothing is strictly below 0).
+    "min_fragment_voxels": 0,
 }
 
 
@@ -104,11 +108,16 @@ class HeuristicConfig:
     min_label_count:
         **Placeholder** (item 007). Minimum number of distinct labels before a
         segmentation is flagged as near-empty. Default ``0`` (no threshold).
+    min_fragment_voxels:
+        Connected-components fragment threshold (item 012). Components with
+        strictly fewer voxels than this value are flagged as small fragments.
+        Default ``0`` means no component is ever flagged.
     """
 
     schema_version: str
     min_foreground_voxels: int
     min_label_count: int
+    min_fragment_voxels: int = 0
 
 
 # ---- Public API ------------------------------------------------------------- #
