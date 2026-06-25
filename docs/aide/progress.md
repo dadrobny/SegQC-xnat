@@ -24,7 +24,7 @@
 |-------|-------|-----------|--------|
 | 0 | Project Scaffolding & I/O Foundation | (foundation) | 📋 |
 | 1 | End-to-End Thin Slice: Empty Detection + Report | G1, G4 | 📋 |
-| 2 | Geometric & Topological Feature Extraction | (feature core) | 📋 |
+| 2 | Geometric & Topological Feature Extraction | (feature core) | 🚧 |
 | 3 | Spinal Curve: Spline Fit & Deviation Features | (feature core) | 📋 |
 | 4 | Heuristic Rule Engine over Failure Modes | G2 | 📋 |
 | 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | 📋 |
@@ -94,12 +94,12 @@ empty / trivially-failed segmentations.
 
 ---
 
-## Stage 2 — Geometric & Topological Feature Extraction — 📋
+## Stage 2 — Geometric & Topological Feature Extraction — 🚧
 
 **Goal.** The feature engine the heuristics depend on — the MVP image-processing core.
 
 **Deliverables.**
-- 📋 Per-label features: voxel & physical volume; extent (x/y/z); bounding box; border-contact flags.
+- 🚧 Per-label features: voxel & physical volume; extent (x/y/z); bounding box; border-contact flags. *(Item 011)*
 - 📋 Connected-components per label: component count + sizes.
 - 📋 Centroid / centre-of-mass per label, level-aware (C1, C2, S).
 - 📋 Inter-vertebra relationships: ordered centroid sequence, neighbour spacing, sequence continuity.
