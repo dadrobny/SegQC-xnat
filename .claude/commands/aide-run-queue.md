@@ -40,6 +40,35 @@ via the Bash tool with `grep` rather than PowerShell `Select-String`. This is
 spelled out in each agent spec and in `CLAUDE.md` → *Command hygiene*; if you
 ever issue a git command from the orchestrator thread, follow it too.
 
+## Pre-loop: resume in-flight branches
+
+Before entering the scout loop, check whether any local `aide/*` branch
+corresponds to an unfinished item — i.e. work that was interrupted mid-run.
+
+**Orchestrator steps (run these yourself, not via a sub-agent):**
+
+1. Run `git branch | grep aide/` to list local `aide/*` branches.
+2. If none exist, skip to the main loop below.
+3. For each local `aide/NNN-*` branch found, read `docs/aide/progress.md` to
+   check whether that item is still 🚧 (in progress) or 📋 (claimed but not
+   started). If it is already ✅ or ❌, skip it.
+4. For each unfinished item (in item-number order), determine the resume point
+   by inspecting commits already on the branch:
+   - **No tests committed yet** → resume at step 3 (test-writer).
+   - **Tests committed, but no production code in `src/`** → resume at step 4
+     (builder).
+   - **Both tests and implementation committed, but not merged to main** →
+     resume at step 5 (validator).
+   - **Validator previously FAILed** (check any FAIL note in the item file or
+     progress.md) → resume at step 6 (build/test ↔ validate cycle), counting
+     prior rounds toward the cap of 3.
+5. Process each resumed item fully (to PASS + merge or to a user-stop) before
+   claiming the next 📋 item from the scout.
+
+> Why: the scout checks remote `aide/*` branches to skip claimed items. If a
+> run was interrupted, the branch exists but the item is unfinished — the scout
+> would silently skip it, leaving it stranded. Resuming here closes that gap.
+
 ## Loop
 
 Repeat until the `scout` reports no remaining unclaimed 📋 item:
