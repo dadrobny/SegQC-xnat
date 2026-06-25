@@ -235,6 +235,11 @@ even though the rule "exists". Required form for all agents:
 - **Recon goes through the Bash tool with `grep`** (`git branch -r | grep aide/`),
   never the PowerShell tool / `Select-String` — only `Bash(...)` rules are in the
   allow-list, so PowerShell-tool calls always prompt.
+- **Python and pytest run through the Bash tool in the *relative* form** —
+  `.venv/Scripts/python -m pytest`, `.venv/Scripts/python -c "import segqc"` (or
+  the `.venv/bin/python` equivalents). The allow rule is `Bash(.venv/Scripts/python:*)`,
+  which matches only the relative prefix; a PowerShell call operator or an absolute
+  `& "c:\…\.venv\Scripts\python" …` path matches nothing and always prompts.
 
 These rules are repeated in each agent spec (`.claude/agents/*.md`) so a
 cold-started sub-agent sees them. After a batch, `/aide-review-permissions` is
