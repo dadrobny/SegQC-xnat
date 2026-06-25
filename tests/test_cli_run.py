@@ -264,3 +264,201 @@ def test_run_empty_labelmap_inventory(empty_labelmap_files, tmp_path, capsys):
         data = json.load(fh)
     assert data["foreground_voxels"] == 0
     assert data["label_inventory"] == []
+
+
+# ---------------------------------------------------------------------------
+# Adversarial tests (validator pass — item 006)
+# ---------------------------------------------------------------------------
+
+
+def test_run_out_is_existing_file_exits_one(labelled_blocks_files, tmp_path, capsys):
+    """``segqc run`` exits 1 and prints an error when ``--out`` is an existing file.
+
+    If <out> names an existing regular file, ``mkdir`` raises ``FileExistsError``.
+    The CLI must catch it cleanly (exit 1 + error to stderr) rather than letting
+    the traceback propagate to the caller.
+    """
+    scan_path, seg_path = labelled_blocks_files
+    # Create a file where --out should be a directory
+    existing_file = tmp_path / "conflict.txt"
+    existing_file.write_text("I am a file, not a directory")
+    code, _stdout, stderr = _run(
+        ["run", "--scan", str(scan_path), "--seg", str(seg_path),
+         "--out", str(existing_file)],
+        capsys,
+    )
+    assert code == 1, (
+        f"Expected exit 1 when --out is an existing file, got {code}; "
+        f"stderr: {stderr!r}"
+    )
+    assert stderr.strip(), "Expected an error message on stderr"
+
+
+def test_run_directory_as_scan_exits_one(tmp_path, capsys):
+    """``segqc run`` exits 1 when ``--scan`` is a directory."""
+    scan_dir = tmp_path / "scan_dir"
+    scan_dir.mkdir()
+    import nibabel as nib
+    import numpy as np
+
+    seg_path = tmp_path / "seg.nii.gz"
+    nib.save(
+        nib.Nifti1Image(np.zeros((4, 4, 4), dtype=np.int16), np.eye(4)),
+        str(seg_path),
+    )
+    out_dir = tmp_path / "out"
+    code, _stdout, stderr = _run(
+        ["run", "--scan", str(scan_dir), "--seg", str(seg_path),
+         "--out", str(out_dir)],
+        capsys,
+    )
+    assert code == 1
+    assert "Error:" in stderr
+
+
+def test_run_garbage_file_as_seg_exits_one(tmp_path, capsys):
+    """``segqc run`` exits 1 when ``--seg`` is a non-NIfTI (garbage) file."""
+    import nibabel as nib
+    import numpy as np
+
+    scan_path = tmp_path / "scan.nii.gz"
+    nib.save(
+        nib.Nifti1Image(np.zeros((4, 4, 4), dtype=np.float32), np.eye(4)),
+        str(scan_path),
+    )
+    garbage = tmp_path / "garbage.nii.gz"
+    garbage.write_bytes(b"\x00\x01garbage binary data not a nifti")
+    out_dir = tmp_path / "out"
+    code, _stdout, stderr = _run(
+        ["run", "--scan", str(scan_path), "--seg", str(garbage),
+         "--out", str(out_dir)],
+        capsys,
+    )
+    assert code == 1
+    assert "Error:" in stderr
+
+
+def test_run_shape_mismatch_exits_one(tmp_path, capsys):
+    """``segqc run`` exits 1 when scan and seg have different shapes."""
+    import nibabel as nib
+    import numpy as np
+
+    scan_path = tmp_path / "scan.nii.gz"
+    seg_path = tmp_path / "seg.nii.gz"
+    nib.save(nib.Nifti1Image(np.zeros((10, 10, 10), dtype=np.float32), np.eye(4)),
+             str(scan_path))
+    nib.save(nib.Nifti1Image(np.zeros((8, 8, 8), dtype=np.int16), np.eye(4)),
+             str(seg_path))
+    out_dir = tmp_path / "out"
+    code, _stdout, stderr = _run(
+        ["run", "--scan", str(scan_path), "--seg", str(seg_path),
+         "--out", str(out_dir)],
+        capsys,
+    )
+    assert code == 1
+    assert "Error:" in stderr
+
+
+def test_run_anisotropic_spacing_preserved_in_json(tmp_path, capsys):
+    """JSON ``spacing`` reflects the actual anisotropic voxel sizes (not defaulted to 1)."""
+    import sys
+    sys.path.insert(0, str(pathlib.Path(__file__).parent))
+    from synthetic import anisotropic_case
+
+    scan_path, seg_path = anisotropic_case().write(tmp_path, suffix=".nii.gz")
+    out_dir = tmp_path / "out"
+    code, _stdout, _stderr = _run(
+        ["run", "--scan", str(scan_path), "--seg", str(seg_path),
+         "--out", str(out_dir)],
+        capsys,
+    )
+    assert code == 0
+    with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
+        data = json.load(fh)
+    # anisotropic_case uses (1.0, 1.0, 3.0) spacing
+    assert data["spacing"] == pytest.approx([1.0, 1.0, 3.0]), (
+        f"Expected spacing [1.0, 1.0, 3.0] in JSON, got {data['spacing']}"
+    )
+    assert all(isinstance(v, float) for v in data["spacing"])
+
+
+def test_run_unknown_labels_in_json(tmp_path, capsys):
+    """Unknown labels (not in TotalSegmentator convention) appear in JSON inventory."""
+    import nibabel as nib
+    import numpy as np
+
+    data = np.zeros((10, 10, 10), dtype=np.uint16)
+    data[0:5, 0:5, 0:5] = 100   # not in default convention
+    data[5:10, 5:10, 5:10] = 200  # not in default convention
+    seg_img = nib.Nifti1Image(data, np.eye(4))
+    scan_img = nib.Nifti1Image(np.zeros((10, 10, 10), dtype=np.float32), np.eye(4))
+    scan_path = tmp_path / "scan.nii.gz"
+    seg_path = tmp_path / "seg.nii.gz"
+    import nibabel as nib
+    nib.save(scan_img, str(scan_path))
+    nib.save(seg_img, str(seg_path))
+    out_dir = tmp_path / "out"
+    code, _stdout, _stderr = _run(
+        ["run", "--scan", str(scan_path), "--seg", str(seg_path),
+         "--out", str(out_dir)],
+        capsys,
+    )
+    assert code == 0
+    with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
+        report = json.load(fh)
+    labels_in_json = {e["label"] for e in report["label_inventory"]}
+    assert 100 in labels_in_json, "Unknown label 100 should appear in JSON inventory"
+    assert 200 in labels_in_json, "Unknown label 200 should appear in JSON inventory"
+    for entry in report["label_inventory"]:
+        assert entry["name"] == "unknown", (
+            f"Label {entry['label']} should have name 'unknown', got {entry['name']!r}"
+        )
+
+
+def test_run_single_voxel_volume(tmp_path, capsys):
+    """``segqc run`` handles a 1x1x1 volume without crashing."""
+    import nibabel as nib
+    import numpy as np
+
+    scan_img = nib.Nifti1Image(np.zeros((1, 1, 1), dtype=np.float32), np.eye(4))
+    seg_img = nib.Nifti1Image(np.ones((1, 1, 1), dtype=np.int16), np.eye(4))
+    scan_path = tmp_path / "scan.nii.gz"
+    seg_path = tmp_path / "seg.nii.gz"
+    nib.save(scan_img, str(scan_path))
+    nib.save(seg_img, str(seg_path))
+    out_dir = tmp_path / "out"
+    code, stdout, _stderr = _run(
+        ["run", "--scan", str(scan_path), "--seg", str(seg_path),
+         "--out", str(out_dir)],
+        capsys,
+    )
+    assert code == 0
+    assert (out_dir / "segqc_report.json").exists()
+    with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
+        report = json.load(fh)
+    assert report["foreground_voxels"] == 1
+
+
+def test_run_affine_mismatch_exits_one(tmp_path, capsys):
+    """``segqc run`` exits 1 when scan and seg have incompatible affines."""
+    import nibabel as nib
+    import numpy as np
+
+    affine1 = np.eye(4, dtype=np.float64)
+    affine2 = np.eye(4, dtype=np.float64)
+    affine2[0, 0] = 1.1  # well outside tolerance (rtol=1e-5, atol=1e-4)
+
+    scan_path = tmp_path / "scan.nii.gz"
+    seg_path = tmp_path / "seg.nii.gz"
+    nib.save(nib.Nifti1Image(np.zeros((4, 4, 4), dtype=np.float32), affine1),
+             str(scan_path))
+    nib.save(nib.Nifti1Image(np.ones((4, 4, 4), dtype=np.int16), affine2),
+             str(seg_path))
+    out_dir = tmp_path / "out"
+    code, _stdout, stderr = _run(
+        ["run", "--scan", str(scan_path), "--seg", str(seg_path),
+         "--out", str(out_dir)],
+        capsys,
+    )
+    assert code == 1
+    assert "Error:" in stderr
