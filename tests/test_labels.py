@@ -157,6 +157,68 @@ def test_convention_is_immutable_no_dict_leak():
 
 
 # --------------------------------------------------------------------------- #
+# D4 (round-2 validation): the read side (name_of / is_known) must honour the
+# SAME total/non-leaking contract that D1 (from_mapping strict-int) and D3
+# (value_of non-str) just established. The D3 fix guarded value_of against a
+# non-str argument but left the symmetric methods name_of / is_known calling
+# int(value) blindly, so a non-int argument still leaks a raw library exception
+# (ValueError / TypeError) or — worse — a float is silently truncated to a
+# WRONG vertebra. That silent coercion is exactly the corruption Decision 6 and
+# vision §4 ("keep label maps integer", "fail loudly") forbid.
+# --------------------------------------------------------------------------- #
+
+def test_name_of_non_numeric_str_does_not_leak():
+    """name_of('C1') must not leak a raw ValueError from int().
+
+    name_of is documented as total ("any integer ... yields a str"); a non-int
+    argument currently leaks `invalid literal for int() with base 10: 'C1'` —
+    a library internal the vision says callers should never see. Acceptable:
+    return UNKNOWN, or raise the project's typed SegQCInputError.
+    """
+    conv = LabelConvention.default()
+    try:
+        result = conv.name_of("C1")  # type: ignore[arg-type]
+    except SegQCInputError:
+        return  # a clear, typed error is acceptable
+    assert result == UNKNOWN
+
+
+def test_is_known_none_does_not_leak():
+    """is_known(None) must not leak a raw TypeError from int().
+
+    is_known is the boolean form of the (total) name_of lookup. A non-int
+    argument currently leaks `int() argument must be ... not 'NoneType'`.
+    Acceptable: return False, or raise the project's typed SegQCInputError.
+    """
+    conv = LabelConvention.default()
+    try:
+        result = conv.is_known(None)  # type: ignore[arg-type]
+    except SegQCInputError:
+        return  # a clear, typed error is acceptable
+    assert result is False
+
+
+def test_name_of_non_integral_float_not_silently_truncated():
+    """name_of(1.9) must NOT silently resolve to C1 (value 1) by truncation.
+
+    int(1.9) == 1, so the blind int(value) coercion returns 'C1' for a
+    NON-integer label value — a silent wrong answer of exactly the kind D1
+    rejected on the write side (Decision 6: keep label maps integer; no silent
+    coercion). Acceptable: treat the non-integral value as UNKNOWN, or raise the
+    typed SegQCInputError. Returning a real vertebra name is NOT acceptable.
+    """
+    conv = LabelConvention.default()
+    try:
+        result = conv.name_of(1.9)  # type: ignore[arg-type]
+    except SegQCInputError:
+        return  # loud rejection is acceptable
+    assert result == UNKNOWN, (
+        "name_of(1.9) silently truncated to a real vertebra name "
+        f"({result!r}); a non-integral value must be UNKNOWN, not coerced."
+    )
+
+
+# --------------------------------------------------------------------------- #
 # Custom override
 # --------------------------------------------------------------------------- #
 
