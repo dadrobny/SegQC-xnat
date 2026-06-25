@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SegQC JSON Report v0",
+  "description": "Machine-readable QC report schema v0 for segqc. Extended by Stage 2 with a 'features' block.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "config_version",
+    "case_id",
+    "verdict",
+    "reasons",
+    "per_label"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Version discriminator for this report schema. Always '0.1' for v0 reports.",
+      "const": "0.1"
+    },
+    "config_version": {
+      "type": "string",
+      "description": "The schema_version from the HeuristicConfig that produced this report, for reproducibility.",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "description": "Identifier for the case (scan). Non-empty.",
+      "minLength": 1
+    },
+    "verdict": {
+      "type": "string",
+      "description": "Overall QC verdict for the case.",
+      "enum": ["pass", "flagged-for-review", "fail"]
+    },
+    "reasons": {
+      "type": "array",
+      "description": "Case-level QC findings (not tied to a specific label).",
+      "items": {
+        "$ref": "#/definitions/reason"
+      }
+    },
+    "per_label": {
+      "type": "object",
+      "description": "Per-label QC findings, keyed by the string representation of the integer label value.",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/reason"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "reason": {
+      "type": "object",
+      "description": "A single QC finding with a human-readable message, severity, and optional label attribution.",
+      "additionalProperties": false,
+      "required": ["message", "severity", "labels"],
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Human-readable description of the finding."
+        },
+        "severity": {
+          "type": "string",
+          "description": "Severity level of this finding.",
+          "enum": ["pass", "flagged-for-review", "fail"]
+        },
+        "labels": {
+          "type": "array",
+          "description": "Integer label values that contributed to this finding. Empty for case-level findings.",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}
