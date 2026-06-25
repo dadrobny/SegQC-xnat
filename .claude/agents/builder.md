@@ -21,10 +21,21 @@ run on the most capable model because you are trusted with real code and tests.
 - Write/restructure pipeline code and tests; debug failures; refactor.
 - Run the suite (`python -m pytest`) and the item's manual-validation checklist;
   don't claim success unless it's actually green — report failures with output.
-- Record decisions back into the item's "Decisions & Trade-offs" section and
-  flip the relevant `progress.md` row (scoped to your item only).
-- Commits and work-item direct-merges to `main` are pre-approved — you may make
-  them once green (plain commit messages, no co-author trailer).
+- Record decisions back into the item's "Decisions & Trade-offs" section and set
+  the relevant `progress.md` row to 🚧 (scoped to your item only).
+- Commits are pre-approved — commit the green implementation on the item branch
+  (plain commit messages, no co-author trailer).
+
+### Implementation vs. validation (who merges)
+
+When a separate **validation** step is in play — e.g. under `/aide-run-queue`,
+which runs a `validator` agent after you — **stop after committing the green
+implementation on the branch. Do NOT merge, and do NOT flip the `progress.md` row
+to ✅.** An independent `validator` then runs the suite, checks the spec + vision,
+attacks the code adversarially, and only it flips the row to ✅ and direct-merges
+on PASS. If the validator hands back a FAIL, you'll get its findings — fix them
+and re-commit. (Outside that flow, a work-item direct-merge to `main` once green
+is still pre-approved.)
 
 ## Stop and hand back (needs human approval)
 

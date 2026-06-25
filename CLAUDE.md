@@ -133,13 +133,19 @@ Two committed subagents split work by cost/capability:
 - **`scout` (Sonnet)** — light, **read-only** recon: finding code, reading specs,
   checking queue/progress state, listing branch/PR claims, running pre-approved
   read-only shell commands. Never edits, commits, or pushes.
-- **`builder` (Opus)** — heavy work: implementing items, writing/restructuring
-  pipeline code, writing tests, non-trivial debugging and refactors.
+- **`builder` (Opus)** — heavy **implementation**: implementing items, writing/
+  restructuring pipeline code, writing tests, non-trivial debugging and refactors.
+- **`validator` (Opus)** — independent, **adversarial validation** of a builder's
+  work: confirms tests pass, checks the code against the item's Acceptance
+  Criteria/description *and* the project vision, then actively tries to break it
+  with hostile/edge-case inputs and adds tests to close gaps. A *different* agent
+  from the builder — the implementer never signs off its own work.
 
 Delegate "where is X / what's the current state" to `scout`; keep code, tests,
-and structural work on `builder` (or the main thread when it's already Opus).
-Claude Code does **not** auto-detect complexity and swap the main model — routing
-happens by delegating to these agents (and by your own `/model` choice).
+and structural work on `builder` (or the main thread when it's already Opus); and
+gate every implemented item through a separate `validator`. Claude Code does
+**not** auto-detect complexity and swap the main model — routing happens by
+delegating to these agents (and by your own `/model` choice).
 
 ### Approval policy (`.claude/settings.json` permissions)
 
@@ -161,13 +167,19 @@ remote in a hard-to-reverse way, asks first.
 ### Running the whole queue (`/aide-run-queue`)
 
 `/aide-run-queue [NNN]` drives the AIDE loop over **every remaining 📋 item** in
-the queue until empty. The invoking session acts purely as an **orchestrator**
-and **spawns a sub-agent per task** rather than doing the work inline: a `scout`
-for each recon/pick, and a **fresh `builder` per item** that runs the whole item
-end-to-end (create-item if needed → claim → implement+test → commit →
-direct-merge) in its own isolated context — the same isolation as "fresh chat per
-item". The orchestrator passes only the item number + short summaries between
-agents, commits and direct-merges green items automatically, and **pauses for
-your approval only at PRs and major structural changes**. Use it for an unattended
-batch run; use the per-step `/speckit-aide-*` commands (fresh chat each) for
-tighter manual control.
+the queue until empty. The invoking session acts purely as an **orchestrator** and
+**spawns a sub-agent per task** rather than doing the work inline, with
+**implementation and validation kept on separate agents**:
+
+1. a `scout` for each recon/pick;
+2. a **fresh `builder` per item** — create-item (if needed) → claim → implement +
+   test → commit on the branch (it does **not** merge);
+3. a **fresh `validator` per item** (a *different* agent) — confirms tests pass,
+   checks the item spec + vision, adversarially attacks the code and adds tests,
+   then flips the row to ✅ and direct-merges **only on PASS**; on FAIL it hands
+   back and the orchestrator re-spawns a builder (cap: 3 build↔validate rounds).
+
+Each item is isolated like "fresh chat per item"; the orchestrator passes only the
+item number + short summaries between agents and **pauses for your approval only
+at PRs and major structural changes**. Use it for an unattended batch run; use the
+per-step `/speckit-aide-*` commands (fresh chat each) for tighter manual control.
