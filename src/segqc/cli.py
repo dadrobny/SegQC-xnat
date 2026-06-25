@@ -3,10 +3,12 @@
 This module defines the argument parser and subcommand dispatch for the
 ``segqc`` console script (see ``[project.scripts]`` in ``pyproject.toml``).
 
-Scope (item 006): the ``run`` subcommand is fully wired — it loads both input
-volumes via :func:`segqc.io.load_case`, resolves anatomical names via
-:func:`segqc.labels.summarise_inventory`, prints the labelled inventory to
-stdout, and writes a stub JSON report to ``<out>/segqc_report.json``.
+Scope (item 010): the ``run`` subcommand is fully wired — it loads both input
+volumes via :func:`segqc.io.load_case`, runs the empty/near-empty check
+(:func:`segqc.empty.check_empty`), builds a :class:`~segqc.verdict.Verdict`,
+writes a JSON report (:func:`segqc.report.serialize_report_json`) and a
+human-readable plain-text report (:func:`segqc.human_report.render_human_report`)
+to ``<out>/segqc_report.json`` and ``<out>/segqc_report.txt`` respectively.
 Heavy imports (NiBabel, NumPy, ...) are deferred to ``_handle_run`` so that
 ``segqc --help`` stays fast and import-clean.
 """
@@ -14,7 +16,6 @@ Heavy imports (NiBabel, NumPy, ...) are deferred to ``_handle_run`` so that
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import pathlib
 import sys
@@ -109,62 +110,15 @@ def _print_inventory(summary) -> None:
                 print(f"  {value!s:>4}  (unknown)     (malformed count: {count!r})")
 
 
-def _write_stub_json(
-    out_dir: str,
-    case,
-    summary,
-    cfg,
-) -> pathlib.Path:
-    """Write the stub JSON report to ``<out_dir>/segqc_report.json``.
-
-    Creates ``out_dir`` (including any missing parents) if it does not exist,
-    then writes a UTF-8 JSON file with the following top-level keys:
-
-    - ``scan_path``             -- absolute path of the scan NIfTI
-    - ``seg_path``              -- absolute path of the segmentation NIfTI
-    - ``spacing``               -- [sx, sy, sz] voxel sizes in mm
-    - ``foreground_voxels``     -- total non-background voxel count
-    - ``label_inventory``       -- list of ``{label, name, voxels}`` objects
-    - ``config_schema_version`` -- from ``default_config().schema_version``
-
-    Returns the :class:`pathlib.Path` of the written file.
-    """
-    out_path = pathlib.Path(out_dir)
-    out_path.mkdir(parents=True, exist_ok=True)
-
-    label_inventory = [
-        {"label": v, "name": n, "voxels": c}
-        for v, n, c in summary.recognised
-    ]
-    # Include unknown labels that have a valid integer count; skip malformed
-    # ones so the JSON stays schema-clean (no null/non-integer values).
-    for v, c in summary.unknown:
-        if isinstance(c, int):
-            label_inventory.append({
-                "label": int(v) if isinstance(v, int) else str(v),
-                "name": "unknown",
-                "voxels": c,
-            })
-
-    report = {
-        "scan_path": case.scan.path,
-        "seg_path": case.seg.path,
-        "spacing": list(case.scan.spacing),
-        "foreground_voxels": case.foreground_voxels,
-        "label_inventory": label_inventory,
-        "config_schema_version": cfg.schema_version,
-    }
-
-    report_path = out_path / "segqc_report.json"
-    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    return report_path
-
-
 def _handle_run(args: argparse.Namespace) -> int:
-    """Handler for ``segqc run``.
+    """Handler for ``segqc run`` — full Stage 1 pipeline.
 
-    Loads the scan and segmentation, prints the labelled inventory, and writes
-    a stub JSON report. Returns 0 on success, 1 on input error.
+    Loads the scan and segmentation, runs the empty/near-empty check, builds
+    a :class:`~segqc.verdict.Verdict`, and writes both a JSON report and a
+    human-readable plain-text report to the output directory.
+
+    Returns 0 on pass or flagged-for-review; returns 1 on fail or input error.
+    Both report files are always written before the process exits (even on fail).
     """
     # Set up logging first so any subsequent log messages respect the level.
     from segqc._logging import setup_logging  # noqa: PLC0415
@@ -174,11 +128,16 @@ def _handle_run(args: argparse.Namespace) -> int:
     from segqc.io import SegQCInputError, load_case  # noqa: PLC0415
     from segqc.labels import LabelConvention, summarise_inventory  # noqa: PLC0415
     from segqc.config import default_config  # noqa: PLC0415
+    from segqc.empty import check_empty  # noqa: PLC0415
+    from segqc.verdict import Reason, Severity, Verdict  # noqa: PLC0415
+    from segqc.report import serialize_report_json  # noqa: PLC0415
+    from segqc.human_report import render_human_report  # noqa: PLC0415
 
     logger.debug(
         "segqc run: scan=%r  seg=%r  out=%r", args.scan, args.seg, args.out
     )
 
+    # --- 1. Load inputs ------------------------------------------------------ #
     try:
         case = load_case(args.scan, args.seg)
     except SegQCInputError as exc:
@@ -193,14 +152,65 @@ def _handle_run(args: argparse.Namespace) -> int:
         )
         return 1
 
+    # --- 2. Print inventory (preserved from item 006) ------------------------- #
     convention = LabelConvention.default()
     summary = summarise_inventory(case.label_inventory, convention)
-    cfg = default_config()
-
     _print_inventory(summary)
-    report_path = _write_stub_json(args.out, case, summary, cfg)
 
-    logger.info("segqc run complete -- report written to %s", report_path)
+    # --- 3. Empty/near-empty check -------------------------------------------- #
+    # check_empty expects a NiBabel Nifti1Image; construct one from the already-
+    # loaded Volume array so we avoid a second disk read.
+    import nibabel as nib  # noqa: PLC0415
+
+    cfg = default_config()
+    seg_img = nib.Nifti1Image(case.seg.data, case.seg.affine)
+    check_result = check_empty(seg_img, cfg)
+
+    # --- 4. Build Verdict from CheckResult ------------------------------------ #
+    # check_empty returns plain strings; convert them into Reason objects.
+    # Severity is FAIL when is_empty=True (any condition fired), PASS otherwise.
+    if check_result.is_empty:
+        reasons = [
+            Reason(message=msg, severity=Severity.FAIL)
+            for msg in check_result.reasons
+        ]
+    else:
+        reasons = [
+            Reason(message=msg, severity=Severity.PASS)
+            for msg in check_result.reasons
+        ]
+    verdict = Verdict.build(reasons=reasons, per_label={})
+
+    # --- 5. Derive case_id from scan filename stem ---------------------------- #
+    # Strip double extension (.nii.gz) or single extension (.nii).
+    scan_stem = pathlib.Path(args.scan).name
+    if scan_stem.endswith(".nii.gz"):
+        case_id = scan_stem[:-7]
+    elif scan_stem.endswith(".nii"):
+        case_id = scan_stem[:-4]
+    else:
+        case_id = pathlib.Path(args.scan).stem
+
+    # --- 6. Write both reports ------------------------------------------------ #
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    json_str = serialize_report_json(verdict, case_id, cfg)
+    json_path = out_path / "segqc_report.json"
+    json_path.write_text(json_str, encoding="utf-8")
+
+    txt_str = render_human_report(verdict, case_id, cfg)
+    txt_path = out_path / "segqc_report.txt"
+    txt_path.write_text(txt_str, encoding="utf-8")
+
+    logger.info(
+        "segqc run complete -- verdict=%s  json=%s  txt=%s",
+        verdict.overall.label, json_path, txt_path,
+    )
+
+    # --- 7. Exit code --------------------------------------------------------- #
+    # fail → 1; pass or flagged-for-review → 0.
+    if verdict.overall == Severity.FAIL:
+        return 1
     return 0
 
 

@@ -189,6 +189,20 @@ Per-label findings:
    `Reason` objects from the string reasons, using `Severity.FAIL` when
    `is_empty=True` and `Severity.PASS` otherwise.
 
+7. **Nifti1Image reconstruction in CLI**: `check_empty` expects a
+   `nib.Nifti1Image`. The `Case.seg` Volume stores the data array and affine,
+   so the CLI reconstructs `nib.Nifti1Image(case.seg.data, case.seg.affine)`
+   in-memory rather than re-reading from disk.
+
+8. **`_write_stub_json` removed**: the old item 006 stub was replaced entirely
+   by `serialize_report_json` (v0 schema). `test_cli_run.py` tests that checked
+   stub-specific fields (`label_inventory`, `foreground_voxels`, `scan_path`,
+   `spacing`, `config_schema_version`) will fail — these are pre-existing item 006
+   tests that must be updated to expect the v0 schema format.
+
+9. **`json` removed from top-level imports in `cli.py`**: no longer needed after
+   removing `_write_stub_json`; serialization is delegated to `serialize_report_json`.
+
 ---
 
 ## Testing Prerequisites
