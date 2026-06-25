@@ -26,9 +26,14 @@ branch, and report back. You run on Haiku because the task is bounded and cheap.
 2. **Check claimed items:** `git branch -r | grep "aide/"` — note which item
    numbers already have remote branches.
 3. **Read queue + progress:** Open `docs/aide/queue/queue-NNN.md` and
-   `docs/aide/progress.md`. Find the **first 📋 (not-started) item** that:
-   - has no corresponding `aide/NNN-*` remote branch (not yet claimed), AND
-   - has no blocking dependencies still marked 📋 or 🚧.
+   `docs/aide/progress.md`. Find the **first item that meets all three
+   conditions**:
+   - **Not done:** status in `progress.md` is 📋 (not-started). Skip any item
+     marked 🚧 (in-progress) or ✅ (done).
+   - **Not blocked:** no dependency of this item is still 📋 or 🚧 in
+     `progress.md`.
+   - **Not claimed:** no `aide/NNN-*` remote branch exists for this item number
+     (from the `git branch -r` output in step 2).
 4. **Claim:** Create and push the branch immediately:
    ```
    git switch -c aide/NNN-short-name
