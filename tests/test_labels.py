@@ -125,6 +125,37 @@ def test_name_to_value_unknown_returns_none():
     assert conv.value_of("") is None
 
 
+def test_value_of_none_does_not_leak_attributeerror():
+    """value_of(None) must not leak a raw AttributeError from .strip().
+
+    value_of is documented as total/non-throwing for a missing name. A None
+    argument currently leaks `'NoneType' object has no attribute 'strip'` —
+    a library internal the vision says callers should never see. Acceptable:
+    return None, or raise the project's typed SegQCInputError.
+    """
+    conv = LabelConvention.default()
+    try:
+        result = conv.value_of(None)  # type: ignore[arg-type]
+    except SegQCInputError:
+        return  # a clear, typed error is acceptable
+    assert result is None
+
+
+def test_convention_is_immutable_no_dict_leak():
+    """The frozen convention must not leak a mutable mapping that corrupts it.
+
+    The dataclass is frozen and the class docstring promises immutability
+    ("external mutation can't leak in"). Mutating the returned value_to_name
+    must not change what name_of resolves to.
+    """
+    conv = LabelConvention.default()
+    try:
+        conv.value_to_name[1] = "HACKED"  # type: ignore[index]
+    except TypeError:
+        pass  # an immutable mapping (e.g. MappingProxyType) correctly forbids it
+    assert conv.name_of(1) == "C1"
+
+
 # --------------------------------------------------------------------------- #
 # Custom override
 # --------------------------------------------------------------------------- #
@@ -163,6 +194,37 @@ def test_override_duplicate_name_case_insensitive_raises():
 def test_override_non_integer_key_raises():
     with pytest.raises(SegQCInputError, match="must be integers"):
         LabelConvention.from_mapping({"not-an-int": "C1"})
+
+
+# --------------------------------------------------------------------------- #
+# Adversarial: non-integer keys must be REJECTED, not silently coerced
+# (Decision 6 / from_mapping docstring: "raises ... a key is not an integer").
+# `int(...)` truncates/parses non-integers, corrupting the label map — the
+# vision requires keeping label maps integer and failing loudly.
+# --------------------------------------------------------------------------- #
+
+def test_override_non_integral_float_key_raises():
+    """A float key like 2.5 is NOT an integer — it must raise, not truncate to 2."""
+    with pytest.raises(SegQCInputError, match="must be integers"):
+        LabelConvention.from_mapping({2.5: "C1"})
+
+
+def test_override_string_integer_key_raises():
+    """A string key like '5' is NOT an integer — it must raise, not parse to 5."""
+    with pytest.raises(SegQCInputError, match="must be integers"):
+        LabelConvention.from_mapping({"5": "C1"})
+
+
+def test_override_float_key_cannot_silently_collide():
+    """{2: 'C1', 2.5: 'C2'} must not silently collapse to a single value.
+
+    With int()-coercion both keys become 2 and one entry is lost without any
+    error — a silent duplicate-value collision that drops data. Rejecting the
+    non-integer key (or detecting the collision) is required; silently winning
+    is not.
+    """
+    with pytest.raises(SegQCInputError):
+        LabelConvention.from_mapping({2: "C1", 2.5: "C2"})
 
 
 def test_default_unaffected_by_override():
@@ -250,6 +312,51 @@ def test_summarise_empty_mapping():
     summary = summarise_inventory({})
     assert summary.recognised == []
     assert summary.unknown == []
+
+
+# --------------------------------------------------------------------------- #
+# Adversarial invariants that SHOULD already hold (regression guards)
+# --------------------------------------------------------------------------- #
+
+def test_summarise_does_not_mutate_caller_inventory():
+    """The summariser must not mutate the caller's inventory mapping."""
+    inventory = {1: 10, 999: 5, -3: 2}
+    snapshot = dict(inventory)
+    summarise_inventory(inventory)
+    assert inventory == snapshot
+
+
+def test_default_factory_returns_independent_instances():
+    """Two default() instances must not share mutable state with each other."""
+    a = LabelConvention.default()
+    b = LabelConvention.default()
+    assert a.value_to_name == b.value_to_name
+    # Building an override or touching one must never alter the shipped default.
+    LabelConvention.from_mapping({100: "C1"})
+    assert LabelConvention.default().name_of(1) == "C1"
+
+
+def test_override_unicode_name_round_trips():
+    """Non-ASCII names survive normalisation and round-trip in both directions."""
+    conv = LabelConvention.from_mapping({1: "Vértebra", 2: "Ω-level"})
+    assert conv.name_of(1) == "Vértebra"
+    assert conv.value_of("vértebra".upper()) == 1
+    assert conv.value_of("Ω-LEVEL") == 2
+
+
+def test_summarise_large_inventory():
+    """A large inventory partitions correctly and stays ordered (no crash)."""
+    inventory = {i: 1 for i in range(1, 5001)}
+    summary = summarise_inventory(inventory)
+    # Default map covers values 1..26, 28, 29 (27 unmapped) -> 28 recognised.
+    assert summary.n_recognised == len(DEFAULT_LABEL_MAP)
+    assert summary.n_unknown == 5000 - len(DEFAULT_LABEL_MAP)
+    # Recognised come out in canonical anatomical order.
+    assert summary.present_levels[:3] == ["C1", "C2", "C3"]
+    assert "T13" in summary.present_levels
+    # Unknown stay sorted ascending by value.
+    unknown_values = [v for v, _c in summary.unknown]
+    assert unknown_values == sorted(unknown_values)
 
 
 # --------------------------------------------------------------------------- #
