@@ -226,8 +226,18 @@ class LabelConvention:
 
         Total and non-throwing: any integer (including negative, very large, or
         unmapped values) yields a ``str`` — the mapped name or ``UNKNOWN``.
+
+        The lookup is **strict/non-coercing**, symmetric with the write-side
+        :meth:`from_mapping` check (Decision 6): a non-``int`` argument — a
+        ``str``, a ``float`` (even an integral-valued one), ``None``, or a
+        ``bool`` — is treated as "not found" and yields :data:`UNKNOWN`. The bare
+        ``int(value)`` coercion is deliberately NOT used: it would leak a raw
+        ``ValueError`` / ``TypeError`` for unparsable arguments and, worse,
+        silently truncate a float (``1.9 -> 1``) into a *wrong* vertebra name.
         """
-        return self.value_to_name.get(int(value), UNKNOWN)
+        if not isinstance(value, int) or isinstance(value, bool):
+            return UNKNOWN
+        return self.value_to_name.get(value, UNKNOWN)
 
     def value_of(self, name: str) -> Optional[int]:
         """Return the integer label for ``name``, or ``None`` if unknown.
@@ -243,8 +253,16 @@ class LabelConvention:
         return self._name_to_value.get(_normalise_name(name))
 
     def is_known(self, value: int) -> bool:
-        """Return ``True`` if ``value`` has a mapping in this convention."""
-        return int(value) in self.value_to_name
+        """Return ``True`` if ``value`` has a mapping in this convention.
+
+        Strict/non-coercing, symmetric with :meth:`name_of` and the write-side
+        :meth:`from_mapping` check (Decision 6): a non-``int`` argument (``str``,
+        ``float``, ``None``, ``bool``) is "not a known label", so this returns
+        ``False`` without leaking a raw ``int()`` exception or truncating a float.
+        """
+        if not isinstance(value, int) or isinstance(value, bool):
+            return False
+        return value in self.value_to_name
 
 
 # --------------------------------------------------------------------------- #

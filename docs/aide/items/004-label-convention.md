@@ -285,7 +285,16 @@ decisions recorded below** (executed 2026-06-25).
    `test_override_float_key_cannot_silently_collide`. Relatedly, `value_of` keeps
    its total, non-throwing contract for a non-`str` argument too: `value_of(None)`
    returns `None` instead of leaking an `AttributeError` from `.strip()` (validator
-   test `test_value_of_none_does_not_leak_attributeerror`).
+   test `test_value_of_none_does_not_leak_attributeerror`). The read-side **value**
+   lookups `name_of` / `is_known` are likewise **strict/non-coercing**, symmetric
+   with the write-side check above: the bare `int(value)` coercion is removed in
+   favour of `isinstance(value, int)` (excluding `bool`), so a non-`int` argument
+   (`str`, `float`, `None`, `bool`) returns `UNKNOWN` / `False` rather than leaking
+   a raw `ValueError`/`TypeError` or silently truncating a non-integral float
+   (`name_of(1.9)` → `UNKNOWN`, never the wrong vertebra `"C1"`). Covered by round-2
+   validator tests `test_name_of_non_numeric_str_does_not_leak`,
+   `test_is_known_none_does_not_leak`, and
+   `test_name_of_non_integral_float_not_silently_truncated`.
 7. **Name normalisation — case-insensitive, whitespace-stripped.** ✅ Canonical
    names are stored **verbatim** (`"C1"`, `"T12"`, `"S"`, `"Cocygis"`); lookup
    keys are normalised with `strip().upper()`, so `" l1 "` and `"c1"` resolve.
