@@ -185,6 +185,14 @@ def _handle_run(args: argparse.Namespace) -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
+    out_path = pathlib.Path(args.out)
+    if out_path.exists() and not out_path.is_dir():
+        print(
+            f"Error: --out path exists and is not a directory: {args.out}",
+            file=sys.stderr,
+        )
+        return 1
+
     convention = LabelConvention.default()
     summary = summarise_inventory(case.label_inventory, convention)
     cfg = default_config()
