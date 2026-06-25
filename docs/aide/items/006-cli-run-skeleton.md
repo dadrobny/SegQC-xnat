@@ -208,24 +208,43 @@ and writes a stub JSON — satisfying the Stage 0 acceptance test in `progress.m
 
 ## Decisions & Trade-offs
 
-*To be updated during implementation.*
+1. **`--log-level` on `run` subcommand, not the top-level parser.** Item 005
+   deferred the CLI flag to item 006; item 001's top-level parser has only
+   `--version`. Adding `--log-level` on the `run` subparser keeps it co-located
+   with the work that actually emits log output. If later subcommands are added,
+   they can each declare their own `--log-level` or a future refactor can hoist
+   it. *Decision: `--log-level` on `run` only.*
 
-Key decisions to record when implementing:
+2. **Stub JSON filename: `segqc_report.json`.** Simple, unambiguous, consistent
+   with the Stage 1 intent where the CLI writes a single report per run. Item 009
+   may rename or add to this when it defines the full schema. *Decision: use
+   `segqc_report.json`.*
 
-1. **`--log-level` on `run` or on the top-level parser?** Item 005 spec says
-   "wired in item 006"; item 001's CLI has top-level `--version` only. Recommended:
-   add `--log-level` to the `run` subcommand (it only makes sense when work is
-   being done). If later items want it top-level too, that's a small migration.
-2. **Stub JSON filename** — `segqc_report.json` (recommended; consistent with
-   Stage 1 intent). Record if changed.
-3. **Unknown-label count guard** — malformed counts (non-int) from edge-case
-   inventory inputs: skip them in the JSON or convert them to `null`. Recommended:
-   skip (as shown in step 4 pseudocode) so the JSON stays schema-clean.
-4. **`_print_inventory` / `_write_stub_json` placement** — same `cli.py` as
-   private helpers (recommended) vs. a new `segqc._report` module. The latter
-   would be premature; item 009 owns the real report module.
-5. **Spacing representation in JSON** — `list(case.scan.spacing)` (3 floats).
-   This is the simplest portable form; record if a different repr is chosen.
+3. **Unknown-label count guard: skip malformed counts in the JSON.** If an
+   inventory entry has a non-integer count (edge case from adversarial callers),
+   it is omitted from `label_inventory` in the JSON rather than emitting `null`
+   or a string. This keeps every `voxels` value in the JSON a valid integer,
+   consistent with the item 009 schema contract. *Decision: skip non-int counts.*
+
+4. **`_print_inventory` and `_write_stub_json` as private helpers in `cli.py`.**
+   Item 009 owns the real report module; adding a separate `segqc._report` module
+   here would be premature and create a half-built public surface. The helpers are
+   private (`_`-prefix) so there is no implicit API to maintain. *Decision:
+   private helpers in `cli.py`.*
+
+5. **Spacing in JSON as a plain list of floats: `list(case.scan.spacing)`.**
+   Three plain Python `float` values serialise cleanly to JSON with `json.dumps`
+   and round-trip without precision loss at typical CT spacing values. *Decision:
+   `list(case.scan.spacing)` (three floats).*
+
+6. **`test_run_stub_returns_zero` in `test_smoke.py` updated to
+   `test_run_missing_inputs_returns_one`.** That smoke test was written for the
+   item 001 stub which returned `0` for any input. Item 006 replaces the stub
+   with a real loader, so the correct post-item-006 behaviour is `exit 1` on
+   missing files. The test name and assertion were updated accordingly; the
+   behaviour is more thoroughly covered in `tests/test_cli_run.py`.
+   *Decision: update the smoke test; `test_cli_run.py` is the primary CLI
+   coverage file.*
 
 ---
 

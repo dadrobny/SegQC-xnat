@@ -44,10 +44,15 @@ def test_run_subcommand_help(capsys):
     assert "--out" in out
 
 
-def test_run_stub_returns_zero(tmp_path):
-    """`segqc run` stub returns 0 and performs no file I/O."""
+def test_run_missing_inputs_returns_one(tmp_path):
+    """`segqc run` with non-existent inputs returns 1 (item 006 behaviour).
+
+    Item 001 originally shipped a stub that returned 0 regardless. Item 006
+    replaced that stub with a real loader: missing files now return exit code 1
+    with an error message and no output directory created.
+    """
     out_dir = tmp_path / "out"
     rc = main(["run", "--scan", "a", "--seg", "b", "--out", str(out_dir)])
-    assert rc == 0
-    # The stub must not create or modify the output directory.
+    assert rc == 1
+    # The output directory must not be created when loading fails.
     assert not out_dir.exists()
