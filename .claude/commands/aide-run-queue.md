@@ -20,8 +20,8 @@ Target queue: **$ARGUMENTS** (if empty, use the highest-numbered
 | Task | Sub-agent | Model | Notes |
 |---|---|---|---|
 | Sync, pick next 📋 item, check claims | `scout` | Sonnet | read-only; returns the item number + short-name + claim status |
-| **Implement** one item | `builder` | Opus | one **fresh** builder per item: create-item (if missing) → claim → implement → test → set progress 🚧 → commit on the branch. **Does NOT merge.** |
-| **Validate** that item | `validator` | Opus | a **different** agent: tests pass + matches spec + serves the vision + adversarial break-attempts + adds tests. On PASS flips progress ✅ and direct-merges; on FAIL hands back. |
+| **Implement** one item | `builder` | Sonnet (→ Opus on 3rd attempt) | one **fresh** builder per item: create-item (if missing) → claim → implement → test → set progress 🚧 → commit on the branch. **Does NOT merge.** Escalate to Opus only if the validator has FAILed this item twice already. |
+| **Validate** that item | `validator` | Sonnet | a **different** agent: tests pass + matches spec + serves the vision + adversarial break-attempts. **Adds tests on first validation pass only** — re-validation rounds only re-run the suite. On PASS flips progress ✅ and direct-merges; on FAIL hands back. |
 | Approval gates, looping | *orchestrator* | — | stays in the main thread; never implements or validates |
 
 **Implementation and validation are always separate agents.** The agent that
@@ -77,7 +77,12 @@ Repeat until the `scout` reports no remaining unclaimed 📋 item:
    - **FAIL with a fixable defect** → spawn a **fresh `builder`** on the same
      branch with the validator's reproduce steps; have it fix + re-commit; then
      spawn a **fresh `validator`** again. Cap at **3 build↔validate rounds**; if
-     still failing, stop and ask the user.
+     still failing after round 3, stop and ask the user.
+     - **Round 1 & 2 builders**: spawn with default model (Sonnet).
+     - **Round 3 builder** (validator has FAILed twice): spawn with `model: opus`
+       and tell it explicitly: "This is attempt 3 — the validator has failed this
+       item twice. You are running on Opus; treat this as a hard defect that
+       requires deeper analysis."
    - **PASS** → the validator has merged; continue.
 
 6. **Checkpoint (orchestrator).** Relay the builder + validator summaries to the

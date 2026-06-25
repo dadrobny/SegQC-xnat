@@ -133,13 +133,18 @@ Two committed subagents split work by cost/capability:
 - **`scout` (Sonnet)** — light, **read-only** recon: finding code, reading specs,
   checking queue/progress state, listing branch/PR claims, running pre-approved
   read-only shell commands. Never edits, commits, or pushes.
-- **`builder` (Opus)** — heavy **implementation**: implementing items, writing/
-  restructuring pipeline code, writing tests, non-trivial debugging and refactors.
-- **`validator` (Opus)** — independent, **adversarial validation** of a builder's
-  work: confirms tests pass, checks the code against the item's Acceptance
-  Criteria/description *and* the project vision, then actively tries to break it
-  with hostile/edge-case inputs and adds tests to close gaps. A *different* agent
-  from the builder — the implementer never signs off its own work.
+- **`builder` (Sonnet, escalates to Opus on 3rd attempt)** — heavy
+  **implementation**: implementing items, writing/restructuring pipeline code,
+  writing tests, non-trivial debugging and refactors. Runs on Sonnet by default;
+  the orchestrator escalates to Opus only when a validator has FAILed the item
+  twice already.
+- **`validator` (Sonnet)** — independent, **adversarial validation** of a
+  builder's work: confirms tests pass, checks the code against the item's
+  Acceptance Criteria/description *and* the project vision, then actively tries
+  to break it with hostile/edge-case inputs. Adds tests **once per branch** (on
+  the first validation pass only; re-validation rounds only re-run the suite). A
+  *different* agent from the builder — the implementer never signs off its own
+  work.
 
 Delegate "where is X / what's the current state" to `scout`; keep code, tests,
 and structural work on `builder` (or the main thread when it's already Opus); and
