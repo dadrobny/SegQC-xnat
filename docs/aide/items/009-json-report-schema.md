@@ -216,6 +216,21 @@ Field descriptions:
    file, accessed via `importlib.resources` (Python 3.9+). This avoids hardcoding
    an absolute path and works correctly after installation.
 
+7. **Schema placed directly in `src/segqc/`** (not a `schemas/` subdirectory) so
+   that `importlib.resources.files(segqc).joinpath("report_schema_v0.json")` resolves
+   it correctly without a nested package. The item spec originally suggested a
+   `schemas/` subdirectory but the test file accesses the resource at the top-level
+   package path.
+
+8. **`_load_schema` helper function** defers the `import segqc` needed for the
+   resource path until after the module is fully initialised, avoiding a circular
+   import. The result is stored in module-level `_SCHEMA` for subsequent calls.
+
+9. **`jsonschema` lazy-imported inside `serialize_report`** (not at module level)
+   to satisfy AC-14 (no unexpected heavy imports at import time). The schema itself
+   is loaded at module level because it is pure `json.loads` + `importlib.resources`
+   — both stdlib.
+
 ---
 
 ## Testing Prerequisites
