@@ -65,9 +65,13 @@ from a `builder` (production code) and a `test-writer` (tests), both unmerged.
 - **PASS** only when all four checks hold. Then:
   1. Flip this item's `progress.md` row to ✅ (`git pull --rebase` first).
   2. Commit that change (plain message, no co-author trailer).
-  3. Direct-merge to `main`:
+  3. Direct-merge to `main` — run each as a **separate** Bash call, not chained
+     with `&&`:
      ```
-     git switch main && git pull --rebase && git merge aide/NNN-short-name && git push
+     git switch main
+     git pull --rebase
+     git merge aide/NNN-short-name
+     git push
      ```
   4. Re-run `pytest` on `main` to confirm still green.
 
@@ -75,6 +79,19 @@ from a `builder` (production code) and a `test-writer` (tests), both unmerged.
 
 Pause and return for: opening a **PR**, **force-push** / history rewrite, or a
 **major structural / framework change**.
+
+## Command hygiene (stay inside the pre-approved allow-list)
+
+Permissions match a command **prefix**, so emit git commands in the shape the
+matcher recognises — otherwise the merge step stalls on prompts:
+
+- **No `cd`** — your working directory is already the repo root.
+- **One command per Bash call** — never chain with `&&` or `;` (the
+  switch/pull/merge/push sequence above is four separate calls).
+- **No `2>&1`** — the Bash tool already captures stderr.
+- **No command substitution** (`$(…)`, backticks) in commit messages — never
+  auto-approved.
+- **Use the Bash tool with `grep`**, not the PowerShell tool / `Select-String`.
 
 ## Output
 

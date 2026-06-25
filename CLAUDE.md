@@ -210,6 +210,34 @@ Rule of thumb: *executing* a work item (code, tests, commit, direct-merge) flows
 without prompts; anything that changes *how everyone works*, or touches the
 remote in a hard-to-reverse way, asks first.
 
+### Command hygiene (so the allow-list actually matches)
+
+The approval rules match a command **prefix** (`git fetch`, `git commit`, …) and
+auto-approve a compound (`A && B`, `A | B`) only when it can be split cleanly
+*and every part* matches. Agents must therefore emit commands in a shape the
+matcher recognises, or an unattended `/aide-run-queue` batch stalls on prompts
+even though the rule "exists". Required form for all agents:
+
+- **No `cd` prefix.** The Bash tool's working directory is already the repo
+  root. `cd "<abs path>" && …` turns a bare allowed command into a fragile
+  multi-part compound — and this repo's path contains spaces and an apostrophe
+  (`King's`), which makes the split worse. Run the bare command.
+- **One command per Bash call.** Don't chain with `&&` or `;`. Separate calls
+  each match their own rule (e.g. `git add …`, then `git commit …`, then
+  `git push`), and a failure is easier to localise.
+- **No `2>&1` (or other redirections).** The Bash tool already captures stderr.
+- **No command substitution in commits.** `git commit -m "$(cat <<'EOF' … EOF)"`
+  is **never** auto-approved — the matcher can't see inside `$(…)`. Use a
+  single-line `-m "msg"`, repeated `-m "summary" -m "body"` for multiple
+  paragraphs, or `git commit -F <file>`.
+- **Recon goes through the Bash tool with `grep`** (`git branch -r | grep aide/`),
+  never the PowerShell tool / `Select-String` — only `Bash(...)` rules are in the
+  allow-list, so PowerShell-tool calls always prompt.
+
+These rules are repeated in each agent spec (`.claude/agents/*.md`) so a
+cold-started sub-agent sees them. After a batch, `/aide-review-permissions` is
+still the backstop for anything that slipped through.
+
 ### Running the whole queue (`/aide-run-queue`)
 
 `/aide-run-queue [NNN]` drives the AIDE loop over **every remaining 📋 item** in

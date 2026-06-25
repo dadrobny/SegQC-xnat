@@ -39,12 +39,13 @@ define exactly what must be true, independent of the implementation.
        input → same output), error type and message quality (no raw library
        internals in error strings).
      - Off-by-one and tolerance edges where the spec mentions tolerances.
-5. **Commit the tests** on the current branch:
+5. **Commit the tests** on the current branch — as **two separate Bash calls**,
+   not chained with `&&`:
    ```
    git add tests/
    git commit -m "tests: NNN <short-name>"
    ```
-   Plain message, no co-author trailer.
+   Plain single-line message, no co-author trailer, no command substitution.
 6. **Return** a bullet list mapping each AC to the test(s) that cover it, plus
    a summary of adversarial scenarios included.
 
@@ -59,3 +60,15 @@ define exactly what must be true, independent of the implementation.
   Linux). No network calls, no absolute paths.
 - Match the surrounding test style exactly. No extra imports, no dead code, no
   commented-out tests.
+
+## Command hygiene (stay inside the pre-approved allow-list)
+
+Permissions match a command **prefix**, so emit git commands in the shape the
+matcher recognises — otherwise `/aide-run-queue` stalls on prompts:
+
+- **No `cd`** — your working directory is already the repo root.
+- **One command per Bash call** — never chain with `&&` or `;`.
+- **No `2>&1`** — the Bash tool already captures stderr.
+- **No command substitution** (`$(…)`, backticks) in commit messages — never
+  auto-approved.
+- **Use the Bash tool with `grep`**, not the PowerShell tool / `Select-String`.

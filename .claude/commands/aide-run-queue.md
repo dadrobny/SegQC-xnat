@@ -32,6 +32,14 @@ Pass only the **minimum** between agents — the item number and branch name.
 Each sub-agent starts cold on purpose. Spawn a **new** instance of each agent
 per item (never reuse across items).
 
+**Command hygiene.** Sub-agents must emit git commands in an allow-list-friendly
+shape so the batch doesn't stall on permission prompts: no `cd` prefix, one
+command per Bash call (no `&&`/`;` chaining), no `2>&1`, no command substitution
+in commit messages (`git commit -m "$(cat <<EOF…)"` always prompts), and recon
+via the Bash tool with `grep` rather than PowerShell `Select-String`. This is
+spelled out in each agent spec and in `CLAUDE.md` → *Command hygiene*; if you
+ever issue a git command from the orchestrator thread, follow it too.
+
 ## Loop
 
 Repeat until the `scout` reports no remaining unclaimed 📋 item:
