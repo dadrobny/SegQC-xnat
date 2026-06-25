@@ -153,7 +153,37 @@ and attach them to a `Verdict`. This item does **not** depend on `segqc.verdict`
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+1. **No runtime imports beyond stdlib, NumPy, and NiBabel.** `scipy`,
+   `skimage`, and `segqc.verdict` are excluded. The function returns plain
+   strings rather than `Reason` objects so item 010 can wire the output into
+   the verdict model without a circular dependency.
+
+2. **`CheckResult` is a frozen dataclass.** Immutable after construction,
+   consistent with the `@dataclass(frozen=True)` style used in `segqc.io`,
+   `segqc.labels`, and `segqc.config`.
+
+3. **`reasons` field is `tuple[str, ...]`, not `list[str]`.** Tuples are
+   immutable and hash cleanly, which is consistent with the frozen dataclass
+   contract and simplifies equality checks in tests.
+
+4. **Array extracted via `np.asanyarray(seg_img.dataobj)`.** Avoids an
+   unnecessary data copy for memory-mapped images; the original array is never
+   modified.
+
+5. **`label_count = 0` when the map is completely empty.** Avoids calling
+   `np.unique` on an empty boolean slice; gives a well-defined zero rather than
+   raising or returning an unexpected value.
+
+6. **Foreground-threshold check uses `else if` (not `if`).** When the map is
+   completely empty the "no foreground" reason already fires; the
+   `min_foreground_voxels` condition is only evaluated for non-empty maps to
+   avoid double-counting. The `min_label_count` condition is independent and
+   runs for all maps so `min_label_count=1` fires on an empty map (0 labels < 1).
+
+7. **NiBabel is a lazy import inside `check_empty`.** The module-level code
+   imports only stdlib + NumPy so the module can be imported cheaply in
+   contexts where NiBabel is not yet needed. This also avoids a top-level
+   circular-import risk if the package is ever restructured.
 
 ---
 

@@ -11,5 +11,6 @@ backend reads ``__version__`` from here (see ``[tool.hatch.version]`` in
 __version__ = "0.0.1"
 
 from segqc.verdict import Reason, Severity, Verdict  # noqa: E402
+from segqc.empty import CheckResult, check_empty  # noqa: E402
 
-__all__ = ["__version__", "Severity", "Reason", "Verdict"]
+__all__ = ["__version__", "Severity", "Reason", "Verdict", "CheckResult", "check_empty"]

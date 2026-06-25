@@ -80,7 +80,7 @@ instance label map, normalises labels, and exits cleanly.
 empty / trivially-failed segmentations.
 
 **Deliverables.**
-- 📋 Empty / near-empty detection (no labels, foreground < N voxels, < K labels), configurable.
+- 🚧 Empty / near-empty detection (no labels, foreground < N voxels, < K labels), configurable.
 - 🚧 QC verdict model: `pass` / `flagged-for-review` / `fail` with per-case + per-vertebra reasons.
 - 📋 JSON report schema v0 (machine-readable, versioned).
 - 📋 Human-readable report (Markdown/plain text) from the same model.
