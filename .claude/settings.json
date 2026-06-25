@@ -45,6 +45,7 @@
       "Bash(rg:*)",
       "Bash(find:*)",
       "Bash(cd:*)",
+      "Bash(git -C:*)",
       "Bash(gh pr list:*)",
       "Bash(gh pr view:*)",
       "Bash(gh pr status:*)",
@@ -58,7 +59,8 @@
       "Write(src/segqc/**)",
       "Edit(src/segqc/**)",
       "Write(tests/**)",
-      "Edit(tests/**)"
+      "Edit(tests/**)",
+      "Write(.claude/settings.local.json)"
     ],
     "ask": [
       "Bash(git push --force:*)",
