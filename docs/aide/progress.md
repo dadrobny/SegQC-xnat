@@ -64,7 +64,7 @@ instance label map, normalises labels, and exits cleanly.
 - ✅ NIfTI loader for scan + label map, preserving spacing/affine, handling anisotropy. *(Item 003)*
 - ✅ Label-convention module: integer label ↔ anatomical vertebra, configurable,
   with a default TotalSegmentator/VerSe mapping. *(Item 004)*
-- 📋 Structured logging + versioned heuristic-config scaffold (YAML/JSON).
+- ✅ Structured logging + versioned heuristic-config scaffold (YAML/JSON). *(Item 005)*
 - ✅ `pytest` harness + tiny synthetic NIfTI fixtures. *(Item 002)*
 
 **Acceptance.**
