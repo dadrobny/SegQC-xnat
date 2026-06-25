@@ -1,6 +1,6 @@
 # Item 008 — QC Verdict Model
 
-> **Status:** 📋 Planned · **Created:** 2026-06-25
+> **Status:** 🚧 In Progress · **Created:** 2026-06-25
 > **Stage:** 1 — End-to-End Thin Slice: Empty Detection + Report
 > **Queue:** [`../queue/queue-001.md`](../queue/queue-001.md) · Item 008
 > **Objectives:** G4 — Per-case QC report (JSON + human-readable)
@@ -138,7 +138,38 @@ beyond the Python standard library** — no NumPy, no NiBabel, no I/O.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+1. **`Severity` uses `enum.IntEnum`** (not `enum.Enum` + `functools.total_ordering`).
+   `IntEnum` gives a total order for free — `PASS=0`, `FLAG=1`, `FAIL=2` — so
+   `max()`, `min()`, and `<`/`>` comparisons work directly on members with no
+   extra boilerplate. The integer values are internal; callers use `.label` for
+   the output strings.
+
+2. **`Reason` is `dataclass(frozen=True)`**. Frozen makes `Reason` hashable,
+   comparable with `==`, and safe to store in sets or as dict values. The
+   `labels` field defaults to `frozenset()` (not `None`) so callers never need
+   a null-check; `frozenset` is itself immutable, satisfying the "no raw library
+   internals" constraint.
+
+3. **`Verdict` stores reasons as `tuple[Reason, ...]`** (not `list`). Tuples are
+   immutable, so `v.reasons` cannot be mutated in place by a caller who holds the
+   reference. `per_label` is a plain `dict[int, tuple[Reason, ...]]`; the outer
+   dict *can* be mutated (a caller could `pop` a key), but `overall` is computed
+   eagerly at construction time in `Verdict.build`, so any post-construction
+   mutation of `per_label` has no effect on `overall` (AC-8).
+
+4. **`overall` is computed eagerly in `Verdict.build`**, not lazily as a
+   `@property`. This means the stored `overall` field is never stale regardless
+   of whether `reasons`/`per_label` are mutated afterwards.
+
+5. **`Verdict.build` copies input collections** (`tuple(reasons)`,
+   `{k: tuple(v) for k, v in per_label.items()}`). This ensures that clearing
+   the caller's original `reasons` list or deleting keys from their `per_label`
+   dict after construction does not affect the stored state (AC-8).
+
+6. **Item 007 wiring deferred to item 010**. The spec notes the wiring of
+   item 007's empty-detection output into a `Verdict` can be done in item 007 or
+   item 010. It is deferred to item 010 (CLI wiring) to keep this item
+   minimal and free of dependencies on item 007's internal API.
 
 ---
 
