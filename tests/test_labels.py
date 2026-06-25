@@ -563,3 +563,74 @@ def test_summarise_loader_case_inventory(labelled_blocks_files):
     # Counts match what the loader reported.
     for value, _name, count in summary.recognised:
         assert count == case.label_inventory[value]
+
+
+# --------------------------------------------------------------------------- #
+# D5 follow-up (round-4 validation, regression guards): the D5 fix deliberately
+# made `_as_int_label` accept numpy integer types via `numbers.Integral`
+# (`isinstance(np.int64(1), int)` is False, so a bare `int` check would wrongly
+# reject a direct caller's numpy-keyed inventory) and added `_unknown_sort_key`
+# so a *mixed* unknown bucket (int + str + None + float keys) never leaks a
+# comparison TypeError at sort time. Neither path had a test; these lock the
+# documented behaviour so a future refactor can't silently break numpy support
+# or reintroduce the sort crash.
+# --------------------------------------------------------------------------- #
+
+def test_summarise_numpy_int_key_and_count_recognised():
+    """A numpy-int-keyed/counted inventory is recognised, normalised to Python int.
+
+    `Case.label_inventory` is already pure-Python int, but a direct caller may
+    pass a numpy-backed mapping. `isinstance(np.int64(1), int)` is False, so the
+    D5 helper accepts numpy ints via `numbers.Integral` and normalises to int.
+    """
+    np = pytest.importorskip("numpy")
+    inventory = {np.int64(1): np.int64(64), np.int32(20): np.int64(100)}
+    summary = summarise_inventory(inventory)
+    assert summary.recognised == [(1, "C1", 64), (20, "L1", 100)]
+    assert summary.unknown == []
+    # Values and counts must be plain Python ints, not numpy scalars.
+    for value, _name, count in summary.recognised:
+        assert type(value) is int
+        assert type(count) is int
+
+
+def test_summarise_numpy_unknown_key_normalised_to_int():
+    """An unmapped numpy-int key is surfaced as unknown with a Python-int value."""
+    np = pytest.importorskip("numpy")
+    summary = summarise_inventory({np.int64(999): np.int64(5)})
+    assert summary.recognised == []
+    assert summary.unknown == [(999, 5)]
+    (value, count), = summary.unknown
+    assert type(value) is int and type(count) is int
+
+
+def test_summarise_mixed_unknown_bucket_sorts_without_typeerror():
+    """A bucket mixing int, float, str, and None keys must sort, not crash.
+
+    `_unknown_sort_key` exists so comparing e.g. a str key against an int key at
+    sort time never leaks a TypeError. The result must be deterministic: integral
+    values first (ascending by value), then non-comparable keys ordered by repr.
+    """
+    inventory = {"C1": 1, None: 2, 1.9: 3, 999: 4, -5: 5}
+    summary = summarise_inventory(inventory)
+    assert summary.recognised == []
+    # Integral-valued unknowns (-5, 1.9-as-float, 999) sort by numeric value
+    # ahead of the non-real keys ("C1", None), which sort by repr — deterministic.
+    keys = [k for k, _c in summary.unknown]
+    assert keys == [-5, 1.9, 999, "C1", None]
+    # Determinism: identical across repeated calls.
+    assert summarise_inventory(dict(inventory)).unknown == summary.unknown
+
+
+def test_summarise_exactly_integral_float_key_read_side_accepted():
+    """On the READ side, an exactly-integral float key (5.0) maps to its vertebra.
+
+    Documented D5 asymmetry: `from_mapping` rejects float keys (strict write
+    side), but the summariser's `_as_int_label` accepts an *exactly* integral
+    float (5.0 -> 5) for numpy tolerance — while still routing a non-integral
+    float (5.5) to unknown. This guards that the integral-float path is not a
+    silent-corruption hole: 5.0 -> C5 is the correct integer, 5.5 stays unknown.
+    """
+    summary = summarise_inventory({5.0: 10, 5.5: 20})
+    assert summary.recognised == [(5, "C5", 10)]
+    assert summary.unknown == [(5.5, 20)]
