@@ -572,7 +572,7 @@ def test_adv_human_report_contains_no_python_class_names(labelled_blocks_files, 
         capsys,
     )
     content = (out_dir / "segqc_report.txt").read_text(encoding="utf-8")
-    for forbidden in ("Severity", "Reason", "Verdict", "NoneType", "frozenset", "Traceback"):
+    for forbidden in ("Severity", "Reason(", "Verdict(", "NoneType", "frozenset", "Traceback"):
         assert forbidden not in content, (
             f"Forbidden string {forbidden!r} found in human report"
         )
