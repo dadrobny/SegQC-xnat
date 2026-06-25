@@ -183,3 +183,23 @@ Each item is isolated like "fresh chat per item"; the orchestrator passes only t
 item number + short summaries between agents and **pauses for your approval only
 at PRs and major structural changes**. Use it for an unattended batch run; use the
 per-step `/speckit-aide-*` commands (fresh chat each) for tighter manual control.
+
+### Permission tracking & review (`/aide-review-permissions`)
+
+Even with the approval policy above, unattended `/aide-run-queue` batches still
+stall on the occasional permission prompt. To close that loop:
+
+- **Auto-logging (hook).** A `PreToolUse`/`PostToolUse` hook
+  (`.claude/hooks/log_permission_event.py`, registered in `.claude/settings.json`)
+  records every prompt-eligible tool call (Bash/Edit/Write/Web…) and its grant/deny
+  outcome — **including inside sub-agents**, which the orchestrator never sees. The
+  hook only records: it never blocks or alters a tool, and always exits 0.
+- **Per-machine log.** Records go to `docs/aide/permissions/log.jsonl`, which is
+  **gitignored** (an append-only log written from many machines would conflict like
+  `progress.md`). Only the *reviewed outcome* — allow-list edits — is shared.
+- **Review.** `/aide-review-permissions` (also folded into
+  `/speckit-aide-feedback-loop`) runs `.claude/scripts/review_permissions.py` to rank
+  the prompts hit, infer grant/deny, drop already-allowed calls, and suggest rules.
+  Promote the safe, recurring ones into `permissions.allow`; keep destructive /
+  outward-facing ones under `ask`. The `settings.json` change is a framework edit —
+  it lands **via PR**.
