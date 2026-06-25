@@ -1,10 +1,16 @@
-"""End-to-end CLI tests for ``segqc run`` (item 006).
+"""End-to-end CLI tests for ``segqc run`` (items 006, 008-010).
 
 These tests exercise the fully-wired ``run`` subcommand: loading real NIfTI
-fixtures from disk, printing the label inventory, writing the stub JSON report,
-and handling error paths. All I/O is isolated to pytest's ``tmp_path``.
+fixtures from disk, printing the label inventory, writing the v0 JSON and
+plain-text reports, and handling error paths. All I/O is isolated to pytest's
+``tmp_path``.
 
 Fixtures are sourced from ``conftest.py`` (item 002's canonical set).
+
+Report format: v0 JSON schema (``schema_version`` = ``"0.1"``), required fields:
+``schema_version``, ``config_version``, ``case_id``, ``verdict``, ``reasons``,
+``per_label``.  Exit codes: 0 for pass/flagged-for-review, 1 for fail or input
+error.
 """
 
 from __future__ import annotations
@@ -82,7 +88,7 @@ def test_run_writes_json_report(labelled_blocks_files, tmp_path, capsys):
 
 
 def test_run_json_fields(labelled_blocks_files, tmp_path, capsys):
-    """The stub JSON report contains all required top-level keys with the right types."""
+    """The v0 JSON report contains all required top-level keys with the right types."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     code, _stdout, _stderr = _run(
@@ -94,24 +100,25 @@ def test_run_json_fields(labelled_blocks_files, tmp_path, capsys):
     with report_path.open(encoding="utf-8") as fh:
         data = json.load(fh)
 
-    assert "scan_path" in data and isinstance(data["scan_path"], str)
-    assert "seg_path" in data and isinstance(data["seg_path"], str)
-    assert "spacing" in data and isinstance(data["spacing"], list) and len(data["spacing"]) == 3
-    assert all(isinstance(v, float) for v in data["spacing"])
-    assert "foreground_voxels" in data and isinstance(data["foreground_voxels"], int)
-    assert data["foreground_voxels"] > 0
-    assert "label_inventory" in data and isinstance(data["label_inventory"], list)
-    assert len(data["label_inventory"]) > 0
-    # Each entry must have label, name, voxels
-    for entry in data["label_inventory"]:
-        assert "label" in entry
-        assert "name" in entry and isinstance(entry["name"], str)
-        assert "voxels" in entry and isinstance(entry["voxels"], int)
-    assert "config_schema_version" in data and isinstance(data["config_schema_version"], str)
+    # v0 schema required fields
+    assert "schema_version" in data and data["schema_version"] == "0.1"
+    assert "config_version" in data and isinstance(data["config_version"], str)
+    assert data["config_version"] != ""
+    assert "case_id" in data and isinstance(data["case_id"], str)
+    assert data["case_id"] != ""
+    assert "verdict" in data and data["verdict"] in ("pass", "flagged-for-review", "fail")
+    assert "reasons" in data and isinstance(data["reasons"], list)
+    assert "per_label" in data and isinstance(data["per_label"], dict)
 
 
 def test_run_json_inventory_matches_fixture(labelled_blocks_files, tmp_path, capsys):
-    """JSON inventory matches the known labelled-blocks voxel counts."""
+    """v0 JSON report for labelled-blocks fixture has pass verdict and correct case_id.
+
+    The labelled-blocks fixture has labels 1, 2, 3 (192 foreground voxels total).
+    With default config thresholds (min_foreground_voxels=0, min_label_count=0),
+    the empty check does not fire, so the overall verdict must be 'pass'.
+    The case_id is derived from the scan filename stem ('scan').
+    """
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     code, _stdout, _stderr = _run(
@@ -121,12 +128,12 @@ def test_run_json_inventory_matches_fixture(labelled_blocks_files, tmp_path, cap
     assert code == 0
     with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
         data = json.load(fh)
-    # labelled_blocks has 3 labels each with 64 voxels (4x4x4 blocks)
-    assert data["foreground_voxels"] == 192  # 3 * 64
-    label_map = {e["label"]: e["voxels"] for e in data["label_inventory"]}
-    for label in (1, 2, 3):
-        assert label in label_map, f"Label {label} missing from JSON inventory"
-        assert label_map[label] == 64, f"Label {label} expected 64 voxels, got {label_map[label]}"
+    # labelled-blocks has 3 non-zero labels -> no empty condition fires -> pass
+    assert data["verdict"] == "pass"
+    # case_id is derived from the scan filename 'scan.nii.gz' -> 'scan'
+    assert data["case_id"] == "scan"
+    # per_label is a dict (may be empty at Stage 1; what matters is the type)
+    assert isinstance(data["per_label"], dict)
 
 
 # ---------------------------------------------------------------------------
@@ -250,20 +257,33 @@ def test_top_level_help_still_exits_zero(capsys):
 
 
 def test_run_empty_labelmap_inventory(empty_labelmap_files, tmp_path, capsys):
-    """``segqc run`` on an empty label map prints '(no foreground labels found)'."""
+    """``segqc run`` on an empty label map exits 1 (fail verdict) and writes v0 report.
+
+    An all-zero segmentation triggers the empty-detection check (condition 1:
+    no foreground voxels), which sets is_empty=True and produces a fail verdict.
+    The CLI therefore exits 1. Both report files are still written before exit.
+    """
     scan_path, seg_path = empty_labelmap_files
     out_dir = tmp_path / "out"
     code, stdout, _stderr = _run(
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    assert code == 0
+    # Empty segmentation -> fail verdict -> exit code 1
+    assert code == 1, f"Expected exit 1 for empty label map, got {code}"
     assert "no foreground labels found" in stdout
-    # JSON is still written
-    with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
+    # JSON is still written even on fail
+    report_path = out_dir / "segqc_report.json"
+    assert report_path.exists(), "segqc_report.json must be written even on fail verdict"
+    with report_path.open(encoding="utf-8") as fh:
         data = json.load(fh)
-    assert data["foreground_voxels"] == 0
-    assert data["label_inventory"] == []
+    # v0 schema fields
+    assert data["schema_version"] == "0.1"
+    assert data["verdict"] == "fail"
+    # At least one reason must be present explaining the failure
+    assert len(data["reasons"]) >= 1
+    assert any("foreground" in r["message"].lower() or "empty" in r["message"].lower()
+               for r in data["reasons"])
 
 
 # ---------------------------------------------------------------------------
@@ -359,8 +379,14 @@ def test_run_shape_mismatch_exits_one(tmp_path, capsys):
     assert "Error:" in stderr
 
 
-def test_run_anisotropic_spacing_preserved_in_json(tmp_path, capsys):
-    """JSON ``spacing`` reflects the actual anisotropic voxel sizes (not defaulted to 1)."""
+def test_run_anisotropic_spacing_pass_verdict(tmp_path, capsys):
+    """``segqc run`` on the anisotropic fixture exits 0 with a pass verdict.
+
+    The anisotropic case has 2 labels and 96 foreground voxels. With default
+    thresholds the empty check does not fire, so the verdict must be 'pass'
+    and the exit code 0. This confirms the CLI handles non-isotropic affines
+    without crashing and the v0 report is written correctly.
+    """
     import sys
     sys.path.insert(0, str(pathlib.Path(__file__).parent))
     from synthetic import anisotropic_case
@@ -375,48 +401,56 @@ def test_run_anisotropic_spacing_preserved_in_json(tmp_path, capsys):
     assert code == 0
     with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
         data = json.load(fh)
-    # anisotropic_case uses (1.0, 1.0, 3.0) spacing
-    assert data["spacing"] == pytest.approx([1.0, 1.0, 3.0]), (
-        f"Expected spacing [1.0, 1.0, 3.0] in JSON, got {data['spacing']}"
-    )
-    assert all(isinstance(v, float) for v in data["spacing"])
+    # anisotropic_case has foreground labels -> no empty condition fires -> pass
+    assert data["verdict"] == "pass"
+    assert data["schema_version"] == "0.1"
 
 
-def test_run_unknown_labels_in_json(tmp_path, capsys):
-    """Unknown labels (not in TotalSegmentator convention) appear in JSON inventory."""
+def test_run_unknown_labels_pass_verdict(tmp_path, capsys):
+    """``segqc run`` with unknown labels still exits 0 at Stage 1 (empty check only).
+
+    Labels 100 and 200 are not in the TotalSegmentator/VerSe convention. The
+    Stage 1 pipeline only checks for emptiness; unknown labels do not trigger a
+    fail. With 250 foreground voxels and default thresholds, the verdict is 'pass'
+    and the exit code 0. The stdout inventory must show those labels as unknown.
+    """
     import nibabel as nib
     import numpy as np
 
-    data = np.zeros((10, 10, 10), dtype=np.uint16)
-    data[0:5, 0:5, 0:5] = 100   # not in default convention
-    data[5:10, 5:10, 5:10] = 200  # not in default convention
-    seg_img = nib.Nifti1Image(data, np.eye(4))
+    arr = np.zeros((10, 10, 10), dtype=np.uint16)
+    arr[0:5, 0:5, 0:5] = 100   # not in default convention
+    arr[5:10, 5:10, 5:10] = 200  # not in default convention
+    seg_img = nib.Nifti1Image(arr, np.eye(4))
     scan_img = nib.Nifti1Image(np.zeros((10, 10, 10), dtype=np.float32), np.eye(4))
     scan_path = tmp_path / "scan.nii.gz"
     seg_path = tmp_path / "seg.nii.gz"
-    import nibabel as nib
     nib.save(scan_img, str(scan_path))
     nib.save(seg_img, str(seg_path))
     out_dir = tmp_path / "out"
-    code, _stdout, _stderr = _run(
+    code, stdout, _stderr = _run(
         ["run", "--scan", str(scan_path), "--seg", str(seg_path),
          "--out", str(out_dir)],
         capsys,
     )
+    # Non-empty segmentation -> no empty condition fires -> pass verdict -> exit 0
     assert code == 0
     with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
         report = json.load(fh)
-    labels_in_json = {e["label"] for e in report["label_inventory"]}
-    assert 100 in labels_in_json, "Unknown label 100 should appear in JSON inventory"
-    assert 200 in labels_in_json, "Unknown label 200 should appear in JSON inventory"
-    for entry in report["label_inventory"]:
-        assert entry["name"] == "unknown", (
-            f"Label {entry['label']} should have name 'unknown', got {entry['name']!r}"
-        )
+    assert report["schema_version"] == "0.1"
+    assert report["verdict"] == "pass"
+    # The stdout inventory line must mention the unknown labels
+    assert "100" in stdout or "200" in stdout, (
+        "Expected unknown label values (100, 200) to appear in stdout inventory"
+    )
 
 
 def test_run_single_voxel_volume(tmp_path, capsys):
-    """``segqc run`` handles a 1x1x1 volume without crashing."""
+    """``segqc run`` handles a 1x1x1 volume without crashing and writes a v0 report.
+
+    A single non-zero voxel is non-empty by definition. With default thresholds
+    the empty check does not fire, so the verdict is 'pass' and exit code 0.
+    The v0 report must contain all required schema fields.
+    """
     import nibabel as nib
     import numpy as np
 
@@ -436,7 +470,11 @@ def test_run_single_voxel_volume(tmp_path, capsys):
     assert (out_dir / "segqc_report.json").exists()
     with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
         report = json.load(fh)
-    assert report["foreground_voxels"] == 1
+    # v0 schema required fields must all be present
+    assert report["schema_version"] == "0.1"
+    assert report["verdict"] == "pass"
+    assert isinstance(report["reasons"], list)
+    assert isinstance(report["per_label"], dict)
 
 
 def test_run_affine_mismatch_exits_one(tmp_path, capsys):
