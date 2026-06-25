@@ -163,7 +163,7 @@ def _handle_run(args: argparse.Namespace) -> int:
     import nibabel as nib  # noqa: PLC0415
 
     cfg = default_config()
-    seg_img = nib.Nifti1Image(case.seg.data, case.seg.affine)
+    seg_img = nib.Nifti1Image(case.seg.data.astype("int32"), case.seg.affine)
     check_result = check_empty(seg_img, cfg)
 
     # --- 4. Build Verdict from CheckResult ------------------------------------ #

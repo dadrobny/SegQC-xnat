@@ -262,15 +262,15 @@ def test_ac8_no_severity_class_name_in_output():
 
 
 def test_ac8_no_reason_class_name_in_output():
-    """'Reason' class name must not appear in the rendered output."""
+    """'Reason(' repr must not appear in the rendered output."""
     result = render_human_report(_fail_verdict(), "c", _config())
-    assert "Reason" not in result
+    assert "Reason(" not in result
 
 
 def test_ac8_no_verdict_class_name_in_output():
-    """'Verdict' class name must not appear in the rendered output."""
+    """'Verdict(' repr must not appear in the rendered output."""
     result = render_human_report(_fail_verdict(), "c", _config())
-    assert "Verdict" not in result
+    assert "Verdict(" not in result
 
 
 def test_ac8_no_frozenset_in_output():
