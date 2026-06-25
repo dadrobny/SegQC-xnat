@@ -58,7 +58,17 @@ The AIDE commands may need project-specific adjustments. Because Spec Kit instal
 
 **When modifying commands**, update the installed copies in the agent-specific directories — these are the files that actually get executed.
 
-### 4. Recommendations
+### 4. Permission Bottlenecks
+
+Unattended runs (especially `/aide-run-queue`) stall whenever an agent hits a permission prompt. Every prompt-eligible tool call and its grant/deny outcome is auto-logged (see `docs/aide/permissions/`), so fold that into this review:
+
+- Run `/aide-review-permissions` (or `python .claude/scripts/review_permissions.py`) to get a ranked table of the prompts hit since the last review, with grant/deny counts and suggested allow rules.
+- Promote the safe, recurring ones into `permissions.allow` in `.claude/settings.json`; keep anything destructive or outward-facing under `ask`.
+- Treat the allow-list change like any framework change — it lands via PR.
+
+Carry the resulting allow/ask decisions into the Recommendations below.
+
+### 5. Recommendations
 
 Provide specific, actionable suggestions:
 - Updates to vision/roadmap/progress

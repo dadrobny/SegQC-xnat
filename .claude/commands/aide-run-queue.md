@@ -111,5 +111,9 @@ one-off read-only investigation a `scout` can answer).
 ## On queue exhaustion
 
 When `scout` reports no 📋 items remain: summarise items completed, branches
-merged, and final test status. If the roadmap has further stages, tell the user
-to run `/speckit-aide-create-queue` (fresh chat) for the next batch.
+merged, and final test status. Permission prompts hit during the batch are
+auto-logged (`docs/aide/permissions/`, via the `PreToolUse`/`PostToolUse` hook);
+recommend the user run **`/aide-review-permissions`** to promote recurring, safe
+prompts into the allow-list so the next batch runs with fewer interruptions. If
+the roadmap has further stages, tell the user to run `/speckit-aide-create-queue`
+(fresh chat) for the next batch.

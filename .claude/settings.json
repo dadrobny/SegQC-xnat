@@ -76,5 +76,29 @@
       "Edit(.specify/extensions/**)",
       "Write(.specify/extensions/**)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/log_permission_event.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/log_permission_event.py"
+          }
+        ]
+      }
+    ]
   }
 }

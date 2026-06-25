@@ -224,3 +224,5 @@ __marimo__/
 .claude/*.local.json
 .claude/.credentials.json
 .claude/credentials.json
+#   Per-machine permission-prompt logs (the committed README stays tracked).
+docs/aide/permissions/*.jsonl
