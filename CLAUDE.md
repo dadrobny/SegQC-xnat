@@ -167,29 +167,29 @@ committed config so the whole team gets them.
 
 ### Model routing by task complexity (`.claude/agents/`)
 
-Two committed subagents split work by cost/capability:
+Four committed subagents split work by role and cost:
 
-- **`scout` (Sonnet)** — light, **read-only** recon: finding code, reading specs,
-  checking queue/progress state, listing branch/PR claims, running pre-approved
-  read-only shell commands. Never edits, commits, or pushes.
-- **`builder` (Sonnet, escalates to Opus on 3rd attempt)** — heavy
-  **implementation**: implementing items, writing/restructuring pipeline code,
-  writing tests, non-trivial debugging and refactors. Runs on Sonnet by default;
-  the orchestrator escalates to Opus only when a validator has FAILed the item
-  twice already.
-- **`validator` (Sonnet)** — independent, **adversarial validation** of a
-  builder's work: confirms tests pass, checks the code against the item's
-  Acceptance Criteria/description *and* the project vision, then actively tries
-  to break it with hostile/edge-case inputs. Adds tests **once per branch** (on
-  the first validation pass only; re-validation rounds only re-run the suite). A
-  *different* agent from the builder — the implementer never signs off its own
-  work.
+- **`scout` (Haiku)** — narrow **recon + claim**: syncs the repo, reads the
+  queue and progress files, checks `aide/*` branches to find the next unclaimed
+  📋 item, then creates and pushes the claim branch. Returns only item number,
+  branch name, and title. Never searches source code; file locations are known.
+- **`builder` (Sonnet, escalates to Opus on 3rd attempt)** — **implementation
+  only**: implements production code in `src/` per the item spec, records
+  decisions, sets progress 🚧, commits. Does **not** write tests and does **not**
+  run pytest. The orchestrator escalates to Opus only when a validator has FAILed
+  the item twice already.
+- **`test-writer` (Sonnet)** — **test definition only**: reads the item spec and
+  AC, writes tests covering every AC plus adversarial/edge-case inputs, commits.
+  Does **not** touch `src/` and does **not** run pytest.
+- **`validator` (Sonnet)** — independent **quality gate**: runs pytest, checks
+  that every AC has a test, verifies code scope, confirms vision fit. Does **not**
+  write or modify tests. On PASS flips ✅ and direct-merges; on FAIL hands back
+  identifying which agent (builder or test-writer) needs to fix it.
 
-Delegate "where is X / what's the current state" to `scout`; keep code, tests,
-and structural work on `builder` (or the main thread when it's already Opus); and
-gate every implemented item through a separate `validator`. Claude Code does
-**not** auto-detect complexity and swap the main model — routing happens by
-delegating to these agents (and by your own `/model` choice).
+Delegate recon/claim to `scout`; implementation to `builder`; test authoring to
+`test-writer`; verification to `validator`. Claude Code does **not** auto-detect
+complexity and swap the main model — routing happens by delegating to these agents
+(and by your own `/model` choice).
 
 ### Approval policy (`.claude/settings.json` permissions)
 
@@ -214,16 +214,19 @@ remote in a hard-to-reverse way, asks first.
 
 `/aide-run-queue [NNN]` drives the AIDE loop over **every remaining 📋 item** in
 the queue until empty. The invoking session acts purely as an **orchestrator** and
-**spawns a sub-agent per task** rather than doing the work inline, with
-**implementation and validation kept on separate agents**:
+**spawns a sub-agent per task** rather than doing the work inline:
 
-1. a `scout` for each recon/pick;
-2. a **fresh `builder` per item** — create-item (if needed) → claim → implement +
-   test → commit on the branch (it does **not** merge);
-3. a **fresh `validator` per item** (a *different* agent) — confirms tests pass,
-   checks the item spec + vision, adversarially attacks the code and adds tests,
-   then flips the row to ✅ and direct-merges **only on PASS**; on FAIL it hands
-   back and the orchestrator re-spawns a builder (cap: 3 build↔validate rounds).
+1. a `scout` per item — syncs, finds the next unclaimed 📋 item, claims it
+   (creates + pushes the `aide/NNN-*` branch);
+2. a **fresh `builder` per item** — checks out the branch, creates the item spec
+   if missing, implements production code, commits (no tests, no pytest);
+3. a **fresh `test-writer` per item** — reads the spec, writes AC + adversarial
+   tests, commits (no production code, no pytest);
+4. a **fresh `validator` per item** (a *different* agent from builder and
+   test-writer) — runs pytest, checks AC coverage, checks scope and vision fit,
+   then flips ✅ and direct-merges **only on PASS**; on FAIL it identifies which
+   agent needs to fix it and the orchestrator re-spawns accordingly
+   (cap: 3 validation rounds).
 
 Each item is isolated like "fresh chat per item"; the orchestrator passes only the
 item number + short summaries between agents and **pauses for your approval only

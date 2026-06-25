@@ -1,16 +1,16 @@
 ---
-description: Orchestrate the AIDE queue to completion by spawning a sub-agent per task — scout for recon, builder for implementation, then a separate validator that adversarially gates the merge — looping until the queue is empty. Pauses only for PRs and major structural changes.
-argument-hint: "[queue number, e.g. 001 — optional; defaults to the active queue]"
+description: Orchestrate the AIDE queue to completion — scout claims items, builder implements, test-writer writes tests, then validator gates the merge — looping until the queue is empty. Pauses only for PRs and major structural changes.
+argument-hint: "[queue number, e.g. 001 — optional; defaults to the highest-numbered queue]"
 ---
 
 # Run the AIDE queue (sub-agent orchestrator)
 
 Drive the AIDE loop (`docs/aide/`) over **every remaining item** in the queue
 until it is empty. **This session is only the orchestrator** — do **not** do
-recon, write code, or run tests yourself in the main thread. Instead **spawn a
-sub-agent for each distinct task** (via the Agent tool) so every task runs in its
-own isolated context — the same isolation as the AIDE "fresh chat per item" rule,
-while this thread keeps a small context and just dispatches and gates approvals.
+recon, write code, write tests, or run tests yourself in the main thread. Instead
+**spawn a sub-agent for each distinct task** so every task runs in its own
+isolated context. This thread keeps a small context and only dispatches and gates
+approvals.
 
 Target queue: **$ARGUMENTS** (if empty, use the highest-numbered
 `docs/aide/queue/queue-*.md`).
@@ -19,85 +19,93 @@ Target queue: **$ARGUMENTS** (if empty, use the highest-numbered
 
 | Task | Sub-agent | Model | Notes |
 |---|---|---|---|
-| Sync, pick next 📋 item, check claims | `scout` | Sonnet | read-only; returns the item number + short-name + claim status |
-| **Implement** one item | `builder` | Sonnet (→ Opus on 3rd attempt) | one **fresh** builder per item: create-item (if missing) → claim → implement → test → set progress 🚧 → commit on the branch. **Does NOT merge.** Escalate to Opus only if the validator has FAILed this item twice already. |
-| **Validate** that item | `validator` | Sonnet | a **different** agent: tests pass + matches spec + serves the vision + adversarial break-attempts. **Adds tests on first validation pass only** — re-validation rounds only re-run the suite. On PASS flips progress ✅ and direct-merges; on FAIL hands back. |
-| Approval gates, looping | *orchestrator* | — | stays in the main thread; never implements or validates |
+| Sync, pick next 📋 item, claim branch | `scout` | Haiku | reads queue + progress, checks `aide/*` branches, creates + pushes claim branch; returns item number + branch name |
+| **Implement** production code | `builder` | Sonnet (→ Opus on 3rd attempt) | one **fresh** builder per item: checkout branch, create item spec if missing, implement `src/`, record decisions, set progress 🚧, commit. **No tests, no pytest.** |
+| **Write tests** for the item | `test-writer` | Sonnet | one **fresh** test-writer per item: reads spec + AC + existing test style, writes tests for all AC + adversarial cases, commits. **No production code, no pytest.** |
+| **Validate** the item | `validator` | Sonnet | a **different** agent: runs pytest, checks AC test coverage, checks code scope, checks vision fit. **No new tests.** On PASS flips ✅ and direct-merges; on FAIL hands back with the responsible agent identified. |
+| Approval gates, looping | *orchestrator* | — | stays in the main thread; never implements, writes tests, or validates |
 
-**Implementation and validation are always separate agents.** The agent that
-wrote the code must never be the one that signs it off — spawn a fresh
-`validator` (not the same `builder` instance) so the review is genuinely
-independent.
+**Implementation, testing, and validation are always separate agents.** No agent
+signs off its own work.
 
-Pass only the **minimum** between agents — the item number, branch name, and each
-agent's short summary — never replay a big transcript. Each sub-agent starts cold
-on purpose. Spawn a **new** `builder` and a **new** `validator` per item (don't
-reuse across items); that's what replaces "fresh chat per item".
+Pass only the **minimum** between agents — the item number and branch name.
+Each sub-agent starts cold on purpose. Spawn a **new** instance of each agent
+per item (never reuse across items).
 
 ## Loop
 
 Repeat until the `scout` reports no remaining unclaimed 📋 item:
 
-1. **Recon → spawn `scout`.** Ask it to `git fetch --all --prune`, read the target
-   queue + `docs/aide/progress.md`, list `aide/NNN-*` remote branches / open PRs,
-   and report the **next 📋 item that is not already claimed** (number +
-   short-name), or "none left". Do this read-only work in the sub-agent, not here.
+1. **Claim → spawn `scout`** with the queue number and this brief:
+   > Sync the repo, check `git branch -r` for existing `aide/*` branches, read
+   > `docs/aide/queue/queue-NNN.md` and `docs/aide/progress.md`, find the first
+   > unclaimed 📋 item (no blocking dependencies still 📋/🚧), then create and
+   > push `aide/NNN-short-name`. Return: item number, branch name, item title.
+   > If none left, say "none left".
 
-2. **Decide (orchestrator).** If `scout` says the next item is claimed by someone
-   else, skip it / stop and report. Otherwise take the item number forward.
+2. **Decide (orchestrator).** If `scout` says "none left", stop and report
+   completion. Otherwise take the item number and branch name forward.
 
-3. **Implement → spawn a fresh `builder`** with just the item number and this brief:
-   > Implement AIDE item NNN. If `docs/aide/items/NNN-*.md` is missing, run
-   > `/speckit-aide-create-item NNN` first. Claim by creating and pushing
-   > `aide/NNN-short-name`. Run `/speckit-aide-execute-item NNN` to implement +
-   > test, recording decisions and setting this item's `progress.md` row to 🚧
-   > (`git pull --rebase` before that edit). When the suite is green, commit on
-   > the branch (plain message, **no co-author trailer**). **Do NOT merge and do
-   > NOT flip the row to ✅ — a separate validator does that.** STOP and report
-   > back if the item needs a PR, force-push, or a major structural / framework
-   > change. Return a one-paragraph summary: item, branch, test result, and any
-   > follow-ups.
+3. **Write tests → spawn a fresh `test-writer`** with the item number + branch
+   and this brief:
+   > Write tests for AIDE item NNN on branch `aide/NNN-short-name`.
+   > If `docs/aide/items/NNN-*.md` is missing, run `/speckit-aide-create-item NNN`
+   > first. Read the spec for all Acceptance Criteria and Decisions. Read `tests/`
+   > for style conventions. Write tests covering every AC (named clearly) plus
+   > adversarial edge cases. Commit to the branch.
+   > **Do NOT touch `src/` and do NOT run pytest.**
+   > Return: bullet list of AC → test name mappings and adversarial scenarios.
 
-4. **Validate → spawn a fresh `validator`** (a *different* agent from the builder)
-   with the item number + branch and this brief:
-   > Independently validate AIDE item NNN on branch `aide/NNN-short-name`, where a
-   > builder has implemented and committed (unmerged). Confirm `python -m pytest`
-   > passes; check the code against every Acceptance Criterion + the Description in
-   > `docs/aide/items/NNN-*.md`; confirm it serves `docs/aide/vision.md`. Then
-   > **adversarially try to break it** with hostile/edge-case inputs and **add
-   > focused tests** for any gaps (inline `tmp_path`, project style). Verdict:
-   > **PASS** only if everything holds incl. your new tests — then commit the
-   > tests, flip the `progress.md` row to ✅ (`git pull --rebase` first), and
-   > direct-merge to `main`, re-running `pytest` on `main`. **FAIL** if the suite
-   > is red, a criterion is unmet, it fights the vision, or an adversarial test
-   > exposes a defect — leave the tests committed on the branch, do NOT merge, and
-   > hand back exact reproduce steps. STOP for PR / force-push / structural needs.
+4. **Implement → spawn a fresh `builder`** with the item number + branch and
+   this brief:
+   > Implement AIDE item NNN on branch `aide/NNN-short-name`. The item spec and
+   > tests are already committed. Check out the branch
+   > (`git switch aide/NNN-short-name`), implement production code in `src/` per
+   > every Acceptance Criterion in `docs/aide/items/NNN-*.md`, record decisions,
+   > set progress.md row to 🚧 (`git pull --rebase` first), commit.
+   > **Do NOT write tests and do NOT run pytest.**
+   > STOP and hand back if a PR, force-push, or framework change is needed.
+   > Return: one-paragraph summary of what was implemented.
 
-5. **Build ↔ validate cycle (orchestrator).** Read the `validator`'s verdict:
-   - **FAIL with a fixable defect** → spawn a **fresh `builder`** on the same
-     branch with the validator's reproduce steps; have it fix + re-commit; then
-     spawn a **fresh `validator`** again. Cap at **3 build↔validate rounds**; if
-     still failing after round 3, stop and ask the user.
-     - **Round 1 & 2 builders**: spawn with default model (Sonnet).
-     - **Round 3 builder** (validator has FAILed twice): spawn with `model: opus`
-       and tell it explicitly: "This is attempt 3 — the validator has failed this
-       item twice. You are running on Opus; treat this as a hard defect that
-       requires deeper analysis."
-   - **PASS** → the validator has merged; continue.
+5. **Validate → spawn a fresh `validator`** (a *different* agent) with the item
+   number + branch and this brief:
+   > Independently validate AIDE item NNN on branch `aide/NNN-short-name`.
+   > Run the full pytest suite. Check that every AC in `docs/aide/items/NNN-*.md`
+   > has at least one test. Check builder's `src/` changes are scoped to this
+   > item. Check alignment with `docs/aide/vision.md`.
+   > **Do NOT write or modify tests.**
+   > PASS: flip progress.md ✅, commit, direct-merge to main, re-run pytest.
+   > FAIL: report which check failed and whether the builder or test-writer needs
+   > to fix it. Do not merge.
 
-6. **Checkpoint (orchestrator).** Relay the builder + validator summaries to the
-   user in one or two lines (item, what was attacked, tests added, merged). If
-   either agent reported a **PR / force-push / structural** stop, **pause and ask
-   the user**. Otherwise continue to step 1 for the next item **without** waiting
-   for approval.
+6. **Build/test ↔ validate cycle (orchestrator).** Read the validator's verdict:
+   - **FAIL — suite red (code bug)** → spawn a **fresh `builder`** on the same
+     branch with the validator's reproduce steps; fix + re-commit; then spawn a
+     **fresh `validator`** again.
+   - **FAIL — missing AC test coverage** → spawn a **fresh `test-writer`** on the
+     same branch; add the missing tests; then spawn a **fresh `validator`** again.
+   - **FAIL — out-of-scope or vision conflict** → spawn a **fresh `builder`** to
+     revert/fix; then spawn a **fresh `validator`** again.
+   - Cap at **3 total validation rounds**. If still failing after round 3, stop
+     and ask the user.
+   - **Round 3 builder** (validator has FAILed twice): spawn with `model: opus`
+     and say explicitly: "This is attempt 3 — the validator has failed twice.
+     You are on Opus; treat this as a hard defect requiring deeper analysis."
+   - **PASS** → the validator has merged; continue to step 1 for the next item.
+
+7. **Checkpoint (orchestrator).** Relay a one- or two-line summary to the user
+   (item, merged/failed, key facts). If any agent reported a **PR / force-push /
+   structural** stop, **pause and ask the user**. Otherwise continue without
+   waiting for approval.
 
 ## Granularity rule
 
-One sub-agent per **cohesive** task. Keep tightly-coupled steps (implement → test
-→ fix → commit) inside the *same* `builder` — splitting *those* across isolated
-agents just forces re-reading and loses iteration state. The deliberate exception
-is **validation**, which is *always* a separate `validator` agent: independence is
-the whole point of a review gate, so the reviewer must not be the implementer.
+One sub-agent per **cohesive** task. Tightly-coupled steps within a role (e.g.
+implement → record decisions → commit for builder, or write AC tests → write
+adversarial tests → commit for test-writer) stay inside the **same** agent
+invocation — splitting them forces re-reading and loses state. The deliberate
+separation across roles — implement / test / validate — is the independence that
+makes the review gate meaningful.
 Spawn other specialised sub-agents only when a task is genuinely separable (e.g. a
 one-off read-only investigation a `scout` can answer).
 

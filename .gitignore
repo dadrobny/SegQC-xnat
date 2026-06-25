@@ -226,3 +226,6 @@ __marimo__/
 .claude/credentials.json
 #   Per-machine permission-prompt logs (the committed README stays tracked).
 docs/aide/permissions/*.jsonl
+
+# Local datasets (large, not versioned)
+dataset-verse19training/
