@@ -125,7 +125,28 @@ in `segqc/features/centroids.py`.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+1. **`np.argwhere` + `np.mean` over `scipy.ndimage.center_of_mass`** — both
+   produce identical results for uniform-weight (binary mask) inputs.
+   `np.argwhere` keeps the implementation dependency-free (no SciPy import
+   required) and makes the computation explicit and easy to audit.
+
+2. **Tuple fields for `centroid_voxel` / `centroid_mm`** — plain Python
+   `tuple[float, float, float]` rather than `np.ndarray` so the frozen dataclass
+   is trivially comparable with `==` and cheaply serialisable without a custom
+   `__eq__`.
+
+3. **`convention=None` defaults to `LabelConvention.default()` at call time** —
+   not at import time — so overriding the convention per call is cheap and
+   avoids any module-level mutable state.
+
+4. **`name_of` is always a `str`** — `LabelConvention.name_of` never raises and
+   returns `UNKNOWN` for unmapped integers, so `level_name` is always a
+   non-empty string without extra guards in this module.
+
+5. **`ValueError` on absent label** — consistent with `compute_label_geometry`
+   (item 011), which raises the same error type for the same condition.  The
+   error message includes both the missing label value and the list of present
+   non-zero labels to aid debugging.
 
 ---
 
