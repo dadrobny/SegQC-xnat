@@ -121,6 +121,45 @@ Two categories, two rules:
 - **Personal (git-ignored):** `.claude/settings.local.json`, any
   `.claude/*.local.*`, and credential files. Never commit credentials.
 
+## Virtual environment
+
+All code (tests, CLI, scripts) runs inside a **local `.venv`** at the project
+root. This directory is gitignored and never committed — each machine builds its
+own on first use.
+
+**Bootstrap (first time, after a fresh clone, or when `.venv` is missing):**
+```powershell
+# Windows (PowerShell or Git Bash)
+python -m venv .venv
+.venv\Scripts\pip install -e .[dev]
+```
+```bash
+# macOS / Linux
+python -m venv .venv
+.venv/bin/pip install -e .[dev]
+```
+
+**Staleness check.** Before running tests or starting a new item, verify the
+env is current:
+```bash
+.venv/Scripts/python -c "import segqc"   # Windows Git Bash
+.venv/bin/python -c "import segqc"       # macOS/Linux
+```
+If the import fails (or `.venv` does not exist), re-run the bootstrap above.
+
+**Agent rule — builders and validators MUST:**
+1. Check whether `.venv` exists and `import segqc` succeeds inside it.
+2. If not, rebuild with the bootstrap commands before writing or running any code.
+3. Invoke all Python and pytest via the venv:
+   - Windows (Git Bash): `.venv/Scripts/python -m pytest`, `.venv/Scripts/pip`
+   - macOS/Linux: `.venv/bin/python -m pytest`, `.venv/bin/pip`
+
+The `Bash(python -m venv:*)`, `Bash(.venv/Scripts/python:*)`,
+`Bash(.venv/bin/python:*)`, and `Bash(.venv/Scripts/pip:*)` entries in
+`settings.json` cover these invocations without further prompts.
+
+---
+
 ## Model routing, approval policy & queue runner
 
 These three pieces tune *how* the agent works on this repo. They live in shared,
@@ -155,8 +194,10 @@ delegating to these agents (and by your own `/model` choice).
 ### Approval policy (`.claude/settings.json` permissions)
 
 - **Auto-approved (no prompt):** read-only shell (git status/log/diff/show/branch,
-  ls/grep/find), `pytest`, `pip install`, `python`, and routine git writes —
-  `add`, `commit`, `switch`/`checkout`, `merge`, `pull`, and (non-force) `push`.
+  ls/grep/find), `pytest`, `pip install`, `python`, `python -m venv`,
+  `.venv/Scripts/python`, `.venv/bin/python` (and their `pip`/`pytest` siblings),
+  and routine git writes — `add`, `commit`, `switch`/`checkout`, `merge`,
+  `pull`, and (non-force) `push`.
 - **Always prompts (`ask`):** opening a **PR** (`gh pr …`), **force-push** /
   `reset --hard` / `rebase` (history rewrite), and **edits to framework/process
   files** — `CLAUDE.md`, `docs/aide/vision.md`, `docs/aide/roadmap.md`,
