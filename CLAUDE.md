@@ -218,10 +218,12 @@ auto-approve a compound (`A && B`, `A | B`) only when it can be split cleanly
 matcher recognises, or an unattended `/aide-run-queue` batch stalls on prompts
 even though the rule "exists". Required form for all agents:
 
-- **No `cd` prefix.** The Bash tool's working directory is already the repo
-  root. `cd "<abs path>" && …` turns a bare allowed command into a fragile
-  multi-part compound — and this repo's path contains spaces and an apostrophe
-  (`King's`), which makes the split worse. Run the bare command.
+- **No `cd` prefix, and no `git -C "<abs path>"`.** The Bash tool's working
+  directory is already the repo root, so both are redundant. `cd "<abs path>" &&
+  …` turns a bare allowed command into a fragile multi-part compound, and
+  `git -C "<abs path>" …` re-injects the path needlessly — and this repo's path
+  contains spaces and an apostrophe (`King's`), which makes either worse. Run the
+  bare command.
 - **One command per Bash call.** Don't chain with `&&` or `;`. Separate calls
   each match their own rule (e.g. `git add …`, then `git commit …`, then
   `git push`), and a failure is easier to localise.

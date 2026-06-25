@@ -53,8 +53,9 @@ branch, and report back. You run on Haiku because the task is bounded and cheap.
 Permissions match a command **prefix**, so emit git commands in the shape the
 matcher recognises — otherwise the run stalls on prompts:
 
-- **No `cd`** — your working directory is already the repo root. Run
-  `git fetch --all --prune`, not `cd "<path>" && git fetch …`.
+- **No `cd`, no `git -C "<path>"`** — your working directory is already the repo
+  root. Run `git fetch --all --prune`, not `cd "<path>" && git fetch …` or
+  `git -C "<path>" fetch …`.
 - **One command per Bash call** — never chain with `&&` or `;` (run `git switch
   -c …` and `git push …` as two separate calls).
 - **No `2>&1`** — the Bash tool already captures stderr.
