@@ -60,6 +60,22 @@ Pause and return to the caller for:
 
 - Match surrounding code style; lazy/cheap imports; cross-platform (Windows +
   macOS + Linux), CPU-only.
-- For multi-line commit messages, write the message to a file and use
-  `git commit -F`, or a Bash heredoc — never PowerShell `@'...'@` in the Bash
-  tool.
+- For commit messages, use a single-line `git commit -m "msg"`; for multiple
+  paragraphs use repeated `-m` flags (`-m "summary" -m "body"`) or write the
+  message to a file and use `git commit -F <file>`. **Never** use command
+  substitution — `git commit -m "$(cat <<'EOF' … EOF)"` is never auto-approved
+  (the matcher can't see inside `$(…)`) so it always triggers a prompt. Never
+  PowerShell `@'...'@` in the Bash tool either.
+
+## Command hygiene (stay inside the pre-approved allow-list)
+
+Permissions match a command **prefix**, so emit git commands in the shape the
+matcher recognises — otherwise `/aide-run-queue` stalls on prompts:
+
+- **No `cd`** — your working directory is already the repo root (run the bare
+  command, not `cd "<path>" && …`).
+- **One command per Bash call** — never chain with `&&` or `;` (run `git add …`,
+  then `git commit …` as separate calls).
+- **No `2>&1`** — the Bash tool already captures stderr.
+- **No command substitution** (`$(…)`, backticks) — never auto-approved.
+- **Use the Bash tool with `grep`**, not the PowerShell tool / `Select-String`.

@@ -47,3 +47,17 @@ branch, and report back. You run on Haiku because the task is bounded and cheap.
   claim branch. No commits, no merges, no edits to any file.
 - Do **not** check GitHub PRs — git branch check is sufficient.
 - If no unclaimed 📋 item exists, report "none left" and stop.
+
+## Command hygiene (stay inside the pre-approved allow-list)
+
+Permissions match a command **prefix**, so emit git commands in the shape the
+matcher recognises — otherwise the run stalls on prompts:
+
+- **No `cd`, no `git -C "<path>"`** — your working directory is already the repo
+  root. Run `git fetch --all --prune`, not `cd "<path>" && git fetch …` or
+  `git -C "<path>" fetch …`.
+- **One command per Bash call** — never chain with `&&` or `;` (run `git switch
+  -c …` and `git push …` as two separate calls).
+- **No `2>&1`** — the Bash tool already captures stderr.
+- **Use the Bash tool with `grep`** for `git branch -r | grep "aide/"`, never the
+  PowerShell tool / `Select-String` — only `Bash(...)` rules are pre-approved.
