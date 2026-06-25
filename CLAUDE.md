@@ -161,9 +161,13 @@ remote in a hard-to-reverse way, asks first.
 ### Running the whole queue (`/aide-run-queue`)
 
 `/aide-run-queue [NNN]` drives the AIDE loop over **every remaining 📋 item** in
-the queue in one session — claim → (create-item if needed) → implement+test via
-`builder` → commit → direct-merge → next — looping until the queue is empty. It
-delegates recon to `scout`, commits and direct-merges green items automatically,
-and **pauses for your approval only at PRs and major structural changes**. Use it
-when you want the batch run unattended; use the per-step `/speckit-aide-*`
-commands (fresh chat each) when you want tighter control.
+the queue until empty. The invoking session acts purely as an **orchestrator**
+and **spawns a sub-agent per task** rather than doing the work inline: a `scout`
+for each recon/pick, and a **fresh `builder` per item** that runs the whole item
+end-to-end (create-item if needed → claim → implement+test → commit →
+direct-merge) in its own isolated context — the same isolation as "fresh chat per
+item". The orchestrator passes only the item number + short summaries between
+agents, commits and direct-merges green items automatically, and **pauses for
+your approval only at PRs and major structural changes**. Use it for an unattended
+batch run; use the per-step `/speckit-aide-*` commands (fresh chat each) for
+tighter manual control.
