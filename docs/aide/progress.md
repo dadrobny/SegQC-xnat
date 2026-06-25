@@ -82,7 +82,7 @@ empty / trivially-failed segmentations.
 **Deliverables.**
 - ✅ Empty / near-empty detection (no labels, foreground < N voxels, < K labels), configurable.
 - ✅ QC verdict model: `pass` / `flagged-for-review` / `fail` with per-case + per-vertebra reasons. *(Item 008)*
-- 🚧 JSON report schema v0 (machine-readable, versioned). *(Item 009)*
+- ✅ JSON report schema v0 (machine-readable, versioned). *(Item 009)*
 - 📋 Human-readable report (Markdown/plain text) from the same model.
 - 📋 CLI wires loader → empty-check → verdict → both report formats.
 
