@@ -377,6 +377,132 @@ def test_summarise_empty_mapping():
 
 
 # --------------------------------------------------------------------------- #
+# D5 (round-3 validation): summarise_inventory is the LAST unguarded member of
+# the "unguarded/coercing argument types on the public surface" defect class
+# that D1 (from_mapping), D3 (value_of), and D4 (name_of/is_known) closed
+# elsewhere. The loop body still does `int(raw_value)` / `int(raw_count)`, so a
+# non-int label key or count is silently truncated/parsed (corrupting the
+# inventory) or leaks a raw ValueError/TypeError.
+#
+# Both outcomes are forbidden by:
+#   * the summariser's own docstring ("never dropped and never raising");
+#   * the item-004 Acceptance Criterion ("handled gracefully across the whole
+#     surface ... without raising") and Decision 6 ("keep label maps integer;
+#     no silent coercion");
+#   * vision sections on integer label maps, failing loudly not silently
+#     (tools "fail in characteristic, often silent ways"), and not crashing.
+#
+# Acceptable fix (mirroring D1/D4): treat a non-integral key as an UNKNOWN
+# label (surfaced, not crashing) OR raise the project's typed SegQCInputError.
+# Silently truncating 1.9 -> C1, parsing "5" -> C5, leaking a raw exception, or
+# collapsing {1: .., 1.9: ..} into one value is NOT acceptable.
+# --------------------------------------------------------------------------- #
+
+def test_summarise_non_integral_float_key_not_silently_truncated():
+    """{1.9: 10} must NOT silently become the C1 (value 1) recognised entry.
+
+    `int(1.9) == 1`, so blind coercion reports a real vertebra for a NON-integer
+    label value — the exact silent corruption D1/D4 reject. Acceptable: the
+    non-integral key is treated as UNKNOWN, or a typed SegQCInputError is raised.
+    """
+    try:
+        summary = summarise_inventory({1.9: 10})
+    except SegQCInputError:
+        return  # loud rejection is acceptable
+    assert summary.recognised == [], (
+        "summarise_inventory silently truncated a non-integral float key "
+        f"into a recognised vertebra: {summary.recognised!r}"
+    )
+
+
+def test_summarise_string_integer_key_not_silently_parsed():
+    """{'5': 10} must NOT silently parse into the C5 (value 5) recognised entry."""
+    try:
+        summary = summarise_inventory({"5": 10})
+    except SegQCInputError:
+        return  # loud rejection is acceptable
+    assert summary.recognised == [], (
+        "summarise_inventory silently parsed a string key into a recognised "
+        f"vertebra: {summary.recognised!r}"
+    )
+
+
+def test_summarise_non_numeric_key_does_not_leak():
+    """{'C1': 10} must not leak a raw ValueError from int().
+
+    The summariser is documented as never raising on unknown labels. A non-numeric
+    key currently leaks `invalid literal for int() with base 10: 'C1'` — a library
+    internal callers should never see. Acceptable: surface it as UNKNOWN, or raise
+    the project's typed SegQCInputError.
+    """
+    try:
+        summary = summarise_inventory({"C1": 10})
+    except SegQCInputError:
+        return  # a clear, typed error is acceptable
+    # If it did not raise, the non-numeric label must be surfaced as unknown,
+    # never recognised, and the call must not have leaked.
+    assert summary.recognised == []
+
+
+def test_summarise_none_key_does_not_leak():
+    """{None: 10} must not leak a raw TypeError from int()."""
+    try:
+        summary = summarise_inventory({None: 10})
+    except SegQCInputError:
+        return  # a clear, typed error is acceptable
+    assert summary.recognised == []
+
+
+def test_summarise_float_keys_cannot_silently_collide():
+    """{1: 10, 1.9: 99} must not silently collapse to two C1 entries.
+
+    With int()-coercion both keys resolve to value 1, so the same vertebra is
+    reported twice from data that was never an integer label — a silent
+    collision of exactly the kind test_override_float_key_cannot_silently_collide
+    rejects on the write side. Acceptable: drop/flag the non-integral key
+    (UNKNOWN) or raise SegQCInputError; reporting C1 twice is not.
+    """
+    try:
+        summary = summarise_inventory({1: 10, 1.9: 99})
+    except SegQCInputError:
+        return  # loud rejection is acceptable
+    recognised_values = [value for value, _name, _count in summary.recognised]
+    assert recognised_values.count(1) <= 1, (
+        "summarise_inventory reported the same vertebra value twice via float "
+        f"truncation: {summary.recognised!r}"
+    )
+
+
+def test_summarise_non_integral_float_count_not_silently_truncated():
+    """{1: 5.7} must NOT silently report C1 with a truncated count of 5.
+
+    `int(5.7) == 5` quietly discards 0.7 of a count; a voxel count is integer by
+    construction (item 003), so a non-integral count is malformed input, not a
+    value to round. Acceptable: pass an integral count through, treat as UNKNOWN,
+    or raise SegQCInputError — silently truncating 5.7 -> 5 is not.
+    """
+    try:
+        summary = summarise_inventory({1: 5.7})
+    except SegQCInputError:
+        return  # loud rejection is acceptable
+    for _value, _name, count in summary.recognised:
+        assert count != 5, (
+            "summarise_inventory silently truncated a non-integral count "
+            f"(5.7 -> {count})"
+        )
+
+
+def test_summarise_non_numeric_count_does_not_leak():
+    """{1: 'lots'} must not leak a raw ValueError from int()."""
+    try:
+        summary = summarise_inventory({1: "lots"})
+    except SegQCInputError:
+        return  # a clear, typed error is acceptable
+    # Did not raise: must not have leaked a non-typed exception.
+    assert isinstance(summary, InventorySummary)
+
+
+# --------------------------------------------------------------------------- #
 # Adversarial invariants that SHOULD already hold (regression guards)
 # --------------------------------------------------------------------------- #
 
