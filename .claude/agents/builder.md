@@ -69,8 +69,8 @@ Pause and return to the caller for:
 
 ## Command hygiene (stay inside the pre-approved allow-list)
 
-Permissions match a command **prefix**, so emit git commands in the shape the
-matcher recognises — otherwise `/aide-run-queue` stalls on prompts:
+Permissions match a command **prefix**, so emit commands in the shape the matcher
+recognises — otherwise `/aide-run-queue` stalls on prompts:
 
 - **No `cd`** — your working directory is already the repo root (run the bare
   command, not `cd "<path>" && …`).
@@ -78,4 +78,8 @@ matcher recognises — otherwise `/aide-run-queue` stalls on prompts:
   then `git commit …` as separate calls).
 - **No `2>&1`** — the Bash tool already captures stderr.
 - **No command substitution** (`$(…)`, backticks) — never auto-approved.
+- **Run Python through the Bash tool in the *relative* form** — e.g. the venv
+  check `.venv/Scripts/python -c "import segqc"` (or `.venv/bin/python`). **Not**
+  the PowerShell tool or an absolute `& "c:\…\python" …` path: only the relative
+  `Bash(.venv/Scripts/python:*)` prefix is pre-approved.
 - **Use the Bash tool with `grep`**, not the PowerShell tool / `Select-String`.

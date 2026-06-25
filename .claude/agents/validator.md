@@ -82,8 +82,8 @@ Pause and return for: opening a **PR**, **force-push** / history rewrite, or a
 
 ## Command hygiene (stay inside the pre-approved allow-list)
 
-Permissions match a command **prefix**, so emit git commands in the shape the
-matcher recognises — otherwise the merge step stalls on prompts:
+Permissions match a command **prefix**, so emit commands in the shape the matcher
+recognises — otherwise the merge and pytest steps stall on prompts:
 
 - **No `cd`** — your working directory is already the repo root.
 - **One command per Bash call** — never chain with `&&` or `;` (the
@@ -91,6 +91,12 @@ matcher recognises — otherwise the merge step stalls on prompts:
 - **No `2>&1`** — the Bash tool already captures stderr.
 - **No command substitution** (`$(…)`, backticks) in commit messages — never
   auto-approved.
+- **Run Python and pytest through the Bash tool in the *relative* form** —
+  `.venv/Scripts/python -m pytest`, `.venv/Scripts/python -c "import segqc"` (or
+  the `.venv/bin/python` equivalents). **Not** the PowerShell tool, and **not** an
+  absolute `& "c:\…\.venv\Scripts\python" …` path: only the relative
+  `Bash(.venv/Scripts/python:*)` prefix is pre-approved, so the call operator and
+  absolute path always prompt.
 - **Use the Bash tool with `grep`**, not the PowerShell tool / `Select-String`.
 
 ## Output
