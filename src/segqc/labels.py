@@ -37,6 +37,7 @@ Public API
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Dict, List, Mapping, Optional, Tuple
 
 from .io import SegQCInputError
@@ -189,12 +190,17 @@ class LabelConvention:
         frozen: Dict[int, str] = {}
         reverse: Dict[str, int] = {}
         for raw_value, raw_name in value_to_name.items():
-            try:
-                value = int(raw_value)
-            except (TypeError, ValueError) as exc:
+            # Strict integer check (Decision 6): keys must already be integers.
+            # ``int(raw_value)`` is deliberately NOT used — it would parse strings
+            # ("5" -> 5) and truncate floats (2.5 -> 2), silently corrupting the
+            # label map and even collapsing distinct keys into a duplicate-value
+            # collision that drops data. ``bool`` is an ``int`` subclass but is not
+            # a meaningful label value, so it is rejected too.
+            if not isinstance(raw_value, int) or isinstance(raw_value, bool):
                 raise SegQCInputError(
                     f"Label convention keys must be integers; got {raw_value!r}."
-                ) from exc
+                )
+            value = raw_value
             name = str(raw_name)
             key = _normalise_name(name)
             if key in reverse:
@@ -204,9 +210,14 @@ class LabelConvention:
                 )
             frozen[value] = name
             reverse[key] = value
-        # Frozen dataclass: assign the (immutable-by-convention) maps via the
-        # base setattr. Wrap in dict() copies so external mutation can't leak in.
-        return cls(value_to_name=dict(frozen), _name_to_value=dict(reverse))
+        # Wrap the maps in read-only proxies over private copies so neither the
+        # caller's original mapping nor the returned ``value_to_name`` can mutate
+        # the convention after construction (the dataclass is ``frozen``, but a
+        # plain ``dict`` attribute would still be mutable in place).
+        return cls(
+            value_to_name=MappingProxyType(dict(frozen)),
+            _name_to_value=MappingProxyType(dict(reverse)),
+        )
 
     # -- lookups ------------------------------------------------------------- #
 
@@ -223,8 +234,12 @@ class LabelConvention:
 
         Lookup is case-insensitive and whitespace-tolerant (``" l1 "`` resolves
         to ``L1``). Returns ``None`` rather than raising for an unknown name
-        (Decision 3) — symmetric with :meth:`name_of`'s ``UNKNOWN`` sentinel.
+        (Decision 3) — symmetric with :meth:`name_of`'s ``UNKNOWN`` sentinel. A
+        non-``str`` argument (e.g. ``None``) is treated as "not found" and yields
+        ``None`` too, so this lookup never leaks an ``AttributeError`` to callers.
         """
+        if not isinstance(name, str):
+            return None
         return self._name_to_value.get(_normalise_name(name))
 
     def is_known(self, value: int) -> bool:

@@ -244,8 +244,12 @@ decisions recorded below** (executed 2026-06-25).
    keyed by the *normalised* name). Immutable, carries its override, mirrors
    `io.py`'s dataclass style. `LabelConvention.default()` returns the shipped
    default; `from_mapping(...)` builds a custom one. The reverse map is built once
-   at construction in `from_mapping` (and copied with `dict(...)`) so lookups are
-   O(1) and external mutation can't leak in.
+   at construction in `from_mapping`. Both `value_to_name` and `_name_to_value`
+   are stored as `types.MappingProxyType` over private `dict` copies, so lookups
+   are O(1) and external mutation can't leak in — `frozen=True` only blocks
+   rebinding the attribute, so without the read-only proxy
+   `conv.value_to_name[1] = "HACKED"` would have corrupted a "frozen" instance in
+   place (closed by validator test `test_convention_is_immutable_no_dict_leak`).
 2. **Exact default TotalSegmentator/VerSe integer↔name table** — ✅ pinned in
    `DEFAULT_LABEL_MAP`. Final table: C1–C7 = **1–7**, T1–T12 = **8–19**,
    L1–L5 = **20–24**, sacrum `S` = **25**, coccyx `Cocygis` = **26**, and the two
@@ -270,7 +274,18 @@ decisions recorded below** (executed 2026-06-25).
 6. **Exception type — new `LabelConventionError` vs reuse `io.SegQCInputError`.**
    ✅ **Reuse `segqc.io.SegQCInputError`** so callers (the CLI in item 006) catch
    one input-error type for both load and label-convention problems. Raised on a
-   duplicate name in an override and on a non-integer key.
+   duplicate name in an override and on a non-integer key. The non-integer-key
+   check is **strict** (`isinstance(raw_value, int)` excluding `bool`) rather than
+   `int(raw_value)`: coercion would parse string keys (`"5"` → 5) and truncate
+   float keys (`2.5` → 2), silently corrupting the label map and even collapsing
+   `{2: …, 2.5: …}` into one entry without error. Loud rejection keeps label maps
+   integer (vision §4) and is covered by validator tests
+   `test_override_non_integral_float_key_raises`,
+   `test_override_string_integer_key_raises`, and
+   `test_override_float_key_cannot_silently_collide`. Relatedly, `value_of` keeps
+   its total, non-throwing contract for a non-`str` argument too: `value_of(None)`
+   returns `None` instead of leaking an `AttributeError` from `.strip()` (validator
+   test `test_value_of_none_does_not_leak_attributeerror`).
 7. **Name normalisation — case-insensitive, whitespace-stripped.** ✅ Canonical
    names are stored **verbatim** (`"C1"`, `"T12"`, `"S"`, `"Cocygis"`); lookup
    keys are normalised with `strip().upper()`, so `" l1 "` and `"c1"` resolve.
