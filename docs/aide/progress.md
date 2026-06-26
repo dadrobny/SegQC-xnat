@@ -103,7 +103,7 @@ empty / trivially-failed segmentations.
 - ✅ Connected-components per label: component count + sizes. *(Item 012)*
 - ✅ Centroid / centre-of-mass per label, level-aware (C1, C2, S). *(Item 013)*
 - 📋 Inter-vertebra relationships: ordered centroid sequence, neighbour spacing, sequence continuity.
-- 🚧 Overlap detection between labels.
+- ✅ Overlap detection between labels. *(Item 015)*
 - 📋 Features serialised into JSON (`features` block) + per-case feature table.
 
 **Acceptance.**
