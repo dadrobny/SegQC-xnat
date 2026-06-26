@@ -257,6 +257,21 @@ def compute_spline_offsets(
 5. **Return order**: the output list preserves the input centroid order, matching
    the convention of all other `compute_*` functions in `segqc/features/`.
 
+6. **minimize_scalar bracket width**: the refinement bracket is set to ±1 step
+   (1/(_N_SCAN-1) ≈ 0.002) around the coarse best u. This is narrow enough to
+   avoid the optimizer escaping to a different local minimum while still providing
+   sub-mm accuracy. When the bracket degenerates (e.g. the coarse best is exactly
+   at u=0 or u=1), the coarse result is returned directly.
+
+7. **numpy einsum for batch distance**: the coarse scan uses
+   `np.einsum("ij,ij->i", diffs, diffs)` to compute all 500 squared distances in
+   one vectorised call, keeping the hot path free of Python loops.
+
+8. **`offset_mm` computed from `diff` directly**: `offset_mm` is derived from the
+   same `diff` vector used to populate dx_mm/dy_mm/dz_mm, ensuring AC4
+   (sqrt consistency) holds exactly (to floating-point precision) without a
+   second spline evaluation.
+
 ---
 
 ## Testing Prerequisites
