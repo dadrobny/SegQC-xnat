@@ -25,7 +25,7 @@
 | 0 | Project Scaffolding & I/O Foundation | (foundation) | 📋 |
 | 1 | End-to-End Thin Slice: Empty Detection + Report | G1, G4 | 📋 |
 | 2 | Geometric & Topological Feature Extraction | (feature core) | 🚧 |
-| 3 | Spinal Curve: Spline Fit & Deviation Features | (feature core) | 📋 |
+| 3 | Spinal Curve: Spline Fit & Deviation Features | (feature core) | 🚧 |
 | 4 | Heuristic Rule Engine over Failure Modes | G2 | 📋 |
 | 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | 📋 |
 | 6 | VerSe Reference Distributions & Delta Rules | G3 | 📋 |
@@ -94,7 +94,7 @@ empty / trivially-failed segmentations.
 
 ---
 
-## Stage 2 — Geometric & Topological Feature Extraction — ✅
+## Stage 2 — Geometric & Topological Feature Extraction — 🚧
 
 **Goal.** The feature engine the heuristics depend on — the MVP image-processing core.
 
@@ -105,30 +105,38 @@ empty / trivially-failed segmentations.
 - ✅ Inter-vertebra relationships: ordered centroid sequence, neighbour spacing, sequence continuity. *(Item 014)*
 - ✅ Overlap detection between labels. *(Item 015)*
 - ✅ Features serialised into JSON (`features` block) + per-case feature table. *(Item 016)*
+- 📋 EDT-based centroid variants (smooth-centre via EDT-threshold CoM; strict-centre via EDT peak) + centroid depth (distance from centroid to nearest label surface). C1/C2 handled as special anatomy. *(Item 023)*
+- 📋 Fragmentation index per label (largest connected component / total label volume), extending the JSON features block. *(Item 025)*
 
 **Acceptance.**
 - [x] Features computed deterministically; values verified against hand-computed expectations.
 - [x] Anisotropic-spacing fixture yields correct physical volumes/extents.
 - [x] `features` block emitted in JSON; tests cover each feature.
+- [ ] EDT-based centroid variants computed; centroid depth available per label. *(Item 023)*
+- [ ] Fragmentation index computed per label and serialised in JSON features block. *(Item 025)*
 
 ---
 
-## Stage 3 — Spinal Curve: Spline Fit & Geometric Deviation Features — 📋
+## Stage 3 — Spinal Curve: Spline Fit & Geometric Deviation Features — 🚧
 
 **Goal.** Centroid-spline and deviation features powering alignment, ordering, and
 mislabelling heuristics.
 
 **Deliverables.**
-- ✅ Spline fit through ordered vertebra centroids, robust to missing levels.
-- ✅ Per-vertebra offset from the spline.
-- ✅ Orientation / rotation estimate per vertebra + global curvature descriptors.
-- 📋 Neighbour-consistency metrics (spacing regularity, monotonic progression).
-- 📋 Optional sagittal projection of centroids + spline for the human report.
+- ✅ Spline fit through ordered vertebra centroids, robust to missing levels. *(Item 017)*
+- ✅ Per-vertebra offset from the spline. *(Item 018)*
+- ✅ Orientation / rotation estimate per vertebra + global curvature descriptors. *(Item 019)*
+- 📋 Neighbour-consistency metrics (spacing regularity, monotonic progression). *(Item 020)*
+- 📋 Optional sagittal projection of centroids + spline for the human report. *(Item 021)*
+- 📋 Stage 3 feature serialisation & GT-vs-perturbed regression tests. *(Item 022)*
+- 📋 Local vertebra neighbourhood comparison (sliding window, n=3–5): per-vertebra deviation from neighbourhood mean/median of centroid spacing, spline offset, and volume; flags isolated anatomical outliers. *(Item 024)*
 
 **Acceptance.**
-- [ ] Spline fits cleanly on GT fixtures; offsets near-zero for GT, large for displaced/mislabelled.
-- [ ] Robust to a deliberately missing level (no crash, sensible fit).
-- [ ] New features in JSON; tests over GT + perturbed cases.
+- [x] Spline fits cleanly on GT fixtures; offsets near-zero for GT, large for displaced/mislabelled.
+- [x] Robust to a deliberately missing level (no crash, sensible fit).
+- [ ] Orientation / curvature features in JSON; tests pass.
+- [ ] Neighbour-consistency and neighbourhood-comparison features in JSON.
+- [ ] Regression tests over GT + perturbed cases pass.
 
 ---
 

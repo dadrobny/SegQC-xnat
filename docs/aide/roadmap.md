@@ -118,8 +118,14 @@ any heavy feature work.
   box**; image-border-contact flags.
 - **Connected-components** per label: component count + sizes (inputs for
   fragmentation / island detection).
-- **Centroid / centre-of-mass** per label, with level-aware special handling
-  (C1, C2, S).
+- **Fragmentation index** per label: ratio of largest connected component to
+  total label volume — a scalar summarising how split the label is.
+- **Vertebra centroid** per label, with level-aware special handling (C1, C2, S):
+  - Simple CoM (baseline).
+  - EDT-based *smooth centre* (CoM of EDT-thresholded mask) and *strict centre*
+    (smoothed EDT peak) for more robust localisation within the vertebral body.
+- **Centroid depth**: distance from the chosen centroid to the nearest label
+  surface (reuses the EDT from the centroid step).
 - **Inter-vertebra relationships**: ordered centroid sequence, neighbour spacing,
   label-sequence continuity.
 - **Overlap detection** between labels.
@@ -147,6 +153,11 @@ ordering, and mislabelling heuristics.
 - **Orientation / rotation** estimate per vertebra + global curvature descriptors.
 - **Neighbour-consistency** metrics (spacing regularity, monotonic progression
   along the curve).
+- **Local neighbourhood comparison** (sliding window, n=3–5 vertebrae): for each
+  vertebra compute its deviation from the local neighbourhood mean/median of
+  centroid spacing, spline offset, volume, and other per-label features; emit a
+  per-vertebra deviation score and flag anatomical outliers within an otherwise-
+  consistent spine segment.
 - Optional sagittal projection of centroids + spline for the human report.
 
 **Dependencies.** Stage 2.

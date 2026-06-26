@@ -127,11 +127,30 @@ the next tool in an automated data flow.
 **Segmentation-based (geometric / topological):**
 - Volume per label; extent (x, y, z); bounding box.
 - Connected-components analysis per label (count, sizes → fragmentation/islands).
-- Centre of mass / vertebra centroid (level-aware: C1, C2, S handled specially).
+- **Fragmentation index**: ratio of largest connected component to total label
+  volume — distinguishes a single dominant body with noise fragments from a
+  truly split label.
+- **Vertebra centroid** with three computation tiers (level-aware; C1 and C2
+  handled specially due to atypical anatomy — no vertebral body in the same
+  sense as thoracic/lumbar):
+  - *Simple CoM* — mean voxel position; fast but can lie in the spinal canal.
+  - *Smooth centre* — centre of mass restricted to the EDT-thresholded mask
+    (e.g. ≥50 % or ≥75 % of max distance), giving a more anatomically central
+    point for intact vertebrae; may drift for fragmented labels.
+  - *Strict centre* — peak of the (smoothed) Euclidean Distance Transform;
+    guaranteed inside the label and most robust to fragmentation / abnormal
+    shape, but noisier than CoM on normal vertebrae.
+- **Centroid depth**: distance from the chosen centroid to the nearest label
+  surface, extracted from the same EDT; centroids near the surface or outside
+  the label are unexpected and flagged.
 - **Spline fit** through the centroid sequence (spinal curve).
 - Per-vertebra **offset from the spline**.
 - Orientation / rotation estimate of centroids/vertebrae.
 - Inter-vertebra relationships (spacing, ordering, neighbour consistency).
+- **Local neighbourhood comparison**: per-vertebra feature deviations from a
+  sliding window of n anatomical neighbours (centroid spacing, spline offset,
+  volume, other per-label features); isolates vertebrae that are outliers
+  within an otherwise-consistent local spine context.
 
 **Image-based:**
 - Radiomics and intensity features over the labelled regions (and optionally the
