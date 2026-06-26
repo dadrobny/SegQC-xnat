@@ -49,6 +49,10 @@
           "$ref": "#/definitions/reason"
         }
       }
+    },
+    "features": {
+      "description": "Optional Stage 2 geometric/topological feature block. Absent for verdict-only (item 009) reports; present when the pipeline serialises computed features.",
+      "$ref": "#/definitions/features"
     }
   },
   "definitions": {
@@ -73,6 +77,206 @@
           "items": {
             "type": "integer"
           }
+        }
+      }
+    },
+    "features": {
+      "type": "object",
+      "description": "Consolidated Stage 2 features for a case: per-label geometry/components/centroid, inter-vertebra relationships, and overlap pairs.",
+      "additionalProperties": false,
+      "required": ["features_version", "per_label", "overlaps", "relationships"],
+      "properties": {
+        "features_version": {
+          "type": "string",
+          "description": "Version discriminator for the features block, independent of the top-level schema_version. Stage 3 bumps this.",
+          "minLength": 1
+        },
+        "per_label": {
+          "type": "object",
+          "description": "Per-label feature records, keyed by the string representation of the integer label value.",
+          "additionalProperties": {
+            "$ref": "#/definitions/labelFeatures"
+          }
+        },
+        "overlaps": {
+          "type": "array",
+          "description": "Voxel-level overlap between label pairs. Empty when no labels overlap.",
+          "items": {
+            "$ref": "#/definitions/overlapPair"
+          }
+        },
+        "relationships": {
+          "description": "Inter-vertebra relationships, or null when not computed (e.g. zero labels).",
+          "oneOf": [
+            {"$ref": "#/definitions/relationships"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "labelFeatures": {
+      "type": "object",
+      "description": "All Stage 2 features for a single integer label.",
+      "additionalProperties": false,
+      "required": ["label", "level_name", "geometry", "components", "centroid"],
+      "properties": {
+        "label": {
+          "type": "integer",
+          "description": "The integer label value."
+        },
+        "level_name": {
+          "type": "string",
+          "description": "Anatomical vertebra name (e.g. 'L3'), or the convention's UNKNOWN sentinel for unmapped labels."
+        },
+        "geometry": {"$ref": "#/definitions/geometry"},
+        "components": {"$ref": "#/definitions/components"},
+        "centroid": {"$ref": "#/definitions/centroid"}
+      }
+    },
+    "bbox": {
+      "type": "object",
+      "description": "Axis-aligned bounding box with named per-axis min/max coordinates.",
+      "additionalProperties": false,
+      "required": ["x_min", "x_max", "y_min", "y_max", "z_min", "z_max"],
+      "properties": {
+        "x_min": {"type": "number"},
+        "x_max": {"type": "number"},
+        "y_min": {"type": "number"},
+        "y_max": {"type": "number"},
+        "z_min": {"type": "number"},
+        "z_max": {"type": "number"}
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "description": "Per-label geometric features (item 011).",
+      "additionalProperties": false,
+      "required": [
+        "voxel_count",
+        "physical_volume_mm3",
+        "extent_x_mm",
+        "extent_y_mm",
+        "extent_z_mm",
+        "bbox_voxel",
+        "bbox_physical",
+        "touches_inferior",
+        "touches_superior",
+        "touches_left",
+        "touches_right",
+        "touches_anterior",
+        "touches_posterior"
+      ],
+      "properties": {
+        "voxel_count": {"type": "integer", "minimum": 0},
+        "physical_volume_mm3": {"type": "number"},
+        "extent_x_mm": {"type": "number"},
+        "extent_y_mm": {"type": "number"},
+        "extent_z_mm": {"type": "number"},
+        "bbox_voxel": {"$ref": "#/definitions/bbox"},
+        "bbox_physical": {"$ref": "#/definitions/bbox"},
+        "touches_inferior": {"type": "boolean"},
+        "touches_superior": {"type": "boolean"},
+        "touches_left": {"type": "boolean"},
+        "touches_right": {"type": "boolean"},
+        "touches_anterior": {"type": "boolean"},
+        "touches_posterior": {"type": "boolean"}
+      }
+    },
+    "components": {
+      "type": "object",
+      "description": "Per-label connected-components features (item 012).",
+      "additionalProperties": false,
+      "required": [
+        "component_count",
+        "component_sizes",
+        "component_volumes_mm3",
+        "largest_component_fraction",
+        "small_fragments"
+      ],
+      "properties": {
+        "component_count": {"type": "integer", "minimum": 0},
+        "component_sizes": {
+          "type": "array",
+          "items": {"type": "integer"}
+        },
+        "component_volumes_mm3": {
+          "type": "array",
+          "items": {"type": "number"}
+        },
+        "largest_component_fraction": {"type": "number"},
+        "small_fragments": {
+          "type": "array",
+          "items": {"type": "integer"}
+        }
+      }
+    },
+    "centroid": {
+      "type": "object",
+      "description": "Per-label centre-of-mass in voxel and physical (mm) coordinates (item 013).",
+      "additionalProperties": false,
+      "required": ["centroid_voxel", "centroid_mm"],
+      "properties": {
+        "centroid_voxel": {
+          "type": "array",
+          "description": "(x, y, z) centre of mass in voxel-index space.",
+          "items": {"type": "number"},
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "centroid_mm": {
+          "type": "array",
+          "description": "(x, y, z) centre of mass in mm.",
+          "items": {"type": "number"},
+          "minItems": 3,
+          "maxItems": 3
+        }
+      }
+    },
+    "overlapPair": {
+      "type": "object",
+      "description": "A single pair of overlapping labels (item 015). Ordered so label_a < label_b.",
+      "additionalProperties": false,
+      "required": ["label_a", "label_b", "name_a", "name_b", "overlap_voxels"],
+      "properties": {
+        "label_a": {"type": "integer"},
+        "label_b": {"type": "integer"},
+        "name_a": {"type": "string"},
+        "name_b": {"type": "string"},
+        "overlap_voxels": {"type": "integer", "minimum": 0}
+      }
+    },
+    "relationships": {
+      "type": "object",
+      "description": "Inter-vertebra relationships for the case (item 014).",
+      "additionalProperties": false,
+      "required": [
+        "present_levels",
+        "missing_levels",
+        "neighbour_spacings_mm",
+        "is_continuous",
+        "out_of_order_labels"
+      ],
+      "properties": {
+        "present_levels": {
+          "type": "array",
+          "description": "Recognised level names in canonical head-to-tail order.",
+          "items": {"type": "string"}
+        },
+        "missing_levels": {
+          "type": "array",
+          "description": "Levels absent within the observed [min..max] span, in canonical order.",
+          "items": {"type": "string"}
+        },
+        "neighbour_spacings_mm": {
+          "type": "array",
+          "description": "Euclidean distances (mm) between adjacent centroids in canonical order.",
+          "items": {"type": "number"}
+        },
+        "is_continuous": {"type": "boolean"},
+        "out_of_order_labels": {
+          "type": "array",
+          "description": "Level names (in input order) that broke canonical monotonicity.",
+          "items": {"type": "string"}
         }
       }
     }

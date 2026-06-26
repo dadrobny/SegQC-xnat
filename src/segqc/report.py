@@ -91,6 +91,7 @@ def serialize_report(
     verdict: "Verdict",
     case_id: str,
     config: "HeuristicConfig",
+    features: "dict | None" = None,
 ) -> dict:
     """Serialize a :class:`~segqc.verdict.Verdict` to a v0 report dict.
 
@@ -106,6 +107,13 @@ def serialize_report(
     config:
         The :class:`~segqc.config.HeuristicConfig` whose ``schema_version``
         is embedded in the report as ``config_version`` for reproducibility.
+    features:
+        Optional Stage 2 ``features`` block (see
+        :func:`segqc.feature_report.build_features_block`). When non-``None`` it
+        is embedded under the report's ``features`` key and validated together
+        with the rest of the report. When ``None`` (default) no ``features`` key
+        is emitted and the report is exactly the item-009 shape, preserving
+        backward compatibility.
 
     Returns
     -------
@@ -139,6 +147,11 @@ def serialize_report(
         },
     }
 
+    # Optional Stage 2 features block — added before validation so it is
+    # schema-checked too. Omitting it keeps the item-009 report shape intact.
+    if features is not None:
+        report["features"] = features
+
     jsonschema.validate(report, _SCHEMA)
     return report
 
@@ -148,6 +161,7 @@ def serialize_report_json(
     case_id: str,
     config: "HeuristicConfig",
     indent: int = 2,
+    features: "dict | None" = None,
 ) -> str:
     """Serialize a :class:`~segqc.verdict.Verdict` to a JSON string.
 
@@ -165,11 +179,14 @@ def serialize_report_json(
         The :class:`~segqc.config.HeuristicConfig` to embed as ``config_version``.
     indent:
         JSON indentation width (default ``2``). Pass ``0`` for compact output.
+    features:
+        Optional Stage 2 ``features`` block, forwarded to
+        :func:`serialize_report`.
 
     Returns
     -------
     str
         Serialized JSON string.
     """
-    report = serialize_report(verdict, case_id, config)
+    report = serialize_report(verdict, case_id, config, features=features)
     return json.dumps(report, indent=indent)

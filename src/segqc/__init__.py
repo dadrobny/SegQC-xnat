@@ -13,7 +13,8 @@ __version__ = "0.0.1"
 from segqc.verdict import Reason, Severity, Verdict  # noqa: E402
 from segqc.empty import CheckResult, check_empty  # noqa: E402
 from segqc.report import serialize_report, serialize_report_json  # noqa: E402
-from segqc.human_report import render_human_report  # noqa: E402
+from segqc.human_report import render_feature_table, render_human_report  # noqa: E402
+from segqc.feature_report import build_features_block  # noqa: E402
 
 __all__ = [
     "__version__",
@@ -25,4 +26,6 @@ __all__ = [
     "serialize_report",
     "serialize_report_json",
     "render_human_report",
+    "render_feature_table",
+    "build_features_block",
 ]

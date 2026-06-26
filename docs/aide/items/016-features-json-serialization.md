@@ -1,6 +1,6 @@
 # Item 016 — Features-block JSON Serialisation & Per-Case Feature Table
 
-> **Status:** 📋 Planned · **Created:** 2026-06-26
+> **Status:** ✅ Complete · **Created:** 2026-06-26 · **Completed:** 2026-06-26
 > **Stage:** 2 — Geometric & Topological Feature Extraction *(completes Stage 2)*
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 016
 > **Objectives:** G4 — Per-case QC report (JSON + human-readable); completes the
@@ -98,43 +98,43 @@ Field origins (each maps directly to an existing dataclass):
 
 ## Acceptance Criteria
 
-- [ ] **AC1 — `features` block round-trips into a validated report.** Given the
+- [x] **AC1 — `features` block round-trips into a validated report.** Given the
       computed feature objects for a fixture, `serialize_report(verdict, case_id,
       config, features=<block>)` returns a dict containing a top-level `features`
       key, and the dict passes `jsonschema.validate` against the extended v0
       schema without raising.
 
-- [ ] **AC2 — Every feature family appears in the JSON.** For a multi-label
+- [x] **AC2 — Every feature family appears in the JSON.** For a multi-label
       fixture, the serialised `features.per_label[<label>]` object contains all
       three of `geometry`, `components`, and `centroid`; the block contains a
       `relationships` object and an `overlaps` array. No feature family is
       silently dropped.
 
-- [ ] **AC3 — Anisotropic fixture round-trips correct physical volumes/extents.**
+- [x] **AC3 — Anisotropic fixture round-trips correct physical volumes/extents.**
       For the anisotropic fixture, the serialised
       `geometry.physical_volume_mm3` and `geometry.extent_{x,y,z}_mm` and
       `centroid.centroid_mm` exactly equal the values returned by the source
       compute functions (within float equality), i.e. spacing is faithfully
       preserved through serialisation.
 
-- [ ] **AC4 — Schema extension is backward-compatible.** A report produced by the
+- [x] **AC4 — Schema extension is backward-compatible.** A report produced by the
       item-009 `serialize_report` **without** features (i.e. no `features` key)
       still validates against the extended schema. The top-level
       `schema_version` remains `"0.1"`; `features` is an *optional* property.
 
-- [ ] **AC5 — Deterministic output / golden snapshot.** Serialising the same
+- [x] **AC5 — Deterministic output / golden snapshot.** Serialising the same
       inputs twice yields equal dicts; `serialize_report_json(...)` for a fixture
       equals a committed golden JSON string (stable key ordering: `per_label`
       assembled in ascending integer-label order, `overlaps` sorted by
       `(label_a, label_b)`, list fields preserved from their source order).
 
-- [ ] **AC6 — Per-case human-readable feature table.** `render_feature_table(features_block)`
+- [x] **AC6 — Per-case human-readable feature table.** `render_feature_table(features_block)`
       returns a non-empty `str` that lists, per label, the level name, voxel
       count, physical volume, component count, and centroid; plus a section for
       overlaps and relationships. Output contains **no** raw Python class names,
       `repr()`, tuples, or `frozenset` text. Deterministic (sorted label order).
 
-- [ ] **AC7 — Empty / single-label maps handled.** Assembling features for a map
+- [x] **AC7 — Empty / single-label maps handled.** Assembling features for a map
       with one known level produces a valid block (`overlaps == []`,
       `relationships.present_levels` has ≤1 entry and
       `relationships.neighbour_spacings_mm == []`); a map with zero labels
@@ -142,7 +142,7 @@ Field origins (each maps directly to an existing dataclass):
       is either an empty-list-bearing object or `null` — and still validates and
       renders without raising.
 
-- [ ] **AC8 — Pure / immutable / import-clean.** The assembler and converters do
+- [x] **AC8 — Pure / immutable / import-clean.** The assembler and converters do
       not mutate their inputs and are deterministic. `import segqc.feature_report`
       pulls in no heavy third-party package at module level beyond what
       `report.py` already needs (`jsonschema` lazily); the converters operate on

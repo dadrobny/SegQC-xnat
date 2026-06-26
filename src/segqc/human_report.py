@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from segqc.config import HeuristicConfig
     from segqc.verdict import Verdict
 
-__all__ = ["render_human_report"]
+__all__ = ["render_human_report", "render_feature_table"]
 
 
 def render_human_report(
@@ -94,6 +94,130 @@ def render_human_report(
                 lines.append(f"    [{reason.severity.label}] {reason.message}")
     else:
         lines.append("  (none)")
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+def _fmt_num(value: float) -> str:
+    """Format a number for the feature table: integers stay bare, floats get 2dp."""
+    if isinstance(value, bool):  # bool is an int subclass; render as text
+        return "yes" if value else "no"
+    if isinstance(value, int):
+        return str(value)
+    # Float: trim to 2 decimals but drop a trailing ".00" for whole values.
+    rounded = round(float(value), 2)
+    if rounded == int(rounded):
+        return str(int(rounded))
+    return f"{rounded:.2f}"
+
+
+def render_feature_table(features_block: dict) -> str:
+    """Render a :func:`segqc.feature_report.build_features_block` block as text.
+
+    Produces a deterministic, stdlib-only plain-text table: one row per label
+    (level name, voxel count, physical volume, component count, centroid in mm)
+    followed by an overlaps section and a relationships section.
+
+    The renderer consumes the **plain dict** features block (not the source
+    dataclasses), so ``human_report.py`` stays stdlib-only and import-clean. The
+    output never contains raw Python class names, ``repr()`` output, tuples, or
+    ``frozenset`` text — every value is formatted explicitly.
+
+    Parameters
+    ----------
+    features_block:
+        A features block dict as returned by
+        :func:`~segqc.feature_report.build_features_block` (or parsed from a
+        serialised report's ``features`` key).
+
+    Returns
+    -------
+    str
+        A non-empty plain-text feature table. Deterministic: labels are listed
+        in ascending integer order regardless of dict insertion order.
+    """
+    lines: list[str] = []
+
+    version = features_block.get("features_version", "?")
+    title = f"Feature table (features v{version})"
+    lines.append(title)
+    lines.append("=" * len(title))
+    lines.append("")
+
+    # ------------------------------------------------------------------ #
+    # Per-label rows (ascending integer-label order)
+    # ------------------------------------------------------------------ #
+    per_label = features_block.get("per_label", {})
+    lines.append("Per-label features:")
+    if per_label:
+        header = (
+            f"  {'Label':>6}  {'Level':<6}  {'Voxels':>8}  "
+            f"{'Volume(mm3)':>12}  {'Comps':>6}  Centroid(mm)"
+        )
+        lines.append(header)
+        lines.append("  " + "-" * (len(header) - 2))
+        for key in sorted(per_label, key=lambda k: int(k)):
+            entry = per_label[key]
+            geom = entry.get("geometry", {})
+            comps = entry.get("components", {})
+            centroid_mm = entry.get("centroid", {}).get("centroid_mm", [])
+            centroid_txt = ", ".join(_fmt_num(v) for v in centroid_mm)
+            lines.append(
+                f"  {entry.get('label', key):>6}  "
+                f"{str(entry.get('level_name', '?')):<6}  "
+                f"{_fmt_num(geom.get('voxel_count', 0)):>8}  "
+                f"{_fmt_num(geom.get('physical_volume_mm3', 0)):>12}  "
+                f"{_fmt_num(comps.get('component_count', 0)):>6}  "
+                f"({centroid_txt})"
+            )
+    else:
+        lines.append("  (none)")
+    lines.append("")
+
+    # ------------------------------------------------------------------ #
+    # Overlaps
+    # ------------------------------------------------------------------ #
+    overlaps = features_block.get("overlaps", [])
+    lines.append("Overlaps:")
+    if overlaps:
+        for ov in overlaps:
+            lines.append(
+                f"  {ov.get('name_a', '?')} (label {ov.get('label_a', '?')}) <-> "
+                f"{ov.get('name_b', '?')} (label {ov.get('label_b', '?')}): "
+                f"{_fmt_num(ov.get('overlap_voxels', 0))} voxels"
+            )
+    else:
+        lines.append("  (none)")
+    lines.append("")
+
+    # ------------------------------------------------------------------ #
+    # Relationships
+    # ------------------------------------------------------------------ #
+    rel = features_block.get("relationships")
+    lines.append("Relationships:")
+    if rel is None:
+        lines.append("  (none)")
+    else:
+        present = rel.get("present_levels", [])
+        missing = rel.get("missing_levels", [])
+        spacings = rel.get("neighbour_spacings_mm", [])
+        out_of_order = rel.get("out_of_order_labels", [])
+        lines.append(
+            f"  Present levels: {', '.join(present) if present else '(none)'}"
+        )
+        lines.append(
+            f"  Missing levels: {', '.join(missing) if missing else '(none)'}"
+        )
+        spacing_txt = (
+            ", ".join(_fmt_num(s) for s in spacings) if spacings else "(none)"
+        )
+        lines.append(f"  Neighbour spacings (mm): {spacing_txt}")
+        lines.append(
+            f"  Continuous: {'yes' if rel.get('is_continuous') else 'no'}"
+        )
+        if out_of_order:
+            lines.append(f"  Out-of-order labels: {', '.join(out_of_order)}")
     lines.append("")
 
     return "\n".join(lines)
