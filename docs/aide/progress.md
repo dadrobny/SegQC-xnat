@@ -125,7 +125,7 @@ mislabelling heuristics.
 **Deliverables.**
 - ✅ Spline fit through ordered vertebra centroids, robust to missing levels. *(Item 017)*
 - ✅ Per-vertebra offset from the spline. *(Item 018)*
-- 🚧 Orientation / rotation estimate per vertebra + global curvature descriptors. *(Item 019)*
+- ✅ Orientation / rotation estimate per vertebra + global curvature descriptors. *(Item 019)*
 - 📋 Neighbour-consistency metrics (spacing regularity, monotonic progression). *(Item 020)*
 - 📋 Optional sagittal projection of centroids + spline for the human report. *(Item 021)*
 - 📋 Stage 3 feature serialisation & GT-vs-perturbed regression tests. *(Item 022)*
