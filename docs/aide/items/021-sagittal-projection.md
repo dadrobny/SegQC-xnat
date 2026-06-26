@@ -204,7 +204,9 @@ def render_sagittal_projection(
    is caught and returns `None`.
 
 4. **`plt.close()` always called** — prevents memory leaks when the function is
-   called in a loop (one figure per case).
+   called in a loop (one figure per case).  `plt.close(fig)` is used (not
+   `plt.close("all")`) on the happy path; `plt.close("all")` is the fallback
+   inside the inner `except` block.
 
 5. **`ValueError` for empty list** — consistent with items 017 and 020; a
    zero-centroid call is a programmer error, not a backend-availability issue,
@@ -212,8 +214,21 @@ def render_sagittal_projection(
 
 6. **Single-centroid behaviour** — a single point cannot define a spline
    (item 017 raises `ValueError`), so `render_sagittal_projection` with one
-   centroid should also raise `ValueError` with a clear message.  This is an
-   edge case the pipeline must guard against upstream.
+   centroid also raises `ValueError` with a clear message.  This is an edge
+   case the pipeline must guard against upstream.
+
+7. **Two-level try/except structure** — outer block catches `ImportError`/`Exception`
+   from the matplotlib import sequence; inner block wraps all rendering and
+   `savefig` calls so that backend write errors (e.g. disk full, patched
+   `plt.savefig`) also return `None` gracefully rather than propagating.
+
+8. **Validation before matplotlib import** — `ValueError` for empty/single-centroid
+   inputs is raised before any `import matplotlib` attempt, ensuring programmer
+   errors surface immediately even on headless environments.
+
+9. **Return value is `Path(output_path)` (not `.resolve()`)** — the non-resolved
+   path is returned so callers can use the same relative/absolute form they
+   supplied.  AC2 accepts either form as long as the same file is on disk.
 
 ---
 
