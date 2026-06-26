@@ -291,6 +291,24 @@ def compute_spine_curvature(
 7. **`inter_tangent_angles_deg`**: angle between successive tangent vectors
    (cosine formula), in degrees. Always non-negative.
 
+8. **Implementation choice — `np.linalg.eigh` on 3×3 covariance**: The
+   covariance matrix is assembled via `np.cov(coords_mm, rowvar=False)` on the
+   centred, mm-scaled voxel coordinate array.  `eigh` (symmetric-matrix
+   specialisation of `eig`) returns eigenvalues in ascending order, so the
+   principal axis is `eigenvectors[:, -1]` and the eigenvalue ratio is
+   `eigenvalues[-1] / eigenvalues[-2]`.  When the second eigenvalue is ≤ 1e-12
+   but the largest is positive (flat/line degenerate) the ratio is returned as
+   `inf`; when all eigenvalues are near-zero (single-voxel guard is earlier, so
+   this rarely fires) it falls back to `0.0`.
+
+9. **`u` values for curvature evaluation**: `SplineFit.u` stores one parameter
+   value per input centroid.  When `len(centroids) == fit.n_points` the stored
+   values are used directly.  When a subset is passed (test-only scenario where
+   `compute_spine_curvature` is called with fewer centroids than were used to fit
+   the spline), chord-length re-parameterisation is applied to the subset to
+   derive sensible `u` values — so `tangent_angles_deg` still reflects the
+   physical curve geometry rather than an arbitrary grid.
+
 ---
 
 ## Testing Prerequisites
