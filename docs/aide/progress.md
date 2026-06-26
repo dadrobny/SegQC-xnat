@@ -102,7 +102,7 @@ empty / trivially-failed segmentations.
 - ✅ Per-label features: voxel & physical volume; extent (x/y/z); bounding box; border-contact flags. *(Item 011)*
 - ✅ Connected-components per label: component count + sizes. *(Item 012)*
 - ✅ Centroid / centre-of-mass per label, level-aware (C1, C2, S). *(Item 013)*
-- 📋 Inter-vertebra relationships: ordered centroid sequence, neighbour spacing, sequence continuity.
+- ✅ Inter-vertebra relationships: ordered centroid sequence, neighbour spacing, sequence continuity. *(Item 014)*
 - ✅ Overlap detection between labels. *(Item 015)*
 - 📋 Features serialised into JSON (`features` block) + per-case feature table.
 
