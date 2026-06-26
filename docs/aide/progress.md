@@ -119,7 +119,7 @@ empty / trivially-failed segmentations.
 mislabelling heuristics.
 
 **Deliverables.**
-- 🚧 Spline fit through ordered vertebra centroids, robust to missing levels.
+- ✅ Spline fit through ordered vertebra centroids, robust to missing levels.
 - 📋 Per-vertebra offset from the spline.
 - 📋 Orientation / rotation estimate per vertebra + global curvature descriptors.
 - 📋 Neighbour-consistency metrics (spacing regularity, monotonic progression).
