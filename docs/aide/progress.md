@@ -122,7 +122,7 @@ mislabelling heuristics.
 - ✅ Spline fit through ordered vertebra centroids, robust to missing levels.
 - ✅ Per-vertebra offset from the spline.
 - ✅ Orientation / rotation estimate per vertebra + global curvature descriptors.
-- 🚧 Neighbour-consistency metrics (spacing regularity, monotonic progression). *(Item 020)*
+- ✅ Neighbour-consistency metrics (spacing regularity, monotonic progression). *(Item 020)*
 - 📋 Optional sagittal projection of centroids + spline for the human report.
 
 **Acceptance.**
