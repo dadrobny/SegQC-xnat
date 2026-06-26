@@ -1,6 +1,6 @@
 # Item 015: Overlap detection between labels
 
-**Status:** 📋 Planned
+**Status:** 🚧 In Progress
 **Branch:** `aide/015-overlap-detection`
 **Stage:** 2 — Geometric & Topological Feature Extraction
 
@@ -70,3 +70,21 @@ Calling `detect_overlaps` twice with the same input returns identical results
   `(A, B)` and `(B, A)` are never both emitted.
 - **Scope.** Serialisation into the JSON report is item 016; this module only
   computes and returns `OverlapPair` records.
+- **Function signature.** The public function is
+  `detect_overlaps(mask_stack, labels, convention=None)` where `mask_stack` is
+  shape `(n_labels, X, Y, Z)` bool and `labels` is a 1-D integer array of
+  length `n_labels`.  `convention` defaults to `LabelConvention.default()`.
+  This matches the test contract exactly (the tests pass a numpy array as the
+  second argument, not a `LabelConvention` object).
+- **OverlapPair field names.** Fields are `label_a`, `label_b`, `name_a`,
+  `name_b`, `overlap_voxels` — matching what the tests assert via
+  `hasattr(pair, field)`.  The task description used `label_a_name` /
+  `label_b_name` but the tests are authoritative.
+- **Pair enumeration.** Uses `itertools.combinations(range(n_labels), 2)` to
+  produce all unique unordered label pairs without repetition.  For each pair,
+  `np.count_nonzero(stack[i] & stack[j])` gives the shared-voxel count in one
+  vectorised pass — no Python-level voxel iteration.
+- **Ordering.** Results are sorted by `(label_a, label_b)` after construction,
+  satisfying AC4 determinism and making downstream consumers predictable.
+- **Input immutability.** `mask_stack[i] & mask_stack[j]` produces a new
+  temporary array; neither input channel is modified in place.
