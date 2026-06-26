@@ -75,20 +75,10 @@ correct ordering, neighbour-spacing values vs hand-computed expectations, and
 that out-of-order / gapped / duplicated label sets are correctly identified;
 deterministic output; missing or single-label maps handled without crashing.
 
-### Item 016: Features-block JSON serialisation & per-case feature table *(completes Stage 2)*
-Consolidate all Stage 2 features — per-label geometry (011), connected-components
-(012), centroids (013), inter-vertebra relationships (014), overlap (015), EDT-
-based centroid variants and centroid depth (023) — into the versioned JSON report
-under a `features` block, and render a per-case **human-readable feature table**.
-Include the **fragmentation index** (largest component / total volume ratio,
-derived from item 012 data) as a per-label scalar in the features block. Extend
-the report schema (009) to cover the features block with validation, and record
-the config/schema version.
-*Testable:* serialised reports validate against the extended schema; golden-
-snapshot tests confirm deterministic output; an anisotropic fixture round-trips
-correct physical volumes/extents; tests assert every feature family (including
-fragmentation index, centroid depth, EDT centroid variants) appears in the JSON.
-Satisfies the Stage 2 acceptance criteria.
+### Item 016: Features-block JSON serialisation & per-case feature table *(completes Stage 2 — ✅ done)*
+Consolidated all Stage 2 features into the versioned JSON report under a
+`features` block with a per-case human-readable feature table. Extended the
+report schema (009) with validation. *(Already merged to main — do not re-open.)*
 
 ### Item 017: Centroid spline fit (robust to missing levels)
 Fit a smooth spline (parametric cubic / B-spline via SciPy) through the **ordered**
@@ -166,6 +156,18 @@ values.
 geometric interior than CoM for a hollow/concave synthetic label; centroid depth
 is positive for a well-placed centroid and near-zero for one on the surface;
 C1/C2 flags set correctly; deterministic.
+
+### Item 025: Fragmentation index per label *(Stage 2 enhancement)*
+Add a **fragmentation index** scalar per label — the ratio of the largest
+connected component's voxel count to the total label voxel count (range 0–1;
+value of 1 = single intact body, lower = progressively split label). Compute
+from the connected-component data already available from item 012. Extend the
+JSON `features` block (016) to include `fragmentation_index` per label and add
+it to the human-readable feature table.
+*Testable:* unit tests assert index = 1.0 for a single-component label, correct
+ratio for a two-component label with known sizes, and near-zero for a highly
+fragmented label; serialised JSON validates against the extended schema;
+deterministic.
 
 ### Item 024: Local vertebra neighbourhood comparison *(completes Stage 3)*
 Using the ordered centroid sequence (014), spline offset per vertebra (018), and
