@@ -50,10 +50,12 @@ intentional. Numbers 011–013 and 015 are done; this queue uses 014, 016–022.
 **Estimated size:** ~1 week (8 items). Each item is independently testable
 locally with `pytest` against the synthetic fixtures from item 002.
 
-**Sequencing note.** Critical path: 014 → 017 → 018 → 020 → 022. Item 016
-(Stage 2 features-to-JSON) can land in parallel with 017; items 019 (orientation)
-and 021 (sagittal projection) are largely independent and can be picked up
-whenever their upstreams (013, 014/017) are merged.
+**Sequencing note.** Original critical path 014 → 017 → 018 is done. Remaining
+path: 019 → 020 → 022. Item 023 (EDT centroid) is a Stage 2 enhancement that
+runs independently and feeds into item 024 and Stage 4 heuristics. Item 024
+(neighbourhood comparison) depends on 017 and 020. Items 021 (sagittal
+projection) and 023 are largely independent and can be picked up in parallel
+with 019/020.
 
 ---
 
@@ -75,14 +77,18 @@ deterministic output; missing or single-label maps handled without crashing.
 
 ### Item 016: Features-block JSON serialisation & per-case feature table *(completes Stage 2)*
 Consolidate all Stage 2 features — per-label geometry (011), connected-components
-(012), centroids (013), inter-vertebra relationships (014), and overlap (015) —
-into the versioned JSON report under a `features` block, and render a per-case
-**human-readable feature table**. Extend the report schema (009) to cover the
-features block with validation, and record the config/schema version.
+(012), centroids (013), inter-vertebra relationships (014), overlap (015), EDT-
+based centroid variants and centroid depth (023) — into the versioned JSON report
+under a `features` block, and render a per-case **human-readable feature table**.
+Include the **fragmentation index** (largest component / total volume ratio,
+derived from item 012 data) as a per-label scalar in the features block. Extend
+the report schema (009) to cover the features block with validation, and record
+the config/schema version.
 *Testable:* serialised reports validate against the extended schema; golden-
 snapshot tests confirm deterministic output; an anisotropic fixture round-trips
-correct physical volumes/extents; tests assert every feature family appears in
-the JSON. Satisfies the Stage 2 acceptance criteria.
+correct physical volumes/extents; tests assert every feature family (including
+fragmentation index, centroid depth, EDT centroid variants) appears in the JSON.
+Satisfies the Stage 2 acceptance criteria.
 
 ### Item 017: Centroid spline fit (robust to missing levels)
 Fit a smooth spline (parametric cubic / B-spline via SciPy) through the **ordered**
@@ -133,23 +139,68 @@ spline markers is produced for a fixture, the output path is recorded in the
 report, and the function degrades gracefully (no crash) when the optional backend
 is absent.
 
-### Item 022: Stage 3 feature serialisation & GT-vs-perturbed regression tests *(completes Stage 3)*
+### Item 022: Stage 3 feature serialisation & GT-vs-perturbed regression tests *(completes Stage 3 — spline features)*
 Serialise the Stage 3 deviation features — spline offset (018), orientation /
 curvature (019), neighbour-consistency (020) — into the JSON `features` block
 (extending 016), and add regression tests over **GT plus perturbed** cases.
 *Testable:* end-to-end tests assert the new features appear in validated JSON;
 offsets / consistency scores are within tolerance for GT fixtures and clearly
 out-of-range for displaced, mislabelled, and missing-level perturbations; golden
-snapshots are deterministic. Satisfies the Stage 3 acceptance criteria.
+snapshots are deterministic.
+
+### Item 023: EDT-based centroid variants & centroid depth *(Stage 2 enhancement)*
+Extend `segqc/features/centroids.py` with two additional centroid computation
+methods alongside the existing CoM baseline: **smooth centre** (centre of mass of
+the EDT-thresholded mask, threshold configurable at e.g. 50 % or 75 % of the max
+EDT value) and **strict centre** (peak of the Gaussian-smoothed EDT — the single
+deepest interior point). Add **centroid depth** as a per-label scalar: the EDT
+value at the chosen centroid position, quantifying how far inside the label the
+centroid lies (low values flag near-surface or outside-label centroids). C1 and
+C2 are flagged as anatomically special (no classic vertebral body) and their
+centroid-depth interpretation documented. Results stored in an extended
+`LabelCentroid` record (or a companion `CentroidFeatures` dataclass). Note: item
+017 is already merged using simple CoM centroids; 023 improves the centroid
+quality and downstream items (024, Stage 4 heuristics) can consume the better
+values.
+*Testable:* unit tests assert smooth-centre and strict-centre lie closer to the
+geometric interior than CoM for a hollow/concave synthetic label; centroid depth
+is positive for a well-placed centroid and near-zero for one on the surface;
+C1/C2 flags set correctly; deterministic.
+
+### Item 024: Local vertebra neighbourhood comparison *(completes Stage 3)*
+Using the ordered centroid sequence (014), spline offset per vertebra (018), and
+per-label geometry (011), compute **local neighbourhood features** via a sliding
+window of configurable width n (default n=3, i.e. ±1 neighbour on each side):
+for each vertebra, the mean/median and deviation of centroid spacing, spline
+offset, and label volume within its local window. Emit a **per-vertebra
+neighbourhood deviation score** and flag vertebrae whose local deviation exceeds a
+configurable threshold as anatomical outliers. This catches isolated failures
+(displaced or mislabelled single vertebra within an otherwise-consistent spine
+segment) that global-mean comparisons miss.
+*Testable:* unit tests assert near-zero deviation for a regular GT fixture;
+a single injected outlier (displaced centroid, abnormal volume) is flagged while
+its neighbours are not; window boundary cases (first/last vertebra) handled
+without crash; deterministic; window width configurable.
 
 ---
 
+## Current state (updated 2026-06-26)
+
+Items 014, 016, 017, 018 are merged to `main`. Item 019
+(orientation/curvature) is in progress on `aide/019-vertebra-orientation-curvature`.
+
+**Remaining in this queue:** 019 (in progress), 020, 021, 022, 023, 024.
+
 ## Next Step
 
-Pick an item from this queue (start with **Item 014**, then **016**, then the
-Stage 3 chain **017 → 018 → 020 → 022**), then open a **new chat session** and run
-`/speckit-aide-create-item` with that item's description to produce a detailed
-work-item specification under `docs/aide/items/NNN-*.md`. Per the team workflow in
-`CLAUDE.md`: `git fetch --all --prune` and check `aide/*` branches first, then
-branch per item (`git switch -c aide/014-inter-vertebra-relationships`) and push
-immediately to claim it; `git pull --rebase` before any `progress.md` edit.
+With 019 in progress, the next items to claim from this queue are:
+- **Item 023** (EDT centroid + centroid depth) — Stage 2 enhancement; best
+  done before the spline features consume the centroid values further downstream.
+- **Item 020** (neighbour-consistency) — can run in parallel with 023 once 019 merges.
+- **Items 021, 022, 024** follow naturally from 020 and the spline layer.
+
+Open a **new chat session** and run `/speckit-aide-create-item` with the chosen
+item's description to produce a detailed spec under `docs/aide/items/NNN-*.md`.
+Per the team workflow in `CLAUDE.md`: `git fetch --all --prune` and check
+`aide/*` branches first, then branch per item and push immediately to claim it;
+`git pull --rebase` before any `progress.md` edit.
