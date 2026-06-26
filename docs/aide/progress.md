@@ -126,7 +126,7 @@ mislabelling heuristics.
 - ✅ Spline fit through ordered vertebra centroids, robust to missing levels. *(Item 017)*
 - ✅ Per-vertebra offset from the spline. *(Item 018)*
 - ✅ Orientation / rotation estimate per vertebra + global curvature descriptors. *(Item 019)*
-- 📋 Neighbour-consistency metrics (spacing regularity, monotonic progression). *(Item 020)*
+- ✅ Neighbour-consistency metrics (spacing regularity, monotonic progression). *(Item 020)*
 - 📋 Optional sagittal projection of centroids + spline for the human report. *(Item 021)*
 - 📋 Stage 3 feature serialisation & GT-vs-perturbed regression tests. *(Item 022)*
 - 📋 Local vertebra neighbourhood comparison (sliding window, n=3–5): per-vertebra deviation from neighbourhood mean/median of centroid spacing, spline offset, and volume; flags isolated anatomical outliers. *(Item 024)*
