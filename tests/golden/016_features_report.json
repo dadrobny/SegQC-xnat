@@ -1,0 +1,196 @@
+{
+  "schema_version": "0.1",
+  "config_version": "0.1",
+  "case_id": "golden-case",
+  "verdict": "pass",
+  "reasons": [],
+  "per_label": {},
+  "features": {
+    "features_version": "0.1",
+    "per_label": {
+      "1": {
+        "label": 1,
+        "level_name": "C1",
+        "geometry": {
+          "voxel_count": 64,
+          "physical_volume_mm3": 64.0,
+          "extent_x_mm": 4.0,
+          "extent_y_mm": 4.0,
+          "extent_z_mm": 4.0,
+          "bbox_voxel": {
+            "x_min": 2,
+            "x_max": 5,
+            "y_min": 2,
+            "y_max": 5,
+            "z_min": 2,
+            "z_max": 5
+          },
+          "bbox_physical": {
+            "x_min": 2.0,
+            "x_max": 5.0,
+            "y_min": 2.0,
+            "y_max": 5.0,
+            "z_min": 2.0,
+            "z_max": 5.0
+          },
+          "touches_inferior": false,
+          "touches_superior": false,
+          "touches_left": false,
+          "touches_right": false,
+          "touches_anterior": false,
+          "touches_posterior": false
+        },
+        "components": {
+          "component_count": 1,
+          "component_sizes": [
+            64
+          ],
+          "component_volumes_mm3": [
+            64.0
+          ],
+          "largest_component_fraction": 1.0,
+          "small_fragments": []
+        },
+        "centroid": {
+          "centroid_voxel": [
+            3.5,
+            3.5,
+            3.5
+          ],
+          "centroid_mm": [
+            3.5,
+            3.5,
+            3.5
+          ]
+        }
+      },
+      "2": {
+        "label": 2,
+        "level_name": "C2",
+        "geometry": {
+          "voxel_count": 64,
+          "physical_volume_mm3": 64.0,
+          "extent_x_mm": 4.0,
+          "extent_y_mm": 4.0,
+          "extent_z_mm": 4.0,
+          "bbox_voxel": {
+            "x_min": 2,
+            "x_max": 5,
+            "y_min": 10,
+            "y_max": 13,
+            "z_min": 2,
+            "z_max": 5
+          },
+          "bbox_physical": {
+            "x_min": 2.0,
+            "x_max": 5.0,
+            "y_min": 10.0,
+            "y_max": 13.0,
+            "z_min": 2.0,
+            "z_max": 5.0
+          },
+          "touches_inferior": false,
+          "touches_superior": false,
+          "touches_left": false,
+          "touches_right": false,
+          "touches_anterior": false,
+          "touches_posterior": false
+        },
+        "components": {
+          "component_count": 1,
+          "component_sizes": [
+            64
+          ],
+          "component_volumes_mm3": [
+            64.0
+          ],
+          "largest_component_fraction": 1.0,
+          "small_fragments": []
+        },
+        "centroid": {
+          "centroid_voxel": [
+            3.5,
+            11.5,
+            3.5
+          ],
+          "centroid_mm": [
+            3.5,
+            11.5,
+            3.5
+          ]
+        }
+      },
+      "3": {
+        "label": 3,
+        "level_name": "C3",
+        "geometry": {
+          "voxel_count": 64,
+          "physical_volume_mm3": 64.0,
+          "extent_x_mm": 4.0,
+          "extent_y_mm": 4.0,
+          "extent_z_mm": 4.0,
+          "bbox_voxel": {
+            "x_min": 10,
+            "x_max": 13,
+            "y_min": 2,
+            "y_max": 5,
+            "z_min": 10,
+            "z_max": 13
+          },
+          "bbox_physical": {
+            "x_min": 10.0,
+            "x_max": 13.0,
+            "y_min": 2.0,
+            "y_max": 5.0,
+            "z_min": 10.0,
+            "z_max": 13.0
+          },
+          "touches_inferior": false,
+          "touches_superior": false,
+          "touches_left": false,
+          "touches_right": false,
+          "touches_anterior": false,
+          "touches_posterior": false
+        },
+        "components": {
+          "component_count": 1,
+          "component_sizes": [
+            64
+          ],
+          "component_volumes_mm3": [
+            64.0
+          ],
+          "largest_component_fraction": 1.0,
+          "small_fragments": []
+        },
+        "centroid": {
+          "centroid_voxel": [
+            11.5,
+            3.5,
+            11.5
+          ],
+          "centroid_mm": [
+            11.5,
+            3.5,
+            11.5
+          ]
+        }
+      }
+    },
+    "relationships": {
+      "present_levels": [
+        "C1",
+        "C2",
+        "C3"
+      ],
+      "missing_levels": [],
+      "neighbour_spacings_mm": [
+        8.0,
+        13.856406460551018
+      ],
+      "is_continuous": true,
+      "out_of_order_labels": []
+    },
+    "overlaps": []
+  }
+}
