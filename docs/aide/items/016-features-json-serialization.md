@@ -61,12 +61,11 @@ The `features` block has this shape (illustrative values):
     }
   },
   "relationships": {
-    "ordered_labels": [22, 23, 24],
-    "neighbour_spacing_voxel": [12.0, 12.5],
-    "neighbour_spacing_mm": [24.0, 25.0],
-    "continuity_findings": [
-      {"kind": "gap", "message": "...", "labels": [23, 24]}
-    ]
+    "present_levels": ["L2", "L3", "L4"],
+    "missing_levels": [],
+    "neighbour_spacings_mm": [24.0, 25.0],
+    "is_continuous": true,
+    "out_of_order_labels": []
   },
   "overlaps": [
     {"label_a": 23, "label_b": 24, "name_a": "L3", "name_b": "L4", "overlap_voxels": 10}
@@ -81,7 +80,7 @@ Field origins (each maps directly to an existing dataclass):
 | `per_label[*].geometry` | item 011 · `segqc.features.geometry.LabelGeometry` (incl. `BBox`) |
 | `per_label[*].components` | item 012 · `segqc.features.components.ComponentsInfo` |
 | `per_label[*].centroid` + `label` + `level_name` | item 013 · `segqc.features.centroids.LabelCentroid` |
-| `relationships` | item 014 · inter-vertebra relationship record *(see Dependencies)* |
+| `relationships` | item 014 · `segqc.features.relationships.SpineRelationships` |
 | `overlaps` | item 015 · `segqc.features.overlap.OverlapPair` |
 
 ### Scope boundary
@@ -136,10 +135,12 @@ Field origins (each maps directly to an existing dataclass):
       `repr()`, tuples, or `frozenset` text. Deterministic (sorted label order).
 
 - [ ] **AC7 — Empty / single-label maps handled.** Assembling features for a map
-      with one label produces a valid block (`overlaps == []`, `relationships`
-      either an object with a single ordered label or `null`); a map with zero
-      labels produces an empty `per_label`, empty `overlaps`, and a `null`/empty
-      `relationships` — and still validates and renders without raising.
+      with one known level produces a valid block (`overlaps == []`,
+      `relationships.present_levels` has ≤1 entry and
+      `relationships.neighbour_spacings_mm == []`); a map with zero labels
+      produces an empty `per_label`, empty `overlaps`, and a `relationships` that
+      is either an empty-list-bearing object or `null` — and still validates and
+      renders without raising.
 
 - [ ] **AC8 — Pure / immutable / import-clean.** The assembler and converters do
       not mutate their inputs and are deterministic. `import segqc.feature_report`
@@ -164,8 +165,12 @@ Field origins (each maps directly to an existing dataclass):
      `#/definitions/labelFeatures` (`label`, `level_name`, `geometry`,
      `components`, `centroid`), `#/definitions/geometry`,
      `#/definitions/components`, `#/definitions/centroid`,
-     `#/definitions/overlapPair`, `#/definitions/relationships`. Use
-     `additionalProperties: false` on each so drift is caught in tests.
+     `#/definitions/overlapPair`, and `#/definitions/relationships` with the
+     **merged item-014 `SpineRelationships` fields** — `present_levels`
+     (array of strings), `missing_levels` (array of strings),
+     `neighbour_spacings_mm` (array of numbers), `is_continuous` (boolean),
+     `out_of_order_labels` (array of strings). Use `additionalProperties: false`
+     on each so drift is caught in tests.
    - The schema `description` already says *"Extended by Stage 2 with a 'features'
      block"* — this realises it.
 
@@ -177,12 +182,16 @@ Field origins (each maps directly to an existing dataclass):
      - `centroid_to_dict(c: LabelCentroid) -> dict` → `{"centroid_voxel": [...],
        "centroid_mm": [...]}` (tuples → lists)
      - `overlap_to_dict(o: OverlapPair) -> dict`
-     - `relationships_to_dict(rel) -> dict | None` (consumes the item-014 record;
-       see Dependencies for the field reconciliation note)
+     - `relationships_to_dict(rel: SpineRelationships | None) -> dict | None` →
+       `{"present_levels": [...], "missing_levels": [...],
+       "neighbour_spacings_mm": [...], "is_continuous": bool,
+       "out_of_order_labels": [...]}`; `None` → `null`. (Consumes the merged
+       item-014 `SpineRelationships` from `segqc.features.relationships`.)
    - `build_features_block(*, geometry, components, centroids, relationships,
      overlaps, features_version="0.1") -> dict` where `geometry`,
      `components`, `centroids` are `Mapping[int, <dataclass>]` keyed by label,
-     `relationships` is the item-014 record or `None`, and `overlaps` is an
+     `relationships` is a `SpineRelationships` (from
+     `compute_spine_relationships(centroids)`) or `None`, and `overlaps` is an
      iterable of `OverlapPair`. Assembles `per_label` in **ascending label
      order**, merging the three per-label dataclasses under one entry with
      `label` and `level_name` (taken from the centroid record); sorts `overlaps`
@@ -220,7 +229,7 @@ Field origins (each maps directly to an existing dataclass):
 - **Test module:** `tests/test_016_features_json.py`.
 - **Approach:** compute the real feature objects from a fixture
   (`compute_label_geometry`, `compute_components`, `compute_centroid`,
-  `detect_overlaps`, and the item-014 relationship function), pass them to
+  `detect_overlaps`, and `compute_spine_relationships`), pass them to
   `build_features_block`, then to `serialize_report` — exercising the full
   consolidation path against actual data rather than mocks.
 - **Coverage / adversarial cases:**
@@ -246,17 +255,16 @@ Field origins (each maps directly to an existing dataclass):
   - Item 011 — `LabelGeometry`, `BBox`, `compute_label_geometry`.
   - Item 012 — `ComponentsInfo`, `compute_components`.
   - Item 013 — `LabelCentroid`, `compute_centroid`.
+  - Item 014 — `SpineRelationships`, `compute_spine_relationships(centroids,
+    convention=None)` in `segqc.features.relationships`. **Merged** (commit
+    `0e716c3`). Its public record carries `present_levels`, `missing_levels`,
+    `neighbour_spacings_mm`, `is_continuous`, and `out_of_order_labels` — the
+    `features` block, `relationships_to_dict`, and the schema's
+    `#/definitions/relationships` (above) are written to **these** field names.
+    Note: `compute_spine_relationships` consumes an ordered sequence of
+    `LabelCentroid` (not a `seg_img`), so 016's tests build it from the same
+    centroid records they already compute.
   - Item 015 — `OverlapPair`, `detect_overlaps`.
-- **Upstream (in flight — HARD dependency): Item 014 — inter-vertebra
-  relationships.** At spec-writing time item 014 is claimed and in progress on
-  `aide/014-inter-vertebra-relationships` and is **not yet merged**.
-  **`execute-item 016` must rebase onto `main` after 014 has merged.** The exact
-  field names of 014's relationship record (e.g. `ordered_labels`,
-  `neighbour_spacing_voxel/_mm`, continuity findings) are **owned by 014**;
-  `relationships_to_dict` and the schema's `#/definitions/relationships` must be
-  reconciled against 014's actual public type when this item is executed — record
-  the reconciliation in *Decisions & Trade-offs*. The shapes shown above are the
-  queue-002 description's intent, not a contract 016 may impose on 014.
 - **Downstream:**
   - Item 022 — serialises Stage 3 deviation features by extending this block
     (bumps `features_version`).
@@ -305,8 +313,14 @@ To be updated during implementation. Initial decisions:
    serialise to JSON arrays `[x, y, z]`; `BBox` serialises to an object with the
    named `x_min`…`z_max` keys.
 
-7. **Item-014 relationship shape is reconciled at execution time** (see
-   Dependencies) — 016 does not freeze 014's API.
+7. **Item-014 relationship shape reconciled against the merged `SpineRelationships`
+   API.** 014 landed (commit `0e716c3`) exposing `present_levels`,
+   `missing_levels`, `neighbour_spacings_mm`, `is_continuous`,
+   `out_of_order_labels` — level **names** (strings) in canonical order, mm
+   spacings only (no voxel spacing), and a boolean+list continuity signal rather
+   than a findings array. The `features` block, schema definition, and
+   `relationships_to_dict` in this spec were updated to match exactly; 016 does
+   not impose its own shape on 014.
 
 ---
 
@@ -371,9 +385,10 @@ When this item is complete, update [`../progress.md`](../progress.md):
 
 - Flip the Stage 2 **"Features serialised into JSON (`features` block) + per-case
   feature table"** deliverable from 📋 → ✅ (mark 🚧 while in progress).
-- This is the **last** outstanding Stage 2 deliverable — once it and item 014 are
-  ✅, tick the Stage 2 acceptance row *"`features` block emitted in JSON; tests
-  cover each feature"* and flip the Stage 2 summary status from 🚧 → ✅.
+- This is the **last** outstanding Stage 2 deliverable (item 014 is already ✅) —
+  once it is ✅, tick the Stage 2 acceptance row *"`features` block emitted in
+  JSON; tests cover each feature"* and flip the Stage 2 summary status from
+  🚧 → ✅.
 - Per `CLAUDE.md`: work on branch `aide/016-features-json-serialization`,
   `git pull --rebase` before editing `progress.md`, keep edits scoped to this
   item's rows, and direct-merge (no PR required) once green.
@@ -382,6 +397,7 @@ When this item is complete, update [`../progress.md`](../progress.md):
 
 ## Next Step
 
-Ensure item 014 has merged to `main`, then start a **new chat session** and run
-`/speckit-aide-execute-item 016` to implement this work item (rebase onto `main`
-first so 014's relationship API is available).
+Item 014 has merged to `main` (its `SpineRelationships` API is available). Start
+a **new chat session**, rebase this branch onto the latest `main`
+(`git rebase main`), then run `/speckit-aide-execute-item 016` to implement this
+work item.
