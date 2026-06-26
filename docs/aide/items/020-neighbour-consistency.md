@@ -1,6 +1,6 @@
 # Item 020 — Neighbour-Consistency Metrics (Spacing Regularity & Monotonic Progression)
 
-> **Status:** 📋 Planned · **Created:** 2026-06-26
+> **Status:** 🚧 In Progress · **Created:** 2026-06-26
 > **Stage:** 3 — Spinal Curve: Spline Fit & Geometric Deviation Features
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 020
 > **Objectives:** Derive neighbour-consistency metrics from the ordered centroid
@@ -294,6 +294,15 @@ raises `ValueError` with a non-empty, human-readable message.
 6. **Monotonicity defined as strictly increasing** — `u[i] >= u[i+1]` is
    flagged (not just `>`), so two anatomically ordered levels that map to
    the same spline parameter are also considered non-monotonic.
+
+7. **CV with single spacing returns 0.0** — when there are exactly 2 centroids
+   there is only 1 spacing value, so the standard deviation is 0 and CV is
+   defined as 0.0 (no variation is possible with a single data point).
+
+8. **Population std (ddof=0)** — CV uses NumPy's default population standard
+   deviation to remain consistent with how CV is typically defined; the spec
+   says `std / mean` without specifying sample vs. population, and population
+   std is the more natural choice here.
 
 ---
 
