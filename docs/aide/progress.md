@@ -25,7 +25,7 @@
 | 0 | Project Scaffolding & I/O Foundation | (foundation) | 📋 |
 | 1 | End-to-End Thin Slice: Empty Detection + Report | G1, G4 | 📋 |
 | 2 | Geometric & Topological Feature Extraction | (feature core) | 🚧 |
-| 3 | Spinal Curve: Spline Fit & Deviation Features | (feature core) | 🚧 |
+| 3 | Spinal Curve: Spline Fit & Deviation Features | (feature core) | ✅ |
 | 4 | Heuristic Rule Engine over Failure Modes | G2 | 📋 |
 | 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | 📋 |
 | 6 | VerSe Reference Distributions & Delta Rules | G3 | 📋 |
@@ -117,7 +117,7 @@ empty / trivially-failed segmentations.
 
 ---
 
-## Stage 3 — Spinal Curve: Spline Fit & Geometric Deviation Features — 🚧
+## Stage 3 — Spinal Curve: Spline Fit & Geometric Deviation Features — ✅
 
 **Goal.** Centroid-spline and deviation features powering alignment, ordering, and
 mislabelling heuristics.
@@ -128,7 +128,7 @@ mislabelling heuristics.
 - ✅ Orientation / rotation estimate per vertebra + global curvature descriptors. *(Item 019)*
 - ✅ Neighbour-consistency metrics (spacing regularity, monotonic progression). *(Item 020)*
 - ✅ Optional sagittal projection of centroids + spline for the human report. *(Item 021)*
-- 🚧 Stage 3 feature serialisation & GT-vs-perturbed regression tests. *(Item 022)*
+- ✅ Stage 3 feature serialisation & GT-vs-perturbed regression tests. *(Item 022)*
 - 📋 Local vertebra neighbourhood comparison (sliding window, n=3–5): per-vertebra deviation from neighbourhood mean/median of centroid spacing, spline offset, and volume; flags isolated anatomical outliers. *(Item 024)*
 
 **Acceptance.**
