@@ -40,6 +40,7 @@ dynamic = ["version"]
 [project.optional-dependencies]
 dev = [
     "pytest>=7",
+    "matplotlib>=3.5",
 ]
 
 [project.urls]
