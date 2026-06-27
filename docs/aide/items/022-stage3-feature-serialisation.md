@@ -283,6 +283,22 @@ This item:
    `per_label_orientations` are sorted ascending by `label` (integer), matching
    the `per_label` ordering convention from item 016.
 
+7. **Partial Stage 3 blocks are valid.** Any single non-`None` Stage 3 argument
+   produces a `"stage3"` key; absent arguments simply omit the corresponding
+   sub-key from `"stage3"`. The schema defines all five sub-keys as optional
+   properties (no `required` array inside `stage3`). This allows callers to
+   supply e.g. only `curvature` without computing the other four objects.
+
+8. **`FEATURES_VERSION_STAGE3 = "0.2"` exported from `feature_report`.** The
+   version constant is auto-applied when any Stage 3 arg is non-`None` and the
+   caller has not overridden `features_version`. Callers that need explicit
+   control can still pass `features_version="0.2"` directly.
+
+9. **Schema definitions added under `report_schema_v0.json`.** Six new
+   definitions: `stage3`, `stage3OffsetEntry`, `stage3OrientationEntry`,
+   `stage3Curvature`, `stage3SpacingConsistency`, `stage3MonotonicConsistency`,
+   all with `additionalProperties: false` for forward-compatibility safety.
+
 ---
 
 ## Testing Prerequisites

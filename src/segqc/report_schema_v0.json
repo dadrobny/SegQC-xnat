@@ -82,13 +82,13 @@
     },
     "features": {
       "type": "object",
-      "description": "Consolidated Stage 2 features for a case: per-label geometry/components/centroid, inter-vertebra relationships, and overlap pairs.",
+      "description": "Consolidated Stage 2 features for a case: per-label geometry/components/centroid, inter-vertebra relationships, and overlap pairs. Stage 3 adds an optional 'stage3' sub-block.",
       "additionalProperties": false,
       "required": ["features_version", "per_label", "overlaps", "relationships"],
       "properties": {
         "features_version": {
           "type": "string",
-          "description": "Version discriminator for the features block, independent of the top-level schema_version. Stage 3 bumps this.",
+          "description": "Version discriminator for the features block, independent of the top-level schema_version. Stage 3 bumps this to '0.2'.",
           "minLength": 1
         },
         "per_label": {
@@ -111,6 +111,10 @@
             {"$ref": "#/definitions/relationships"},
             {"type": "null"}
           ]
+        },
+        "stage3": {
+          "description": "Optional Stage 3 deviation features (spline offset, orientation/curvature, neighbour-consistency). Absent for Stage-2-only reports.",
+          "$ref": "#/definitions/stage3"
         }
       }
     },
@@ -277,6 +281,146 @@
           "type": "array",
           "description": "Level names (in input order) that broke canonical monotonicity.",
           "items": {"type": "string"}
+        }
+      }
+    },
+    "stage3": {
+      "type": "object",
+      "description": "Stage 3 deviation features (item 022): per-vertebra spline offsets, orientation/curvature, and neighbour-consistency metrics.",
+      "additionalProperties": false,
+      "properties": {
+        "per_label_offsets": {
+          "type": "array",
+          "description": "Per-vertebra perpendicular offset from the fitted spline (item 018). Sorted ascending by label.",
+          "items": {"$ref": "#/definitions/stage3OffsetEntry"}
+        },
+        "per_label_orientations": {
+          "type": "array",
+          "description": "Per-vertebra PCA orientation (item 019). Sorted ascending by label.",
+          "items": {"$ref": "#/definitions/stage3OrientationEntry"}
+        },
+        "curvature": {
+          "description": "Global spinal curvature descriptors (item 019).",
+          "$ref": "#/definitions/stage3Curvature"
+        },
+        "spacing_consistency": {
+          "description": "Inter-centroid spacing regularity metrics (item 020).",
+          "$ref": "#/definitions/stage3SpacingConsistency"
+        },
+        "monotonic_consistency": {
+          "description": "Anatomical-order vs spline-parameter monotonicity metrics (item 020).",
+          "$ref": "#/definitions/stage3MonotonicConsistency"
+        }
+      }
+    },
+    "stage3OffsetEntry": {
+      "type": "object",
+      "description": "Per-vertebra perpendicular offset from the fitted spline.",
+      "additionalProperties": false,
+      "required": ["label", "level_name", "closest_u", "offset_mm", "offset_voxel", "dx_mm", "dy_mm", "dz_mm"],
+      "properties": {
+        "label": {"type": "integer", "description": "Integer label value."},
+        "level_name": {"type": "string", "description": "Anatomical vertebra name."},
+        "closest_u": {"type": "number", "description": "Spline parameter value (0..1) of the closest point on the curve."},
+        "offset_mm": {"type": "number", "minimum": 0, "description": "Euclidean distance (mm) to the closest spline point."},
+        "offset_voxel": {"type": "number", "minimum": 0, "description": "Same distance in voxel units."},
+        "dx_mm": {"type": "number", "description": "x-component of the displacement vector (mm)."},
+        "dy_mm": {"type": "number", "description": "y-component of the displacement vector (mm)."},
+        "dz_mm": {"type": "number", "description": "z-component of the displacement vector (mm)."}
+      }
+    },
+    "stage3OrientationEntry": {
+      "type": "object",
+      "description": "Per-vertebra PCA orientation.",
+      "additionalProperties": false,
+      "required": ["label", "level_name", "principal_axis", "eigenvalue_ratio"],
+      "properties": {
+        "label": {"type": "integer", "description": "Integer label value."},
+        "level_name": {"type": "string", "description": "Anatomical vertebra name."},
+        "principal_axis": {
+          "type": "array",
+          "description": "Unit vector (3 floats) of the first principal component in mm-space.",
+          "items": {"type": "number"},
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "eigenvalue_ratio": {"type": "number", "description": "Ratio of the largest to the second-largest PCA eigenvalue."}
+      }
+    },
+    "stage3Curvature": {
+      "type": "object",
+      "description": "Global spinal curvature descriptors.",
+      "additionalProperties": false,
+      "required": ["tangent_angles_deg", "inter_tangent_angles_deg", "total_curvature_deg"],
+      "properties": {
+        "tangent_angles_deg": {
+          "type": "array",
+          "description": "Spline tangent angle (degrees) at each centroid's u value, relative to the z-axis.",
+          "items": {"type": "number"}
+        },
+        "inter_tangent_angles_deg": {
+          "type": "array",
+          "description": "Angle (degrees) between consecutive tangent vectors. Length is n_centroids - 1.",
+          "items": {"type": "number"}
+        },
+        "total_curvature_deg": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Cobb-like proxy: range (max - min) of tangent angles."
+        }
+      }
+    },
+    "stage3SpacingConsistency": {
+      "type": "object",
+      "description": "Inter-centroid spacing regularity metrics.",
+      "additionalProperties": false,
+      "required": ["mean_spacing_mm", "cv_spacing", "spacings_mm", "deviations_mm", "outlier_pairs"],
+      "properties": {
+        "mean_spacing_mm": {"type": "number", "description": "Mean inter-centroid spacing (mm)."},
+        "cv_spacing": {"type": "number", "minimum": 0, "description": "Coefficient of variation of inter-centroid spacings."},
+        "spacings_mm": {
+          "type": "array",
+          "description": "Per-adjacent-pair spacings in anatomical order (length n_centroids - 1).",
+          "items": {"type": "number"}
+        },
+        "deviations_mm": {
+          "type": "array",
+          "description": "Signed deviation of each spacing from the mean.",
+          "items": {"type": "number"}
+        },
+        "outlier_pairs": {
+          "type": "array",
+          "description": "Level-name pairs whose spacing is flagged as an outlier. Each entry is a 2-element list [level_a, level_b].",
+          "items": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 2,
+            "maxItems": 2
+          }
+        }
+      }
+    },
+    "stage3MonotonicConsistency": {
+      "type": "object",
+      "description": "Anatomical-order vs spline-parameter monotonicity metrics.",
+      "additionalProperties": false,
+      "required": ["is_monotonic", "non_monotonic_pairs", "u_values"],
+      "properties": {
+        "is_monotonic": {"type": "boolean", "description": "True iff spline parameter u increases at every consecutive pair."},
+        "non_monotonic_pairs": {
+          "type": "array",
+          "description": "Level-name pairs where u did not advance. Each entry is a 2-element list [level_a, level_b].",
+          "items": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "u_values": {
+          "type": "array",
+          "description": "Per-centroid spline parameter values (length n_centroids).",
+          "items": {"type": "number"}
         }
       }
     }

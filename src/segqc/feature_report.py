@@ -1,20 +1,22 @@
-"""Features-block assembly & JSON serialisation (item 016).
+"""Features-block assembly & JSON serialisation (items 016, 022).
 
 This module is a **pure serialisation / assembly layer**. It does *not* compute
-geometry — the Stage 2 extractors (items 011–015) already produce frozen
-dataclasses. Here we convert each dataclass to a JSON-ready ``dict`` and
-assemble them into a single ``features`` block that embeds in the v0 report
-(see :mod:`segqc.report`) and validates against the extended
-``report_schema_v0.json``.
+geometry — the Stage 2 extractors (items 011–015) and Stage 3 extractors
+(items 018–020) already produce frozen dataclasses. Here we convert each
+dataclass to a JSON-ready ``dict`` and assemble them into a single ``features``
+block that embeds in the v0 report (see :mod:`segqc.report`) and validates
+against the extended ``report_schema_v0.json``.
 
 Public API
 ----------
 ``build_features_block(...) -> dict``
     Assemble the ``features`` block from already-computed per-label dataclasses
-    plus the case-level relationships and overlaps.
+    plus the case-level relationships, overlaps, and optional Stage 3 objects.
 
 The per-dataclass converters (``geometry_to_dict``, ``components_to_dict``,
-``centroid_to_dict``, ``overlap_to_dict``, ``relationships_to_dict``) are also
+``centroid_to_dict``, ``overlap_to_dict``, ``relationships_to_dict``,
+``spline_offset_to_dict``, ``orientation_to_dict``, ``curvature_to_dict``,
+``spacing_consistency_to_dict``, ``monotonic_consistency_to_dict``) are also
 exported for callers that need finer-grained control.
 
 Design decisions (item 016)
@@ -34,18 +36,39 @@ Design decisions (item 016)
    with the named ``x_min``…``z_max`` keys.
 5. **Inputs are never mutated.** Every converter builds and returns a fresh
    dict; the source dataclasses are frozen and only read.
+
+Design decisions (item 022)
+----------------------------
+1. **``"stage3"`` as a sub-object, not flat fields.** Grouping Stage 3 fields
+   under a single ``"stage3"`` key isolates them from Stage 2 fields and keeps
+   the schema modular. Future stages follow the same pattern.
+2. **``features_version`` bumped only when Stage 3 is present.** A
+   Stage-2-only call keeps ``"0.1"``; a Stage-3-enriched call emits ``"0.2"``.
+3. **All Stage 3 args optional (default ``None``).** Any non-``None`` Stage 3
+   argument triggers the ``"stage3"`` block; missing args are simply absent from
+   the sub-dict.
+4. **Tuples → lists in JSON.** ``principal_axis``, ``tangent_angles_deg``, etc.
+   are Python tuples in the dataclasses; converters emit lists for JSON compat.
+5. **``outlier_pairs`` / ``non_monotonic_pairs``** become list-of-two-element-lists
+   ``[[level_a, level_b], ...]`` for compact JSON representation.
+6. **Sorting within Stage 3 lists.** ``per_label_offsets`` and
+   ``per_label_orientations`` are sorted ascending by ``label`` (integer),
+   matching the ``per_label`` ordering convention from item 016.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterable, Mapping, Optional
+from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence
 
 if TYPE_CHECKING:
     from segqc.features.centroids import LabelCentroid
     from segqc.features.components import ComponentsInfo
+    from segqc.features.consistency import MonotonicConsistency, SpacingConsistency
     from segqc.features.geometry import BBox, LabelGeometry
+    from segqc.features.orientation import SpineCurvature, VertebralOrientation
     from segqc.features.overlap import OverlapPair
     from segqc.features.relationships import SpineRelationships
+    from segqc.features.spline_offset import VertebralSplineOffset
 
 __all__ = [
     "geometry_to_dict",
@@ -53,14 +76,22 @@ __all__ = [
     "centroid_to_dict",
     "overlap_to_dict",
     "relationships_to_dict",
+    "spline_offset_to_dict",
+    "orientation_to_dict",
+    "curvature_to_dict",
+    "spacing_consistency_to_dict",
+    "monotonic_consistency_to_dict",
     "build_features_block",
     "FEATURES_VERSION",
+    "FEATURES_VERSION_STAGE3",
 ]
 
 # Version discriminator for the features block, independent of the top-level
-# report ``schema_version``. Stage 3 (item 022) bumps this when it extends the
-# block with deviation features.
+# report ``schema_version``.
 FEATURES_VERSION = "0.1"
+
+# Bumped version when Stage 3 deviation features are included.
+FEATURES_VERSION_STAGE3 = "0.2"
 
 
 # --------------------------------------------------------------------------- #
@@ -164,6 +195,86 @@ def relationships_to_dict(
 
 
 # --------------------------------------------------------------------------- #
+# Stage 3 per-dataclass converters (item 022)
+# --------------------------------------------------------------------------- #
+
+
+def spline_offset_to_dict(o: "VertebralSplineOffset") -> dict:
+    """Convert a :class:`~segqc.features.spline_offset.VertebralSplineOffset` to a dict.
+
+    All eight fields are serialised verbatim. The source dataclass is frozen
+    and never mutated.
+    """
+    return {
+        "label": o.label,
+        "level_name": o.level_name,
+        "closest_u": o.closest_u,
+        "offset_mm": o.offset_mm,
+        "offset_voxel": o.offset_voxel,
+        "dx_mm": o.dx_mm,
+        "dy_mm": o.dy_mm,
+        "dz_mm": o.dz_mm,
+    }
+
+
+def orientation_to_dict(o: "VertebralOrientation") -> dict:
+    """Convert a :class:`~segqc.features.orientation.VertebralOrientation` to a dict.
+
+    ``principal_axis`` is emitted as a 3-element list (the source stores a
+    Python tuple; lists are required for JSON compatibility).
+    """
+    return {
+        "label": o.label,
+        "level_name": o.level_name,
+        "principal_axis": list(o.principal_axis),
+        "eigenvalue_ratio": o.eigenvalue_ratio,
+    }
+
+
+def curvature_to_dict(c: "SpineCurvature") -> dict:
+    """Convert a :class:`~segqc.features.orientation.SpineCurvature` to a dict.
+
+    Tuple fields ``tangent_angles_deg`` and ``inter_tangent_angles_deg`` become
+    lists. ``total_curvature_deg`` is emitted as a float.
+    """
+    return {
+        "tangent_angles_deg": list(c.tangent_angles_deg),
+        "inter_tangent_angles_deg": list(c.inter_tangent_angles_deg),
+        "total_curvature_deg": float(c.total_curvature_deg),
+    }
+
+
+def spacing_consistency_to_dict(s: "SpacingConsistency") -> dict:
+    """Convert a :class:`~segqc.features.consistency.SpacingConsistency` to a dict.
+
+    ``spacings_mm`` and ``deviations_mm`` become lists. ``outlier_pairs`` —
+    a tuple of ``(level_a, level_b)`` string-tuples — becomes a list of
+    two-element lists ``[[level_a, level_b], ...]`` for compact JSON.
+    """
+    return {
+        "mean_spacing_mm": s.mean_spacing_mm,
+        "cv_spacing": s.cv_spacing,
+        "spacings_mm": list(s.spacings_mm),
+        "deviations_mm": list(s.deviations_mm),
+        "outlier_pairs": [list(pair) for pair in s.outlier_pairs],
+    }
+
+
+def monotonic_consistency_to_dict(m: "MonotonicConsistency") -> dict:
+    """Convert a :class:`~segqc.features.consistency.MonotonicConsistency` to a dict.
+
+    ``u_values`` becomes a list. ``non_monotonic_pairs`` — a tuple of
+    ``(level_a, level_b)`` string-tuples — becomes a list of two-element lists
+    ``[[level_a, level_b], ...]``. ``is_monotonic`` is emitted as a bool.
+    """
+    return {
+        "is_monotonic": bool(m.is_monotonic),
+        "non_monotonic_pairs": [list(pair) for pair in m.non_monotonic_pairs],
+        "u_values": list(m.u_values),
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Assembler
 # --------------------------------------------------------------------------- #
 
@@ -175,13 +286,22 @@ def build_features_block(
     centroids: Mapping[int, "LabelCentroid"],
     relationships: Optional["SpineRelationships"],
     overlaps: Iterable["OverlapPair"],
+    # --- Stage 3 (all optional, item 022) ---
+    spline_offsets: "Optional[Sequence[VertebralSplineOffset]]" = None,
+    orientations: "Optional[Sequence[VertebralOrientation]]" = None,
+    curvature: "Optional[SpineCurvature]" = None,
+    spacing_consistency: "Optional[SpacingConsistency]" = None,
+    monotonic_consistency: "Optional[MonotonicConsistency]" = None,
     features_version: str = FEATURES_VERSION,
 ) -> dict:
-    """Assemble the ``features`` block from pre-computed Stage 2 dataclasses.
+    """Assemble the ``features`` block from pre-computed Stage 2 (and optional
+    Stage 3) dataclasses.
 
     This is the consolidation layer: it does not re-derive any geometry, it
     merges already-computed per-label dataclasses into one ``per_label`` entry
     per label and attaches the case-level ``relationships`` and ``overlaps``.
+    When any Stage 3 argument is non-``None``, a ``"stage3"`` sub-block is
+    appended and ``features_version`` is promoted to ``"0.2"``.
 
     Parameters
     ----------
@@ -198,9 +318,31 @@ def build_features_block(
     overlaps:
         Iterable of :class:`~segqc.features.overlap.OverlapPair` (item 015).
         Re-sorted defensively by ``(label_a, label_b)``.
+    spline_offsets:
+        Optional sequence of
+        :class:`~segqc.features.spline_offset.VertebralSplineOffset` (item 018).
+        When non-``None``, serialised as ``stage3.per_label_offsets`` sorted by
+        label.
+    orientations:
+        Optional sequence of
+        :class:`~segqc.features.orientation.VertebralOrientation` (item 019).
+        When non-``None``, serialised as ``stage3.per_label_orientations`` sorted
+        by label.
+    curvature:
+        Optional :class:`~segqc.features.orientation.SpineCurvature` (item 019).
+        When non-``None``, serialised as ``stage3.curvature``.
+    spacing_consistency:
+        Optional :class:`~segqc.features.consistency.SpacingConsistency`
+        (item 020). When non-``None``, serialised as
+        ``stage3.spacing_consistency``.
+    monotonic_consistency:
+        Optional :class:`~segqc.features.consistency.MonotonicConsistency`
+        (item 020). When non-``None``, serialised as
+        ``stage3.monotonic_consistency``.
     features_version:
         Version discriminator embedded in the block; defaults to
-        :data:`FEATURES_VERSION`.
+        :data:`FEATURES_VERSION`. Overridden to :data:`FEATURES_VERSION_STAGE3`
+        when any Stage 3 argument is non-``None``.
 
     Returns
     -------
@@ -234,9 +376,54 @@ def build_features_block(
     overlap_dicts = [overlap_to_dict(o) for o in overlaps]
     overlap_dicts.sort(key=lambda d: (d["label_a"], d["label_b"]))
 
-    return {
-        "features_version": features_version,
+    # Determine whether any Stage 3 data was supplied.
+    has_stage3 = any(
+        arg is not None
+        for arg in (spline_offsets, orientations, curvature,
+                    spacing_consistency, monotonic_consistency)
+    )
+
+    # Promote features_version to "0.2" when Stage 3 data is present, unless
+    # the caller explicitly overrode the version.
+    effective_version = features_version
+    if has_stage3 and features_version == FEATURES_VERSION:
+        effective_version = FEATURES_VERSION_STAGE3
+
+    block: dict = {
+        "features_version": effective_version,
         "per_label": per_label,
         "relationships": relationships_to_dict(relationships),
         "overlaps": overlap_dicts,
     }
+
+    if has_stage3:
+        stage3: dict = {}
+
+        if spline_offsets is not None:
+            stage3["per_label_offsets"] = [
+                spline_offset_to_dict(o)
+                for o in sorted(spline_offsets, key=lambda o: o.label)
+            ]
+
+        if orientations is not None:
+            stage3["per_label_orientations"] = [
+                orientation_to_dict(o)
+                for o in sorted(orientations, key=lambda o: o.label)
+            ]
+
+        if curvature is not None:
+            stage3["curvature"] = curvature_to_dict(curvature)
+
+        if spacing_consistency is not None:
+            stage3["spacing_consistency"] = spacing_consistency_to_dict(
+                spacing_consistency
+            )
+
+        if monotonic_consistency is not None:
+            stage3["monotonic_consistency"] = monotonic_consistency_to_dict(
+                monotonic_consistency
+            )
+
+        block["stage3"] = stage3
+
+    return block
