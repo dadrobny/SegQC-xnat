@@ -26,13 +26,19 @@ from typing import Optional, Tuple
 
 import numpy as np
 import nibabel as nib
+from scipy.ndimage import distance_transform_edt, gaussian_filter
 
 from segqc.labels import UNKNOWN, LabelConvention
 
 __all__ = [
     "LabelCentroid",
     "compute_centroid",
+    "CentroidFeatures",
+    "compute_edt_centroids",
 ]
+
+#: Anatomical level names that have no classic vertebral body (atlas / axis).
+_ATLAS_AXIS_NAMES = frozenset({"C1", "C2"})
 
 
 # --------------------------------------------------------------------------- #
@@ -158,4 +164,182 @@ def compute_centroid(
         level_name=level_name,
         centroid_voxel=centroid_voxel,
         centroid_mm=centroid_mm,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# EDT-based centroid variants & centroid depth (item 023)
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class CentroidFeatures:
+    """EDT-derived centroid variants and centroid-depth record for one label.
+
+    Computed by :func:`compute_edt_centroids`.  Frozen and NiBabel-free, so it
+    is cheaply comparable with ``==`` and serialisable.
+
+    Attributes
+    ----------
+    label:
+        The integer label value.
+    level_name:
+        Anatomical vertebra name from the convention, or
+        :data:`~segqc.labels.UNKNOWN`; never empty.
+    is_atlas_axis:
+        ``True`` when ``level_name`` is ``"C1"`` or ``"C2"`` (vertebrae with no
+        classic body).  Informational only — no special geometry is applied.
+    smooth_centre_voxel / smooth_centre_mm:
+        Centre of mass of the EDT-thresholded mask (voxels whose EDT is at or
+        above ``smooth_threshold`` of the label's peak EDT).  Pulls the centroid
+        into the robust interior core.  ``_mm`` is ``_voxel * spacing``.
+    strict_centre_voxel / strict_centre_mm:
+        Voxel of the peak of the Gaussian-smoothed EDT — the single deepest
+        interior point.  ``_mm`` is ``_voxel * spacing``.
+    centroid_depth_smooth / centroid_depth_strict:
+        Distance, in voxel units, from the respective centroid voxel to the
+        nearest label surface.  Derived from the EDT sampled at the
+        integer-rounded centroid voxel: ``max(0, EDT - 0.5)`` (the surface lies
+        midway to the nearest background voxel centre, so a surface voxel has
+        depth 0.5).  High → well inside the interior; ``< 1`` → on/near the
+        surface.
+    smooth_threshold:
+        The threshold fraction (0–1) used for the smooth centre.
+    strict_sigma:
+        The Gaussian sigma (voxels) used for the strict centre.
+    """
+
+    label: int
+    level_name: str
+    is_atlas_axis: bool
+    smooth_centre_voxel: Tuple[float, float, float]
+    smooth_centre_mm: Tuple[float, float, float]
+    strict_centre_voxel: Tuple[float, float, float]
+    strict_centre_mm: Tuple[float, float, float]
+    centroid_depth_smooth: float
+    centroid_depth_strict: float
+    smooth_threshold: float
+    strict_sigma: float
+
+
+def _compute_edt(mask: np.ndarray) -> np.ndarray:
+    """Euclidean distance transform of a binary ``mask`` (float64, same shape).
+
+    Each foreground voxel holds its distance (in voxel units) to the nearest
+    background voxel; background voxels are 0.
+    """
+    return distance_transform_edt(mask)
+
+
+def _depth_from_edt(edt: np.ndarray, voxel: Tuple[float, ...]) -> float:
+    """Sample ``edt`` at the integer-rounded ``voxel`` and convert to depth.
+
+    Depth is the distance from the voxel centre to the nearest label surface:
+    the surface lies halfway to the nearest background voxel centre, so we
+    subtract 0.5 from the raw EDT value (clamped at 0).  A voxel adjacent to
+    background (raw EDT 1.0) therefore has depth 0.5 (< 1).
+    """
+    idx = tuple(
+        int(min(max(round(v), 0), dim - 1)) for v, dim in zip(voxel, edt.shape)
+    )
+    return max(0.0, float(edt[idx]) - 0.5)
+
+
+def compute_edt_centroids(
+    seg_img: nib.Nifti1Image,
+    label: int,
+    *,
+    smooth_threshold: float = 0.50,
+    strict_sigma: float = 1.0,
+    convention: Optional[LabelConvention] = None,
+) -> CentroidFeatures:
+    """Compute EDT-based centroid variants and centroid depth for one label.
+
+    Read-only (the input image is never modified) and deterministic.
+
+    Parameters
+    ----------
+    seg_img:
+        A NiBabel ``Nifti1Image`` carrying an integer instance label map.
+    label:
+        The integer label value to analyse.
+    smooth_threshold:
+        Fraction (0–1) of the label's peak EDT used to threshold the mask before
+        computing the smooth centre's centre of mass.  ``0.0`` includes the whole
+        label (equivalent to the plain CoM); ``1.0`` keeps only the peak voxels.
+    strict_sigma:
+        Gaussian sigma (in voxels) applied to the EDT before taking its argmax
+        for the strict centre.  ``0.0`` disables smoothing.
+    convention:
+        Optional :class:`~segqc.labels.LabelConvention`; defaults to
+        :meth:`LabelConvention.default`.
+
+    Returns
+    -------
+    CentroidFeatures
+        EDT centroid record for the requested label.
+
+    Raises
+    ------
+    ValueError
+        If ``label`` is not present in ``seg_img`` (no voxels carry that value).
+    """
+    # Read-only view; we never write to it.
+    data = np.asanyarray(seg_img.dataobj)
+
+    mask = data == label
+    if not mask.any():
+        raise ValueError(
+            f"Label {label!r} is not present in the segmentation image "
+            f"(no voxels found). "
+            f"Available non-zero labels: "
+            f"{sorted(int(v) for v in np.unique(data) if v != 0)}"
+        )
+
+    sx, sy, sz = _get_spacing(seg_img)
+    spacing = (sx, sy, sz)
+
+    edt = _compute_edt(mask)
+    edt_max = float(edt.max())
+
+    # --- Smooth centre: CoM of the EDT-thresholded interior core ----------- #
+    thresh_mask = (edt >= smooth_threshold * edt_max) & mask
+    if not thresh_mask.any():  # pragma: no cover - peak is always in the mask
+        thresh_mask = mask
+    smooth_coords = np.argwhere(thresh_mask)
+    smooth_mean = smooth_coords.mean(axis=0)
+    smooth_centre_voxel = (
+        float(smooth_mean[0]),
+        float(smooth_mean[1]),
+        float(smooth_mean[2]),
+    )
+
+    # --- Strict centre: argmax of the Gaussian-smoothed EDT ---------------- #
+    smoothed = gaussian_filter(edt, sigma=strict_sigma)
+    peak = np.unravel_index(int(np.argmax(smoothed)), smoothed.shape)
+    strict_centre_voxel = (float(peak[0]), float(peak[1]), float(peak[2]))
+
+    smooth_centre_mm = tuple(v * s for v, s in zip(smooth_centre_voxel, spacing))
+    strict_centre_mm = tuple(v * s for v, s in zip(strict_centre_voxel, spacing))
+
+    centroid_depth_smooth = _depth_from_edt(edt, smooth_centre_voxel)
+    centroid_depth_strict = _depth_from_edt(edt, strict_centre_voxel)
+
+    if convention is None:
+        convention = LabelConvention.default()
+    level_name = convention.name_of(label)
+    is_atlas_axis = level_name in _ATLAS_AXIS_NAMES
+
+    return CentroidFeatures(
+        label=label,
+        level_name=level_name,
+        is_atlas_axis=is_atlas_axis,
+        smooth_centre_voxel=smooth_centre_voxel,
+        smooth_centre_mm=smooth_centre_mm,
+        strict_centre_voxel=strict_centre_voxel,
+        strict_centre_mm=strict_centre_mm,
+        centroid_depth_smooth=centroid_depth_smooth,
+        centroid_depth_strict=centroid_depth_strict,
+        smooth_threshold=float(smooth_threshold),
+        strict_sigma=float(strict_sigma),
     )
