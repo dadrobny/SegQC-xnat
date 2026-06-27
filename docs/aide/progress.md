@@ -129,7 +129,7 @@ mislabelling heuristics.
 - ✅ Neighbour-consistency metrics (spacing regularity, monotonic progression). *(Item 020)*
 - ✅ Optional sagittal projection of centroids + spline for the human report. *(Item 021)*
 - ✅ Stage 3 feature serialisation & GT-vs-perturbed regression tests. *(Item 022)*
-- 📋 Local vertebra neighbourhood comparison (sliding window, n=3–5): per-vertebra deviation from neighbourhood mean/median of centroid spacing, spline offset, and volume; flags isolated anatomical outliers. *(Item 024)*
+- 🚧 Local vertebra neighbourhood comparison (sliding window, n=3–5): per-vertebra deviation from neighbourhood mean/median of centroid spacing, spline offset, and volume; flags isolated anatomical outliers. *(Item 024)*
 
 **Acceptance.**
 - [x] Spline fits cleanly on GT fixtures; offsets near-zero for GT, large for displaced/mislabelled.

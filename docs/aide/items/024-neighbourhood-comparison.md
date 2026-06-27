@@ -259,11 +259,15 @@ def compute_neighbourhood_features(
    window is clamped. This avoids edge-case crashes while keeping window
    statistics local.
 
-2. **deviation_score formula**: the primary signal is how far the focal
-   vertebra's spline offset and volume deviate from the local window. A
-   combined score (max of normalised deviations, or sum of absolute
-   z-scores within the window) is implementation-defined; the spec guarantees
-   it is >= 0 and that it is large for clearly anomalous vertebrae.
+2. **deviation_score formula**: leave-one-out z-score — the focal vertebra's
+   offset and volume are each compared against the *neighbour-only* portion of
+   the window (excluding the focal value itself), then the maximum normalised
+   deviation is taken as the score. Leave-one-out prevents the outlier from
+   inflating the local mean/std and masking its own deviation, which is
+   critical for AC2 (single injected outlier must be flagged while neighbours
+   are not). When the neighbour std is near zero the formula uses _MIN_STD
+   (1e-6) to keep scores near 0 for homogeneous spines (AC1). When there are
+   no neighbours (window size 1 or single-vertebra input) the score is 0.0.
 
 3. **spacing_mm in window**: inter-centroid spacings are *pair* quantities
    (between consecutive vertebrae), not *per-vertebra* quantities. For a
