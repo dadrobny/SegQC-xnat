@@ -106,14 +106,14 @@ empty / trivially-failed segmentations.
 - ✅ Overlap detection between labels. *(Item 015)*
 - ✅ Features serialised into JSON (`features` block) + per-case feature table. *(Item 016)*
 - ✅ EDT-based centroid variants (smooth-centre via EDT-threshold CoM; strict-centre via EDT peak) + centroid depth (distance from centroid to nearest label surface). C1/C2 handled as special anatomy. *(Item 023)*
-- 🚧 Fragmentation index per label (largest connected component / total label volume), extending the JSON features block. *(Item 025)*
+- ✅ Fragmentation index per label (largest connected component / total label volume), extending the JSON features block. *(Item 025)*
 
 **Acceptance.**
 - [x] Features computed deterministically; values verified against hand-computed expectations.
 - [x] Anisotropic-spacing fixture yields correct physical volumes/extents.
 - [x] `features` block emitted in JSON; tests cover each feature.
 - [x] EDT-based centroid variants computed; centroid depth available per label. *(Item 023)*
-- [ ] Fragmentation index computed per label and serialised in JSON features block. *(Item 025)*
+- [x] Fragmentation index computed per label and serialised in JSON features block. *(Item 025)*
 
 ---
 
