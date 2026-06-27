@@ -1,0 +1,164 @@
+{
+  "schema_version": "0.1",
+  "config_version": "0.1",
+  "case_id": "golden-case-022",
+  "verdict": "pass",
+  "reasons": [],
+  "per_label": {},
+  "features": {
+    "features_version": "0.2",
+    "per_label": {},
+    "relationships": null,
+    "overlaps": [],
+    "stage3": {
+      "per_label_offsets": [
+        {
+          "label": 1,
+          "level_name": "T7",
+          "closest_u": 5.611895432316293e-07,
+          "offset_mm": 2.244758172898975e-05,
+          "offset_voxel": 2.244758172898975e-05,
+          "dx_mm": 0.0,
+          "dy_mm": 0.0,
+          "dz_mm": -2.244758172898975e-05
+        },
+        {
+          "label": 2,
+          "level_name": "T8",
+          "closest_u": 0.24999999999999994,
+          "offset_mm": 1.7763568394002505e-15,
+          "offset_voxel": 1.7763568394002505e-15,
+          "dx_mm": 0.0,
+          "dy_mm": 0.0,
+          "dz_mm": 1.7763568394002505e-15
+        },
+        {
+          "label": 3,
+          "level_name": "T9",
+          "closest_u": 0.4999999999999997,
+          "offset_mm": 7.105427357601002e-15,
+          "offset_voxel": 7.105427357601002e-15,
+          "dx_mm": 0.0,
+          "dy_mm": 0.0,
+          "dz_mm": 7.105427357601002e-15
+        },
+        {
+          "label": 4,
+          "level_name": "T10",
+          "closest_u": 0.75,
+          "offset_mm": 0.0,
+          "offset_voxel": 0.0,
+          "dx_mm": 0.0,
+          "dy_mm": 0.0,
+          "dz_mm": 0.0
+        },
+        {
+          "label": 5,
+          "level_name": "T11",
+          "closest_u": 0.9999994401419617,
+          "offset_mm": 2.2394321526064687e-05,
+          "offset_voxel": 2.2394321526064687e-05,
+          "dx_mm": 0.0,
+          "dy_mm": 0.0,
+          "dz_mm": 2.2394321526064687e-05
+        }
+      ],
+      "per_label_orientations": [
+        {
+          "label": 1,
+          "level_name": "T7",
+          "principal_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "eigenvalue_ratio": 2.0
+        },
+        {
+          "label": 2,
+          "level_name": "T8",
+          "principal_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "eigenvalue_ratio": 2.0
+        },
+        {
+          "label": 3,
+          "level_name": "T9",
+          "principal_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "eigenvalue_ratio": 2.0
+        },
+        {
+          "label": 4,
+          "level_name": "T10",
+          "principal_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "eigenvalue_ratio": 2.0
+        },
+        {
+          "label": 5,
+          "level_name": "T11",
+          "principal_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "eigenvalue_ratio": 2.0
+        }
+      ],
+      "curvature": {
+        "tangent_angles_deg": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "inter_tangent_angles_deg": [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "total_curvature_deg": 0.0
+      },
+      "spacing_consistency": {
+        "mean_spacing_mm": 10.0,
+        "cv_spacing": 0.0,
+        "spacings_mm": [
+          10.0,
+          10.0,
+          10.0,
+          10.0
+        ],
+        "deviations_mm": [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "outlier_pairs": []
+      },
+      "monotonic_consistency": {
+        "is_monotonic": true,
+        "non_monotonic_pairs": [],
+        "u_values": [
+          5.611895432316293e-07,
+          0.24999999999999994,
+          0.4999999999999997,
+          0.75,
+          0.9999994401419617
+        ]
+      }
+    }
+  }
+}

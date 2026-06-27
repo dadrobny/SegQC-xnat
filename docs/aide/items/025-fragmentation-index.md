@@ -168,8 +168,6 @@ value under the public name `fragmentation_index` per label:
 
 ## Decisions & Trade-offs
 
-To be updated during implementation. Initial decisions:
-
 1. **Re-use `largest_component_fraction` from `ComponentsInfo`** — This value
    is already computed as part of item 012; item 025 exposes it under the public
    name `fragmentation_index` without re-running the component analysis.
@@ -184,6 +182,27 @@ To be updated during implementation. Initial decisions:
    call to `build_features_block` passes a `ComponentsInfo` (which always has
    `largest_component_fraction`), the field is always present; making it
    `required` catches serialisation bugs early.
+
+4. **`compute_fragmentation_index` is a thin wrapper in a dedicated module**
+   (`src/segqc/features/fragmentation.py`) — A separate module gives the concept
+   a clean, discoverable public API (importable as `segqc.features.fragmentation`)
+   and keeps the connected-components logic entirely in `components.py`. The lazy
+   import of `compute_components` prevents circular-import issues.
+
+5. **`fragmentation_index` stored as `float(...)` in `components_to_dict`** —
+   Explicit `float()` cast ensures the JSON value is always a Python float (not a
+   numpy scalar), which serialises correctly with `json.dumps`.
+
+6. **`frag_idx` column added to `render_feature_table` header as `frag_idx`** —
+   Short enough to fit a fixed-width column while still containing the string
+   `"frag"` (case-insensitive match satisfies AC6). Displayed per-label row
+   alongside `Comps` before the centroid column.
+
+7. **Golden snapshot for item 016 regenerated** — Adding `fragmentation_index`
+   to `components_to_dict` changes the serialised output for any report with
+   per-label data. The golden file `tests/golden/016_features_report.json` was
+   regenerated programmatically to reflect the new field. The item 022 golden
+   snapshot is unaffected (its `per_label` block is empty).
 
 ---
 

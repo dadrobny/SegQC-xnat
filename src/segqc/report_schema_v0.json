@@ -188,14 +188,15 @@
     },
     "components": {
       "type": "object",
-      "description": "Per-label connected-components features (item 012).",
+      "description": "Per-label connected-components features (items 012, 025).",
       "additionalProperties": false,
       "required": [
         "component_count",
         "component_sizes",
         "component_volumes_mm3",
         "largest_component_fraction",
-        "small_fragments"
+        "small_fragments",
+        "fragmentation_index"
       ],
       "properties": {
         "component_count": {"type": "integer", "minimum": 0},
@@ -211,6 +212,12 @@
         "small_fragments": {
           "type": "array",
           "items": {"type": "integer"}
+        },
+        "fragmentation_index": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Fraction of label voxels in the largest connected component (item 025). Range (0, 1]: 1.0 = intact, <1.0 = fragmented."
         }
       }
     },

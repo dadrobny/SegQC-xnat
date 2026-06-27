@@ -153,7 +153,7 @@ def render_feature_table(features_block: dict) -> str:
     if per_label:
         header = (
             f"  {'Label':>6}  {'Level':<6}  {'Voxels':>8}  "
-            f"{'Volume(mm3)':>12}  {'Comps':>6}  Centroid(mm)"
+            f"{'Volume(mm3)':>12}  {'Comps':>6}  {'frag_idx':>8}  Centroid(mm)"
         )
         lines.append(header)
         lines.append("  " + "-" * (len(header) - 2))
@@ -163,12 +163,15 @@ def render_feature_table(features_block: dict) -> str:
             comps = entry.get("components", {})
             centroid_mm = entry.get("centroid", {}).get("centroid_mm", [])
             centroid_txt = ", ".join(_fmt_num(v) for v in centroid_mm)
+            frag_idx = comps.get("fragmentation_index")
+            frag_txt = _fmt_num(frag_idx) if frag_idx is not None else "?"
             lines.append(
                 f"  {entry.get('label', key):>6}  "
                 f"{str(entry.get('level_name', '?')):<6}  "
                 f"{_fmt_num(geom.get('voxel_count', 0)):>8}  "
                 f"{_fmt_num(geom.get('physical_volume_mm3', 0)):>12}  "
                 f"{_fmt_num(comps.get('component_count', 0)):>6}  "
+                f"{frag_txt:>8}  "
                 f"({centroid_txt})"
             )
     else:

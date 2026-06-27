@@ -140,6 +140,10 @@ def components_to_dict(c: "ComponentsInfo") -> dict:
     List fields are shallow-copied so the returned dict never aliases the
     source dataclass's lists (the source is frozen, but callers may mutate the
     returned dict).
+
+    ``fragmentation_index`` (item 025) is an alias for
+    ``largest_component_fraction`` exposed under its public name. It is always
+    included so the field is available at every serialisation site.
     """
     return {
         "component_count": c.component_count,
@@ -147,6 +151,7 @@ def components_to_dict(c: "ComponentsInfo") -> dict:
         "component_volumes_mm3": list(c.component_volumes_mm3),
         "largest_component_fraction": c.largest_component_fraction,
         "small_fragments": list(c.small_fragments),
+        "fragmentation_index": float(c.largest_component_fraction),
     }
 
 
