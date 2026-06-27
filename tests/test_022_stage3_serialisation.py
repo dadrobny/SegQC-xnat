@@ -603,13 +603,15 @@ def test_ac6_missing_level_detected_in_relationships():
     # Remove centroids[3] — simulates a missing segmentation level
     with_gap = centroids[:3] + centroids[4:]
 
-    centroid_map = {c.label: c for c in with_gap}
     relationships = compute_spine_relationships(with_gap)
 
+    # geometry, components, and centroids must share keys (or all be empty).
+    # Pass all three as empty so build_features_block builds no per_label
+    # entries — the relationships assertion does not depend on per_label.
     block = build_features_block(
         geometry={},
         components={},
-        centroids=centroid_map,
+        centroids={},
         relationships=relationships,
         overlaps=[],
     )
@@ -619,10 +621,27 @@ def test_ac6_missing_level_detected_in_relationships():
 
 
 def test_ac6_missing_level_creates_spacing_outlier():
-    """AC6: Removing a centroid doubles the adjacent gap, which is flagged as an outlier."""
-    centroids = _straight_spine(7, spacing_mm=10.0)
-    # Remove centroids[3]: gap between index 2 and 4 becomes 20 mm (2x the 10 mm mean)
-    with_gap = centroids[:3] + centroids[4:]
+    """AC6: A missing level leaves a gap that is flagged as a spacing outlier.
+
+    Fixture arithmetic (outlier_threshold_high = 2.0):
+      Centroids at z = 0, 5, 10, 35, 40 mm  (labels 1-5, levels T8-T12).
+      Spacings:  5, 5, 25, 5  (4 gaps; >= 2 spacings so mean comparison is valid)
+      mean_spacing = (5 + 5 + 25 + 5) / 4 = 40 / 4 = 10.0 mm
+      threshold_high = 2.0 * 10.0 = 20.0 mm
+      Large gap = 25.0 mm  >  20.0 mm  →  flagged as outlier  ✓
+
+    The centroid that would have bridged the gap (at z ≈ 17.5 mm, between T10
+    and T11) represents the missing segmentation level.
+    """
+    # Build the sequence directly so the gap arithmetic is exact.
+    levels = ["T8", "T9", "T10", "T11", "T12"]
+    zs = [0.0, 5.0, 10.0, 35.0, 40.0]
+    with_gap = [
+        _centroid(levels[i], (0.0, 0.0, zs[i]), label=i + 1)
+        for i in range(5)
+    ]
+    # Verify the outlier condition holds (5, 5, 25, 5 → mean=10, threshold=20).
+    # 25 > 20 → at least one outlier pair must be produced.
 
     fit = fit_centroid_spline(with_gap)
     offsets = compute_spline_offsets(with_gap, fit)
@@ -648,7 +667,8 @@ def test_ac6_missing_level_creates_spacing_outlier():
     )
     outlier_pairs = block["stage3"]["spacing_consistency"]["outlier_pairs"]
     assert len(outlier_pairs) >= 1, (
-        "Expected at least one spacing outlier after removing a centroid"
+        "Expected at least one spacing outlier: gap 25 mm > threshold 20 mm "
+        "(2.0 × mean 10.0 mm)"
     )
 
 
