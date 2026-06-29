@@ -120,6 +120,21 @@ Provide concrete, verifiable results:
 
 Save the work item to `docs/aide/items/NNN-descriptive-name.md`.
 
+### Commit the spec immediately (do not leave it untracked)
+
+The item spec is the source of truth for every downstream step (tests,
+implementation, validation), so it must be tracked, not left machine-local.
+Commit it on the item's `aide/NNN-*` claim branch as soon as it is written (each
+a separate Bash call):
+
+```
+git add docs/aide/items/NNN-descriptive-name.md
+git commit -m "docs(NNN): work item spec for <short title>"
+```
+
+(When this skill is invoked as the `spec-author` step inside `/aide-run-item`,
+that agent performs this commit.)
+
 ## Next Step
 
 Start a **new chat session** and run `/speckit-aide-execute-item` with the item number to implement it.

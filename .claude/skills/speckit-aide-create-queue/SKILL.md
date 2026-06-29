@@ -43,9 +43,47 @@ Read `docs/aide/vision.md`, `docs/aide/roadmap.md`, and `docs/aide/progress.md`,
 
 Name the queue file sequentially: `queue-001.md`, `queue-002.md`, etc.
 
+### Tidy the previous queue first
+
+Before (or alongside) writing the new queue, **tidy the now-superseded queue
+NNN-1** so the history stays legible and exactly one queue is "live":
+
+- Add/update a status line at its top, e.g.
+  `> **Status:** ✅ Completed — superseded by queue-NNN (YYYY-MM-DD).`
+- Reflect each item's final `progress.md` state (✅ done, or ⏸️/❌ if carried or
+  dropped) so a stale 📋 list isn't left implying open work.
+
+If this is the first queue, there is nothing to tidy — skip.
+
 ### Output
 
 Save the queue to `docs/aide/queue/queue-NNN.md` (where NNN is the next sequential number).
+
+### Commit the queue immediately (do not leave it untracked)
+
+A queue file is a **shared project document**, not a scratch note — an untracked
+or machine-local queue is invisible to collaborators and to the scout, which
+reads the committed queue. As soon as the file is written, commit it (and the
+previous-queue tidy-up), each as a separate Bash call. **Where** you commit
+depends on how this skill was invoked:
+
+- **Standalone, or `/aide-run-roadmap --continuous`** — commit directly to `main`
+  (queue files are additive AIDE docs, allowed per `CLAUDE.md`):
+  ```
+  git pull --rebase
+  git add docs/aide/queue/queue-NNN.md docs/aide/queue/queue-<NNN-1>.md
+  git commit -m "docs(aide): add work queue NNN"
+  git push
+  ```
+- **`/aide-run-roadmap` gated (default)** — you are already on the `aide/queue-NNN`
+  branch; commit there (no `git switch`/push to `main`) so the queue lands via the
+  human-reviewed PR that command opens:
+  ```
+  git add docs/aide/queue/queue-NNN.md docs/aide/queue/queue-<NNN-1>.md
+  git commit -m "docs(aide): add work queue NNN"
+  ```
+
+Either way, do **not** end this step with the queue left only in the working tree.
 
 ## Next Step
 

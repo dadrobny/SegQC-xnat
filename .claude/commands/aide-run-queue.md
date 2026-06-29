@@ -1,169 +1,102 @@
 ---
-description: Orchestrate the AIDE queue to completion — scout claims items, builder implements, test-writer writes tests, then validator gates the merge — looping until the queue is empty. Pauses only for PRs and major structural changes.
+description: Iterate one AIDE queue to completion — a scout claims each item, then /aide-run-item drives it (spec → tests → build → validate → merge) — looping until that queue is empty, then stops. Does NOT create the next queue. Pauses only for PRs and major structural changes.
 argument-hint: "[queue number, e.g. 001 — optional; defaults to the highest-numbered queue]"
 ---
 
-# Run the AIDE queue (sub-agent orchestrator)
+# Run one AIDE queue (iterator over /aide-run-item)
 
-Drive the AIDE loop (`docs/aide/`) over **every remaining item** in the queue
-until it is empty. **This session is only the orchestrator** — do **not** do
-recon, write code, write tests, or run tests yourself in the main thread. Instead
-**spawn a sub-agent for each distinct task** so every task runs in its own
-isolated context. This thread keeps a small context and only dispatches and gates
-approvals.
+Drive the AIDE loop (`docs/aide/`) over **every remaining item in a single
+queue**, then **stop**. This command is **queue-scoped**: it does *not* generate
+the next queue — that is `/aide-run-roadmap`'s job (the loop *over* queues). This
+session is only the orchestrator — do **not** author specs, write code, write
+tests, or run tests yourself in the main thread. You **delegate each item to
+`/aide-run-item`** and only handle claiming and approval gates between items.
 
 Target queue: **$ARGUMENTS** (if empty, use the highest-numbered
 `docs/aide/queue/queue-*.md`).
 
-## Task → sub-agent mapping
+## Division of labour
 
-| Task | Sub-agent | Model | Notes |
-|---|---|---|---|
-| Sync, pick next 📋 item, claim branch | `scout` | Haiku | reads queue + progress, checks `aide/*` branches, creates + pushes claim branch; returns item number + branch name |
-| **Implement** production code | `builder` | Sonnet (→ Opus on 3rd attempt) | one **fresh** builder per item: checkout branch, create item spec if missing, implement `src/`, record decisions, set progress 🚧, commit. **No tests, no pytest.** |
-| **Write tests** for the item | `test-writer` | Sonnet | one **fresh** test-writer per item: reads spec + AC + existing test style, writes tests for all AC + adversarial cases, commits. **No production code, no pytest.** |
-| **Validate** the item | `validator` | Sonnet | a **different** agent: runs pytest, checks AC test coverage, checks code scope, checks vision fit. **No new tests.** On PASS flips ✅ and direct-merges; on FAIL hands back with the responsible agent identified. |
-| Approval gates, looping | *orchestrator* | — | stays in the main thread; never implements, writes tests, or validates |
+| Concern | Owner | Notes |
+|---|---|---|
+| Claim the next 📋 item | `scout` (Haiku) | syncs, checks `aide/*` branches, picks the first unclaimed unblocked 📋 item, pushes `aide/NNN-*`; returns item number + branch + title |
+| Run one item end-to-end | **`/aide-run-item NNN`** | spec-author (Opus) → test-writer → builder → validator+merge, incl. the ≤3-round validate cycle. See that command for the per-item detail. |
+| Approval gates, looping | *orchestrator* | stays in the main thread |
+| Generating the **next** queue | **not here** | only `/aide-run-roadmap` (or a manual `/speckit-aide-create-queue`) does that |
 
-**Implementation, testing, and validation are always separate agents.** No agent
-signs off its own work.
+The per-item mechanics (which agent does what, the build↔validate cycle, the
+Opus escalation on round 3) live in **`/aide-run-item`** — this command does not
+restate them. Keeping a single source of truth for the item loop is the point of
+the split.
 
-Pass only the **minimum** between agents — the item number and branch name.
-Each sub-agent starts cold on purpose. Spawn a **new** instance of each agent
-per item (never reuse across items).
-
-**Command hygiene.** Sub-agents must emit git commands in an allow-list-friendly
-shape so the batch doesn't stall on permission prompts: no `cd` prefix, one
-command per Bash call (no `&&`/`;` chaining), no `2>&1`, no command substitution
-in commit messages (`git commit -m "$(cat <<EOF…)"` always prompts), and recon
-via the Bash tool with `grep` rather than PowerShell `Select-String`. This is
-spelled out in each agent spec and in `CLAUDE.md` → *Command hygiene*; if you
-ever issue a git command from the orchestrator thread, follow it too.
+**Command hygiene** applies to any git command you issue from this thread too: no
+`cd` prefix, one command per Bash call, no `2>&1`, no command substitution in
+commit messages, recon via the Bash tool with `grep`. See `CLAUDE.md` →
+*Command hygiene*.
 
 ## Pre-loop: resume in-flight branches
 
-Before entering the scout loop, check whether any local `aide/*` branch
-corresponds to an unfinished item — i.e. work that was interrupted mid-run.
+Before claiming new items, resume any interrupted ones. The scout skips item
+numbers that already have an `aide/*` branch, so an interrupted item would be
+stranded otherwise.
 
 **Orchestrator steps (run these yourself, not via a sub-agent):**
 
-1. Run `git branch | grep aide/` to list local `aide/*` branches.
-2. If none exist, skip to the main loop below.
-3. For each local `aide/NNN-*` branch found, read `docs/aide/progress.md` to
-   check whether that item is still 🚧 (in progress) or 📋 (claimed but not
-   started). If it is already ✅ or ❌, skip it.
-4. For each unfinished item (in item-number order), determine the resume point
-   by inspecting commits already on the branch:
-   - **No tests committed yet** → resume at step 3 (test-writer).
-   - **Tests committed, but no production code in `src/`** → resume at step 4
-     (builder).
-   - **Both tests and implementation committed, but not merged to main** →
-     resume at step 5 (validator).
-   - **Validator previously FAILed** (check any FAIL note in the item file or
-     progress.md) → resume at step 6 (build/test ↔ validate cycle), counting
-     prior rounds toward the cap of 3.
-5. Process each resumed item fully (to PASS + merge or to a user-stop) before
-   claiming the next 📋 item from the scout.
-
-> Why: the scout checks remote `aide/*` branches to skip claimed items. If a
-> run was interrupted, the branch exists but the item is unfinished — the scout
-> would silently skip it, leaving it stranded. Resuming here closes that gap.
+1. `git branch | grep aide/` — list local `aide/*` branches.
+2. If none, skip to the loop.
+3. For each `aide/NNN-*` branch, read `docs/aide/progress.md`: if the item is
+   already ✅/❌, skip it; if 🚧 or 📋, it is unfinished.
+4. For each unfinished item (item-number order), hand it to **`/aide-run-item NNN
+   aide/NNN-short-name`**. `/aide-run-item` is itself resumable — its spec-author
+   step no-ops if the spec exists, and the validate/build cycle picks up from
+   whatever is already committed — so just run it.
+5. Process each resumed item to PASS+merge (or a user-stop) before claiming new
+   work below.
 
 ## Loop
 
-Repeat until the `scout` reports no remaining unclaimed 📋 item:
+Repeat until the `scout` reports no remaining unclaimed 📋 item **in this queue**:
 
-1. **Claim → spawn `scout`** with the queue number and this brief:
+1. **Claim → spawn `scout`** with the queue number:
    > Sync the repo, check `git branch -r` for existing `aide/*` branches, read
    > `docs/aide/queue/queue-NNN.md` and `docs/aide/progress.md`, find the first
-   > unclaimed 📋 item (no blocking dependencies still 📋/🚧), then create and
+   > unclaimed 📋 item with no blocking dependency still 📋/🚧, then create and
    > push `aide/NNN-short-name`. Return: item number, branch name, item title.
-   > If none left, say "none left".
+   > If none left in this queue, say "none left".
 
-2. **Decide (orchestrator).** If `scout` says "none left", stop and report
-   completion. Otherwise take the item number and branch name forward.
+2. **Decide (orchestrator).**
+   - **Item returned** → go to step 3.
+   - **"none left"** → the queue is exhausted; go to **On queue exhaustion**.
 
-3. **Write tests → spawn a fresh `test-writer`** with the item number + branch
-   and this brief:
-   > Write tests for AIDE item NNN on branch `aide/NNN-short-name`.
-   > If `docs/aide/items/NNN-*.md` is missing, run `/speckit-aide-create-item NNN`
-   > first. Read the spec for all Acceptance Criteria and Decisions. Read `tests/`
-   > for style conventions. Write tests covering every AC (named clearly) plus
-   > adversarial edge cases. Commit to the branch.
-   > **Do NOT touch `src/` and do NOT run pytest.**
-   > Return: bullet list of AC → test name mappings and adversarial scenarios.
+3. **Run the item → invoke `/aide-run-item NNN aide/NNN-short-name`.** This drives
+   the full per-item workflow and merges on PASS. Wait for it to return.
 
-4. **Implement → spawn a fresh `builder`** with the item number + branch and
-   this brief:
-   > Implement AIDE item NNN on branch `aide/NNN-short-name`. The item spec and
-   > tests are already committed. Check out the branch
-   > (`git switch aide/NNN-short-name`), implement production code in `src/` per
-   > every Acceptance Criterion in `docs/aide/items/NNN-*.md`, record decisions,
-   > set progress.md row to 🚧 (`git pull --rebase` first), commit.
-   > **Do NOT write tests and do NOT run pytest.**
-   > STOP and hand back if a PR, force-push, or framework change is needed.
-   > Return: one-paragraph summary of what was implemented.
-
-5. **Validate → spawn a fresh `validator`** (a *different* agent) with the item
-   number + branch and this brief:
-   > Independently validate AIDE item NNN on branch `aide/NNN-short-name`.
-   > Run the full pytest suite. Check that every AC in `docs/aide/items/NNN-*.md`
-   > has at least one test. Check builder's `src/` changes are scoped to this
-   > item. Check alignment with `docs/aide/vision.md`.
-   > **Do NOT write or modify tests.**
-   > PASS: flip progress.md ✅, commit, direct-merge to main, re-run pytest.
-   > FAIL: report which check failed and whether the builder or test-writer needs
-   > to fix it. Do not merge.
-
-6. **Build/test ↔ validate cycle (orchestrator).** Read the validator's verdict:
-   - **FAIL — suite red (code bug)** → spawn a **fresh `builder`** on the same
-     branch with the validator's reproduce steps; fix + re-commit; then spawn a
-     **fresh `validator`** again.
-   - **FAIL — missing AC test coverage** → spawn a **fresh `test-writer`** on the
-     same branch; add the missing tests; then spawn a **fresh `validator`** again.
-   - **FAIL — out-of-scope or vision conflict** → spawn a **fresh `builder`** to
-     revert/fix; then spawn a **fresh `validator`** again.
-   - Cap at **3 total validation rounds**. If still failing after round 3, stop
-     and ask the user.
-   - **Round 3 builder** (validator has FAILed twice): spawn with `model: opus`
-     and say explicitly: "This is attempt 3 — the validator has failed twice.
-     You are on Opus; treat this as a hard defect requiring deeper analysis."
-   - **PASS** → the validator has merged; continue to step 1 for the next item.
-
-7. **Checkpoint (orchestrator).** Relay a one- or two-line summary to the user
-   (item, merged/failed, key facts). If any agent reported a **PR / force-push /
-   structural** stop, **pause and ask the user**. Otherwise continue without
-   waiting for approval.
-
-## Granularity rule
-
-One sub-agent per **cohesive** task. Tightly-coupled steps within a role (e.g.
-implement → record decisions → commit for builder, or write AC tests → write
-adversarial tests → commit for test-writer) stay inside the **same** agent
-invocation — splitting them forces re-reading and loses state. The deliberate
-separation across roles — implement / test / validate — is the independence that
-makes the review gate meaningful.
-Spawn other specialised sub-agents only when a task is genuinely separable (e.g. a
-one-off read-only investigation a `scout` can answer).
-
-## When the orchestrator must stop and ask the user
-
-- A `builder` or `validator` hands back needing a **PR**, **force-push**, or
-  history rewrite.
-- An item needs a **major structural change** or an edit to a framework/process
-  file (`CLAUDE.md`, `vision.md`, `roadmap.md`, `constitution.md`,
-  `.claude/skills|commands|agents/**`, `.specify/extensions/**`) — these need a
-  reviewed PR, never a direct merge.
-- A `builder` can't get tests green, the **build↔validate cycle exceeds 3 rounds**,
-  or the item is blocked / contradictory. Document the blocker in the item file
-  and suggest `/speckit-aide-feedback-loop`.
+4. **Checkpoint (orchestrator).** Relay a one- or two-line summary (item,
+   merged/failed, key facts). If `/aide-run-item` reported a **PR / force-push /
+   structural** stop, **pause and ask the user**. Otherwise continue to step 1.
 
 ## On queue exhaustion
 
-When `scout` reports no 📋 items remain: summarise items completed, branches
-merged, and final test status. Permission prompts hit during the batch are
-auto-logged (`docs/aide/permissions/`, via the `PreToolUse`/`PostToolUse` hook);
-recommend the user run **`/aide-review-permissions`** to promote recurring, safe
-prompts into the allow-list so the next batch runs with fewer interruptions. If
-the roadmap has further stages, tell the user to run `/speckit-aide-create-queue`
-(fresh chat) for the next batch.
+When `scout` reports no 📋 items remain in this queue, **stop** and report:
+items completed, branches merged, and final test status. Then point the user at
+the next move (do **not** generate the next queue yourself):
+
+- **Driving the whole roadmap?** Run **`/aide-run-roadmap`** — it generates and
+  gates the next queue (human-reviewed PR by default, or `--continuous` to keep
+  going), then re-enters this command for that queue.
+- **Working a single batch manually?** Start a fresh chat and run
+  `/speckit-aide-create-queue` for the next batch.
+
+Permission prompts hit during the batch are auto-logged (`docs/aide/permissions/`);
+suggest the user run **`/aide-review-permissions`** to promote recurring safe
+prompts (it also **rotates** the log).
+
+## When the orchestrator must stop and ask the user
+
+- `/aide-run-item` hands back needing a **PR**, **force-push**, or history rewrite.
+- An item needs a **major structural change** or an edit to a framework/process
+  file (`CLAUDE.md`, `vision.md`, `roadmap.md`, `constitution.md`,
+  `.claude/skills|commands|agents/**`, `.specify/extensions/**`) — needs a
+  reviewed PR, never a direct merge.
+- The build↔validate cycle for an item exceeds 3 rounds, or an item is blocked /
+  contradictory — document the blocker and suggest `/speckit-aide-feedback-loop`.

@@ -24,7 +24,7 @@
 |-------|-------|-----------|--------|
 | 0 | Project Scaffolding & I/O Foundation | (foundation) | 📋 |
 | 1 | End-to-End Thin Slice: Empty Detection + Report | G1, G4 | 📋 |
-| 2 | Geometric & Topological Feature Extraction | (feature core) | 🚧 |
+| 2 | Geometric & Topological Feature Extraction | (feature core) | ✅ |
 | 3 | Spinal Curve: Spline Fit & Deviation Features | (feature core) | ✅ |
 | 4 | Heuristic Rule Engine over Failure Modes | G2 | 📋 |
 | 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | 📋 |
@@ -94,7 +94,7 @@ empty / trivially-failed segmentations.
 
 ---
 
-## Stage 2 — Geometric & Topological Feature Extraction — 🚧
+## Stage 2 — Geometric & Topological Feature Extraction — ✅
 
 **Goal.** The feature engine the heuristics depend on — the MVP image-processing core.
 
@@ -134,9 +134,9 @@ mislabelling heuristics.
 **Acceptance.**
 - [x] Spline fits cleanly on GT fixtures; offsets near-zero for GT, large for displaced/mislabelled.
 - [x] Robust to a deliberately missing level (no crash, sensible fit).
-- [ ] Orientation / curvature features in JSON; tests pass.
-- [ ] Neighbour-consistency and neighbourhood-comparison features in JSON.
-- [ ] Regression tests over GT + perturbed cases pass.
+- [x] Orientation / curvature features in JSON; tests pass. *(Item 019)*
+- [x] Neighbour-consistency and neighbourhood-comparison features in JSON. *(Items 020, 024)*
+- [x] Regression tests over GT + perturbed cases pass. *(Item 022)*
 
 ---
 

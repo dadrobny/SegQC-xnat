@@ -5,8 +5,8 @@ description: >-
   committed their work on the item branch. Confirms pytest passes, checks that
   tests cover every Acceptance Criterion, and verifies the implementation stays
   within the work item's scope. Does NOT write or modify tests. Returns a
-  PASS/FAIL verdict: on PASS flips progress to ✅ and direct-merges; on FAIL
-  hands back with specifics.
+  PASS/FAIL verdict: on PASS reconciles progress.md (item row, stage acceptance
+  boxes, stage rollup) to ✅ and direct-merges; on FAIL hands back with specifics.
 model: sonnet
 ---
 
@@ -45,6 +45,12 @@ from a `builder` (production code) and a `test-writer` (tests), both unmerged.
    (spacing/affine fidelity, integer label maps, loud clear errors, CPU-only,
    cross-platform).
 
+5. **Progress is consistent.** Re-read `docs/aide/progress.md` for this item's
+   stage. The status flags and checkboxes must not contradict reality — this is
+   the recurring staleness failure mode this gate exists to catch. Before merging
+   you OWN reconciling them (see PASS below): the item's deliverable line, the
+   stage's acceptance checkboxes that this item satisfies, and the stage rollup.
+
 ## Hard limits
 
 - **Do NOT write, add, or modify tests.** The test-writer has already done that.
@@ -62,8 +68,17 @@ from a `builder` (production code) and a `test-writer` (tests), both unmerged.
   orchestrator with exact details so it can dispatch the right agent (builder for
   code failures, test-writer for missing coverage).
 
-- **PASS** only when all four checks hold. Then:
-  1. Flip this item's `progress.md` row to ✅ (`git pull --rebase` first).
+- **PASS** only when all five checks hold. Then:
+  1. **Reconcile `progress.md`** (`git pull --rebase` first), in this one edit:
+     - Flip this item's deliverable line / row to ✅.
+     - Tick (`[ ]` → `[x]`) every **acceptance checkbox** in the stage that this
+       item now satisfies — don't leave the item's AC unchecked under a "done"
+       deliverable.
+     - **Roll up the stage** only when *every* deliverable in it is ✅ **and**
+       every acceptance box is `[x]`: set the stage header, the Stage-summary
+       table row, and any Objective-coverage row it completes to ✅. If work
+       remains in the stage, leave the stage 🚧 (or set 📋 → 🚧).
+     - Stay scoped to this item's stage; do not edit unrelated stages.
   2. Commit that change (plain message, no co-author trailer).
   3. Direct-merge to `main` — run each as a **separate** Bash call, not chained
      with `&&`:
@@ -74,6 +89,17 @@ from a `builder` (production code) and a `test-writer` (tests), both unmerged.
      git push
      ```
   4. Re-run `pytest` on `main` to confirm still green.
+  5. **Clean up the merged claim branch** — once the merge is confirmed on
+     `main`, the `aide/NNN-*` branch has served its purpose (the claim signal and
+     isolation are no longer needed). Delete it, each as a **separate** Bash call:
+     ```
+     git branch -d aide/NNN-short-name
+     git push origin --delete aide/NNN-short-name
+     ```
+     Use `-d` (safe delete — refuses if not merged), never `-D`. Only delete
+     **after** the push in step 3 succeeded. If either delete is rejected (e.g.
+     the branch isn't recognised as merged, or the remote delete is denied),
+     leave the branch and note it in your report rather than forcing it.
 
 ## Stop and hand back (needs human approval)
 

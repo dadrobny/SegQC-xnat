@@ -127,3 +127,47 @@ def test_aggregate_classifies_and_ranks():
     assert new["total"] == 2 and new["denied"] == 2
     # 'new' bottlenecks sort ahead of already-covered rows.
     assert rows[0]["status"] == "new"
+
+
+# --- rotate_log -------------------------------------------------------------
+
+
+def test_rotate_log_archives_and_truncates(tmp_path):
+    log = tmp_path / "log.jsonl"
+    reviewed = tmp_path / "log.reviewed.jsonl"
+    log.write_text('{"a": 1}\n{"b": 2}\n', encoding="utf-8")
+
+    moved = review.rotate_log(log, reviewed)
+
+    assert moved == 2
+    assert log.read_text(encoding="utf-8") == ""  # truncated
+    assert reviewed.read_text(encoding="utf-8") == '{"a": 1}\n{"b": 2}\n'
+
+
+def test_rotate_log_appends_to_existing_reviewed(tmp_path):
+    log = tmp_path / "log.jsonl"
+    reviewed = tmp_path / "log.reviewed.jsonl"
+    reviewed.write_text('{"old": 0}\n', encoding="utf-8")
+    log.write_text('{"new": 1}\n', encoding="utf-8")
+
+    moved = review.rotate_log(log, reviewed)
+
+    assert moved == 1
+    assert reviewed.read_text(encoding="utf-8") == '{"old": 0}\n{"new": 1}\n'
+
+
+def test_rotate_log_missing_log_is_noop(tmp_path):
+    log = tmp_path / "absent.jsonl"
+    reviewed = tmp_path / "log.reviewed.jsonl"
+
+    assert review.rotate_log(log, reviewed) == 0
+    assert not reviewed.exists()
+
+
+def test_rotate_log_blank_lines_ignored(tmp_path):
+    log = tmp_path / "log.jsonl"
+    reviewed = tmp_path / "log.reviewed.jsonl"
+    log.write_text("\n  \n", encoding="utf-8")
+
+    assert review.rotate_log(log, reviewed) == 0
+    assert log.read_text(encoding="utf-8") == ""  # normalised to empty
