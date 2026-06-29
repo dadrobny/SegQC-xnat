@@ -47,8 +47,8 @@ Design decisions (item 005)
 from __future__ import annotations
 
 import pathlib
-from dataclasses import dataclass
-from typing import Any, Dict, Union
+from dataclasses import dataclass, field
+from typing import Any, Dict, Mapping, Union
 
 __all__ = [
     "SUPPORTED_SCHEMA_VERSION",
@@ -75,6 +75,14 @@ _DEFAULTS: Dict[str, Any] = {
     # voxels than this value are flagged as small fragments.  Default ``0`` means
     # no component is ever flagged (nothing is strictly below 0).
     "min_fragment_voxels": 0,
+    # Per-rule heuristic configuration (item 026).  Each entry has the shape:
+    #   <rule_id>:
+    #     enabled: bool          # default True when absent
+    #     params:                # optional; individual rules supply their own
+    #       <key>: <value>       # defaults via config.rule_param(id, key, default)
+    # An absent or empty "rules" section means all rules are enabled with
+    # their built-in defaults.
+    "rules": {},
 }
 
 
@@ -118,6 +126,71 @@ class HeuristicConfig:
     min_foreground_voxels: int
     min_label_count: int
     min_fragment_voxels: int = 0
+    # Per-rule config section (item 026).  Shape:
+    #   { <rule_id>: { "enabled": bool, "params": { <key>: <value> } } }
+    # Access via rule_enabled / rule_param / rule_params rather than directly.
+    rules: Dict[str, Any] = field(default_factory=dict)
+
+    # ------------------------------------------------------------------ #
+    # Per-rule accessors (item 026)
+    # ------------------------------------------------------------------ #
+
+    def rule_enabled(self, rule_id: str, default: bool = True) -> bool:
+        """Return whether *rule_id* is enabled in the config.
+
+        Reads ``rules[rule_id]["enabled"]``; returns *default* (``True``) when
+        the rule section or the ``enabled`` key is absent.
+
+        Parameters
+        ----------
+        rule_id:
+            The rule identifier string (e.g. ``"bounds"``).
+        default:
+            Value returned when no entry exists for *rule_id*.
+
+        Returns
+        -------
+        bool
+        """
+        rule_cfg = self.rules.get(rule_id, {})
+        return rule_cfg.get("enabled", default)
+
+    def rule_params(self, rule_id: str) -> Mapping[str, Any]:
+        """Return the ``params`` sub-dict for *rule_id*, or an empty mapping.
+
+        Parameters
+        ----------
+        rule_id:
+            The rule identifier string.
+
+        Returns
+        -------
+        Mapping[str, Any]
+            The ``params`` dict from the config, or ``{}`` if absent.
+        """
+        rule_cfg = self.rules.get(rule_id, {})
+        return rule_cfg.get("params", {})
+
+    def rule_param(self, rule_id: str, key: str, default: Any) -> Any:
+        """Return a single parameter value for *rule_id*, or *default*.
+
+        Convenience accessor: reads ``rules[rule_id]["params"][key]``; returns
+        *default* when the rule section, ``params``, or *key* is absent.
+
+        Parameters
+        ----------
+        rule_id:
+            The rule identifier string (e.g. ``"bounds"``).
+        key:
+            The parameter name within the rule's ``params`` block.
+        default:
+            Value returned when the key is absent at any level.
+
+        Returns
+        -------
+        Any
+        """
+        return self.rule_params(rule_id).get(key, default)
 
 
 # ---- Public API ------------------------------------------------------------- #

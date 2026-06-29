@@ -145,7 +145,7 @@ mislabelling heuristics.
 **Goal.** Explainable, configurable rule engine detecting each §6 failure mode.
 
 **Deliverables.**
-- 📋 Config-driven rule engine: each rule emits flag + human-readable reason + offending labels.
+- 🚧 Config-driven rule engine: each rule emits flag + human-readable reason + offending labels. *(Item 026)*
 - 📋 Rule families covering §6:
   - 📋 min/max bounds (volume, extent), level-aware;
   - 📋 connected-components → fragmentation / island flags;

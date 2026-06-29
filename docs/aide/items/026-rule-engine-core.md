@@ -310,9 +310,42 @@ mapping; concrete rules (027–033) reach into specific sub-keys.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+### Builder decisions (implemented)
 
-Initial design intentions (may be revised by the builder):
+1. **`Finding.__post_init__` uses `object.__setattr__` for label coercion.**
+   Since `Finding` is `frozen=True`, direct attribute assignment in
+   `__post_init__` is forbidden. Labels supplied as a `list` or `set` are
+   coerced to `frozenset` via `object.__setattr__(self, "labels", frozenset(...))`,
+   the standard pattern for post-construction normalisation in frozen dataclasses.
+
+2. **`register_rule` is a plain function, not a pure decorator.**
+   The tests call `register_rule(_StubRule)` rather than using it as a decorator.
+   The implementation accepts both forms: it takes the class as an argument,
+   instantiates it once, stores the instance, and returns the class unchanged —
+   so `@register_rule` and `register_rule(cls)` are both valid.
+
+3. **`_RULES` is a module-level dict in `segqc.heuristics.rule`, not hidden.**
+   Intentionally not name-mangled so tests can import it directly for
+   snapshot/restore registry isolation. This is documented in the module docstring.
+
+4. **`rules` field on `HeuristicConfig` uses `field(default_factory=dict)`.**
+   The dataclass is `frozen=True`, so a mutable default requires `default_factory`.
+   The dict itself is not deeply immutable, but the frozen constraint prevents the
+   field from being rebound — sufficient for read-only config use.
+
+5. **`load_config` merges `rules` with a shallow replace, not a deep merge.**
+   Since `"rules": {}` is in `_DEFAULTS`, the current merge loop (`if key in
+   merged: merged[key] = value`) replaces the default empty dict with the file's
+   entire `rules` mapping in one shot. This is intentional: partial per-rule
+   overrides are handled inside `rule_enabled` / `rule_param` (missing keys fall
+   back to defaults), so a shallow file-level replace is sufficient.
+
+6. **`iter_rules()` sorts by `rule_id` string at call time, not at registration.**
+   Registration order is unspecified (import order may differ across platforms);
+   sorting at call time guarantees deterministic runner output regardless of when
+   rules register themselves.
+
+### Initial design intentions (unchanged):
 
 1. **Reuse `segqc.verdict.Severity` for `Finding.severity`** rather than a new
    enum — so findings flow directly into the Stage 1 `Verdict` model in item 034
