@@ -26,7 +26,7 @@
 | 1 | End-to-End Thin Slice: Empty Detection + Report | G1, G4 | 📋 |
 | 2 | Geometric & Topological Feature Extraction | (feature core) | ✅ |
 | 3 | Spinal Curve: Spline Fit & Deviation Features | (feature core) | ✅ |
-| 4 | Heuristic Rule Engine over Failure Modes | G2 | 📋 |
+| 4 | Heuristic Rule Engine over Failure Modes | G2 | 🚧 |
 | 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | 📋 |
 | 6 | VerSe Reference Distributions & Delta Rules | G3 | 📋 |
 | 7 | Evaluation, Calibration & Metrics *(Phase 1 complete)* | G3, G7 | 📋 |
@@ -140,12 +140,12 @@ mislabelling heuristics.
 
 ---
 
-## Stage 4 — Heuristic Rule Engine over the Failure Modes (G2) — 📋
+## Stage 4 — Heuristic Rule Engine over the Failure Modes (G2) — 🚧
 
 **Goal.** Explainable, configurable rule engine detecting each §6 failure mode.
 
 **Deliverables.**
-- 🚧 Config-driven rule engine: each rule emits flag + human-readable reason + offending labels. *(Item 026)*
+- ✅ Config-driven rule engine: each rule emits flag + human-readable reason + offending labels. *(Item 026)*
 - 📋 Rule families covering §6:
   - 📋 min/max bounds (volume, extent), level-aware;
   - 📋 connected-components → fragmentation / island flags;
