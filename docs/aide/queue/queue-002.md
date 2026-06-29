@@ -1,6 +1,8 @@
 # Seg-QC-xnat — Work Queue 002
 
-> **Status:** Draft v1 · **Created:** 2026-06-26
+> **Status:** ✅ Completed — superseded by queue-003 (2026-06-29). All items
+> (014, 016–025) merged to `main`; Stage 2 and Stage 3 are complete.
+> **Created:** 2026-06-26
 > Step 4 of the AIDE workflow. Derived from [`../vision.md`](../vision.md),
 > [`../roadmap.md`](../roadmap.md), and [`../progress.md`](../progress.md).
 > Follows [`queue-001.md`](queue-001.md) (items 001–010).
@@ -186,23 +188,21 @@ without crash; deterministic; window width configurable.
 
 ---
 
-## Current state (updated 2026-06-26)
+## Final state (closed 2026-06-29)
 
-Items 014, 016, 017, 018 are merged to `main`. Item 019
-(orientation/curvature) is in progress on `aide/019-vertebra-orientation-curvature`.
+All items in this queue are ✅ complete and merged to `main`:
 
-**Remaining in this queue:** 019 (in progress), 020, 021, 022, 023, 024.
+- ✅ 014 Inter-vertebra relationships
+- ✅ 016 Features-block JSON serialisation
+- ✅ 017 Centroid spline fit
+- ✅ 018 Per-vertebra spline offset
+- ✅ 019 Vertebra orientation/curvature
+- ✅ 020 Neighbour-consistency metrics
+- ✅ 021 Sagittal projection
+- ✅ 022 Stage 3 feature serialisation & regression tests
+- ✅ 023 EDT-based centroid variants & depth
+- ✅ 024 Local vertebra neighbourhood comparison
+- ✅ 025 Fragmentation index per label
 
-## Next Step
-
-With 019 in progress, the next items to claim from this queue are:
-- **Item 023** (EDT centroid + centroid depth) — Stage 2 enhancement; best
-  done before the spline features consume the centroid values further downstream.
-- **Item 020** (neighbour-consistency) — can run in parallel with 023 once 019 merges.
-- **Items 021, 022, 024** follow naturally from 020 and the spline layer.
-
-Open a **new chat session** and run `/speckit-aide-create-item` with the chosen
-item's description to produce a detailed spec under `docs/aide/items/NNN-*.md`.
-Per the team workflow in `CLAUDE.md`: `git fetch --all --prune` and check
-`aide/*` branches first, then branch per item and push immediately to claim it;
-`git pull --rebase` before any `progress.md` edit.
+Stage 2 and Stage 3 are complete. Superseded by
+[`queue-003.md`](queue-003.md), which begins Stage 4 (heuristic rule engine).
