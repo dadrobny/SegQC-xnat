@@ -254,10 +254,11 @@ These rules are repeated in each agent spec (`.claude/agents/*.md`) so a
 cold-started sub-agent sees them. After a batch, `/aide-review-permissions` is
 still the backstop for anything that slipped through.
 
-### Running one item (`/aide-run-item`) and the whole queue (`/aide-run-queue`)
+### Running items, queues, and the roadmap (`/aide-run-item` · `/aide-run-queue` · `/aide-run-roadmap`)
 
-Two layered orchestrator commands. The invoking session is purely an
-**orchestrator** — it **spawns a sub-agent per task** rather than working inline.
+Three **nested** orchestrator commands — item ⊂ queue ⊂ roadmap. The invoking
+session is purely an **orchestrator**: it **spawns a sub-agent per task** and/or
+delegates to the next command down, rather than working inline.
 
 **`/aide-run-item NNN [branch]`** drives a **single already-claimed item**
 end-to-end and stops. It is the reusable unit:
@@ -274,17 +275,34 @@ end-to-end and stops. It is the reusable unit:
    identifies which agent must fix it and the orchestrator re-spawns accordingly
    (cap: 3 validation rounds, builder escalates to Opus on round 3).
 
-**`/aide-run-queue [NNN]`** iterates the queue: a `scout` per item claims the next
-unclaimed 📋 item (creates + pushes `aide/NNN-*`), then it hands that item to
-`/aide-run-item`. When a queue empties, if the roadmap has further stages it runs
-`/speckit-aide-create-queue`, **commits the new queue immediately** (no untracked
-project docs), and continues — until the roadmap is exhausted.
+**`/aide-run-queue [NNN]`** iterates **one queue**: a `scout` per item claims the
+next unclaimed 📋 item (creates + pushes `aide/NNN-*`), then hands it to
+`/aide-run-item`. It **stops when that queue is empty** and does **not** create
+the next queue — that is the roadmap loop's job.
+
+**`/aide-run-roadmap [--continuous]`** loops **over queues** across the whole
+roadmap: generate a queue → `/aide-run-queue` it → generate the next → … until no
+stage remains. The **queue is the human checkpoint** (review the batch plan ~once
+per 10 items, not every item):
+
+- *default (gated)* — each new queue lands via a **human-reviewed PR**; the loop
+  **pauses** until the human merges it, then runs that queue. Spans sessions and
+  is resumable (it detects open queue PRs, merged-but-unrun queues, and exhausted
+  queues on each invocation).
+- `--continuous` — commit each new queue straight to `main` and run it
+  immediately, looping without waiting; the human reviews queues after the fact
+  and course-corrects via `/speckit-aide-feedback-loop` (which captures any
+  already-merged work needing rework as new corrective items).
+
+Generating queue NNN also **tidies the superseded queue NNN-1** (status line +
+final item states) so exactly one queue is ever live.
 
 Each item is isolated like "fresh chat per item"; the orchestrator passes only the
-item number + short summaries between agents and **pauses for your approval only
-at PRs and major structural changes**. Use `/aide-run-queue` for an unattended
-batch, `/aide-run-item` for a single item, or the per-step `/speckit-aide-*`
-commands (fresh chat each) for tighter manual control.
+item number + short summaries between agents and **pauses for your approval at
+PRs and major structural changes** (and, in gated mode, at every queue PR). Use
+`/aide-run-roadmap` to drive the whole project, `/aide-run-queue` for one batch,
+`/aide-run-item` for a single item, or the per-step `/speckit-aide-*` commands
+(fresh chat each) for tighter manual control.
 
 ### Permission tracking & review (`/aide-review-permissions`)
 

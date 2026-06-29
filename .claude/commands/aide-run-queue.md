@@ -1,16 +1,16 @@
 ---
-description: Iterate the AIDE queue to completion — scout claims each item, then /aide-run-item drives it (spec → tests → build → validate → merge) — auto-generating the next queue when one empties, until the roadmap is exhausted. Pauses only for PRs and major structural changes.
+description: Iterate one AIDE queue to completion — a scout claims each item, then /aide-run-item drives it (spec → tests → build → validate → merge) — looping until that queue is empty, then stops. Does NOT create the next queue. Pauses only for PRs and major structural changes.
 argument-hint: "[queue number, e.g. 001 — optional; defaults to the highest-numbered queue]"
 ---
 
-# Run the AIDE queue (iterator over /aide-run-item)
+# Run one AIDE queue (iterator over /aide-run-item)
 
-Drive the AIDE loop (`docs/aide/`) over **every remaining item** in the queue,
-then over **subsequent queues** until the roadmap has no more stages. **This
-session is only the orchestrator** — do **not** do recon, author specs, write
-code, write tests, or run tests yourself in the main thread. You **delegate each
-item to `/aide-run-item`** and only handle claiming, queue creation, and approval
-gates between items, keeping this thread's context small.
+Drive the AIDE loop (`docs/aide/`) over **every remaining item in a single
+queue**, then **stop**. This command is **queue-scoped**: it does *not* generate
+the next queue — that is `/aide-run-roadmap`'s job (the loop *over* queues). This
+session is only the orchestrator — do **not** author specs, write code, write
+tests, or run tests yourself in the main thread. You **delegate each item to
+`/aide-run-item`** and only handle claiming and approval gates between items.
 
 Target queue: **$ARGUMENTS** (if empty, use the highest-numbered
 `docs/aide/queue/queue-*.md`).
@@ -21,13 +21,13 @@ Target queue: **$ARGUMENTS** (if empty, use the highest-numbered
 |---|---|---|
 | Claim the next 📋 item | `scout` (Haiku) | syncs, checks `aide/*` branches, picks the first unclaimed unblocked 📋 item, pushes `aide/NNN-*`; returns item number + branch + title |
 | Run one item end-to-end | **`/aide-run-item NNN`** | spec-author (Opus) → test-writer → builder → validator+merge, incl. the ≤3-round validate cycle. See that command for the per-item detail. |
-| Generate the next queue when one empties | `/speckit-aide-create-queue` | only if the roadmap has further stages; **commit the new queue immediately** |
 | Approval gates, looping | *orchestrator* | stays in the main thread |
+| Generating the **next** queue | **not here** | only `/aide-run-roadmap` (or a manual `/speckit-aide-create-queue`) does that |
 
 The per-item mechanics (which agent does what, the build↔validate cycle, the
 Opus escalation on round 3) live in **`/aide-run-item`** — this command does not
-restate them. Keeping a single source of truth for the item loop is the whole
-point of the split.
+restate them. Keeping a single source of truth for the item loop is the point of
+the split.
 
 **Command hygiene** applies to any git command you issue from this thread too: no
 `cd` prefix, one command per Bash call, no `2>&1`, no command substitution in
@@ -48,16 +48,14 @@ stranded otherwise.
    already ✅/❌, skip it; if 🚧 or 📋, it is unfinished.
 4. For each unfinished item (item-number order), hand it to **`/aide-run-item NNN
    aide/NNN-short-name`**. `/aide-run-item` is itself resumable — its spec-author
-   step no-ops if the spec exists, and the validator/build cycle picks up from
-   whatever is already committed — so you do not need to compute a resume point
-   here; just run it.
+   step no-ops if the spec exists, and the validate/build cycle picks up from
+   whatever is already committed — so just run it.
 5. Process each resumed item to PASS+merge (or a user-stop) before claiming new
    work below.
 
 ## Loop
 
-Repeat until the `scout` reports no remaining unclaimed 📋 item **and** the
-roadmap has no further stage to queue:
+Repeat until the `scout` reports no remaining unclaimed 📋 item **in this queue**:
 
 1. **Claim → spawn `scout`** with the queue number:
    > Sync the repo, check `git branch -r` for existing `aide/*` branches, read
@@ -68,7 +66,7 @@ roadmap has no further stage to queue:
 
 2. **Decide (orchestrator).**
    - **Item returned** → go to step 3.
-   - **"none left"** → go to **On queue exhaustion** below.
+   - **"none left"** → the queue is exhausted; go to **On queue exhaustion**.
 
 3. **Run the item → invoke `/aide-run-item NNN aide/NNN-short-name`.** This drives
    the full per-item workflow and merges on PASS. Wait for it to return.
@@ -79,26 +77,19 @@ roadmap has no further stage to queue:
 
 ## On queue exhaustion
 
-When `scout` reports no 📋 items remain in the current queue:
+When `scout` reports no 📋 items remain in this queue, **stop** and report:
+items completed, branches merged, and final test status. Then point the user at
+the next move (do **not** generate the next queue yourself):
 
-1. **Check the roadmap for more work.** Read `docs/aide/roadmap.md` and
-   `docs/aide/progress.md`. If every stage is ✅ (or deferred/excluded), the
-   project batch is done — go to step 4.
-2. **Generate the next queue.** If stages remain, run
-   `/speckit-aide-create-queue` (it reads vision/roadmap/progress and numbers the
-   next batch sequentially). **Commit the new queue file immediately** so it is
-   never an untracked, machine-local document:
-   - `git switch main`
-   - `git pull --rebase`
-   - `git add docs/aide/queue/queue-NNN.md`
-   - `git commit -m "docs(aide): add work queue NNN"`
-   - `git push`
-3. **Continue.** Re-enter the **Loop** above with the new queue number.
-4. **Done.** Summarise items completed, branches merged, queues generated, and
-   final test status. Permission prompts hit during the batch are auto-logged
-   (`docs/aide/permissions/`); recommend the user run **`/aide-review-permissions`**
-   to promote recurring safe prompts (it also **rotates** the log so the next
-   review starts clean).
+- **Driving the whole roadmap?** Run **`/aide-run-roadmap`** — it generates and
+  gates the next queue (human-reviewed PR by default, or `--continuous` to keep
+  going), then re-enters this command for that queue.
+- **Working a single batch manually?** Start a fresh chat and run
+  `/speckit-aide-create-queue` for the next batch.
+
+Permission prompts hit during the batch are auto-logged (`docs/aide/permissions/`);
+suggest the user run **`/aide-review-permissions`** to promote recurring safe
+prompts (it also **rotates** the log).
 
 ## When the orchestrator must stop and ask the user
 
@@ -109,6 +100,3 @@ When `scout` reports no 📋 items remain in the current queue:
   reviewed PR, never a direct merge.
 - The build↔validate cycle for an item exceeds 3 rounds, or an item is blocked /
   contradictory — document the blocker and suggest `/speckit-aide-feedback-loop`.
-- **Queue creation is a framework-adjacent doc step**: generating *and committing*
-  the next queue is allowed inline (it's an additive doc, like progress), but if
-  `create-queue` would also need to touch vision/roadmap, stop and ask.
