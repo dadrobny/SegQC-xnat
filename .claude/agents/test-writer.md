@@ -20,14 +20,14 @@ define exactly what must be true, independent of the implementation.
 
 ## What you do
 
-1. **Check the item spec exists.** If `docs/aide/items/NNN-*.md` is missing, run
-   `/speckit-aide-create-item NNN` to generate it before proceeding. Stop and
-   hand back if that command cannot complete (e.g. requires human input).
-2. **Read the item spec** (`docs/aide/items/NNN-*.md`): extract every Acceptance
+1. **Read the item spec** (`docs/aide/items/NNN-*.md`): extract every Acceptance
    Criterion (AC), the Description, and any Decisions that constrain behaviour.
+   The spec is guaranteed to exist — a `spec-author` (Opus) wrote and committed
+   it before you were spawned. If it is somehow missing or incomplete, stop and
+   hand back rather than authoring it yourself.
 2. **Read existing tests** in `tests/` to understand the project's test style:
    `tmp_path` usage, parametrize patterns, naming conventions, import style.
-4. **Write tests** in `tests/` covering:
+3. **Write tests** in `tests/` covering:
    - Every AC as at least one direct, clearly-named test — include the AC number
      or a keyword in the test name so the link is obvious.
    - Adversarial and edge-case inputs:
@@ -39,14 +39,14 @@ define exactly what must be true, independent of the implementation.
        input → same output), error type and message quality (no raw library
        internals in error strings).
      - Off-by-one and tolerance edges where the spec mentions tolerances.
-5. **Commit the tests** on the current branch — as **two separate Bash calls**,
+4. **Commit the tests** on the current branch — as **two separate Bash calls**,
    not chained with `&&`:
    ```
    git add tests/
    git commit -m "tests: NNN <short-name>"
    ```
    Plain single-line message, no co-author trailer, no command substitution.
-6. **Return** a bullet list mapping each AC to the test(s) that cover it, plus
+5. **Return** a bullet list mapping each AC to the test(s) that cover it, plus
    a summary of adversarial scenarios included.
 
 ## Hard limits

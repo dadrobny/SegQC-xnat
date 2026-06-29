@@ -167,12 +167,17 @@ committed config so the whole team gets them.
 
 ### Model routing by task complexity (`.claude/agents/`)
 
-Four committed subagents split work by role and cost:
+Five committed subagents split work by role and cost:
 
 - **`scout` (Haiku)** — narrow **recon + claim**: syncs the repo, reads the
   queue and progress files, checks `aide/*` branches to find the next unclaimed
   📋 item, then creates and pushes the claim branch. Returns only item number,
   branch name, and title. Never searches source code; file locations are known.
+- **`spec-author` (Opus)** — **work-item spec authoring only**: turns the queued
+  one-liner into a complete, testable `docs/aide/items/NNN-*.md` (atomic AC,
+  steps, testing strategy, deps), commits it. Runs on Opus deliberately — the
+  spec is the single source of truth every later agent depends on, so stronger
+  up-front guidance pays off. Does **not** write code or tests, no pytest.
 - **`builder` (Sonnet, escalates to Opus on 3rd attempt)** — **implementation
   only**: implements production code in `src/` per the item spec, records
   decisions, sets progress 🚧, commits. Does **not** write tests and does **not**
@@ -183,11 +188,15 @@ Four committed subagents split work by role and cost:
   Does **not** touch `src/` and does **not** run pytest.
 - **`validator` (Sonnet)** — independent **quality gate**: runs pytest, checks
   that every AC has a test, verifies code scope, confirms vision fit. Does **not**
-  write or modify tests. On PASS flips ✅ and direct-merges; on FAIL hands back
-  identifying which agent (builder or test-writer) needs to fix it.
+  write or modify tests. On PASS it **reconciles `progress.md`** (the item row,
+  the stage's acceptance checkboxes, and the stage rollup — so status flags don't
+  go stale), direct-merges, then deletes the merged `aide/NNN-*` claim branch
+  (local + remote, safe `-d`); on FAIL hands back identifying which agent (builder
+  or test-writer) needs to fix it.
 
-Delegate recon/claim to `scout`; implementation to `builder`; test authoring to
-`test-writer`; verification to `validator`. Claude Code does **not** auto-detect
+Delegate recon/claim to `scout`; spec authoring to `spec-author`; implementation
+to `builder`; test authoring to `test-writer`; verification to `validator`.
+Claude Code does **not** auto-detect
 complexity and swap the main model — routing happens by delegating to these agents
 (and by your own `/model` choice).
 
@@ -245,28 +254,37 @@ These rules are repeated in each agent spec (`.claude/agents/*.md`) so a
 cold-started sub-agent sees them. After a batch, `/aide-review-permissions` is
 still the backstop for anything that slipped through.
 
-### Running the whole queue (`/aide-run-queue`)
+### Running one item (`/aide-run-item`) and the whole queue (`/aide-run-queue`)
 
-`/aide-run-queue [NNN]` drives the AIDE loop over **every remaining 📋 item** in
-the queue until empty. The invoking session acts purely as an **orchestrator** and
-**spawns a sub-agent per task** rather than doing the work inline:
+Two layered orchestrator commands. The invoking session is purely an
+**orchestrator** — it **spawns a sub-agent per task** rather than working inline.
 
-1. a `scout` per item — syncs, finds the next unclaimed 📋 item, claims it
-   (creates + pushes the `aide/NNN-*` branch);
-2. a **fresh `builder` per item** — checks out the branch, creates the item spec
-   if missing, implements production code, commits (no tests, no pytest);
-3. a **fresh `test-writer` per item** — reads the spec, writes AC + adversarial
-   tests, commits (no production code, no pytest);
-4. a **fresh `validator` per item** (a *different* agent from builder and
-   test-writer) — runs pytest, checks AC coverage, checks scope and vision fit,
-   then flips ✅ and direct-merges **only on PASS**; on FAIL it identifies which
-   agent needs to fix it and the orchestrator re-spawns accordingly
-   (cap: 3 validation rounds).
+**`/aide-run-item NNN [branch]`** drives a **single already-claimed item**
+end-to-end and stops. It is the reusable unit:
+
+1. a `spec-author` (Opus) — authors `docs/aide/items/NNN-*.md` and commits it
+   (skipped if a complete spec already exists);
+2. a **fresh `test-writer`** — reads the spec, writes AC + adversarial tests,
+   commits (no production code, no pytest);
+3. a **fresh `builder`** — implements `src/` per every AC, sets progress 🚧,
+   commits (no tests, no pytest);
+4. a **fresh `validator`** (a *different* agent) — runs pytest, checks AC
+   coverage / scope / vision fit, **reconciles `progress.md`**, then on PASS
+   flips ✅, direct-merges, and deletes the merged claim branch; on FAIL it
+   identifies which agent must fix it and the orchestrator re-spawns accordingly
+   (cap: 3 validation rounds, builder escalates to Opus on round 3).
+
+**`/aide-run-queue [NNN]`** iterates the queue: a `scout` per item claims the next
+unclaimed 📋 item (creates + pushes `aide/NNN-*`), then it hands that item to
+`/aide-run-item`. When a queue empties, if the roadmap has further stages it runs
+`/speckit-aide-create-queue`, **commits the new queue immediately** (no untracked
+project docs), and continues — until the roadmap is exhausted.
 
 Each item is isolated like "fresh chat per item"; the orchestrator passes only the
 item number + short summaries between agents and **pauses for your approval only
-at PRs and major structural changes**. Use it for an unattended batch run; use the
-per-step `/speckit-aide-*` commands (fresh chat each) for tighter manual control.
+at PRs and major structural changes**. Use `/aide-run-queue` for an unattended
+batch, `/aide-run-item` for a single item, or the per-step `/speckit-aide-*`
+commands (fresh chat each) for tighter manual control.
 
 ### Permission tracking & review (`/aide-review-permissions`)
 

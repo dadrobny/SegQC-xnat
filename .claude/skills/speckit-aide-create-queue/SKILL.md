@@ -47,6 +47,24 @@ Name the queue file sequentially: `queue-001.md`, `queue-002.md`, etc.
 
 Save the queue to `docs/aide/queue/queue-NNN.md` (where NNN is the next sequential number).
 
+### Commit the queue immediately (do not leave it untracked)
+
+A queue file is a **shared project document**, not a scratch note — an untracked
+or machine-local queue is invisible to collaborators and to the scout, which
+reads the committed queue. As soon as the file is written, commit it (each as a
+separate Bash call; `git pull --rebase` first so it stacks cleanly on `main`):
+
+```
+git pull --rebase
+git add docs/aide/queue/queue-NNN.md
+git commit -m "docs(aide): add work queue NNN"
+git push
+```
+
+Per `CLAUDE.md`, queue files are additive AIDE docs and may be committed/pushed
+directly to `main`. Do **not** end this step with the queue left only in the
+working tree.
+
 ## Next Step
 
 Select an item from the queue and start a **new chat session**. Run `/speckit-aide-create-item` with the item description to create a detailed work item specification.

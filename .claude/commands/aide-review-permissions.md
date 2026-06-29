@@ -48,9 +48,17 @@ Target log: **$ARGUMENTS** (if empty, the default
    **not** direct-merge. State this to the user; stop at the PR (gh pr create is
    `ask`-gated).
 
-5. **Rotate the log** so the same prompts aren't re-reviewed next time: append the
-   reviewed lines to `docs/aide/permissions/log.reviewed.jsonl` and truncate
-   `docs/aide/permissions/log.jsonl`. Both stay gitignored.
+5. **Rotate the log** so the same prompts aren't re-reviewed next time and the
+   raw log doesn't grow without bound. Run:
+   ```
+   python .claude/scripts/review_permissions.py --rotate
+   ```
+   This archives every current record into `docs/aide/permissions/log.reviewed.jsonl`
+   and truncates `docs/aide/permissions/log.jsonl` (both stay gitignored). Do this
+   **after** you've captured the allow-rule decisions in step 2–4 — once rotated,
+   those records are no longer in the live review. Always rotate at the end of a
+   review; an un-rotated log re-surfaces the same prompts and balloons over time
+   (it has reached ~1 MB / thousands of records when left unrotated).
 
 ## Notes
 

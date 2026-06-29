@@ -25,6 +25,7 @@ from urllib.parse import urlparse
 
 _ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_LOG = _ROOT / "docs" / "aide" / "permissions" / "log.jsonl"
+DEFAULT_REVIEWED = _ROOT / "docs" / "aide" / "permissions" / "log.reviewed.jsonl"
 DEFAULT_SETTINGS = _ROOT / ".claude" / "settings.json"
 
 # How many leading tokens form a stable Bash prefix per CLI (subcommand depth).
@@ -221,6 +222,31 @@ def load_records(log_path):
     return records
 
 
+def rotate_log(log_path, reviewed_path):
+    """Move every line of ``log_path`` into ``reviewed_path`` and truncate the log.
+
+    Returns the number of (non-blank) records rotated. This is what keeps the
+    raw log from growing without bound: after a review the processed entries are
+    appended to the reviewed archive and the live log is emptied, so the next
+    review starts clean. Both files stay gitignored (per-machine). A missing or
+    empty log is a no-op returning 0.
+    """
+    log = Path(log_path)
+    if not log.exists():
+        return 0
+    lines = [ln for ln in log.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    if not lines:
+        # Nothing to rotate; still normalise the file to empty.
+        log.write_text("", encoding="utf-8")
+        return 0
+    reviewed = Path(reviewed_path)
+    reviewed.parent.mkdir(parents=True, exist_ok=True)
+    with reviewed.open("a", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+    log.write_text("", encoding="utf-8")
+    return len(lines)
+
+
 def load_rules(settings_path):
     path = Path(settings_path)
     if not path.exists():
@@ -247,9 +273,21 @@ def _render_table(rows):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--log", default=str(DEFAULT_LOG))
+    parser.add_argument("--reviewed", default=str(DEFAULT_REVIEWED))
     parser.add_argument("--settings", default=str(DEFAULT_SETTINGS))
     parser.add_argument("--json", action="store_true", help="machine-readable output")
+    parser.add_argument(
+        "--rotate",
+        action="store_true",
+        help="archive the current log to the reviewed file and truncate it, "
+        "then exit (run this after promoting allow-rules so the next review starts clean)",
+    )
     args = parser.parse_args(argv)
+
+    if args.rotate:
+        moved = rotate_log(args.log, args.reviewed)
+        print(f"Rotated {moved} record(s) from {args.log} to {args.reviewed}.")
+        return 0
 
     records = load_records(args.log)
     allow_rules, ask_rules = load_rules(args.settings)

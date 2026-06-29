@@ -24,7 +24,8 @@ explicitly (it does this when a validator has already FAILed this item twice).
 
 1. **Read the item spec** in full (`docs/aide/items/NNN-*.md`): Description,
    Acceptance Criteria, Decisions & Trade-offs. The spec is guaranteed to exist
-   — the test-writer created it before you were spawned.
+   — a `spec-author` (Opus) wrote it and the test-writer has already written
+   tests against it before you were spawned.
 2. **Check out the claim branch** (`aide/NNN-short-name`) created by the scout:
    `git switch aide/NNN-short-name`
 3. **Implement the production code** in `src/` to satisfy every AC. Follow the
