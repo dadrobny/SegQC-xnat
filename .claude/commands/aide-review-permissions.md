@@ -62,7 +62,19 @@ Target log: **$ARGUMENTS** (if empty, the default
 
 ## Notes
 
-- The hook never blocks or alters a tool — it only records. If the log is missing or
-  empty, there is nothing to review (no run has hit a prompt since the last rotation).
+- The hook never blocks or alters a tool — it only records.
+- **An empty log has *two* causes — check trust first.** Either no run has hit a
+  prompt since the last rotation, **or the logging hook never ran because this
+  project folder isn't trusted.** Crucially, an untrusted folder *also* silently
+  disables the `.claude/settings.json` allow-list you're trying to tune — both the
+  hook and the allow-list are gated by the same trust flag. So the symptom
+  "permission prompts keep firing **and** the review log is empty" almost always
+  means **untrusted folder**, not a missing rule. Verify before chasing rules: in
+  `~/.claude.json`, find this repo's path under `projects` and confirm
+  `"hasTrustDialogAccepted": true`. The key is an **exact, case-sensitive** path
+  string — mind `c:` vs `C:` and any OneDrive/symlinked spelling (a mismatched key
+  is a *different*, untrusted project). Fix by re-opening the folder to accept the
+  trust prompt, or setting that flag. (The reviewer script prints this reminder
+  whenever the log is empty.)
 - Re-run this anytime, and from `/speckit-aide-feedback-loop`, which calls it as part
   of its process review.

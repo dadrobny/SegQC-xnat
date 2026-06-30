@@ -23,6 +23,24 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from urllib.parse import urlparse
 
+# Shown when the log is empty. An empty log while you ARE hitting permission
+# prompts is the tell-tale sign of an untrusted folder: the logging hook only
+# runs in a trusted project, and an untrusted folder ALSO silently disables the
+# .claude/settings.json allow-list this command is meant to tune. So the empty
+# log and the "my allow-list is ignored" symptom share one root cause.
+TRUST_HINT = (
+    "Are you actually seeing permission prompts even though this log is EMPTY?\n"
+    "That usually means the project FOLDER IS NOT TRUSTED. An untrusted folder\n"
+    "makes Claude Code silently ignore this repo's .claude/settings.json -- both\n"
+    "the permission allow-list AND the hooks (including the one that writes this\n"
+    "log) -- so the allow-list 'exists' but is never applied.\n"
+    "  Check: in ~/.claude.json, find this repo's absolute path under \"projects\"\n"
+    "  and confirm \"hasTrustDialogAccepted\": true. The key is an EXACT,\n"
+    "  case-sensitive path string -- mind c: vs C: and any OneDrive/symlinked\n"
+    "  spelling; a mismatched key is treated as a separate, untrusted project.\n"
+    "  Fix: re-open the folder and accept the trust prompt, or set that flag true.\n"
+)
+
 _ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_LOG = _ROOT / "docs" / "aide" / "permissions" / "log.jsonl"
 DEFAULT_REVIEWED = _ROOT / "docs" / "aide" / "permissions" / "log.reviewed.jsonl"
@@ -258,7 +276,7 @@ def load_rules(settings_path):
 
 def _render_table(rows):
     if not rows:
-        return "No prompt-eligible tool calls logged yet.\n"
+        return "No prompt-eligible tool calls in the log (if you ARE hitting prompts, see the trust note above).\n"
     header = f"{'#':>2}  {'count':>5}  {'grant':>5}  {'deny':>4}  {'status':<12}  rule"
     lines = [header, "-" * len(header)]
     for i, r in enumerate(rows, 1):
@@ -301,6 +319,8 @@ def main(argv=None):
         return 0
 
     print(f"Permission review - {len(records)} log records, {args.log}\n")
+    if not records:
+        print(TRUST_HINT)
     print(_render_table(rows))
     if new_rules:
         print("\nSuggested `allow` additions (review each - full command shown above):")
