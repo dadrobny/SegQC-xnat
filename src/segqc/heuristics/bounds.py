@@ -41,7 +41,7 @@ __all__ = ["BoundsRule", "DEFAULT_BOUNDS"]
 # with the label convention.  S and Cocygis are intentionally omitted (unbounded).
 _LEVEL_GROUP: Dict[str, str] = {}
 for _name in CANONICAL_ORDER:
-    if _name.startswith("C"):
+    if _name.startswith("C") and len(_name) > 1 and _name[1].isdigit():
         _LEVEL_GROUP[_name] = "cervical"
     elif _name.startswith("T"):
         _LEVEL_GROUP[_name] = "thoracic"
