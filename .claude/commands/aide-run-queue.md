@@ -1,6 +1,6 @@
 ---
 description: Iterate one AIDE queue to completion — a scout claims each item, then /aide-run-item drives it (spec → tests → build → validate → merge) — looping until that queue is empty, then stops. Does NOT create the next queue. Pauses only for PRs and major structural changes.
-argument-hint: "[queue number, e.g. 001 — optional] [--continuous — optional, headless item nesting]"
+argument-hint: "[queue number, e.g. 001 — optional] [--continuous — headless item nesting] [--worktree — isolate in a worktree]"
 ---
 
 # Run one AIDE queue (iterator over /aide-run-item)
@@ -29,19 +29,20 @@ pin the session model, so `/model sonnet` first if you're on Opus.
   separate API usage limit and can't answer permission prompts — it relies on the
   `permissions.allow` list; keep it current.**
 
-**Worktree in `--continuous`.** A continuous queue run switches branches
-constantly and must not collide with the human's checkout, so it runs in a
-dedicated **git worktree** (sibling of the repo, owning `main`, with its own
-`.venv` — see `/aide-run-roadmap` → *Worktree isolation* for the full rules):
-- **Invoked directly** (not from `/aide-run-roadmap`) → **create the worktree
-  yourself** at the start (create the sibling worktree on `main`, bootstrap its
-  venv) and **remove it** when the queue is done.
-- **Spawned by `/aide-run-roadmap --continuous`** → you are *already* inside the
-  loop worktree; **reuse it** — do not create a nested one, and leave teardown to
-  the roadmap loop that owns it.
+**Worktree isolation (`--worktree`, or implied by `--continuous`).** Isolation is
+orthogonal to the continuous mechanism: a multi-item queue run switches branches
+constantly, so **isolate it whenever parallel work is possible**. Use a dedicated
+**git worktree** (sibling of the repo, owning `main`, with its own `.venv` — see
+`/aide-run-roadmap` → *Worktree isolation* for the full rules). When to set it up:
+- **Already inside a loop worktree** (spawned by `/aide-run-roadmap` with
+  isolation, or the human launched you there) → **reuse it**; don't nest, and
+  leave teardown to whoever created it.
+- **`--worktree`/`--continuous` and not yet isolated** (direct invocation) →
+  **create the worktree yourself** at the start (sibling on `main` + venv;
+  gated: `cd` into it once), and **remove it** when the queue is done.
+- **Neither flag** → run in-place in the primary checkout (solo, sequential).
 
-Detect which case you're in by checking whether the current working directory is
-already a loop worktree on `main`; if so, reuse, else create.
+Detect by checking whether the current cwd is already a loop worktree on `main`.
 
 ## Division of labour
 
@@ -113,11 +114,11 @@ Repeat until the `scout` reports no remaining unclaimed 📋 item **in this queu
 ## On queue exhaustion
 
 When `scout` reports no 📋 items remain in this queue, **stop** and report:
-items completed, branches merged, and final test status. If you are in
-`--continuous` and **created your own worktree** (direct invocation), remove it
-now (`git worktree remove <path>`); if it was provided by `/aide-run-roadmap`,
-leave it for the roadmap loop to tear down. Then point the user at the next move
-(do **not** generate the next queue yourself):
+items completed, branches merged, and final test status. If you **created your own
+worktree** (direct `--worktree`/`--continuous` invocation), remove it now
+(`git worktree remove <path>`); if it was provided by `/aide-run-roadmap`, leave it
+for the roadmap loop to tear down. Then point the user at the next move (do **not**
+generate the next queue yourself):
 
 - **Driving the whole roadmap?** Run **`/aide-run-roadmap`** — it generates and
   gates the next queue (human-reviewed PR by default, or `--continuous` to keep

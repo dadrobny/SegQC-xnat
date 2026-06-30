@@ -342,12 +342,22 @@ process can:
   may count against a **separate API usage limit**, so it's used *only* behind the
   explicit flag; (2) **permissions** — a headless child can't answer a prompt, so
   it lives or dies by `permissions.allow` (keep it current; likely add
-  `--permission-mode acceptEdits`). It runs in a dedicated **git worktree**
-  (sibling of the repo, **owning `main`** while the human stays off `main`, with
-  its **own `.venv`** — an editable install resolves `segqc` to *its* checkout's
-  source, so a shared venv would test the wrong code). The worktree is created at
-  loop start and removed on exit; the framework makes no assumption about *where*
-  the repo lives (keeping it off a synced/cloud disk is a user setup concern).
+  `--permission-mode acceptEdits`).
+
+**Worktree isolation (`--worktree`) is orthogonal to `--continuous`.** Isolation
+is about *where* a loop runs; `--continuous` is about *how* layers nest. Any
+multi-item loop (`/aide-run-queue`, `/aide-run-roadmap`) switches branches
+constantly, so running it in a dedicated **git worktree** is good practice
+**whenever the human (or another loop) might touch the repo in parallel** — it is
+the structural fix for the "two actors, one HEAD" collision. It's **opt-in via
+`--worktree`** (recommended in that case); **`--continuous` always implies it**;
+single-item `/aide-run-item` never needs it. The worktree is a **sibling of the
+repo, owning `main`** while the human stays off `main`, with its **own `.venv`**
+(an editable install resolves `segqc` to *its* checkout's source, so a shared venv
+would test the wrong code); created at loop start, removed on exit. `--continuous`
+children get it as their cwd; a gated `--worktree` loop `cd`s into it once (the
+sole exception to the no-`cd` rule). The framework makes no assumption about
+*where* the repo lives — keeping it off a synced/cloud disk is a user setup concern.
 
 ### Permission tracking & review (`/aide-review-permissions`)
 

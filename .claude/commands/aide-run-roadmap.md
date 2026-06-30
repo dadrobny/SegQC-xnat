@@ -1,6 +1,6 @@
 ---
 description: Drive the AIDE roadmap across MULTIPLE queues — generate a queue, run it to completion (via /aide-run-queue), then generate the next — until the roadmap is exhausted. Default gates each new queue behind a human-reviewed PR; --continuous keeps going without waiting.
-argument-hint: "[--continuous] — optional; default is human-gated (PR per queue)"
+argument-hint: "[--continuous] [--worktree] — optional; default is human-gated (PR per queue), in-place"
 ---
 
 # Run the AIDE roadmap (loop over queues)
@@ -63,12 +63,24 @@ commit messages, recon via Bash + `grep`.
 > as the `permissions.allow` list (and likely `--permission-mode acceptEdits` for
 > builders' file edits). Keep the allow-list current via `/aide-review-permissions`.
 
-## Worktree isolation (`--continuous`)
+## Worktree isolation (`--worktree`, implied by `--continuous`)
 
-A continuous run constantly switches branches (`aide/NNN-*` → `main` to merge →
-next). If it shares the **one** working directory with the human (or another
-loop), their HEADs collide — exactly the failure that lands commits on the wrong
-branch. So a continuous run operates in its **own git worktree**:
+Worktree isolation and the headless `--continuous` mechanism are **orthogonal**:
+isolation is about *where* the loop runs; `--continuous` is about *how* layers
+nest. Any multi-item loop switches branches constantly (`aide/NNN-*` → `main` to
+merge → next), so if it shares the **one** working directory with the human (or
+another loop), their HEADs collide — exactly the failure that lands commits on the
+wrong branch. So **isolation is good practice for any multi-item loop where
+parallel work is possible**, independent of `--continuous`:
+
+- **`--worktree`** (opt-in) — run this gated/interactive loop in its own worktree.
+  **Recommended whenever you (or another loop) will touch the repo in parallel.**
+- **`--continuous`** — **always** isolated (it *must* be, since its headless
+  children run with the worktree as cwd); `--continuous` implies `--worktree`.
+- Neither flag — runs in-place in the primary checkout (fine for a solo,
+  sequential session with no parallel work).
+
+When isolating, operate in a **dedicated git worktree**:
 
 1. **Create a sibling worktree that owns `main`.** From the repo root, derive a
    sibling path (e.g. `../segqc-aide-loop`) and `git worktree add <path> main`.
@@ -83,8 +95,15 @@ branch. So a continuous run operates in its **own git worktree**:
    *primary* source — so the worktree **must** bootstrap its own venv or tests
    would silently exercise the wrong code. In the worktree: `python -m venv .venv`
    then `.venv/Scripts/pip install -e .[dev]` (or `.venv/bin/...`).
-3. **Run all `claude -p` children with their cwd set to the worktree.** They (and
-   their workers) operate entirely there; the primary checkout is never touched.
+3. **Operate inside the worktree.** Mechanism depends on mode:
+   - *`--continuous`* → spawn the `claude -p` children with their **cwd set to the
+     worktree**; they (and their workers) operate entirely there.
+   - *gated `--worktree`* → `cd <worktree>` **once** at the start as its own Bash
+     call (the Bash tool's cwd persists across calls). This is the one allowed
+     exception to the "no `cd`" hygiene rule — it is a standalone `cd`, not a
+     `cd X && cmd` compound, so subsequent **bare** git/python commands still match
+     the allow-list, now operating in the worktree. The primary checkout is never
+     touched.
 4. **Clean up on exit / resume.** When the roadmap is exhausted (or you abort),
    `git worktree remove <path>`; on resume, `git worktree prune` and reuse an
    existing loop worktree rather than stacking new ones.
@@ -100,9 +119,10 @@ This loop spans sessions (gated mode pauses for a human merge), so always start
 by working out where things stand. `git fetch --all --prune`, then read
 `docs/aide/roadmap.md`, `docs/aide/progress.md`, and the queue files.
 
-**`--continuous` first:** before the state check, ensure the **loop worktree**
-exists (create it + its venv per *Worktree isolation* above, or reuse/prune an
-existing one) and run everything below with the worktree as cwd.
+**If `--worktree` or `--continuous`:** before the state check, ensure the **loop
+worktree** exists (create it + its venv per *Worktree isolation* above, or
+reuse/prune an existing one) and operate inside it (cwd for `--continuous`
+children; a one-time `cd` for gated `--worktree`).
 
 | State | Action |
 |---|---|
