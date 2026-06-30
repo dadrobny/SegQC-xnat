@@ -147,6 +147,13 @@ env is current:
 ```
 If the import fails (or `.venv` does not exist), re-run the bootstrap above.
 
+**Worktrees need their own `.venv`.** Each git worktree (e.g. the
+`/aide-run-roadmap --continuous` loop worktree) has its own `src/`, but an
+editable install (`pip install -e .`) resolves `import segqc` to the checkout it
+was built in — so a venv built in the primary checkout would make a worktree
+silently test the *primary's* code. Bootstrap a fresh `.venv` inside each
+worktree; never share one across worktrees.
+
 **Agent rule — builders and validators MUST:**
 1. Check whether `.venv` exists and `import segqc` succeeds inside it.
 2. If not, rebuild with the bootstrap commands before writing or running any code.
@@ -167,12 +174,18 @@ committed config so the whole team gets them.
 
 ### Model routing by task complexity (`.claude/agents/`)
 
-Five committed subagents split work by role and cost:
+Six committed subagents split work by role and cost:
 
 - **`scout` (Haiku)** — narrow **recon + claim**: syncs the repo, reads the
   queue and progress files, checks `aide/*` branches to find the next unclaimed
   📋 item, then creates and pushes the claim branch. Returns only item number,
   branch name, and title. Never searches source code; file locations are known.
+- **`queue-planner` (Opus)** — **queue authoring only**: generates the next batch
+  of ~10 items into `docs/aide/queue/queue-NNN.md` from vision/roadmap/progress,
+  tidies the superseded previous queue, and commits both (no push/PR). On Opus
+  because a batch plan cascades into ~10 items — high-leverage planning, the
+  queue-level analogue of `spec-author`. The roadmap orchestrator spawns it
+  rather than running `create-queue` inline.
 - **`spec-author` (Opus)** — **work-item spec authoring only**: turns the queued
   one-liner into a complete, testable `docs/aide/items/NNN-*.md` (atomic AC,
   steps, testing strategy, deps), commits it. Runs on Opus deliberately — the
@@ -194,8 +207,9 @@ Five committed subagents split work by role and cost:
   (local + remote, safe `-d`); on FAIL hands back identifying which agent (builder
   or test-writer) needs to fix it.
 
-Delegate recon/claim to `scout`; spec authoring to `spec-author`; implementation
-to `builder`; test authoring to `test-writer`; verification to `validator`.
+Delegate recon/claim to `scout`; queue authoring to `queue-planner`; spec
+authoring to `spec-author`; implementation to `builder`; test authoring to
+`test-writer`; verification to `validator`.
 Claude Code does **not** auto-detect
 complexity and swap the main model — routing happens by delegating to these agents
 (and by your own `/model` choice).
@@ -303,6 +317,47 @@ PRs and major structural changes** (and, in gated mode, at every queue PR). Use
 `/aide-run-roadmap` to drive the whole project, `/aide-run-queue` for one batch,
 `/aide-run-item` for a single item, or the per-step `/speckit-aide-*` commands
 (fresh chat each) for tighter manual control.
+
+**Orchestration model & session scope.** The orchestrator's own job — dispatch a
+subagent, read its short summary, decide the next step, gate approvals — is light,
+so **run the orchestrator on Sonnet**; all heavy cognition lives in the subagents
+(`queue-planner`/`spec-author` on Opus, builder/validator on Sonnet, scout on
+Haiku). A slash command can't pin the session model, so `/model sonnet` before a
+long run if you're on Opus. The two modes nest differently, because the `Task`
+subagent tool can't reliably spawn *its own* subagents but a fresh `claude`
+process can:
+
+- **Gated (default) — inline, one session per queue.** Layers load each other as
+  skills in one interactive session; only the leaf `/aide-run-item` spawns worker
+  subagents. The human re-invokes per queue, so context stays bounded. **No
+  headless sessions.**
+- **`--continuous` — headless nesting in a worktree.** Each layer spawns the next
+  as a fresh subprocess — `claude --model sonnet -p "/aide-run-queue NNN
+  --continuous"` → `… -p "/aide-run-item NNN …"` → worker subagents — and blocks
+  until the child exits (that is how the parent "waits"). A `claude -p` child is a
+  full session, so it *can* spawn subagents; each cold-starts, does one
+  queue/item, and exits, bounding every layer's context.
+
+  Two caveats make `--continuous` reliable: (1) **billing** — headless `claude -p`
+  may count against a **separate API usage limit**, so it's used *only* behind the
+  explicit flag; (2) **permissions** — a headless child can't answer a prompt, so
+  it lives or dies by `permissions.allow` (keep it current; likely add
+  `--permission-mode acceptEdits`).
+
+**Worktree isolation (`--worktree`) is orthogonal to `--continuous`.** Isolation
+is about *where* a loop runs; `--continuous` is about *how* layers nest. Any
+multi-item loop (`/aide-run-queue`, `/aide-run-roadmap`) switches branches
+constantly, so running it in a dedicated **git worktree** is good practice
+**whenever the human (or another loop) might touch the repo in parallel** — it is
+the structural fix for the "two actors, one HEAD" collision. It's **opt-in via
+`--worktree`** (recommended in that case); **`--continuous` always implies it**;
+single-item `/aide-run-item` never needs it. The worktree is a **sibling of the
+repo, owning `main`** while the human stays off `main`, with its **own `.venv`**
+(an editable install resolves `segqc` to *its* checkout's source, so a shared venv
+would test the wrong code); created at loop start, removed on exit. `--continuous`
+children get it as their cwd; a gated `--worktree` loop `cd`s into it once (the
+sole exception to the no-`cd` rule). The framework makes no assumption about
+*where* the repo lives — keeping it off a synced/cloud disk is a user setup concern.
 
 ### Permission tracking & review (`/aide-review-permissions`)
 
