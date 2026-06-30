@@ -148,7 +148,7 @@ mislabelling heuristics.
 - ✅ Config-driven rule engine: each rule emits flag + human-readable reason + offending labels. *(Item 026)*
 - 📋 Rule families covering §6:
   - ✅ min/max bounds (volume, extent), level-aware; *(Item 027)*
-  - 📋 connected-components → fragmentation / island flags;
+  - ✅ connected-components → fragmentation / island flags; *(Item 028)*
   - 📋 incomplete coverage / missing levels (count vs expected sequence);
   - 📋 label-sequence continuity (e.g. L1→T12→L2→L5);
   - 📋 border-partial-vertebra flag;
