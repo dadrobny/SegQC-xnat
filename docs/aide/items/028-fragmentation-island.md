@@ -379,8 +379,7 @@ This item is **parallel-independent** of the other rule families (027,
 
 ## Decisions & Trade-offs
 
-To be updated during implementation. Initial intent (to be confirmed / refined
-when the code lands):
+Confirmed during implementation (builder, 2026-06-30):
 
 - **One rule, two finding kinds, one `rule_id`.** Both fragmentation and rogue
   islands derive from the same connected-components data, so they live in one
@@ -423,6 +422,10 @@ when the code lands):
 - **Hand-set default magnitudes.** `fragmentation_index_threshold = 0.75` and
   `island_min_voxels = 50` are placeholders chosen for plausibility; Stage 6
   (item 006) supersedes them with VerSe-derived distributions.
+
+- **`or`-chained fallback for fragmentation index.** `index = comp.get("fragmentation_index") or comp.get("largest_component_fraction")` uses Python `or`, so a `0.0` value would fall through to the alias. In practice a label with voxels will never have a 0.0 index, and both keys alias the same value, so this is safe. If `None` is returned (both keys absent), the fragmentation check is skipped (AC17).
+
+- **`isinstance(comp, dict)` guard.** The components value is validated with `isinstance(comp, dict)` before any field access, so a non-mapping value (e.g. a string) is skipped gracefully rather than raising `AttributeError` (AC17).
 
 ---
 
