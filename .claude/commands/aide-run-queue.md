@@ -15,6 +15,10 @@ tests, or run tests yourself in the main thread. You **delegate each item to
 Target queue: **$ARGUMENTS** (if empty, use the highest-numbered
 `docs/aide/queue/queue-*.md`).
 
+**Orchestration model.** This dispatch-and-gate role is light — run it on
+**Sonnet** (the heavy work is in the Opus/Sonnet subagents). A slash command can't
+pin the session model, so `/model sonnet` first if you're on Opus.
+
 ## Division of labour
 
 | Concern | Owner | Notes |

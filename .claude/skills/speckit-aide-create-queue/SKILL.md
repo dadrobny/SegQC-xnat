@@ -63,25 +63,23 @@ Save the queue to `docs/aide/queue/queue-NNN.md` (where NNN is the next sequenti
 
 A queue file is a **shared project document**, not a scratch note — an untracked
 or machine-local queue is invisible to collaborators and to the scout, which
-reads the committed queue. As soon as the file is written, commit it (and the
-previous-queue tidy-up), each as a separate Bash call. **Where** you commit
-depends on how this skill was invoked:
+reads the committed queue. As soon as the file is written, **commit it and the
+previous-queue tidy-up on the current branch**, each as a separate Bash call:
 
-- **Standalone, or `/aide-run-roadmap --continuous`** — commit directly to `main`
-  (queue files are additive AIDE docs, allowed per `CLAUDE.md`):
-  ```
-  git pull --rebase
-  git add docs/aide/queue/queue-NNN.md docs/aide/queue/queue-<NNN-1>.md
-  git commit -m "docs(aide): add work queue NNN"
-  git push
-  ```
-- **`/aide-run-roadmap` gated (default)** — you are already on the `aide/queue-NNN`
-  branch; commit there (no `git switch`/push to `main`) so the queue lands via the
-  human-reviewed PR that command opens:
-  ```
-  git add docs/aide/queue/queue-NNN.md docs/aide/queue/queue-<NNN-1>.md
-  git commit -m "docs(aide): add work queue NNN"
-  ```
+```
+git add docs/aide/queue/queue-NNN.md docs/aide/queue/queue-<NNN-1>.md
+git commit -m "docs(aide): add work queue NNN"
+```
+
+**Push/PR is the caller's job, not this step's:**
+
+- **Run standalone (manual)** — also push to `main` (`git pull --rebase` first;
+  queue files are additive AIDE docs, allowed per `CLAUDE.md`): `git pull --rebase`,
+  then `git push`.
+- **Invoked as the `queue-planner` subagent inside `/aide-run-roadmap`** — commit
+  only, do **not** push or open a PR. The orchestrator handles it: in gated mode
+  you're on the `aide/queue-NNN` branch and it pushes + opens the human-reviewed
+  PR; in `--continuous` it pushes your commit to `main`.
 
 Either way, do **not** end this step with the queue left only in the working tree.
 

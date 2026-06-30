@@ -19,6 +19,10 @@ branch name, else the existing `aide/NNN-*` branch).
 > `scout` / queue loop does. If no branch exists, stop and tell the caller to
 > claim it first.
 
+**Orchestration model.** This dispatch-and-gate role is light — run it on
+**Sonnet** (the heavy work is in the Opus/Sonnet subagents). A slash command can't
+pin the session model, so `/model sonnet` first if you're on Opus.
+
 ## Task → sub-agent mapping
 
 | Step | Task | Sub-agent | Model | Notes |

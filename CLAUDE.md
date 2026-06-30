@@ -167,12 +167,18 @@ committed config so the whole team gets them.
 
 ### Model routing by task complexity (`.claude/agents/`)
 
-Five committed subagents split work by role and cost:
+Six committed subagents split work by role and cost:
 
 - **`scout` (Haiku)** — narrow **recon + claim**: syncs the repo, reads the
   queue and progress files, checks `aide/*` branches to find the next unclaimed
   📋 item, then creates and pushes the claim branch. Returns only item number,
   branch name, and title. Never searches source code; file locations are known.
+- **`queue-planner` (Opus)** — **queue authoring only**: generates the next batch
+  of ~10 items into `docs/aide/queue/queue-NNN.md` from vision/roadmap/progress,
+  tidies the superseded previous queue, and commits both (no push/PR). On Opus
+  because a batch plan cascades into ~10 items — high-leverage planning, the
+  queue-level analogue of `spec-author`. The roadmap orchestrator spawns it
+  rather than running `create-queue` inline.
 - **`spec-author` (Opus)** — **work-item spec authoring only**: turns the queued
   one-liner into a complete, testable `docs/aide/items/NNN-*.md` (atomic AC,
   steps, testing strategy, deps), commits it. Runs on Opus deliberately — the
@@ -194,8 +200,9 @@ Five committed subagents split work by role and cost:
   (local + remote, safe `-d`); on FAIL hands back identifying which agent (builder
   or test-writer) needs to fix it.
 
-Delegate recon/claim to `scout`; spec authoring to `spec-author`; implementation
-to `builder`; test authoring to `test-writer`; verification to `validator`.
+Delegate recon/claim to `scout`; queue authoring to `queue-planner`; spec
+authoring to `spec-author`; implementation to `builder`; test authoring to
+`test-writer`; verification to `validator`.
 Claude Code does **not** auto-detect
 complexity and swap the main model — routing happens by delegating to these agents
 (and by your own `/model` choice).
@@ -303,6 +310,18 @@ PRs and major structural changes** (and, in gated mode, at every queue PR). Use
 `/aide-run-roadmap` to drive the whole project, `/aide-run-queue` for one batch,
 `/aide-run-item` for a single item, or the per-step `/speckit-aide-*` commands
 (fresh chat each) for tighter manual control.
+
+**Orchestration model & session scope.** The orchestrator's own job — dispatch a
+subagent, read its short summary, decide the next step, gate approvals — is light,
+so **run the orchestrator session on Sonnet**; all heavy cognition lives in the
+subagents (`queue-planner`/`spec-author` on Opus, builder/validator on Sonnet,
+scout on Haiku). A slash command can't pin the session model, so `/model sonnet`
+before a long run if you're on Opus. Because Claude Code subagents can't reliably
+spawn their own subagents, we keep **one orchestrator + one worker level** rather
+than nesting orchestrators — and **bound each orchestrator session to one queue**:
+gated mode does this for free (it stops at each queue PR; the human re-invokes),
+and `--continuous` should **start a fresh orchestrator session per queue** instead
+of carrying one ever-growing session across the whole roadmap.
 
 ### Permission tracking & review (`/aide-review-permissions`)
 

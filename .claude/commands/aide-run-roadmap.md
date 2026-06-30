@@ -23,9 +23,26 @@ Mode: **$ARGUMENTS**
   `/speckit-aide-feedback-loop` if needed.
 
 This session is only the orchestrator — delegate item execution to
-`/aide-run-queue` (which delegates to `/aide-run-item`). **Command hygiene**
-applies to any git you issue: no `cd` prefix, one command per Bash call, no
-`2>&1`, no command substitution in commit messages, recon via Bash + `grep`.
+`/aide-run-queue` (which delegates to `/aide-run-item`) and queue *authoring* to
+the `queue-planner` subagent. **Command hygiene** applies to any git you issue:
+no `cd` prefix, one command per Bash call, no `2>&1`, no command substitution in
+commit messages, recon via Bash + `grep`.
+
+## Orchestration model & session scope
+
+- **Run the orchestrator on Sonnet.** Orchestration here is light dispatch and
+  gating — spawn a subagent, read its short summary, decide the next step. The
+  heavy cognition lives in the subagents (`queue-planner` and `spec-author` on
+  Opus; builder/validator on Sonnet). A slash command can't pin the session
+  model, so if you're on Opus, `/model sonnet` before a long run.
+- **One orchestrator session ≈ one queue.** Subagents can't reliably spawn their
+  own subagents, so we keep a single orchestrator + one worker level rather than
+  nesting orchestrators. Bound that session to a single queue:
+  - *gated* — you already stop at each queue PR; the human re-invokes for the next
+    queue, so each queue gets a fresh session naturally.
+  - *`--continuous`* — when a queue finishes, **start a fresh orchestrator session
+    for the next queue** (re-invoke `/aide-run-roadmap --continuous`) rather than
+    carrying one ever-growing session across the whole roadmap.
 
 ## Determine current state first (resumable)
 
@@ -43,20 +60,26 @@ by working out where things stand. `git fetch --all --prune`, then read
 
 ## Generate the next queue
 
-1. Work out the next queue number NNN (highest existing + 1) and **tidy the old
-   queue document** first (see *Tidy the previous queue* below).
-2. **Gated (default):**
+Queue authoring is delegated to the **`queue-planner` (Opus)** subagent — never
+run `/speckit-aide-create-queue` inline in the orchestrator (it would pollute this
+session's context and tie queue quality to the orchestration model). The planner
+writes + commits `queue-NNN.md` **and** tidies the superseded `queue-(NNN-1).md`
+on whatever branch it's on, then returns a one-line summary. **You** (orchestrator)
+prepare the branch and handle push/PR/merge around it.
+
+1. **Gated (default):**
    - `git switch -c aide/queue-NNN` off an up-to-date `main` (`git pull --rebase`).
-   - Run `/speckit-aide-create-queue` (it generates **and commits** `queue-NNN.md`
-     on this branch; see that skill).
+   - **Spawn `queue-planner`**: "Generate queue NNN on branch `aide/queue-NNN`;
+     tidy the previous queue; commit both; do not push or PR." Wait for its summary.
    - `git push -u origin aide/queue-NNN`, then open a **PR**:
-     `gh pr create` titled `docs(aide): work queue NNN` describing the batch.
+     `gh pr create` titled `docs(aide): work queue NNN`, body summarising the batch.
    - **STOP and tell the user**: review/edit/merge the queue PR, then re-invoke
      `/aide-run-roadmap` (or `/aide-run-queue NNN`) to execute it. A queue PR is
      the right place to reshape the plan before any code is built against it.
-3. **`--continuous`:**
-   - On `main` (`git pull --rebase`), run `/speckit-aide-create-queue` — it
-     commits `queue-NNN.md` straight to `main` — then `git push`.
+2. **`--continuous`:**
+   - On `main` (`git pull --rebase`), **spawn `queue-planner`**: "Generate queue
+     NNN on `main`; tidy the previous queue; commit both; do not push." Then
+     `git push` the planner's commit to `main`.
    - Proceed immediately to **Run a queue** (do not open a PR, do not wait).
 
 ## Run a queue
@@ -66,9 +89,12 @@ item to merge and **stops when that queue is empty** (it never creates the next
 queue). When it returns:
 
 - **Gated:** loop back to **Generate the next queue** for NNN+1 (which branches +
-  PRs + stops again).
-- **`--continuous`:** loop back to **Generate the next queue** for NNN+1 and keep
-  going — no pause — until the roadmap is exhausted or a hard blocker appears.
+  PRs + stops again — the human re-invokes, giving a fresh session per queue).
+- **`--continuous`:** **start a fresh orchestrator session** for the next queue —
+  re-invoke `/aide-run-roadmap --continuous` (state-detection will pick up at
+  *Generate the next queue* for NNN+1) — rather than carrying one ever-growing
+  session across the whole roadmap. Keep going until the roadmap is exhausted or a
+  hard blocker appears.
 
 ## Tidy the previous queue
 
