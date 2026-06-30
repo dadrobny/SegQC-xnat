@@ -35,20 +35,74 @@ commit messages, recon via Bash + `grep`.
   heavy cognition lives in the subagents (`queue-planner` and `spec-author` on
   Opus; builder/validator on Sonnet). A slash command can't pin the session
   model, so if you're on Opus, `/model sonnet` before a long run.
-- **One orchestrator session ≈ one queue.** Subagents can't reliably spawn their
-  own subagents, so we keep a single orchestrator + one worker level rather than
-  nesting orchestrators. Bound that session to a single queue:
-  - *gated* — you already stop at each queue PR; the human re-invokes for the next
-    queue, so each queue gets a fresh session naturally.
-  - *`--continuous`* — when a queue finishes, **start a fresh orchestrator session
-    for the next queue** (re-invoke `/aide-run-roadmap --continuous`) rather than
-    carrying one ever-growing session across the whole roadmap.
+- **The two modes execute differently** (because the `Task` subagent tool can't
+  reliably spawn its *own* subagents, but a fresh `claude` process can):
+  - **Gated (default) — inline, interactive, one session per queue.** Each layer
+    loads the next as a skill in *this* session; only the leaf (`/aide-run-item`)
+    spawns worker subagents. The human re-invokes per queue, so each queue gets a
+    fresh session naturally. **No headless sessions are used in gated mode.**
+  - **`--continuous` — headless nesting in an isolated worktree.** Each layer
+    spawns the next as a **fresh `claude` subprocess** (`claude --model sonnet -p
+    "/aide-run-queue NNN --continuous"`), run inside a dedicated **git worktree**
+    (see below). The Bash call blocks until that child exits — that is how "the
+    higher level waits for the lower to finish." A `claude -p` child is a full
+    session, so it *can* spawn its own subagents; this is what makes true nesting
+    work. Each child cold-starts, does one queue/item, and exits, keeping every
+    layer's context bounded.
+
+> **⚠️ Billing & opt-in.** Headless `claude -p` sessions may count against a
+> **separate API usage limit**, distinct from interactive sessions. They are used
+> **only** behind the explicit `--continuous` flag — gated mode draws none. Don't
+> reach for `claude -p` outside this path. Standardise the spawn as
+> `claude --model sonnet -p "<slash command>"` (stable prefix first) so it stays
+> inside the allow-list and pins the cheap model.
+
+> **Permission posture is essential for `--continuous`.** A headless `claude -p`
+> child **cannot answer a permission prompt** — any non-allow-listed tool call
+> stalls or denies it instead of asking. So a continuous run is only as reliable
+> as the `permissions.allow` list (and likely `--permission-mode acceptEdits` for
+> builders' file edits). Keep the allow-list current via `/aide-review-permissions`.
+
+## Worktree isolation (`--continuous`)
+
+A continuous run constantly switches branches (`aide/NNN-*` → `main` to merge →
+next). If it shares the **one** working directory with the human (or another
+loop), their HEADs collide — exactly the failure that lands commits on the wrong
+branch. So a continuous run operates in its **own git worktree**:
+
+1. **Create a sibling worktree that owns `main`.** From the repo root, derive a
+   sibling path (e.g. `../segqc-aide-loop`) and `git worktree add <path> main`.
+   The loop does *all* its branch create/checkout/merge work there.
+   - **Contract:** the human's primary checkout must **stay off `main`** (work on
+     your own branch). Git forbids the same branch in two worktrees, so the loop
+     owning `main` and the human staying off it is what keeps the validator's
+     `switch main && merge` working. If `main` is already checked out in the
+     primary, stop and ask the user to switch off it first.
+2. **Give the worktree its own `.venv`.** A worktree has its own `src/`, but the
+   primary checkout's venv resolves `import segqc` (editable install) to the
+   *primary* source — so the worktree **must** bootstrap its own venv or tests
+   would silently exercise the wrong code. In the worktree: `python -m venv .venv`
+   then `.venv/Scripts/pip install -e .[dev]` (or `.venv/bin/...`).
+3. **Run all `claude -p` children with their cwd set to the worktree.** They (and
+   their workers) operate entirely there; the primary checkout is never touched.
+4. **Clean up on exit / resume.** When the roadmap is exhausted (or you abort),
+   `git worktree remove <path>`; on resume, `git worktree prune` and reuse an
+   existing loop worktree rather than stacking new ones.
+
+> The framework places the worktree as a **sibling of wherever the repo lives** —
+> it makes no assumption about that location. Heavy git churn is happiest on a
+> fast local disk; keeping the repo off a synced/cloud folder is a **user setup
+> concern**, not something this workflow handles.
 
 ## Determine current state first (resumable)
 
 This loop spans sessions (gated mode pauses for a human merge), so always start
 by working out where things stand. `git fetch --all --prune`, then read
-`docs/aide/roadmap.md`, `docs/aide/progress.md`, and the queue files:
+`docs/aide/roadmap.md`, `docs/aide/progress.md`, and the queue files.
+
+**`--continuous` first:** before the state check, ensure the **loop worktree**
+exists (create it + its venv per *Worktree isolation* above, or reuse/prune an
+existing one) and run everything below with the worktree as cwd.
 
 | State | Action |
 |---|---|
@@ -84,17 +138,22 @@ prepare the branch and handle push/PR/merge around it.
 
 ## Run a queue
 
-Invoke **`/aide-run-queue NNN`** for the current queue. It claims and drives each
-item to merge and **stops when that queue is empty** (it never creates the next
-queue). When it returns:
+Run the current queue to completion, then move on. **How** depends on the mode:
 
-- **Gated:** loop back to **Generate the next queue** for NNN+1 (which branches +
-  PRs + stops again — the human re-invokes, giving a fresh session per queue).
-- **`--continuous`:** **start a fresh orchestrator session** for the next queue —
-  re-invoke `/aide-run-roadmap --continuous` (state-detection will pick up at
-  *Generate the next queue* for NNN+1) — rather than carrying one ever-growing
-  session across the whole roadmap. Keep going until the roadmap is exhausted or a
-  hard blocker appears.
+- **Gated:** load **`/aide-run-queue NNN`** inline in this session and drive it to
+  empty. When it returns, loop back to **Generate the next queue** for NNN+1
+  (which branches + PRs + stops again — the human re-invokes, giving a fresh
+  session per queue).
+- **`--continuous`:** spawn a **fresh headless child** for the queue, in the loop
+  worktree, and **wait for it to exit**:
+  ```
+  claude --model sonnet -p "/aide-run-queue NNN --continuous"
+  ```
+  (run with the worktree as cwd). The child drives that queue to empty and exits;
+  the blocking Bash call is the orchestrator "waiting for the lower session to
+  end." When it returns, loop to **Generate the next queue** for NNN+1 and spawn
+  the next child. Keep going until the roadmap is exhausted or a hard blocker
+  appears, then **remove the worktree**.
 
 ## Tidy the previous queue
 

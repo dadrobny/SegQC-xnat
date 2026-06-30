@@ -1,6 +1,6 @@
 ---
 description: Iterate one AIDE queue to completion — a scout claims each item, then /aide-run-item drives it (spec → tests → build → validate → merge) — looping until that queue is empty, then stops. Does NOT create the next queue. Pauses only for PRs and major structural changes.
-argument-hint: "[queue number, e.g. 001 — optional; defaults to the highest-numbered queue]"
+argument-hint: "[queue number, e.g. 001 — optional] [--continuous — optional, headless item nesting]"
 ---
 
 # Run one AIDE queue (iterator over /aide-run-item)
@@ -12,12 +12,36 @@ session is only the orchestrator — do **not** author specs, write code, write
 tests, or run tests yourself in the main thread. You **delegate each item to
 `/aide-run-item`** and only handle claiming and approval gates between items.
 
-Target queue: **$ARGUMENTS** (if empty, use the highest-numbered
-`docs/aide/queue/queue-*.md`).
+Arguments: **$ARGUMENTS** — a queue number (if empty, the highest-numbered
+`docs/aide/queue/queue-*.md`) and an optional `--continuous` flag.
 
 **Orchestration model.** This dispatch-and-gate role is light — run it on
 **Sonnet** (the heavy work is in the Opus/Sonnet subagents). A slash command can't
 pin the session model, so `/model sonnet` first if you're on Opus.
+
+**How items run depends on the mode** (mirrors `/aide-run-roadmap`):
+- **default (inline)** — load `/aide-run-item NNN` as a skill in *this* session
+  per item. Used when a human drives one queue interactively.
+- **`--continuous`** — spawn each item as a **fresh headless child** and **wait**
+  for it: `claude --model sonnet -p "/aide-run-item NNN aide/NNN-short-name"` (run
+  with the loop worktree as cwd). This bounds each item's context and lets the
+  child spawn its own worker subagents. **Headless `claude -p` may draw on a
+  separate API usage limit and can't answer permission prompts — it relies on the
+  `permissions.allow` list; keep it current.**
+
+**Worktree in `--continuous`.** A continuous queue run switches branches
+constantly and must not collide with the human's checkout, so it runs in a
+dedicated **git worktree** (sibling of the repo, owning `main`, with its own
+`.venv` — see `/aide-run-roadmap` → *Worktree isolation* for the full rules):
+- **Invoked directly** (not from `/aide-run-roadmap`) → **create the worktree
+  yourself** at the start (create the sibling worktree on `main`, bootstrap its
+  venv) and **remove it** when the queue is done.
+- **Spawned by `/aide-run-roadmap --continuous`** → you are *already* inside the
+  loop worktree; **reuse it** — do not create a nested one, and leave teardown to
+  the roadmap loop that owns it.
+
+Detect which case you're in by checking whether the current working directory is
+already a loop worktree on `main`; if so, reuse, else create.
 
 ## Division of labour
 
@@ -72,18 +96,28 @@ Repeat until the `scout` reports no remaining unclaimed 📋 item **in this queu
    - **Item returned** → go to step 3.
    - **"none left"** → the queue is exhausted; go to **On queue exhaustion**.
 
-3. **Run the item → invoke `/aide-run-item NNN aide/NNN-short-name`.** This drives
-   the full per-item workflow and merges on PASS. Wait for it to return.
+3. **Run the item** — drives the full per-item workflow and merges on PASS;
+   **wait for it to finish**:
+   - **default (inline)** → load `/aide-run-item NNN aide/NNN-short-name` as a
+     skill in this session.
+   - **`--continuous`** → spawn the headless child and block on it:
+     `claude --model sonnet -p "/aide-run-item NNN aide/NNN-short-name"` (cwd = the
+     loop worktree).
 
 4. **Checkpoint (orchestrator).** Relay a one- or two-line summary (item,
-   merged/failed, key facts). If `/aide-run-item` reported a **PR / force-push /
-   structural** stop, **pause and ask the user**. Otherwise continue to step 1.
+   merged/failed, key facts). If the item reported a **PR / force-push /
+   structural** stop, **pause and ask the user** (in `--continuous`, a child can't
+   pause — it returns the stop reason; surface it and halt the loop). Otherwise
+   continue to step 1.
 
 ## On queue exhaustion
 
 When `scout` reports no 📋 items remain in this queue, **stop** and report:
-items completed, branches merged, and final test status. Then point the user at
-the next move (do **not** generate the next queue yourself):
+items completed, branches merged, and final test status. If you are in
+`--continuous` and **created your own worktree** (direct invocation), remove it
+now (`git worktree remove <path>`); if it was provided by `/aide-run-roadmap`,
+leave it for the roadmap loop to tear down. Then point the user at the next move
+(do **not** generate the next queue yourself):
 
 - **Driving the whole roadmap?** Run **`/aide-run-roadmap`** — it generates and
   gates the next queue (human-reviewed PR by default, or `--continuous` to keep

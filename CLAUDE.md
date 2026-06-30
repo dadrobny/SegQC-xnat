@@ -147,6 +147,13 @@ env is current:
 ```
 If the import fails (or `.venv` does not exist), re-run the bootstrap above.
 
+**Worktrees need their own `.venv`.** Each git worktree (e.g. the
+`/aide-run-roadmap --continuous` loop worktree) has its own `src/`, but an
+editable install (`pip install -e .`) resolves `import segqc` to the checkout it
+was built in — so a venv built in the primary checkout would make a worktree
+silently test the *primary's* code. Bootstrap a fresh `.venv` inside each
+worktree; never share one across worktrees.
+
 **Agent rule — builders and validators MUST:**
 1. Check whether `.venv` exists and `import segqc` succeeds inside it.
 2. If not, rebuild with the bootstrap commands before writing or running any code.
@@ -313,15 +320,34 @@ PRs and major structural changes** (and, in gated mode, at every queue PR). Use
 
 **Orchestration model & session scope.** The orchestrator's own job — dispatch a
 subagent, read its short summary, decide the next step, gate approvals — is light,
-so **run the orchestrator session on Sonnet**; all heavy cognition lives in the
-subagents (`queue-planner`/`spec-author` on Opus, builder/validator on Sonnet,
-scout on Haiku). A slash command can't pin the session model, so `/model sonnet`
-before a long run if you're on Opus. Because Claude Code subagents can't reliably
-spawn their own subagents, we keep **one orchestrator + one worker level** rather
-than nesting orchestrators — and **bound each orchestrator session to one queue**:
-gated mode does this for free (it stops at each queue PR; the human re-invokes),
-and `--continuous` should **start a fresh orchestrator session per queue** instead
-of carrying one ever-growing session across the whole roadmap.
+so **run the orchestrator on Sonnet**; all heavy cognition lives in the subagents
+(`queue-planner`/`spec-author` on Opus, builder/validator on Sonnet, scout on
+Haiku). A slash command can't pin the session model, so `/model sonnet` before a
+long run if you're on Opus. The two modes nest differently, because the `Task`
+subagent tool can't reliably spawn *its own* subagents but a fresh `claude`
+process can:
+
+- **Gated (default) — inline, one session per queue.** Layers load each other as
+  skills in one interactive session; only the leaf `/aide-run-item` spawns worker
+  subagents. The human re-invokes per queue, so context stays bounded. **No
+  headless sessions.**
+- **`--continuous` — headless nesting in a worktree.** Each layer spawns the next
+  as a fresh subprocess — `claude --model sonnet -p "/aide-run-queue NNN
+  --continuous"` → `… -p "/aide-run-item NNN …"` → worker subagents — and blocks
+  until the child exits (that is how the parent "waits"). A `claude -p` child is a
+  full session, so it *can* spawn subagents; each cold-starts, does one
+  queue/item, and exits, bounding every layer's context.
+
+  Two caveats make `--continuous` reliable: (1) **billing** — headless `claude -p`
+  may count against a **separate API usage limit**, so it's used *only* behind the
+  explicit flag; (2) **permissions** — a headless child can't answer a prompt, so
+  it lives or dies by `permissions.allow` (keep it current; likely add
+  `--permission-mode acceptEdits`). It runs in a dedicated **git worktree**
+  (sibling of the repo, **owning `main`** while the human stays off `main`, with
+  its **own `.venv`** — an editable install resolves `segqc` to *its* checkout's
+  source, so a shared venv would test the wrong code). The worktree is created at
+  loop start and removed on exit; the framework makes no assumption about *where*
+  the repo lives (keeping it off a synced/cloud disk is a user setup concern).
 
 ### Permission tracking & review (`/aide-review-permissions`)
 
