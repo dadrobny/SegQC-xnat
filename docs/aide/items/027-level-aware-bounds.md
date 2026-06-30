@@ -325,25 +325,46 @@ share only the already-merged item-026 interface.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation. Open choices to pin while building:
+Pinned during implementation (2026-06-30):
 
-- **One finding per violated metric vs one per label.** Intended: one `Finding`
-  per `(label, metric)` violation for maximal explainability (each finding names
-  exactly one metric + its limit). Confirm during build; if it produces excessive
-  noise, collapse to one finding per label listing all violations and update the
-  AC reason assertions accordingly.
-- **Inclusive vs exclusive bounds.** Intended: bounds are **inclusive** (a value
-  equal to `min`/`max` passes); a violation requires strictly `< min` or
-  `> max`. Pin and test.
-- **Default severity.** `Severity.FLAG` (`flagged-for-review`) — a bounds
-  violation is suspicious but not categorically fatal; final pass/flag/fail is
-  item 034's job. Severity is config-overridable (AC12).
-- **Hand-set default bound magnitudes.** The shipped numbers are placeholders;
-  record the chosen ranges and their rationale here so Stage 6 can compare them
-  against the VerSe-derived distributions that supersede them.
-- **Unknown-severity-string handling.** Decide whether an unrecognised
-  `severity` param raises or falls back to the default; document the chosen
-  behaviour.
+- **One finding per violated metric (confirmed).** Each `Finding` carries
+  exactly one `(label, metric)` violation — `labels == frozenset({label_int})`
+  and `reason` names that single metric plus its measured value vs the
+  violated bound. A label out of range on both volume and extent therefore
+  yields two separate findings. This maximises explainability and lets
+  downstream item 034 weight individual metrics independently.
+
+- **Inclusive bounds (confirmed).** A value strictly `< min` or strictly
+  `> max` fires. A value exactly equal to `min` or `max` passes. This is the
+  conventional "closed interval" interpretation and is tested and pinned.
+
+- **Default severity is `Severity.FLAG` (`"flagged-for-review"`).** Bounds
+  violations are suspicious but not categorically fatal; the final
+  pass/flag/fail verdict is item 034's job. Severity is config-overridable
+  via `rules.bounds.params.severity`.
+
+- **Unrecognised severity string raises `ValueError` (raises path pinned).**
+  If `rules.bounds.params.severity` is not a recognised Severity label
+  (`"pass"`, `"flagged-for-review"`, or `"fail"`), `evaluate` raises
+  `ValueError` immediately. Falling back to the default was considered but
+  rejected: a misconfigured severity string is more likely a typo that should
+  surface loudly than a deliberate choice that should degrade silently.
+
+- **Hand-set default bound magnitudes.** Placeholder ranges chosen from
+  published vertebra morphometry. Stage 6 (item 006) will supersede them with
+  VerSe-derived distributions:
+  - Cervical (C1–C7): volume 3 000–35 000 mm3; extents 10–80 mm (x/y), 5–60 mm (z).
+  - Thoracic (T1–T13): volume 5 000–70 000 mm3; extents 15–100 mm (x/y), 8–80 mm (z).
+  - Lumbar (L1–L6): volume 8 000–120 000 mm3; extents 20–120 mm (x/y), 15–100 mm (z).
+
+- **Level-group map built from `CANONICAL_ORDER`.** `_LEVEL_GROUP` is derived
+  at module import time by inspecting each canonical name's prefix (C/T/L),
+  so the mapping stays in step with any future extension to the label
+  convention without a separate maintenance point.
+
+- **Metric order is fixed by `_METRICS` list.** Output order within a label
+  is volume → extent_x → extent_y → extent_z, making the rule deterministic
+  (AC13) regardless of dict-iteration order in the geometry sub-dict.
 
 ---
 
