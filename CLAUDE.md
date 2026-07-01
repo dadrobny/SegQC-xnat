@@ -174,7 +174,23 @@ committed config so the whole team gets them.
 
 ### Model routing by task complexity (`.claude/agents/`)
 
-Six committed subagents split work by role and cost:
+Six committed subagents split work by role and cost. Each pins **both** a `model`
+and an `effort` level in its frontmatter — effort is set *as high as necessary, as
+low as adequate*, scaled by reasoning complexity × blast radius, so the stronger
+new models don't silently over-spend tokens on mechanical work:
+
+| Agent | Model | Effort | Rationale |
+|---|---|---|---|
+| `scout` | Haiku | `low` | fixed mechanical git recon/claim — no judgment |
+| `builder` | Sonnet | `medium` | codes against a spec + tests that already fix the target |
+| `test-writer` | Sonnet | `medium` | spec's Testing Strategy pre-enumerates most cases |
+| `validator` | Sonnet | `medium` | verification against fixed artifacts; no lower than those it audits |
+| `spec-author` | Opus | `high` | authors the per-item source of truth; cascades into 4 downstream agents |
+| `queue-planner` | Opus | `xhigh` | one plan cascades into ~10 items — the highest-leverage decision |
+
+`max` is deliberately unused — reserved for genuinely intractable one-off problems,
+not routine batch/spec work. The per-agent files carry the full reasoning; the
+list below summarises each role.
 
 - **`scout` (Haiku)** — narrow **recon + claim**: syncs the repo, reads the
   queue and progress files, checks `aide/*` branches to find the next unclaimed
