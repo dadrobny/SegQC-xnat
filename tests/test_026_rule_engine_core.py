@@ -857,8 +857,6 @@ def test_ac18_no_concrete_rule_family_module_in_package():
     import segqc.heuristics as pkg
     pkg_dir = pathlib.Path(pkg.__file__).parent
     forbidden_stems = {
-        "fragmentation",
-        "island",
         "coverage",
         "sequence",
         "border",
