@@ -76,6 +76,23 @@ Provide specific, actionable suggestions:
 - New commands to create
 - Process improvements
 
+### 6. Refresh the status summary (optional)
+
+After applying recommendations, regenerate the living HTML **project-status
+summary** so the visible snapshot of progress stays current. Run the
+`/speckit-aide-status-report` skill (or its generator directly):
+
+```bash
+.venv/Scripts/python scripts/aide_status_report.py            # Windows (Git Bash)
+.venv/bin/python scripts/aide_status_report.py                # macOS / Linux
+```
+
+It reads the AIDE documents, summarises the test suite, and writes
+`docs/aide/status/index.html` — a high-level overview of finished vs. queued
+work, roadmap-phase and vision-objective alignment, testing status, and QC
+feature highlights. The output is a regenerable, gitignored artifact; only the
+generator and skill are version-controlled.
+
 ### Important Notes
 
 - **Routine decisions** during smooth implementation belong in the work item's "Decisions" section, not here.
