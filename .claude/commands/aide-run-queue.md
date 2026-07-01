@@ -1,6 +1,6 @@
 ---
 description: Iterate one AIDE queue to completion — a scout claims each item, then /aide-run-item drives it (spec → tests → build → validate → merge) — looping until that queue is empty, then stops. Does NOT create the next queue. Pauses only for PRs and major structural changes.
-argument-hint: "[queue number, e.g. 001 — optional] [--continuous — headless item nesting] [--worktree — isolate in a worktree]"
+argument-hint: "[queue number, e.g. 001 — optional; defaults to the highest-numbered queue]"
 ---
 
 # Run one AIDE queue (iterator over /aide-run-item)
@@ -13,36 +13,20 @@ tests, or run tests yourself in the main thread. You **delegate each item to
 `/aide-run-item`** and only handle claiming and approval gates between items.
 
 Arguments: **$ARGUMENTS** — a queue number (if empty, the highest-numbered
-`docs/aide/queue/queue-*.md`) and an optional `--continuous` flag.
+`docs/aide/queue/queue-*.md`).
 
 **Orchestration model.** This dispatch-and-gate role is light — run it on
 **Sonnet** (the heavy work is in the Opus/Sonnet subagents). A slash command can't
 pin the session model, so `/model sonnet` first if you're on Opus.
 
-**How items run depends on the mode** (mirrors `/aide-run-roadmap`):
-- **default (inline)** — load `/aide-run-item NNN` as a skill in *this* session
-  per item. Used when a human drives one queue interactively.
-- **`--continuous`** — spawn each item as a **fresh headless child** and **wait**
-  for it: `claude --model sonnet -p "/aide-run-item NNN aide/NNN-short-name"` (run
-  with the loop worktree as cwd). This bounds each item's context and lets the
-  child spawn its own worker subagents. **Headless `claude -p` may draw on a
-  separate API usage limit and can't answer permission prompts — it relies on the
-  `permissions.allow` list; keep it current.**
-
-**Worktree isolation (`--worktree`, or implied by `--continuous`).** Isolation is
-orthogonal to the continuous mechanism: a multi-item queue run switches branches
-constantly, so **isolate it whenever parallel work is possible**. Use a dedicated
-**git worktree** (sibling of the repo, owning `main`, with its own `.venv` — see
-`/aide-run-roadmap` → *Worktree isolation* for the full rules). When to set it up:
-- **Already inside a loop worktree** (spawned by `/aide-run-roadmap` with
-  isolation, or the human launched you there) → **reuse it**; don't nest, and
-  leave teardown to whoever created it.
-- **`--worktree`/`--continuous` and not yet isolated** (direct invocation) →
-  **create the worktree yourself** at the start (sibling on `main` + venv;
-  gated: `cd` into it once), and **remove it** when the queue is done.
-- **Neither flag** → run in-place in the primary checkout (solo, sequential).
-
-Detect by checking whether the current cwd is already a loop worktree on `main`.
+**One session, one layer.** Per item, load `/aide-run-item NNN` **inline as a
+skill in *this* session** — it is a prompt expansion, not a subprocess. The only
+parallel/isolated contexts are the `Task` subagents (`scout`, `spec-author`,
+`test-writer`, `builder`, `validator`) that do the leaf work. There is **no
+headless `claude -p` nesting** (an earlier `--continuous` design tried it and was
+removed — see `/aide-run-roadmap` → *Historical note*). The loop runs **in-place
+in the primary checkout**; for parallel human work, isolate in a worktree per
+`/aide-run-roadmap` → *Working in parallel*.
 
 ## Division of labour
 
@@ -97,32 +81,23 @@ Repeat until the `scout` reports no remaining unclaimed 📋 item **in this queu
    - **Item returned** → go to step 3.
    - **"none left"** → the queue is exhausted; go to **On queue exhaustion**.
 
-3. **Run the item** — drives the full per-item workflow and merges on PASS;
-   **wait for it to finish**:
-   - **default (inline)** → load `/aide-run-item NNN aide/NNN-short-name` as a
-     skill in this session.
-   - **`--continuous`** → spawn the headless child and block on it:
-     `claude --model sonnet -p "/aide-run-item NNN aide/NNN-short-name"` (cwd = the
-     loop worktree).
+3. **Run the item** — load `/aide-run-item NNN aide/NNN-short-name` inline as a
+   skill in this session. It drives the full per-item workflow (spec → tests →
+   build → validate) and merges on PASS; **wait for it to finish** before looping.
 
 4. **Checkpoint (orchestrator).** Relay a one- or two-line summary (item,
    merged/failed, key facts). If the item reported a **PR / force-push /
-   structural** stop, **pause and ask the user** (in `--continuous`, a child can't
-   pause — it returns the stop reason; surface it and halt the loop). Otherwise
-   continue to step 1.
+   structural** stop, **pause and ask the user**. Otherwise continue to step 1.
 
 ## On queue exhaustion
 
 When `scout` reports no 📋 items remain in this queue, **stop** and report:
-items completed, branches merged, and final test status. If you **created your own
-worktree** (direct `--worktree`/`--continuous` invocation), remove it now
-(`git worktree remove <path>`); if it was provided by `/aide-run-roadmap`, leave it
-for the roadmap loop to tear down. Then point the user at the next move (do **not**
-generate the next queue yourself):
+items completed, branches merged, and final test status. Then point the user at
+the next move (do **not** generate the next queue yourself):
 
-- **Driving the whole roadmap?** Run **`/aide-run-roadmap`** — it generates and
-  gates the next queue (human-reviewed PR by default, or `--continuous` to keep
-  going), then re-enters this command for that queue.
+- **Driving the whole roadmap?** Run **`/aide-run-roadmap`** — it generates the
+  next queue behind a human-reviewed PR, then re-enters this command for that
+  queue once you merge it.
 - **Working a single batch manually?** Start a fresh chat and run
   `/speckit-aide-create-queue` for the next batch.
 

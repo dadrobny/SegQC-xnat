@@ -147,9 +147,9 @@ env is current:
 ```
 If the import fails (or `.venv` does not exist), re-run the bootstrap above.
 
-**Worktrees need their own `.venv`.** Each git worktree (e.g. the
-`/aide-run-roadmap --continuous` loop worktree) has its own `src/`, but an
-editable install (`pip install -e .`) resolves `import segqc` to the checkout it
+**Worktrees need their own `.venv`.** Each git worktree (e.g. an optional
+parallel-work loop worktree, see *Working in parallel* below) has its own `src/`,
+but an editable install (`pip install -e .`) resolves `import segqc` to the checkout it
 was built in — so a venv built in the primary checkout would make a worktree
 silently test the *primary's* code. Bootstrap a fresh `.venv` inside each
 worktree; never share one across worktrees.
@@ -174,7 +174,23 @@ committed config so the whole team gets them.
 
 ### Model routing by task complexity (`.claude/agents/`)
 
-Six committed subagents split work by role and cost:
+Six committed subagents split work by role and cost. Each pins **both** a `model`
+and an `effort` level in its frontmatter — effort is set *as high as necessary, as
+low as adequate*, scaled by reasoning complexity × blast radius, so the stronger
+new models don't silently over-spend tokens on mechanical work:
+
+| Agent | Model | Effort | Rationale |
+|---|---|---|---|
+| `scout` | Haiku | `low` | fixed mechanical git recon/claim — no judgment |
+| `builder` | Sonnet | `medium` | codes against a spec + tests that already fix the target |
+| `test-writer` | Sonnet | `medium` | spec's Testing Strategy pre-enumerates most cases |
+| `validator` | Sonnet | `medium` | verification against fixed artifacts; no lower than those it audits |
+| `spec-author` | Opus | `high` | authors the per-item source of truth; cascades into 4 downstream agents |
+| `queue-planner` | Opus | `xhigh` | one plan cascades into ~10 items — the highest-leverage decision |
+
+`max` is deliberately unused — reserved for genuinely intractable one-off problems,
+not routine batch/spec work. The per-agent files carry the full reasoning; the
+list below summarises each role.
 
 - **`scout` (Haiku)** — narrow **recon + claim**: syncs the repo, reads the
   queue and progress files, checks `aide/*` branches to find the next unclaimed
@@ -294,70 +310,62 @@ next unclaimed 📋 item (creates + pushes `aide/NNN-*`), then hands it to
 `/aide-run-item`. It **stops when that queue is empty** and does **not** create
 the next queue — that is the roadmap loop's job.
 
-**`/aide-run-roadmap [--continuous]`** loops **over queues** across the whole
-roadmap: generate a queue → `/aide-run-queue` it → generate the next → … until no
-stage remains. The **queue is the human checkpoint** (review the batch plan ~once
-per 10 items, not every item):
-
-- *default (gated)* — each new queue lands via a **human-reviewed PR**; the loop
-  **pauses** until the human merges it, then runs that queue. Spans sessions and
-  is resumable (it detects open queue PRs, merged-but-unrun queues, and exhausted
-  queues on each invocation).
-- `--continuous` — commit each new queue straight to `main` and run it
-  immediately, looping without waiting; the human reviews queues after the fact
-  and course-corrects via `/speckit-aide-feedback-loop` (which captures any
-  already-merged work needing rework as new corrective items).
+**`/aide-run-roadmap`** loops **over queues** across the whole roadmap: generate a
+queue → `/aide-run-queue` it → generate the next → … until no stage remains. The
+**queue is the human checkpoint** (review the batch plan ~once per 10 items, not
+every item): each new queue lands via a **human-reviewed PR**; the loop **pauses**
+until the human merges it, then runs that queue. It spans sessions and is
+resumable — on each invocation it detects open queue PRs, merged-but-unrun queues,
+in-flight `aide/NNN-*` branches, and exhausted queues, and picks up from there.
 
 Generating queue NNN also **tidies the superseded queue NNN-1** (status line +
 final item states) so exactly one queue is ever live.
 
 Each item is isolated like "fresh chat per item"; the orchestrator passes only the
 item number + short summaries between agents and **pauses for your approval at
-PRs and major structural changes** (and, in gated mode, at every queue PR). Use
+PRs and major structural changes** (including at every queue PR). Use
 `/aide-run-roadmap` to drive the whole project, `/aide-run-queue` for one batch,
 `/aide-run-item` for a single item, or the per-step `/speckit-aide-*` commands
 (fresh chat each) for tighter manual control.
 
-**Orchestration model & session scope.** The orchestrator's own job — dispatch a
-subagent, read its short summary, decide the next step, gate approvals — is light,
-so **run the orchestrator on Sonnet**; all heavy cognition lives in the subagents
-(`queue-planner`/`spec-author` on Opus, builder/validator on Sonnet, scout on
-Haiku). A slash command can't pin the session model, so `/model sonnet` before a
-long run if you're on Opus. The two modes nest differently, because the `Task`
-subagent tool can't reliably spawn *its own* subagents but a fresh `claude`
-process can:
+**Orchestration model & session scope — one session, one layer.** The
+orchestrator's own job — dispatch a subagent, read its short summary, decide the
+next step, gate approvals — is light, so **run the orchestrator on Sonnet**; all
+heavy cognition lives in the subagents (`queue-planner`/`spec-author` on Opus,
+builder/validator on Sonnet, scout on Haiku). A slash command can't pin the
+session model, so `/model sonnet` before a long run if you're on Opus.
+`/aide-run-roadmap` → `/aide-run-queue` → `/aide-run-item` are logically nested
+but load each other **as skills in the *same* interactive session** (they are
+prompt expansions, not subprocesses); the only parallel/isolated contexts are the
+`Task` subagents that do the leaf work (scout, spec-author, test-writer, builder,
+validator, queue-planner). The loop runs **in-place in the primary checkout**, and
+git commits are the durable checkpoint — a restart re-enters cleanly via the
+resume logic. The human re-invokes per queue at the PR gate, so context stays
+bounded without any headless machinery.
 
-- **Gated (default) — inline, one session per queue.** Layers load each other as
-  skills in one interactive session; only the leaf `/aide-run-item` spawns worker
-  subagents. The human re-invokes per queue, so context stays bounded. **No
-  headless sessions.**
-- **`--continuous` — headless nesting in a worktree.** Each layer spawns the next
-  as a fresh subprocess — `claude --model sonnet -p "/aide-run-queue NNN
-  --continuous"` → `… -p "/aide-run-item NNN …"` → worker subagents — and blocks
-  until the child exits (that is how the parent "waits"). A `claude -p` child is a
-  full session, so it *can* spawn subagents; each cold-starts, does one
-  queue/item, and exits, bounding every layer's context.
+> **Historical note — the removed `--continuous` / headless-worktree mode.** An
+> earlier design added a `--continuous` flag to run the roadmap unattended by
+> nesting headless `claude -p` subprocesses (one per layer) inside a dedicated git
+> **worktree** that owned `main`. It was **removed** because on Windows the Bash
+> tool resets cwd to the repo root between calls (breaking the worktree `cd`-once
+> contract), headless `-p` children stalled on clarifying questions they couldn't
+> answer, deep process nesting multiplied cold-start/failure points, and a parent
+> death lost in-flight subagent state — so it produced little reliable work.
+> Unattended long runs are now handled by an **external supervisor** (the personal,
+> git-ignored `watch_and_resume` script) that relaunches the gated
+> `/aide-run-roadmap` when usage limits allow, relying on git commits + the resume
+> logic for durable state — not on in-process nesting.
 
-  Two caveats make `--continuous` reliable: (1) **billing** — headless `claude -p`
-  may count against a **separate API usage limit**, so it's used *only* behind the
-  explicit flag; (2) **permissions** — a headless child can't answer a prompt, so
-  it lives or dies by `permissions.allow` (keep it current; likely add
-  `--permission-mode acceptEdits`).
-
-**Worktree isolation (`--worktree`) is orthogonal to `--continuous`.** Isolation
-is about *where* a loop runs; `--continuous` is about *how* layers nest. Any
-multi-item loop (`/aide-run-queue`, `/aide-run-roadmap`) switches branches
-constantly, so running it in a dedicated **git worktree** is good practice
-**whenever the human (or another loop) might touch the repo in parallel** — it is
-the structural fix for the "two actors, one HEAD" collision. It's **opt-in via
-`--worktree`** (recommended in that case); **`--continuous` always implies it**;
-single-item `/aide-run-item` never needs it. The worktree is a **sibling of the
-repo, owning `main`** while the human stays off `main`, with its **own `.venv`**
-(an editable install resolves `segqc` to *its* checkout's source, so a shared venv
-would test the wrong code); created at loop start, removed on exit. `--continuous`
-children get it as their cwd; a gated `--worktree` loop `cd`s into it once (the
-sole exception to the no-`cd` rule). The framework makes no assumption about
-*where* the repo lives — keeping it off a synced/cloud disk is a user setup concern.
+**Working in parallel (optional worktree).** The loop runs in-place, which is right
+for a solo session. If **you** want to keep working in the repo while a loop runs,
+give the loop its own **git worktree** so your HEADs don't collide: a sibling
+checkout owning `main` (`git worktree add ../segqc-aide-loop main`) while you stay
+on your own branch, with its **own `.venv`** (an editable install resolves `segqc`
+to *its* source, so a shared venv would test the wrong tree). Launch the loop
+*from* that directory — don't rely on a one-time `cd`, since the Bash tool resets
+cwd between calls; use `git -C <worktree>` / absolute paths if needed. Remove it
+when done (`git worktree remove <path>`). This is a manual convenience for genuine
+parallel work, not part of the automated flow.
 
 ### Permission tracking & review (`/aide-review-permissions`)
 
