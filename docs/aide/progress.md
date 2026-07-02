@@ -22,8 +22,8 @@
 
 | Stage | Title | Objectives | Status |
 |-------|-------|-----------|--------|
-| 0 | Project Scaffolding & I/O Foundation | (foundation) | 📋 |
-| 1 | End-to-End Thin Slice: Empty Detection + Report | G1, G4 | 📋 |
+| 0 | Project Scaffolding & I/O Foundation | (foundation) | ✅ |
+| 1 | End-to-End Thin Slice: Empty Detection + Report | G1, G4 | ✅ |
 | 2 | Geometric & Topological Feature Extraction | (feature core) | ✅ |
 | 3 | Spinal Curve: Spline Fit & Deviation Features | (feature core) | ✅ |
 | 4 | Heuristic Rule Engine over Failure Modes | G2 | 🚧 |
@@ -39,10 +39,10 @@
 
 | Objective | Delivered by | Status |
 |-----------|--------------|--------|
-| G1 Detect empty / trivially-failed | Stage 1 | 📋 |
+| G1 Detect empty / trivially-failed | Stage 1 | ✅ |
 | G2 Detect catalogued failure modes (§6) | Stages 4, 5 | 📋 |
 | G3 Distinguish failure from variation | Stages 6, 7 | 📋 |
-| G4 Per-case QC report (JSON + human) | Stage 1 (ext. 2–4) | 📋 |
+| G4 Per-case QC report (JSON + human) | Stage 1 (ext. 2–4) | ✅ |
 | G5 Deploy on XNAT *(deferred)* | Stage 9 | 📋 |
 | G6 Portable / GPU *(deferred)* | Stage 10 | 📋 |
 | G7 Evaluable & regression-testable | Stages 5, 7 | 📋 |
@@ -52,7 +52,7 @@
 
 # Phase 1 — Complete MVP Pipeline
 
-## Stage 0 — Project Scaffolding & I/O Foundation — 📋
+## Stage 0 — Project Scaffolding & I/O Foundation — ✅
 
 **Goal.** A runnable, cross-platform Python package + CLI that loads a scan and an
 instance label map, normalises labels, and exits cleanly.
@@ -68,29 +68,29 @@ instance label map, normalises labels, and exits cleanly.
 - ✅ `pytest` harness + tiny synthetic NIfTI fixtures. *(Item 002)*
 
 **Acceptance.**
-- [ ] `segqc run` on a fixture loads both volumes, prints labelled inventory, writes a stub JSON.
-- [ ] Unit tests for loader and label mapping pass.
-- [ ] Runs CPU-only on Windows, macOS, and Linux.
+- [x] `segqc run` on a fixture loads both volumes, prints labelled inventory, writes a stub JSON. *(Items 006, 010; `test_cli_run.py`, `test_010_pipeline.py`)*
+- [x] Unit tests for loader and label mapping pass. *(`test_io.py`, `test_labels.py`)*
+- [x] Runs CPU-only on Windows, macOS, and Linux. *(NumPy/SciPy CPU-only deps; suite green on Windows)*
 
 ---
 
-## Stage 1 — End-to-End Thin Slice: Empty Detection + Report (G1, G4) — 📋
+## Stage 1 — End-to-End Thin Slice: Empty Detection + Report (G1, G4) — ✅
 
 **Goal.** Smallest complete pipeline (input → verdict → report) detecting
 empty / trivially-failed segmentations.
 
 **Deliverables.**
-- ✅ Empty / near-empty detection (no labels, foreground < N voxels, < K labels), configurable.
+- ✅ Empty / near-empty detection (no labels, foreground < N voxels, < K labels), configurable. *(Item 007)*
 - ✅ QC verdict model: `pass` / `flagged-for-review` / `fail` with per-case + per-vertebra reasons. *(Item 008)*
 - ✅ JSON report schema v0 (machine-readable, versioned). *(Item 009)*
-- ✅ Human-readable report (Markdown/plain text) from the same model.
-- ✅ CLI wires loader → empty-check → verdict → both report formats.
+- ✅ Human-readable report (Markdown/plain text) from the same model. *(Item 010)*
+- ✅ CLI wires loader → empty-check → verdict → both report formats. *(Items 006, 010)*
 
 **Acceptance.**
-- [ ] 100% of empty / near-empty fixtures flagged `fail` with explicit reason (**G1**).
-- [ ] A non-empty fixture passes the empty check.
-- [ ] JSON validates against schema; human report generated (**G4**).
-- [ ] Tests cover empty-detection thresholds.
+- [x] 100% of empty / near-empty fixtures flagged `fail` with explicit reason (**G1**). *(`test_007_empty_detection.py`)*
+- [x] A non-empty fixture passes the empty check. *(`test_007_empty_detection.py`)*
+- [x] JSON validates against schema; human report generated (**G4**). *(`test_009_json_report.py`, `test_010_human_report.py`)*
+- [x] Tests cover empty-detection thresholds. *(`test_007_empty_detection.py`)*
 
 ---
 
