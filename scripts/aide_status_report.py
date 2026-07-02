@@ -161,16 +161,26 @@ def parse_progress(text: str) -> Tuple[List[Stage], List[Objective], Dict[int, T
                 )
 
     # --- Per-item status, tracked by which "## Stage N" section it appears in ---
+    # A deliverable may wrap across physical lines, leaving its ``*(Item NNN)*``
+    # reference on a continuation line that carries no status icon. Such a line
+    # inherits the icon of the list item (``- ✅ …``) it belongs to, so the item
+    # is not misread as "planned".
     current_stage: Optional[str] = None
+    bullet_status: Optional[str] = None
     stage_header_re = re.compile(r"^##\s+Stage\s+(\d+)")
+    bullet_re = re.compile(r"^\s*-\s")
     for line in lines:
         hm = stage_header_re.match(line)
         if hm:
             current_stage = hm.group(1)
+            bullet_status = None
             continue
+        line_icon = _icon_to_status(line)
+        if bullet_re.match(line):
+            bullet_status = line_icon
         for ref in _ITEM_REF_RE.finditer(line):
             num = int(ref.group(1))
-            status = _icon_to_status(line) or "planned"
+            status = line_icon or bullet_status or "planned"
             prev = item_status.get(num)
             if prev is None or _STATUS_RANK[status] > _STATUS_RANK[prev[0]]:
                 item_status[num] = (status, current_stage)

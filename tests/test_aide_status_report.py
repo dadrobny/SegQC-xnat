@@ -77,6 +77,21 @@ def test_parse_progress_status_precedence():
     assert item_status[50][0] == "complete"
 
 
+def test_parse_progress_item_ref_on_wrapped_continuation_line():
+    # A deliverable that wraps leaves its *(Item NNN)* ref on a continuation
+    # line with no icon; it must inherit the bullet's status, not default to
+    # "planned". (Regression: items 001/004 wrongly shown as planned.)
+    text = (
+        "## Stage 0 — Scaffolding — ✅\n"
+        "- ✅ Python package `segqc/` targeting Python 3.9+; with pinned\n"
+        "  core deps (NumPy, SciPy, scikit-image). *(Item 001)*\n"
+        "- ✅ CLI entry point. *(Item 006)*\n"
+    )
+    _, _, item_status = asr.parse_progress(text)
+    assert item_status[1] == ("complete", "0")
+    assert item_status[6] == ("complete", "0")
+
+
 def test_parse_progress_handles_empty():
     stages, objectives, item_status = asr.parse_progress("")
     assert stages == [] and objectives == [] and item_status == {}
