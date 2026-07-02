@@ -226,6 +226,12 @@ __marimo__/
 .claude/credentials.json
 #   Per-machine permission-prompt logs (the committed README stays tracked).
 docs/aide/permissions/*.jsonl
+#   Generated project-status report (regenerable; the committed README stays tracked).
+docs/aide/status/*.html
+docs/aide/status/*.png
+docs/aide/status/*.svg
+docs/aide/status/*.jpg
+docs/aide/status/*.jpeg
 
 # Local datasets (large, not versioned)
 dataset-verse19training/
