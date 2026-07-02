@@ -76,5 +76,5 @@ Target log: **$ARGUMENTS** (if empty, the default
   is a *different*, untrusted project). Fix by re-opening the folder to accept the
   trust prompt, or setting that flag. (The reviewer script prints this reminder
   whenever the log is empty.)
-- Re-run this anytime, and from `/speckit-aide-feedback-loop`, which calls it as part
+- Re-run this anytime, and from `/aide-feedback-loop`, which calls it as part
   of its process review.
