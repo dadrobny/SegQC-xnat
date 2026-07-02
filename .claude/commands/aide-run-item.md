@@ -15,9 +15,9 @@ Item: **$ARGUMENTS** (first token = item number NNN; optional second token =
 branch name, else the existing `aide/NNN-*` branch).
 
 > **Prerequisite:** the item must already be **claimed** — an `aide/NNN-*` branch
-> pushed by the `scout` (or by you). This command does *not* claim items; the
-> `scout` / queue loop does. If no branch exists, stop and tell the caller to
-> claim it first.
+> created by `python .aide/scripts/aide.py claim` (or by you). This command does
+> *not* claim items; the queue loop does. If no branch exists, stop and tell the
+> caller to claim it first.
 
 **Orchestration model.** This dispatch-and-gate role is light — run it on
 **Sonnet** (the heavy work is in the Opus/Sonnet subagents). A slash command can't
@@ -29,21 +29,18 @@ pin the session model, so `/model sonnet` first if you're on Opus.
 |---|---|---|---|---|
 | 0 | **Author the item spec** | `spec-author` | **Opus** | writes `docs/aide/items/NNN-*.md` (Description, atomic AC, steps, testing strategy, deps, decisions), commits. **No code, no tests.** Skip only if the spec file already exists and is complete. |
 | 1 | **Write tests** for the item | `test-writer` | Sonnet | reads spec + AC + existing test style, writes tests for every AC + adversarial cases, commits. **No production code, no pytest.** |
-| 2 | **Implement** production code | `builder` | Sonnet (→ Opus on 3rd attempt) | checkout branch, implement `src/` per every AC, record decisions, set progress 🚧, commit. **No tests, no pytest.** |
-| 3 | **Validate** + merge | `validator` | Sonnet | a **different** agent: runs pytest, checks AC coverage + scope + vision fit, **reconciles progress.md** (item row, stage acceptance boxes, summary rollup), then on PASS flips ✅ and direct-merges. **No new tests.** |
+| 2 | **Implement** production code | `builder` | Sonnet (→ Opus on 3rd attempt) | checkout branch, implement `source_dir` per every AC, record decisions, set progress in-progress (`aide progress set NNN in-progress`), commit. **No tests, no pytest.** |
+| 3 | **Validate** + merge | `validator` | Sonnet | a **different** agent: runs pytest, checks AC coverage + scope + vision fit, then on PASS reconciles + merges via the CLI (`aide progress set NNN done`, `aide merge NNN`). **No new tests.** |
 
 **Spec authoring, testing, implementation, and validation are always separate
 agents.** No agent signs off its own work. Spawn a **new** instance of each per
 item — never reuse across items. Pass only the **minimum** between agents: the
 item number, the branch name, and (from spec-author) the list of AC.
 
-**Command hygiene.** Sub-agents must emit git/python commands in an
-allow-list-friendly shape so the run doesn't stall on prompts: no `cd` prefix,
-one command per Bash call (no `&&`/`;` chaining), no `2>&1`, no command
-substitution in commit messages, Python/pytest via the relative
-`.venv/Scripts/python` (or `.venv/bin/python`) form, and recon via the Bash tool
-with `grep` rather than PowerShell `Select-String`. Spelled out in each agent
-spec and `CLAUDE.md` → *Command hygiene*.
+**Command hygiene.** Sub-agents emit git/CLI commands in the allow-list-friendly
+shape defined once in `.aide/conventions.md` §3 (no `cd`, one command per Bash
+call, no `2>&1`, no command substitution in commits, venv Python in relative form,
+the `aide` CLI as `python .aide/scripts/aide.py …`).
 
 ## Steps
 
@@ -65,9 +62,9 @@ spec and `CLAUDE.md` → *Command hygiene*.
 
 3. **Implement → spawn a fresh `builder`.** Brief:
    > Implement AIDE item NNN on branch `aide/NNN-short-name`. Spec and tests are
-   > committed. `git switch aide/NNN-short-name`, implement `src/` per every AC,
-   > record decisions in the spec, set the item's progress.md row to 🚧
-   > (`git pull --rebase` first), commit.
+   > committed. `git switch aide/NNN-short-name`, implement `source_dir` (from
+   > `aide.toml`) per every AC, record decisions in the spec, then
+   > `python .aide/scripts/aide.py progress set NNN in-progress`, commit.
    > **Do NOT write tests and do NOT run pytest.**
    > STOP and hand back if a PR, force-push, or framework change is needed.
    > Return: one-paragraph summary of what was implemented.
@@ -75,15 +72,15 @@ spec and `CLAUDE.md` → *Command hygiene*.
 4. **Validate → spawn a fresh `validator`** (a *different* agent). Brief:
    > Independently validate AIDE item NNN on branch `aide/NNN-short-name`.
    > Run the full pytest suite. Check every AC in `docs/aide/items/NNN-*.md` has a
-   > test; check builder's `src/` changes are in scope; check alignment with
-   > `docs/aide/vision.md`. **Reconcile `docs/aide/progress.md`**: tick this
-   > item's deliverable and acceptance checkboxes, and if every deliverable in the
-   > stage is now done, roll the stage status (header + summary table + objective
-   > coverage) up to ✅. **Do NOT write or modify tests.**
-   > PASS: flip progress.md ✅ + reconcile as above, commit, direct-merge to main,
-   > re-run pytest, then delete the merged `aide/NNN-*` claim branch (local +
-   > remote, safe `-d`). FAIL: report which check failed and whether builder or
-   > test-writer must fix it. Do not merge.
+   > test; check builder's `source_dir` changes are in scope; check alignment with
+   > `docs/aide/vision.md` and the spec's Assumptions. **Do NOT write or modify
+   > tests.**
+   > PASS: reconcile + merge via the CLI —
+   > `python .aide/scripts/aide.py progress set NNN done` then
+   > `python .aide/scripts/aide.py merge NNN` (honours git.mode: direct-merge +
+   > re-test + branch cleanup for auto-merge; push-and-stop for pr; local merge for
+   > local). FAIL: report which check failed and whether builder or test-writer
+   > must fix it. Do not merge.
 
 5. **Build/test ↔ validate cycle (orchestrator).** Read the verdict:
    - **FAIL — suite red (code bug)** → fresh `builder` on the same branch with the
@@ -106,8 +103,7 @@ spec and `CLAUDE.md` → *Command hygiene*.
 - A `spec-author`, `builder`, or `validator` hands back needing a **PR**,
   **force-push**, or history rewrite.
 - The item needs a **major structural change** or an edit to a framework/process
-  file (`CLAUDE.md`, `vision.md`, `roadmap.md`, `constitution.md`,
-  `.claude/skills|commands|agents/**`, `.specify/extensions/**`) — needs a
-  reviewed PR, never a direct merge.
+  file (`CLAUDE.md`, `aide.toml`, `.aide/**`, `vision.md`, `roadmap.md`,
+  `.claude/skills|commands|agents/**`) — needs a reviewed PR, never a direct merge.
 - The **build↔validate cycle exceeds 3 rounds**, or the item is blocked /
-  contradictory. Document the blocker and suggest `/speckit-aide-feedback-loop`.
+  contradictory. Document the blocker and suggest `/aide-feedback-loop`.
