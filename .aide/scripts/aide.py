@@ -573,6 +573,207 @@ def cmd_queue(args: argparse.Namespace) -> int:
 
 
 # --------------------------------------------------------------------------- #
+# git layer — claim / merge / env
+# --------------------------------------------------------------------------- #
+def venv_python(repo_root: Path, config: Dict[str, Dict[str, object]]) -> Path:
+    """Resolve the venv interpreter path (Windows Scripts vs. posix bin)."""
+    venv = repo_root / str(config["python"].get("venv", ".venv"))
+    if os.name == "nt":
+        return venv / "Scripts" / "python.exe"
+    return venv / "bin" / "python"
+
+
+def resolve_test_command(repo_root: Path, config: Dict[str, Dict[str, object]]) -> List[str]:
+    """The configured test command, with a leading ``python`` bound to the venv."""
+    raw = str(config["python"].get("test_command", "python -m pytest")).split()
+    vpy = venv_python(repo_root, config)
+    if raw and raw[0] == "python" and vpy.exists():
+        return [str(vpy), *raw[1:]]
+    return raw
+
+
+def env_status(repo_root: Path, config: Dict[str, Dict[str, object]]) -> str:
+    """Return 'ok', 'missing', or 'stale' for the project venv."""
+    vpy = venv_python(repo_root, config)
+    if not vpy.exists():
+        return "missing"
+    module = str(config["python"].get("import_check", "") or "").strip()
+    if not module:
+        return "ok"
+    res = subprocess.run([str(vpy), "-c", f"import {module}"],
+                         cwd=str(repo_root), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return "ok" if res.returncode == 0 else "stale"
+
+
+def cmd_env(args: argparse.Namespace) -> int:
+    repo_root = find_repo_root(args.repo)
+    config = load_config(repo_root)
+    status = env_status(repo_root, config)
+    if status == "ok":
+        print("aide env: OK (venv present, import succeeds)")
+        return 0
+    if not args.bootstrap:
+        print(f"aide env: {status} — run 'python .aide/scripts/aide.py env --bootstrap' to build it")
+        return 1
+    venv = repo_root / str(config["python"].get("venv", ".venv"))
+    bootstrap = str(config["python"].get("bootstrap", "pip install -e .[dev]")).split()
+    print(f"aide env: bootstrapping {venv} …")
+    subprocess.run([sys.executable, "-m", "venv", str(venv)], cwd=str(repo_root), check=True)
+    vpy = venv_python(repo_root, config)
+    cmd = [str(vpy), "-m", *bootstrap] if bootstrap and bootstrap[0] == "pip" else [str(vpy), *bootstrap]
+    subprocess.run(cmd, cwd=str(repo_root), check=True)
+    final = env_status(repo_root, config)
+    print(f"aide env: bootstrap done ({final})")
+    return 0 if final == "ok" else 1
+
+
+def _slug(title: str, max_words: int = 5) -> str:
+    words = re.findall(r"[A-Za-z0-9]+", title.lower())
+    return "-".join(words[:max_words]) or "item"
+
+
+def _queue_titles(text: str) -> Dict[int, str]:
+    titles: Dict[int, str] = {}
+    for line in text.splitlines():
+        m = re.match(r"^###\s+Item\s+0*(\d+)\s*:\s*(.+?)\s*$", line)
+        if m:
+            titles[int(m.group(1))] = m.group(2)
+    return titles
+
+
+def _item_dependencies(repo_root: Path, config, number: int) -> List[int]:
+    """Item numbers named in the spec's Dependencies section (best effort)."""
+    idir = docs_dir(repo_root, config) / "items"
+    if not idir.is_dir():
+        return []
+    specs = list(idir.glob(f"{number:03d}-*.md"))
+    if not specs:
+        return []
+    text = specs[0].read_text(encoding="utf-8")
+    m = re.search(r"^##\s+Dependencies\s*$(.*?)(^##\s|\Z)", text, re.MULTILINE | re.DOTALL)
+    section = m.group(1) if m else ""
+    deps = {int(x) for x in re.findall(r"\bItem[s]?\s+0*(\d+)", section)}
+    deps.discard(number)
+    return sorted(deps)
+
+
+def _pick_item(repo_root: Path, config, queue_text: str,
+               claim_branches: List[str]) -> Optional[Tuple[int, str]]:
+    """First queue item that is planned, unclaimed, and unblocked. (number, title)."""
+    _, _, item_status = _parse_item_status(
+        (docs_dir(repo_root, config) / "progress.md").read_text(encoding="utf-8").splitlines()
+    ) if (docs_dir(repo_root, config) / "progress.md").is_file() else ([], [], {})
+    claimed_nums = set()
+    for br in claim_branches:
+        cm = re.search(r"/(\d+)-", br) or re.search(r"(\d+)", br.rsplit("/", 1)[-1])
+        if cm:
+            claimed_nums.add(int(cm.group(1)))
+    titles = _queue_titles(queue_text)
+    for num in queue_item_numbers(queue_text):
+        if item_status.get(num, "planned") != "planned":
+            continue
+        if num in claimed_nums:
+            continue
+        deps = _item_dependencies(repo_root, config, num)
+        if any(item_status.get(d, "planned") in ("planned", "in-progress") for d in deps):
+            continue
+        return num, titles.get(num, f"item {num}")
+    return None
+
+
+def _live_queue_text(repo_root: Path, config, queue_number: Optional[int]) -> Optional[str]:
+    qdir = docs_dir(repo_root, config) / "queue"
+    if queue_number is not None:
+        path = qdir / f"queue-{queue_number:03d}.md"
+        return path.read_text(encoding="utf-8") if path.is_file() else None
+    if not qdir.is_dir():
+        return None
+    for path in sorted(qdir.glob("queue-*.md"), reverse=True):
+        text = path.read_text(encoding="utf-8")
+        if is_live_queue(text):
+            return text
+    return None
+
+
+def cmd_claim(args: argparse.Namespace) -> int:
+    repo_root = find_repo_root(args.repo)
+    config = load_config(repo_root)
+    prefix = str(config["git"].get("branch_prefix", "aide/"))
+    mode = str(config["git"].get("mode", "auto-merge"))
+    if mode != "local":
+        git(["fetch", "--all", "--prune"], repo_root, check=False)
+    queue_text = _live_queue_text(repo_root, config, args.queue)
+    if queue_text is None:
+        print("aide claim: no Live queue found", file=sys.stderr)
+        return 1
+    branches = _list_claim_branches(repo_root, prefix)
+    pick = _pick_item(repo_root, config, queue_text, branches)
+    if pick is None:
+        print("none left")
+        return 0
+    number, title = pick
+    branch = f"{prefix}{number:03d}-{_slug(title)}"
+    if args.dry_run:
+        print(f"would claim item {number:03d} -> {branch} ({title})")
+        return 0
+    git(["switch", "-c", branch], repo_root)
+    if mode != "local":
+        git(["push", "-u", "origin", branch], repo_root)
+    print(f"claimed item {number:03d}: {branch} — {title}")
+    return 0
+
+
+def _find_claim_branch(repo_root: Path, prefix: str, number: int) -> Optional[str]:
+    for br in _list_claim_branches(repo_root, prefix):
+        cm = re.search(r"/(\d+)-", br) or re.search(r"(\d+)", br.rsplit("/", 1)[-1])
+        if cm and int(cm.group(1)) == number:
+            return br
+    return None
+
+
+def cmd_merge(args: argparse.Namespace) -> int:
+    repo_root = find_repo_root(args.repo)
+    config = load_config(repo_root)
+    prefix = str(config["git"].get("branch_prefix", "aide/"))
+    mode = str(config["git"].get("mode", "auto-merge"))
+    main = str(config["git"].get("main_branch", "main"))
+    branch = args.branch or _find_claim_branch(repo_root, prefix, args.number)
+    if not branch:
+        print(f"aide merge: no claim branch found for item {args.number:03d}", file=sys.stderr)
+        return 1
+
+    if mode == "pr":
+        git(["push", "-u", "origin", branch], repo_root)
+        print(f"aide merge (pr mode): pushed {branch}. Open a PR to land it "
+              f"(e.g. 'gh pr create'); merge is left to the human review gate.")
+        return 0
+
+    git(["switch", main], repo_root)
+    if mode != "local":
+        git(["pull", "--rebase"], repo_root, check=False)
+    merge_res = git(["merge", "--no-edit", branch], repo_root, check=False)
+    if merge_res.returncode != 0:
+        print(f"aide merge: merge of {branch} failed:\n{merge_res.stdout}{merge_res.stderr}", file=sys.stderr)
+        return 1
+    if mode != "local":
+        git(["push"], repo_root, check=False)
+
+    if not args.no_test:
+        cmd = resolve_test_command(repo_root, config)
+        test_res = subprocess.run(cmd, cwd=str(repo_root))
+        if test_res.returncode != 0:
+            print(f"aide merge: merged {branch} but the post-merge test run FAILED — investigate", file=sys.stderr)
+            return 1
+
+    # Clean up the merged claim branch (safe -d; refuses if not merged).
+    git(["branch", "-d", branch], repo_root, check=False)
+    if mode != "local":
+        git(["push", "origin", "--delete", branch], repo_root, check=False)
+    print(f"aide merge: item {args.number:03d} merged to {main} and claim branch {branch} deleted")
+    return 0
+
+
+# --------------------------------------------------------------------------- #
 # CLI
 # --------------------------------------------------------------------------- #
 def build_parser() -> argparse.ArgumentParser:
@@ -601,8 +802,22 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def register_git_subcommands(sub) -> None:  # noqa: D401 - populated by the git layer
-    """Attach claim/merge/env subparsers. No-op until the git layer is present."""
+def register_git_subcommands(sub) -> None:
+    """Attach the claim / merge / env subparsers (git layer)."""
+    p_claim = sub.add_parser("claim", help="pick + claim the next unclaimed 📋 item")
+    p_claim.add_argument("--queue", type=int, default=None, help="queue number (default: the Live queue)")
+    p_claim.add_argument("--dry-run", action="store_true", help="print the pick, do not create/push a branch")
+    p_claim.set_defaults(func=cmd_claim)
+
+    p_merge = sub.add_parser("merge", help="merge a validated item per git.mode")
+    p_merge.add_argument("number", type=int)
+    p_merge.add_argument("branch", nargs="?", default=None, help="claim branch (default: found from number)")
+    p_merge.add_argument("--no-test", action="store_true", help="skip the post-merge test run")
+    p_merge.set_defaults(func=cmd_merge)
+
+    p_env = sub.add_parser("env", help="venv existence / import check + bootstrap")
+    p_env.add_argument("--bootstrap", action="store_true", help="create + populate the venv if missing/stale")
+    p_env.set_defaults(func=cmd_env)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
