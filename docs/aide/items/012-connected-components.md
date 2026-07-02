@@ -1,6 +1,6 @@
 # Item 012 — Connected-Components Analysis per Label
 
-> **Status:** 🚧 In Progress · **Created:** 2026-06-25
+> **Created:** 2026-06-25 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 2 — Geometric & Topological Feature Extraction
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 012
 > **Objectives:** Topological feature engine — fragment detection (failure mode 3)

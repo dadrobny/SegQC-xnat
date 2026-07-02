@@ -1,6 +1,6 @@
 # Item 007 — Empty / Near-Empty Detection
 
-> **Status:** 📋 Planned · **Created:** 2026-06-25
+> **Created:** 2026-06-25 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 1 — End-to-End Thin Slice: Empty Detection + Report
 > **Queue:** [`../queue/queue-001.md`](../queue/queue-001.md) · Item 007
 > **Objectives:** G1 — Detect empty / trivially-failed segmentations

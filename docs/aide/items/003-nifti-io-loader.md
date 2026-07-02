@@ -1,6 +1,6 @@
 # Item 003 — NIfTI I/O Loader
 
-> **Status:** 📋 Planned · **Created:** 2026-06-24
+> **Created:** 2026-06-24 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 0 — Project Scaffolding & I/O Foundation
 > **Queue:** [`../queue/queue-001.md`](../queue/queue-001.md) · Item 003
 > **Objectives:** Foundation (I/O substrate for G1–G4 and every later stage)

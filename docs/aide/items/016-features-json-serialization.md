@@ -1,6 +1,6 @@
 # Item 016 — Features-block JSON Serialisation & Per-Case Feature Table
 
-> **Status:** ✅ Complete · **Created:** 2026-06-26 · **Completed:** 2026-06-26
+> **Created:** 2026-06-26 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 2 — Geometric & Topological Feature Extraction *(completes Stage 2)*
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 016
 > **Objectives:** G4 — Per-case QC report (JSON + human-readable); completes the

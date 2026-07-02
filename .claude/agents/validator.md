@@ -59,6 +59,9 @@ audits, but a fixed-artifact review does not need high.
    the recurring staleness failure mode this gate exists to catch. Before merging
    you OWN reconciling them (see PASS below): the item's deliverable line, the
    stage's acceptance checkboxes that this item satisfies, and the stage rollup.
+   `progress.md` is the **single source of truth** for status — the item spec
+   header carries no status field, so there is nothing to reconcile there (and you
+   must not add one).
 
 ## Hard limits
 

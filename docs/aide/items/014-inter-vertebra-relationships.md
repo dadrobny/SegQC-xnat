@@ -1,6 +1,5 @@
 # Item 014: Inter-vertebra relationships — ordered sequence, neighbour spacing, continuity
 
-**Status:** ✅ Complete
 **Branch:** `aide/014-inter-vertebra-relationships`
 **Queue:** queue-002.md
 

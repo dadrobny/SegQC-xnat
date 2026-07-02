@@ -1,6 +1,6 @@
 # Item 018 — Per-Vertebra Offset from the Spline
 
-> **Status:** 📋 Planned · **Created:** 2026-06-26
+> **Created:** 2026-06-26 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 3 — Spinal Curve: Spline Fit & Geometric Deviation Features
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 018
 > **Objectives:** Compute perpendicular offset of each vertebra centroid from the

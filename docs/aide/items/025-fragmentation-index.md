@@ -1,6 +1,6 @@
 # Item 025 — Fragmentation Index per Label
 
-> **Status:** 🚧 In Progress · **Created:** 2026-06-27
+> **Created:** 2026-06-27 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 2 — Geometric & Topological Feature Extraction *(enhancement)*
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 025
 > **Objectives:** Topological feature engine — fragment detection (failure mode 3)

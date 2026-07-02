@@ -1,6 +1,6 @@
 # Item 017 — Centroid Spline Fit (Robust to Missing Levels)
 
-> **Status:** 🚧 In Progress · **Created:** 2026-06-26
+> **Created:** 2026-06-26 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 3 — Spinal Curve: Spline Fit & Geometric Deviation Features
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 017
 > **Objectives:** Continuous spinal-curve representation for downstream deviation

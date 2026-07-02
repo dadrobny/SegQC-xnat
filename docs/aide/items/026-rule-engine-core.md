@@ -1,6 +1,6 @@
 # Item 026 — Rule-Engine Core: `Rule` Abstraction, Finding Model & Config-Driven Runner
 
-> **Status:** 📋 Planned · **Created:** 2026-06-29
+> **Created:** 2026-06-29 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 4 — Heuristic Rule Engine over the Failure Modes (G2)
 > **Queue:** [`../queue/queue-003.md`](../queue/queue-003.md) · Item 026
 > **Objectives:** G2 (explainable rule engine), supporting G4 (per-case reasons)

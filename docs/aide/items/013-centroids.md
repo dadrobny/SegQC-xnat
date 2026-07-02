@@ -1,6 +1,6 @@
 # Item 013 — Centroid / Centre-of-Mass per Label (Level-Aware)
 
-> **Status:** 🚧 In Progress · **Created:** 2026-06-25
+> **Created:** 2026-06-25 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 2 — Geometric & Topological Feature Extraction
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 013
 > **Objectives:** Per-vertebra centroid for spline and heuristic downstream modules
