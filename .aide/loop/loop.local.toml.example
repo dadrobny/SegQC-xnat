@@ -1,0 +1,36 @@
+# Personal, per-machine config for the AIDE loop supervisor (.aide/loop/loop.py).
+# Copy this file to loop.local.toml (gitignored) and edit. Nothing here is shared.
+
+[loop]
+# Stop once the 7-day utilization reaches this percent (0 disables).
+max_weekly_pct = 95
+
+# Reserve this many percent of the weekly budget per whole day still left before
+# the weekly reset (0 disables). The effective weekly ceiling is the smaller of
+# max_weekly_pct and 100 - daily_reserve_pct * days_left, so it rises toward 100
+# as the reset nears.
+daily_reserve_pct = 10
+
+# Treat the 5-hour/session window as exhausted at this percent (then WAIT for reset).
+max_session_pct = 98
+
+# Seconds of slack added when sleeping until a window resets.
+buffer_seconds = 30
+
+# Seconds to wait between passes after a normal RUN.
+interval = 300
+
+# Fallback wait (seconds) if a WAIT is chosen but no reset time is available.
+wait_fallback = 900
+
+# Deadline: once the clock passes this, the loop finishes the current run and
+# exits without restarting. Any ISO-8601 datetime (e.g. "2026-06-30T09:00" or
+# "2026-06-30 09:00"). Empty = run indefinitely.
+stop_after = ""
+
+# Override the OAuth credentials file (empty = ~/.claude/.credentials.json).
+credentials_path = ""
+
+# Command to run each pass (empty = claude "/aide-run-roadmap"). The ERR/re-auth
+# path runs this same plain command — never pass a removed --continuous flag.
+command = ""
