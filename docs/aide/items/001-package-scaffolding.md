@@ -1,6 +1,6 @@
 # Item 001 — Package Scaffolding & Build Configuration
 
-> **Status:** ✅ Complete · **Created:** 2026-06-24 · **Completed:** 2026-06-24
+> **Created:** 2026-06-24 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 0 — Project Scaffolding & I/O Foundation
 > **Queue:** [`../queue/queue-001.md`](../queue/queue-001.md) · Item 001
 > **Objectives:** Foundation (enables G1, G4 and all later stages)

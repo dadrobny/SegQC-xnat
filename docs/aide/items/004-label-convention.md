@@ -1,6 +1,6 @@
 # Item 004 — Label-Convention Module
 
-> **Status:** 📋 Planned · **Created:** 2026-06-25
+> **Created:** 2026-06-25 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 0 — Project Scaffolding & I/O Foundation
 > **Queue:** [`../queue/queue-001.md`](../queue/queue-001.md) · Item 004
 > **Objectives:** Foundation (tool-agnostic label→anatomy normalisation for G1–G4)

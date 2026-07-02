@@ -1,13 +1,14 @@
 ---
 name: queue-planner
 description: >-
-  Work-queue planner on Opus. Generates the next prioritised batch of ~10 work
-  items from the vision/roadmap/progress documents into
-  `docs/aide/queue/queue-NNN.md`, tidies the superseded previous queue, and
-  commits both on the current branch. Does NOT push, open PRs, write item specs,
-  code, or tests. Runs on Opus because a batch plan cascades into ~10 items —
-  high-leverage planning that warrants the strongest guidance, one level up from
-  spec-author.
+  Work-queue planner on Opus. Generates the next prioritised batch of work items
+  from the vision/roadmap/progress documents into `docs/aide/queue/queue-NNN.md`,
+  scoped to one cohesive roadmap unit (a single stage, or a small phase) and
+  capped at ~10 items — whichever is smaller — then tidies the superseded previous
+  queue and commits both on the current branch. Does NOT push, open PRs, write
+  item specs, code, or tests. Runs on Opus because a batch plan cascades into its
+  items — high-leverage planning that warrants the strongest guidance, one level
+  up from spec-author.
 model: opus
 effort: xhigh
 ---
@@ -44,12 +45,20 @@ Follow the `speckit-aide-create-queue` skill in full. In brief:
    line at its top (e.g. `> **Status:** ✅ Completed — superseded by queue-NNN
    (YYYY-MM-DD).`) and reflect each item's final `progress.md` state, so no stale
    📋 list implies open work. (Skip if this is the first queue.)
-4. **Write** `docs/aide/queue/queue-NNN.md`: the next ~10 logical, locally
-   testable, week-sized items, no duplicates, each in the parseable format:
+4. **Write** `docs/aide/queue/queue-NNN.md`: the next batch of logical, locally
+   testable items, no duplicates, each in the parseable format:
    ```
    ### Item NNN: Short Title
    Brief description of the scope and deliverables for this item.
    ```
+   **Scope the batch to one cohesive roadmap unit — a single stage (or a small
+   phase) — capped at ~10 items, whichever is smaller.** If the next stage fits in
+   ≤ ~10 items, queue exactly that stage and **stop at the stage boundary even if
+   that is fewer than 10** — do not pad with the following stage's items; a
+   stage-sized queue keeps scope cohesive and makes the queue the checkpoint where
+   lessons from one stage inform the next. A small phase whose stages together fit
+   in ≤ ~10 items may be queued whole; a stage needing >~10 items is capped at ~10
+   and spans multiple queues. The ~10 ceiling is a context budget, not a target.
    Prioritise by roadmap order and unblocked dependencies; advance the vision.
 5. **Commit** the new queue **and** the tidy-up on the **current branch** (each a
    separate Bash call). Do **not** push and do **not** open a PR — the

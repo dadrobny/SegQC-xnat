@@ -1,6 +1,6 @@
 # Item 011 — Per-label Geometric Features
 
-> **Status:** 🚧 In Progress · **Created:** 2026-06-25
+> **Created:** 2026-06-25 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 2 — Geometric & Topological Feature Extraction
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 011
 > **Objectives:** Feature engine foundation (inputs to G2 heuristics)

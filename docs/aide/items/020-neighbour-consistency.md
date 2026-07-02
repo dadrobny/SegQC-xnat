@@ -1,6 +1,6 @@
 # Item 020 — Neighbour-Consistency Metrics (Spacing Regularity & Monotonic Progression)
 
-> **Status:** 🚧 In Progress · **Created:** 2026-06-26
+> **Created:** 2026-06-26 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 3 — Spinal Curve: Spline Fit & Geometric Deviation Features
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 020
 > **Objectives:** Derive neighbour-consistency metrics from the ordered centroid

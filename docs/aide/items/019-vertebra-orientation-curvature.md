@@ -1,6 +1,6 @@
 # Item 019 — Vertebra Orientation/Rotation & Global Curvature Descriptors
 
-> **Status:** 📋 Planned · **Created:** 2026-06-26
+> **Created:** 2026-06-26 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 3 — Spinal Curve: Spline Fit & Geometric Deviation Features
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 019
 > **Objectives:** Per-vertebra orientation (PCA of label voxel cloud) + global

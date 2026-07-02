@@ -1,6 +1,6 @@
 # Item 005 — Structured Logging & Versioned Heuristic-Config Scaffold
 
-> **Status:** 📋 Planned · **Created:** 2026-06-25
+> **Created:** 2026-06-25 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 0 — Project Scaffolding & I/O Foundation
 > **Queue:** [`../queue/queue-001.md`](../queue/queue-001.md) · Item 005
 > **Objectives:** Foundation (reproducibility + config plumbing for G2, G4)

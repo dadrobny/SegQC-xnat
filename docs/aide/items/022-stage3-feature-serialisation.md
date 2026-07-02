@@ -1,6 +1,6 @@
 # Item 022 — Stage 3 Feature Serialisation & GT-vs-Perturbed Regression Tests
 
-> **Status:** 🚧 In Progress · **Created:** 2026-06-27
+> **Created:** 2026-06-27 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 3 — Spinal Curve: Spline Fit & Geometric Deviation Features *(completes Stage 3)*
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 022
 > **Objectives:** Serialise Stage 3 deviation features — spline offset (018),

@@ -1,6 +1,6 @@
 # Item 010 — Human-Readable Report Renderer & Final Pipeline Wiring
 
-> **Status:** 🚧 In Progress · **Created:** 2026-06-25
+> **Created:** 2026-06-25 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 1 — End-to-End Thin Slice: Empty Detection + Report
 > **Queue:** [`../queue/queue-001.md`](../queue/queue-001.md) · Item 010
 > **Objectives:** G1 — Empty fixture flagged `fail`; G4 — Per-case QC report (JSON + human-readable)

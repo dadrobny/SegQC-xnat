@@ -43,6 +43,11 @@ multiple items rather than one.
    the existing conventions the item must fit.
 3. **Write `docs/aide/items/NNN-descriptive-name.md`** following the structure in
    the `speckit-aide-create-item` skill. It MUST contain:
+   - **Header** — set a `**Created:** YYYY-MM-DD` date and a static pointer
+     (`status tracked in [`progress.md`](../progress.md)`), plus Stage, Queue,
+     Objectives, and Suggested branch. **Do NOT add a `Status:` or `Completed:`
+     field** — implementation status lives only in `progress.md` (the single
+     source of truth); a duplicated header status has no owner and only drifts.
    - **Description** — scope and deliverables, bounded to this one item.
    - **Acceptance Criteria** — each criterion **atomic, observable, and directly
      testable** (a test-writer must be able to write one test per AC without

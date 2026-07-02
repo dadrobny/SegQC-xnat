@@ -1,6 +1,6 @@
 # Item 006 — CLI `segqc run` Skeleton: Load, Inventory, Stub JSON
 
-> **Status:** 📋 Planned · **Created:** 2026-06-25
+> **Created:** 2026-06-25 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 0 — Project Scaffolding & I/O Foundation *(final item, completes Stage 0)*
 > **Queue:** [`../queue/queue-001.md`](../queue/queue-001.md) · Item 006
 > **Objectives:** Foundation — closes the Stage 0 acceptance test (G1, G4 substrate)

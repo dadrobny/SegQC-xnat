@@ -197,16 +197,26 @@ list below summarises each role.
   📋 item, then creates and pushes the claim branch. Returns only item number,
   branch name, and title. Never searches source code; file locations are known.
 - **`queue-planner` (Opus)** — **queue authoring only**: generates the next batch
-  of ~10 items into `docs/aide/queue/queue-NNN.md` from vision/roadmap/progress,
-  tidies the superseded previous queue, and commits both (no push/PR). On Opus
-  because a batch plan cascades into ~10 items — high-leverage planning, the
-  queue-level analogue of `spec-author`. The roadmap orchestrator spawns it
-  rather than running `create-queue` inline.
+  into `docs/aide/queue/queue-NNN.md` from vision/roadmap/progress, tidies the
+  superseded previous queue, and commits both (no push/PR). The batch is **scoped
+  to one cohesive roadmap unit — a single stage (or a small phase) — capped at ~10
+  items, whichever is smaller**: a stage that fits in ≤ ~10 items is queued whole
+  and the queue stops at the stage boundary (small stages → small queues, so each
+  stage becomes a checkpoint where its lessons inform the next); a stage needing
+  more spans multiple queues at the ~10 cap. On Opus because a batch plan cascades
+  into its items — high-leverage planning, the queue-level analogue of
+  `spec-author`. The roadmap orchestrator spawns it rather than running
+  `create-queue` inline.
 - **`spec-author` (Opus)** — **work-item spec authoring only**: turns the queued
   one-liner into a complete, testable `docs/aide/items/NNN-*.md` (atomic AC,
   steps, testing strategy, deps), commits it. Runs on Opus deliberately — the
   spec is the single source of truth every later agent depends on, so stronger
-  up-front guidance pays off. Does **not** write code or tests, no pytest.
+  up-front guidance pays off. Does **not** write code or tests, no pytest. The
+  item spec is a **static** artifact and carries **no implementation-status
+  field** (only a `Created` date + a pointer to progress); implementation status
+  (📋 / 🚧 / ✅) lives **only** in `progress.md`, the single source of truth the
+  builder (🚧) and validator (✅) update — a header status would just drift, since
+  no step owns it.
 - **`builder` (Sonnet, escalates to Opus on 3rd attempt)** — **implementation
   only**: implements production code in `src/` per the item spec, records
   decisions, sets progress 🚧, commits. Does **not** write tests and does **not**
@@ -312,8 +322,9 @@ the next queue — that is the roadmap loop's job.
 
 **`/aide-run-roadmap`** loops **over queues** across the whole roadmap: generate a
 queue → `/aide-run-queue` it → generate the next → … until no stage remains. The
-**queue is the human checkpoint** (review the batch plan ~once per 10 items, not
-every item): each new queue lands via a **human-reviewed PR**; the loop **pauses**
+**queue is the human checkpoint** (review the batch plan once per queue — a stage
+or small phase, up to ~10 items — not every item): each new queue lands via a
+**human-reviewed PR**; the loop **pauses**
 until the human merges it, then runs that queue. It spans sessions and is
 resumable — on each invocation it detects open queue PRs, merged-but-unrun queues,
 in-flight `aide/NNN-*` branches, and exhausted queues, and picks up from there.

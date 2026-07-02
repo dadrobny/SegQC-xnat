@@ -52,6 +52,28 @@ real work begins — `execute-item` re-checks this.
 
 Create a comprehensive work item specification for the selected item and save it to `docs/aide/items/NNN-descriptive-name.md`.
 
+### Header / front-matter (no implementation-status field)
+
+The item spec is a **static specification of what to build** — its existence does
+not imply any implementation state (items may be authored in bulk, reviewed, then
+implemented later). **`docs/aide/progress.md` is the single source of truth for
+implementation status** (📋 / 🚧 / ✅), reconciled by the validator; the status
+report derives per-item status from it. So the item header **must not carry a
+`Status:` (or `Completed:`) field** — a duplicated status only drifts, because no
+step owns it. Use a header block like:
+
+```markdown
+# Item NNN — <Title>
+
+> **Created:** YYYY-MM-DD · status tracked in [`progress.md`](../progress.md)
+> **Stage:** N — <stage title>
+> **Queue:** [`../queue/queue-NNN.md`](../queue/queue-NNN.md) · Item NNN
+> **Objectives:** <G-codes this item advances>
+> **Suggested branch:** `aide/NNN-descriptive-name`
+```
+
+`Created` is set once and never changes; everything mutable lives in `progress.md`.
+
 ### Required Sections
 
 The work item MUST include:
@@ -67,7 +89,9 @@ The work item MUST include:
 Add a "Decisions & Trade-offs" section where implementation decisions will be documented as work progresses. Initialize with "To be updated during implementation."
 
 #### 3. Completion Reminder
-Note that `docs/aide/progress.md` MUST be updated (📋 → 🚧 → ✅) when the item is completed.
+Note that `docs/aide/progress.md` MUST be updated (📋 → 🚧 → ✅) as the item
+progresses — it is the **only** place implementation status is tracked (the item
+header carries no status field). The builder sets 🚧; the validator reconciles ✅.
 
 #### 4. Project-Specific Adaptations
 If this project has unique needs (e.g., specific test strategy, deployment process), adapt the template accordingly. Document any template changes in the work item.

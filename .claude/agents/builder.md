@@ -42,9 +42,11 @@ raises it, higher effort) is warranted; until then, medium is enough.
 3. **Implement the production code** in `src/` to satisfy every AC. Follow the
    existing style, the item's Decisions, and `CLAUDE.md` conventions.
 4. **Record decisions** back into the item spec's "Decisions & Trade-offs"
-   section.
+   section. Edit only that section — do **not** add or change any status field in
+   the item header; implementation status lives solely in `progress.md`.
 5. **Set `progress.md`** for this item's row to 🚧 (`git pull --rebase` first;
-   edit only this item's row).
+   edit only this item's row). This is the **only** place you record status — the
+   item header has no status field to update.
 6. **Commit** the implementation on the branch (plain message, no co-author
    trailer).
 7. **Return** a one-paragraph summary: item, what was implemented, key

@@ -1,6 +1,6 @@
 # Item 008 — QC Verdict Model
 
-> **Status:** 🚧 In Progress · **Created:** 2026-06-25
+> **Created:** 2026-06-25 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 1 — End-to-End Thin Slice: Empty Detection + Report
 > **Queue:** [`../queue/queue-001.md`](../queue/queue-001.md) · Item 008
 > **Objectives:** G4 — Per-case QC report (JSON + human-readable)

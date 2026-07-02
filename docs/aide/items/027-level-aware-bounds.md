@@ -1,6 +1,6 @@
 # Item 027 — Level-Aware Min/Max Bounds Rules (Volume & Extent)
 
-> **Status:** 📋 Planned · **Created:** 2026-06-30
+> **Created:** 2026-06-30 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 4 — Heuristic Rule Engine over the Failure Modes (G2)
 > **Queue:** [`../queue/queue-003.md`](../queue/queue-003.md) · Item 027
 > **Objectives:** G2 (detect §6 failure modes — mode 2, gross over-/under-segmentation),

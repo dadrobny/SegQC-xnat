@@ -1,6 +1,6 @@
 # Item 024 — Local Vertebra Neighbourhood Comparison
 
-> **Status:** 📋 Planned · **Created:** 2026-06-27
+> **Created:** 2026-06-27 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 3 — Spinal Curve: Spline Fit & Geometric Deviation Features
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 024
 > **Objectives:** Compute local neighbourhood features via a sliding window for

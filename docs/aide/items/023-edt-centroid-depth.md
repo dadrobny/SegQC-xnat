@@ -1,6 +1,6 @@
 # Item 023 — EDT-Based Centroid Variants & Centroid Depth
 
-> **Status:** ✅ Complete · **Created:** 2026-06-27
+> **Created:** 2026-06-27 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 2 — Geometric & Topological Feature Extraction (enhancement)
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 023
 > **Objectives:** Improve centroid quality for downstream spline/heuristic consumers

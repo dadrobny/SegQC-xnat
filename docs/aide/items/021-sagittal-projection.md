@@ -1,6 +1,6 @@
 # Item 021 — Sagittal Projection of Centroids & Spline (Human-Report Visual)
 
-> **Status:** 📋 Planned · **Created:** 2026-06-26
+> **Created:** 2026-06-26 · status tracked in [`progress.md`](../progress.md)
 > **Stage:** 3 — Spinal Curve: Spline Fit & Geometric Deviation Features
 > **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 021
 > **Objectives:** Optional 2-D sagittal projection figure (centroids + spline)
