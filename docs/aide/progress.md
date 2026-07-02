@@ -1,10 +1,12 @@
 # Seg-QC-xnat — Progress Tracker
 
-> **Status:** Draft v1 · **Created:** 2026-06-24
-> Step 3 of the AIDE workflow. Derived from [`vision.md`](vision.md) and
-> [`roadmap.md`](roadmap.md). Tracks completion state per stage, deliverable, and
-> acceptance criterion. Update **incrementally** — never reset a non-planned
-> status back to 📋.
+> **Status:** Draft v2 · **Created:** 2026-06-24 · **Re-issued:** 2026-07-02
+> (structure per `.aide/templates/progress.md`; all statuses carried over)
+> Step 3 of the AIDE loop. Derived from [`vision.md`](vision.md) and
+> [`roadmap.md`](roadmap.md). **Single source of truth for implementation
+> status** per stage, deliverable, and acceptance criterion — machine-parsed per
+> `.aide/conventions.md` §1 and edited via `python .aide/scripts/aide.py progress
+> set`. Update **incrementally** — never reset a non-planned status back to 📋.
 
 ---
 
@@ -146,16 +148,15 @@ mislabelling heuristics.
 
 **Deliverables.**
 - ✅ Config-driven rule engine: each rule emits flag + human-readable reason + offending labels. *(Item 026)*
-- 📋 Rule families covering §6:
-  - ✅ min/max bounds (volume, extent), level-aware; *(Item 027)*
-  - ✅ connected-components → fragmentation / island flags; *(Item 028)*
-  - 📋 incomplete coverage / missing levels (count vs expected sequence);
-  - 📋 label-sequence continuity (e.g. L1→T12→L2→L5);
-  - 📋 border-partial-vertebra flag;
-  - 📋 overlap flag;
-  - 📋 mislabel / misalignment (centroid vs expected level ordering / spline).
-- 📋 Verdict aggregation: combine flags → pass / flag / fail with severity.
-- 📋 Heuristic thresholds in a documented, versioned config file.
+- ✅ Rule family — min/max bounds (volume, extent), level-aware. *(Item 027)*
+- ✅ Rule family — connected-components → fragmentation / island flags. *(Item 028)*
+- 📋 Rule family — incomplete coverage / missing levels (count vs expected sequence). *(Item 029)*
+- 📋 Rule family — label-sequence continuity (e.g. L1→T12→L2→L5). *(Item 030)*
+- 📋 Rule family — border-partial-vertebra flag. *(Item 031)*
+- 📋 Rule family — overlap flag. *(Item 032)*
+- 📋 Rule family — mislabel / misalignment (centroid vs expected level ordering / spline). *(Item 033)*
+- 📋 Verdict aggregation: combine flags → pass / flag / fail with severity. *(Item 034)*
+- 📋 Heuristic thresholds in a documented, versioned config file; pipeline/report integration & per-failure-mode tests. *(Item 035)*
 
 **Acceptance.**
 - [ ] Each of the 8 §6 failure modes has ≥1 heuristic firing on a crafted example (**G2**).
@@ -289,4 +290,4 @@ abnormalities are accounted for rather than naively flagged.
 ## Next Step
 
 Review this progress tracker. When ready, start a **new chat session** and run
-`/speckit-aide-create-queue` to generate the first batch of prioritized work items.
+`/aide-create-queue` to generate the next batch of prioritized work items.

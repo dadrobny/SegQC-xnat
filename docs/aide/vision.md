@@ -1,8 +1,11 @@
 # Seg-QC-xnat — Project Vision
 
-> **Status:** Draft v1 · **Created:** 2026-06-24
-> Step 1 of the AIDE workflow. This document is the single source of truth from
-> which the roadmap, progress tracker, and all work items are derived.
+> **Status:** Draft v2 · **Created:** 2026-06-24 · **Re-issued:** 2026-07-02
+> (structure per `.aide/templates/vision.md`; content carried over unchanged)
+> Step 1 of the AIDE loop. This document is the single source of truth from
+> which the roadmap, progress tracker, and all work items are derived. Its
+> guiding principles, out-of-scope list, and success criteria are the mandatory
+> core the validator checks implementations against.
 
 ---
 
@@ -371,4 +374,4 @@ The project is successful when the tool can **automatically**:
 ## Next Step
 
 Review this vision, then start a **new chat session** and run
-`/speckit-aide-create-roadmap` to generate a staged development roadmap.
+`/aide-create-roadmap` to generate a staged development roadmap.
