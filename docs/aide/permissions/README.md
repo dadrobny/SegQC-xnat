@@ -43,5 +43,5 @@ completion was denied (or errored before running).
 
 Run `/aide-review-permissions` (or `python .claude/scripts/review_permissions.py`
 directly) to get a ranked table of bottlenecks with grant/deny counts and suggested
-allow rules, decide which to promote, and rotate the log. `/speckit-aide-feedback-loop`
+allow rules, decide which to promote, and rotate the log. `/aide-feedback-loop`
 triggers this review as part of its process check.
