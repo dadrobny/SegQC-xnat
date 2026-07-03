@@ -460,7 +460,28 @@ This item is **parallel-independent** of the other rule families (027, 028,
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implementation confirms the spec's initial design decisions unchanged (see
+below). Additional decisions made while implementing
+`src/segqc/heuristics/coverage.py`:
+
+- **`present_levels` is trusted as already canonically ordered** (per
+  `relationships_to_dict`, item 016/014) — the rule does not re-sort it;
+  `present_levels[0]` / `present_levels[-1]` are read directly as the
+  superior/inferior span ends, per the spec's pinned convention.
+- **Span-end border-flag lookup is a linear scan of `per_label.values()`**
+  matching `entry["level_name"] == <span-end level>`, mirroring the spec's
+  pinned lookup convention exactly (`per_label` is keyed by integer label, not
+  level name, so a direct key lookup isn't possible). A missing/no-match entry
+  yields "not touching the border" (conservative — never suppresses on absent
+  data).
+- **Check 2's beyond-span-end partitioning excludes interior ranks
+  explicitly** (`top_rank < rank < bottom_rank` is skipped, neither branch
+  fires) so an expected level that happens to fall inside the present span
+  (already covered by check 1 if genuinely missing, or trivially present) is
+  never double-flagged by the span check.
+- **`expected_levels` values not present in `CANONICAL_ORDER` are filtered out
+  up front** via membership in the rank map, satisfying the "ignored without
+  crashing" adversarial requirement without special-casing later logic.
 
 Initial design decisions carried from this spec (confirm or revise during
 implementation):
