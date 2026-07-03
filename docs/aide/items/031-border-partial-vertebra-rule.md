@@ -440,9 +440,36 @@ This item is **parallel-independent** of the other rule families (027–030, 032
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implementation confirmed the spec's initial design decisions below without
+deviation. Notes from the actual build:
 
-Initial design decisions carried from this spec (confirm or revise during
+- `BorderRule.evaluate` reads `severity` via `config.rule_param` and resolves
+  it through `_severity_from_param` **before** touching `per_label` or
+  `relationships`, so an unrecognised `severity` string raises `ValueError`
+  even for an empty/degenerate record (AC12's before-any-per-record-processing
+  requirement).
+- `end_severity` is resolved **lazily**, on first use, only once
+  `report_expected_ends` is `True` and an expected-end case is actually
+  encountered — so a malformed `end_severity` never raises on the default
+  (`report_expected_ends: false`) path, matching the adversarial test
+  `test_adv_bad_end_severity_unused_on_default_path_no_raise`.
+- `per_label` entries are sorted by `int(key)` (falling back to the entry's
+  own `label` field if the key itself isn't int-coercible) for deterministic
+  ascending-label ordering, mirroring `coverage.py` / `sequence.py`'s helper
+  pattern.
+- Both the unexpected-clip and expected-end `reason` strings share the same
+  "label N (level_name) touches image face(s): ..." body, differing only in
+  their leading tag (`_UNEXPECTED_CLIP_TAG` / `_EXPECTED_END_TAG`) and
+  severity — keeping the two paths visually and structurally parallel for
+  report readability.
+- No changes were needed to `config.py`, `rule.py`, `runner.py`,
+  `finding.py`, or any extractor; the rule plugs in purely through
+  `rule_param` and the existing `Rule` / `register_rule` engine core, and is
+  wired into `segqc.heuristics.__init__` with the same one-line
+  `# noqa: F401` import pattern as `bounds` / `fragmentation` / `coverage` /
+  `sequence`.
+
+Initial design decisions carried from this spec (confirmed during
 implementation):
 
 - **Cranio-caudal touches are FOV-end truncation; in-plane touches are always

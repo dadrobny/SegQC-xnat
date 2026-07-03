@@ -74,6 +74,7 @@ from segqc.heuristics import bounds  # noqa: F401 — registers BoundsRule (item
 from segqc.heuristics import fragmentation  # noqa: F401 — registers FragmentationRule (item 028)
 from segqc.heuristics import coverage  # noqa: F401 — registers CoverageRule (item 029)
 from segqc.heuristics import sequence  # noqa: F401 — registers SequenceRule (item 030)
+from segqc.heuristics import border  # noqa: F401 — registers BorderRule (item 031)
 
 __all__ = [
     "Finding",
