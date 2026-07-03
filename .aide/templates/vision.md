@@ -61,6 +61,7 @@ whichever the project actually commits to._
 ## 8. Constraints & assumptions
 
 **Constraints** — {{hard limits: platforms, versions, dependencies}}
+
 **Assumptions** — {{what must hold for the design to work}}
 
 ## 9. Out of scope  <!-- MANDATORY: validator flags work that contradicts this -->
