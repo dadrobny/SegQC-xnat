@@ -357,7 +357,13 @@ This item is **parallel-independent** of the other rule families (027–029,
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implementation confirmed the spec's initial design decisions below without
+deviation. `src/segqc/heuristics/sequence.py` implements `SequenceRule`
+mirroring `coverage.py`'s structure (`_severity_from_param`,
+`_label_for_level` mirrors `_find_entry_by_level_name`) and is wired into
+`src/segqc/heuristics/__init__.py` alongside `bounds`/`fragmentation`/
+`coverage`. No changes were needed to `config.py`, `rule.py`, `runner.py`,
+`finding.py`, `relationships.py`, or `feature_report.py`.
 
 Initial design decisions carried from this spec (confirm or revise during
 implementation):
