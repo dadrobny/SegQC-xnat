@@ -599,7 +599,12 @@ def test_ac14_per_label_dict_not_mutated():
 
 def test_adv_per_label_entry_not_a_mapping_no_raise():
     """Adversarial: a per_label entry that is not a mapping (malformed) is
-    tolerated when scanning for a level_name match — treated as unmatched."""
+    tolerated when scanning for a level_name match — treated as unmatched.
+
+    Invoked directly against SequenceRule (not run_rules) so this exercises
+    only sequence.py's own robustness in isolation: BoundsRule (item 027) is
+    not defensive against a non-mapping per_label entry and would otherwise
+    crash before SequenceRule is ever reached."""
     record = {
         "relationships": {
             "present_levels": ["L1", "T12"],
@@ -609,7 +614,7 @@ def test_adv_per_label_entry_not_a_mapping_no_raise():
         "per_label": {1: "not-a-dict", 2: _make_per_label_entry(_LABEL_L1, "L1")},
         "overlaps": {},
     }
-    findings = _seq_findings(run_rules(record, default_config()))
+    findings = get_rule("sequence").evaluate(record, default_config())
     assert len(findings) == 1
     assert findings[0].labels == frozenset()
 
