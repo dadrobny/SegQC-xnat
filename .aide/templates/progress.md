@@ -11,10 +11,13 @@
   Deliverables bullet is ✅ -> then its Acceptance boxes are [x] and its summary
   row / header / delivered objectives read ✅. Mixed -> 🚧. None started -> 📋.
   Update INCREMENTALLY; never reset a non-planned status back to 📋.
--->
-# <Project> — Progress Tracker
 
-> **Status:** Draft v1 · **Created:** YYYY-MM-DD
+  Fill-in conventions: `{{slot}}` = literal value; _italic line_ = guidance to
+  read then replace. Delete this comment in the generated file.
+-->
+# {{project-name}} — Progress Tracker
+
+> **Status:** Draft v1 · **Created:** {{yyyy-mm-dd}}
 > Step 3 of the AIDE loop. Single source of truth for status, per stage,
 > deliverable, and acceptance criterion.
 
@@ -30,44 +33,42 @@
 
 ## Stage summary
 
+_One row per roadmap stage._
+
 | Stage | Title | Objectives | Status |
 |-------|-------|-----------|--------|
-| 0 | <Title> | (foundation) | 📋 |
-| 1 | <Title> | G1 | 📋 |
+| 0 | {{title}} | (foundation) | 📋 |
 
 ## Objective coverage
 
+_One row per vision objective._
+
 | Objective | Delivered by | Status |
 |-----------|--------------|--------|
-| G1 <short> | Stage 1 | 📋 |
+| G1 {{short}} | Stage 1 | 📋 |
 
 ---
 
-## Stage 0 — <Title> — 📋
+## Stage 0 — {{title}} — 📋
 
-**Goal.** <one line>
+**Goal.** {{one line}}
 
 **Deliverables.**
-- 📋 <Deliverable, one flat bullet with its item ref.> *(Item 001)*
-- 📋 <…> *(Item 002)*
+
+_Flat bullets only — one per deliverable, each with its item reference. See
+`.aide/conventions.md` § format contract for the exact shape._
+
+- 📋 {{deliverable}}. *(Item {{nnn}})*
 
 **Acceptance.**
-- [ ] <Acceptance check from the roadmap stage.>
-- [ ] <…>
+
+_One checkbox per acceptance criterion from the matching roadmap stage._
+
+- [ ] {{acceptance check}}
 
 ---
 
-## Stage 1 — <Title> — 📋
-
-**Goal.** <one line>
-
-**Deliverables.**
-- 📋 <…> *(Item 003)*
-
-**Acceptance.**
-- [ ] <…>
-
-<!-- repeat per stage -->
+_Repeat "## Stage N — Title — icon" per stage._
 
 ---
 

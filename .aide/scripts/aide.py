@@ -343,6 +343,30 @@ def tidy_queue_text(text: str, superseded_by: int, date: str) -> str:
 # --------------------------------------------------------------------------- #
 # check
 # --------------------------------------------------------------------------- #
+_TEMPLATE_SLOT_RE = re.compile(r"\{\{[^}]*\}\}")
+
+
+def template_residue_errors(ddir: Path) -> List[str]:
+    """Flag unfilled ``{{slot}}`` template markers left in generated documents.
+
+    Templates use ``{{slot-name}}`` for values an author must fill in (see
+    ``.aide/templates/``); a real ``docs/aide/`` document should never contain
+    one. Scanning for the literal ``{{`` is deterministic and cheap — the
+    format contract's answer to "did someone forget to fill in the template".
+    """
+    errors: List[str] = []
+    if not ddir.is_dir():
+        return errors
+    for path in sorted(ddir.rglob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            for m in _TEMPLATE_SLOT_RE.finditer(line):
+                errors.append(
+                    f"{path.relative_to(ddir)}:{lineno}: unfilled template slot {m.group(0)}"
+                )
+    return errors
+
+
 def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
                branches: Optional[List[str]] = None) -> Tuple[List[str], List[str]]:
     """Return ``(errors, warnings)``. Empty errors == pass."""
@@ -350,6 +374,8 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
     warnings: List[str] = []
     ddir = docs_dir(repo_root, config)
     progress_path = ddir / "progress.md"
+
+    errors.extend(template_residue_errors(ddir))
 
     if not progress_path.is_file():
         return [f"missing {progress_path}"], warnings

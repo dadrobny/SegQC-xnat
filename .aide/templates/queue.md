@@ -8,10 +8,13 @@
       queues read "> **Status:** ✅ Completed — superseded by queue-NNN (date).")
     - Each item: "### Item NNN: Short Title" + a description paragraph.
   Item numbers are GLOBALLY SEQUENTIAL across all queues — never restart.
--->
-# <Project> — Work Queue NNN
 
-> **Status:** Live · **Created:** YYYY-MM-DD
+  Fill-in conventions: `{{slot}}` = literal value; _italic line_ = guidance to
+  read then replace. Delete this comment in the generated file.
+-->
+# {{project-name}} — Work Queue {{nnn}}
+
+> **Status:** Live · **Created:** {{yyyy-mm-dd}}
 > Step 4 of the AIDE loop. Derived from [`../vision.md`](../vision.md),
 > [`../roadmap.md`](../roadmap.md), and [`../progress.md`](../progress.md).
 
@@ -19,23 +22,24 @@
 
 ## Scope of this queue
 
-<Which roadmap stage/phase this batch delivers, and the milestone it completes.>
+_Which roadmap stage/phase this batch delivers, and the milestone it completes._
 
-**Prioritisation.** <Why these items, in this order; the critical path and what is
-parallelisable.>
+**Prioritisation.** {{why these items, in this order; the critical path and
+what is parallelisable}}
 
-**Numbering.** Continues at the next free integer: **NNN–MMM**.
+**Numbering.** Continues at the next free integer: **{{nnn}}–{{mmm}}**.
 
 ---
 
 ## Work items
 
-### Item NNN: <Short Title>
-<One paragraph: scope and deliverables for this item. End with a *Testable:*
-sentence naming how it is verified locally.>
+_One "### Item NNN: Title" section per item — add as many as this batch needs
+(see `loop.queue_cap` in `aide.toml`)._
 
-### Item NNN+1: <Short Title>
-<…>
+### Item {{nnn}}: {{short title}}
+
+{{one paragraph: scope and deliverables for this item}}. *Testable:*
+{{how it is verified locally}}.
 
 ---
 

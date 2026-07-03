@@ -264,6 +264,32 @@ def test_check_warns_stale_claim_branch(tmp_path: Path):
 
 
 # --------------------------------------------------------------------------- #
+# template residue ({{slot}} left unfilled in a generated document)
+# --------------------------------------------------------------------------- #
+def test_template_residue_flags_unfilled_slot(tmp_path: Path):
+    root = _docs(tmp_path, progress=PROGRESS.replace("Scaffolding", "{{title}}"))
+    cfg = aide.load_config(root)
+    errors, _ = aide.run_checks(root, cfg, branches=[])
+    assert any("unfilled template slot {{title}}" in e for e in errors)
+
+
+def test_template_residue_silent_on_filled_docs(tmp_path: Path):
+    root = _docs(tmp_path)
+    ddir = root / "docs" / "aide"
+    assert aide.template_residue_errors(ddir) == []
+
+
+def test_template_residue_scans_items_dir(tmp_path: Path):
+    root = _docs(tmp_path)
+    ddir = root / "docs" / "aide"
+    (ddir / "items" / "002-core.md").write_text(
+        "# Item 002 — {{title}}\n", encoding="utf-8"
+    )
+    errors = aide.template_residue_errors(ddir)
+    assert any("002-core.md" in e and "{{title}}" in e for e in errors)
+
+
+# --------------------------------------------------------------------------- #
 # CLI end-to-end
 # --------------------------------------------------------------------------- #
 def test_cli_check_ok(tmp_path: Path, capsys):

@@ -13,51 +13,55 @@
     - Decisions & Trade-offs          [builder records as it goes]
   No Docker/services "Testing Prerequisites" boilerplate in the core — enable a
   project-specific block via aide.toml only if the project actually needs it.
--->
-# Item NNN — <Title>
 
-> **Created:** YYYY-MM-DD · status tracked in [`progress.md`](../progress.md)
-> **Stage:** N — <stage title>
-> **Queue:** [`../queue/queue-NNN.md`](../queue/queue-NNN.md) · Item NNN
-> **Objectives:** <G-codes this item advances>
-> **Suggested branch:** `aide/NNN-descriptive-name`
+  Fill-in conventions: `{{slot}}` = literal value; _italic line_ = guidance to
+  read then replace. Delete this comment in the generated file.
+-->
+# Item {{nnn}} — {{title}}
+
+> **Created:** {{yyyy-mm-dd}} · status tracked in [`progress.md`](../progress.md)
+> **Stage:** {{n}} — {{stage title}}
+> **Queue:** [`../queue/queue-{{nnn}}.md`](../queue/queue-{{nnn}}.md) · Item {{nnn}}
+> **Objectives:** {{g-codes this item advances}}
+> **Suggested branch:** `aide/{{nnn}}-descriptive-name`
 
 ---
 
 ## Description
 
-<Scope and deliverables, bounded to this one item. What it is — and, briefly,
-what it is NOT (to fence scope).>
+_Scope and deliverables, bounded to this one item — what it is and, briefly,
+what it is NOT (to fence scope)._
 
 ## Acceptance Criteria
 
-Each criterion atomic, observable, and directly testable (one test per AC, no
-guessing). Split any compound "and/or" criterion.
+_Each criterion atomic, observable, and directly testable — one test per AC,
+no guessing. Split any compound "and/or" criterion._
 
-- [ ] **AC1: <short name>.** <Observable statement.>
-- [ ] **AC2: <…>.** <…>
+- [ ] **AC1: {{short name}}.** {{observable statement}}
 
 ## Assumptions  <!-- MANDATORY: what was assumed when the queued one-liner was ambiguous -->
 
-Under clarify mode `assume`, record each defensible default taken here (the
+_Under clarify mode `assume`, record each defensible default taken here (the
 validator surfaces them for audit). A spec written before a dependency is
 *implemented* pins that interface here as an assumption; the builder/validator
-hand back if reality diverged. Write "None." if the item was fully specified.
+hand back if reality diverged. Write "None." if the item was fully specified._
 
-- <Assumption, and the interface/behaviour it pins.>
+- {{assumption, and the interface/behaviour it pins}}
 
 ## Implementation Steps
 
-<The intended code path in `source_dir` (see `aide.toml`). Ordered, specific.>
+_The intended code path in `source_dir` (see `aide.toml`). Ordered, specific._
 
 ## Testing Strategy
 
-<What to test: one focused test per AC, plus adversarial / edge cases (empty,
-degenerate, malformed, boundary, determinism, immutability). Name the test module.>
+_What to test: one focused test per AC, plus adversarial / edge cases (empty,
+degenerate, malformed, boundary, determinism, immutability). Name the test
+module._
 
 ## Dependencies
 
-<Other item numbers this relies on (must be ✅/🚧), and what each provides.>
+_Other item numbers this relies on (must be ✅/🚧), and what each provides.
+Write "None." if there are none._
 
 ## Decisions & Trade-offs
 

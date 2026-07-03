@@ -14,6 +14,15 @@ heuristics), the **claim protocol** (how "in progress" is signalled), and the
 the shapes below breaks the tooling, so the templates in `.aide/templates/`
 model them and `aide check` enforces them.
 
+**Template fill-in conventions** (readable rendered *and* machine-checkable):
+a template uses `{{slot-name}}` for a literal value to substitute, and an
+_italic line_ for authoring guidance to read then replace with real prose.
+Both render as ordinary markdown — nothing is swallowed by a renderer the way
+an unescaped `<Placeholder>` tag would be. `aide check` flags any `{{...}}`
+left in a generated `docs/aide/**.md` file as an unfilled template slot.
+Dates are always **ISO 8601** (`YYYY-MM-DD`) — the templates' `{{yyyy-mm-dd}}`
+slot spells the format out so no separate lookup is needed.
+
 ### Status icons (the only five)
 
 | Icon | Meaning | Rank |
@@ -63,7 +72,7 @@ completion (per-item AC ticking is not deterministic).
 ### `items/NNN-*.md`
 
 - Filename begins with the zero-padded number. First `#` heading is
-  `# Item NNN — <Title>`. *(status report title parse)*
+  `# Item NNN — Title`. *(status report title parse)*
 - **No status field** in the header — status lives only in `progress.md`. The
   header carries `Created`, Stage, Queue, Objectives, Suggested branch, and a
   mandatory **Assumptions** block (see the item template). *(spec-author,
