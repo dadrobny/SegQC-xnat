@@ -6,10 +6,20 @@ Two principles govern everything: **lean over formal**, **token efficiency over
 over-formal process** — deterministic work is scripted, only genuine reasoning is
 spent on agents.
 
-This directory *is* the framework — project-agnostic and versioned (`VERSION`).
-It is "installed" by copying `.aide/` + the `.claude/` glue into a repo and
-writing one `aide.toml`. Nothing here names any specific project; all
-project facts live in `aide.toml` and `docs/aide/`.
+This directory is the **engine** — the provider-agnostic core, versioned
+(`VERSION`) and naming no specific project. A full install is **three parts:
+engine (`.aide/`) + one provider adapter + project config (`aide.toml`)**. The
+*adapter* is what a specific agent runtime uses to drive the engine; for **Claude
+Code** it is the `.claude/` directory (agents, skills, commands, `settings.json`,
+hooks) — **required, not optional glue**. A different runtime (Cursor, Copilot,
+Gemini CLI, a raw SDK driver) would replace `.claude/` wholesale while reusing
+`.aide/` unchanged — the engine has zero Claude coupling by design. All project
+facts live in `aide.toml` and `docs/aide/`.
+
+> **Providers.** Claude Code is the *reference* adapter (the one built here).
+> Porting to another runtime means re-expressing the `.claude/` control files
+> (agents, skills, commands) in that runtime's format; the deterministic engine
+> (`aide.py`) is shared unchanged. See `docs/aide/framework-standalone-plan.md`.
 
 - **`conventions.md`** — the format contract, claim protocol, command hygiene,
   git modes, clarify mode. Read it; the loop assumes it.
