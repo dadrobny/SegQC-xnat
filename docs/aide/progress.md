@@ -42,7 +42,7 @@
 | Objective | Delivered by | Status |
 |-----------|--------------|--------|
 | G1 Detect empty / trivially-failed | Stage 1 | ✅ |
-| G2 Detect catalogued failure modes (§6) | Stages 4, 5 | 📋 |
+| G2 Detect catalogued failure modes (§6) | Stages 4, 5 | 🚧 |
 | G3 Distinguish failure from variation | Stages 6, 7 | 📋 |
 | G4 Per-case QC report (JSON + human) | Stage 1 (ext. 2–4) | ✅ |
 | G5 Deploy on XNAT *(deferred)* | Stage 9 | 📋 |
@@ -150,7 +150,7 @@ mislabelling heuristics.
 - ✅ Config-driven rule engine: each rule emits flag + human-readable reason + offending labels. *(Item 026)*
 - ✅ Rule family — min/max bounds (volume, extent), level-aware. *(Item 027)*
 - ✅ Rule family — connected-components → fragmentation / island flags. *(Item 028)*
-- 📋 Rule family — incomplete coverage / missing levels (count vs expected sequence). *(Item 029)*
+- 🚧 Rule family — incomplete coverage / missing levels (count vs expected sequence). *(Item 029)*
 - 📋 Rule family — label-sequence continuity (e.g. L1→T12→L2→L5). *(Item 030)*
 - 📋 Rule family — border-partial-vertebra flag. *(Item 031)*
 - 📋 Rule family — overlap flag. *(Item 032)*
