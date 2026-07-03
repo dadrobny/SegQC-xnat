@@ -45,7 +45,7 @@ Mandatory, in order (consumer in brackets):
      check rollup)*
 
 **Rollup rule (deterministic — `aide progress` and `aide check` both apply it):**
-a stage is ✅ iff *every* Deliverables bullet in it is ✅; then all its Acceptance
+a stage is ✅ if *every* Deliverables bullet in it is ✅; then all its Acceptance
 boxes are `[x]`, and its summary-table row, section header, and any Objective row
 delivered solely by complete stages read ✅. If any bullet is ✅/🚧 but not all,
 the stage is 🚧. Otherwise 📋. Acceptance boxes are ticked **only** at stage
