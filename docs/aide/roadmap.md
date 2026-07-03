@@ -1,7 +1,8 @@
 # Seg-QC-xnat — Development Roadmap
 
-> **Status:** Draft v1 · **Created:** 2026-06-24
-> Step 2 of the AIDE workflow. Derived from [`vision.md`](vision.md). Breaks the
+> **Status:** Draft v2 · **Created:** 2026-06-24 · **Re-issued:** 2026-07-02
+> (structure per `.aide/templates/roadmap.md`; content carried over unchanged)
+> Step 2 of the AIDE loop. Derived from [`vision.md`](vision.md). Breaks the
 > vision into incremental, demonstrable, locally-deployable stages (~1 week each).
 
 ---
@@ -349,4 +350,4 @@ flagged (Vision Success Criterion 4) (**G8**).
 ## Next Step
 
 Review this roadmap. When you're happy with it, start a **new chat session** and
-run `/speckit-aide-create-progress` to create the progress-tracking file.
+run `/aide-create-progress` to create the progress-tracking file.

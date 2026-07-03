@@ -1,0 +1,81 @@
+---
+name: aide-feedback-loop
+description: Analyze issues and suggest improvements to the process and documents.
+---
+
+# Feedback Loop
+
+Analyze what went wrong and identify improvements — Step 7 of the AIDE loop,
+available at any point. Use whenever work didn't go smoothly: human intervention
+needed, unclear requirements, process breakdown.
+
+## Instructions
+
+Analyze the current state of the project documents and recent work.
+
+### 1. Document gaps
+
+- What should have been in `docs/aide/vision.md` but wasn't?
+- What should have been in `docs/aide/roadmap.md` (dependencies, prerequisites)?
+- What should have been in `docs/aide/progress.md` for tracking?
+- Was the work item specification missing critical information? Were its
+  **Assumptions** wrong or missing?
+
+### 2. Process issues
+
+- Did the human need to intervene? Why?
+- Were requirements unclear (would `loop.clarify = "interactive"` have helped)?
+- Were dependencies not identified upfront?
+- Did scope expand unexpectedly?
+
+### 3. Framework adaptations needed
+
+The framework surface is: `.aide/` (conventions, templates, `aide.py`, loop),
+`aide.toml`, `.claude/skills/aide-*`, `.claude/commands/aide-*`,
+`.claude/agents/`. Consider:
+
+- Should a template in `.aide/templates/` gain/lose a section for this project's
+  needs? (Add project-specific blocks via the item template's guidance, not
+  boilerplate.)
+- Should an `aide.toml` value change (queue cap, clarify mode, git mode)?
+- Should a deterministic step move into `aide.py` rather than agent prose?
+- What worked well that should be kept?
+
+Framework/process changes land via a **reviewed PR**, never a direct merge.
+
+### 4. Consistency & permission bottlenecks
+
+- Run `python .aide/scripts/aide.py check` — fix any format-contract errors it
+  reports (they break the scripts the loop depends on).
+- Unattended runs stall on permission prompts. Every prompt-eligible call is
+  auto-logged (see `docs/aide/permissions/`): run `/aide-review-permissions` (or
+  `python .claude/scripts/review_permissions.py`) for a ranked table, promote the
+  safe recurring ones into `permissions.allow` in `.claude/settings.json` (via
+  PR), and rotate the log.
+
+### 5. Recommendations
+
+Provide specific, actionable suggestions: updates to vision/roadmap/progress,
+template changes, `aide.toml` changes, new skills, process improvements.
+
+### 6. Refresh the status summary (optional)
+
+Regenerate the living HTML status page so the visible snapshot stays current —
+run the `/aide-status-report` skill (or the generator directly):
+
+```bash
+.venv/Scripts/python scripts/aide_status_report.py    # Windows (Git Bash)
+.venv/bin/python scripts/aide_status_report.py        # macOS / Linux
+```
+
+### Important notes
+
+- **Routine decisions** during smooth implementation belong in the work item's
+  "Decisions" section, not here.
+- This loop is for **systemic issues** needing process/document/framework change.
+- **Be minimal** — the smallest set of changes that prevents recurrence.
+
+## Next Step
+
+After applying the changes, resume the workflow where you left off, in a fresh
+chat session.

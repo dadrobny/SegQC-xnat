@@ -1,7 +1,7 @@
 # AIDE project-status report
 
 This directory holds the generated **HTML project-status summary** produced by
-`scripts/aide_status_report.py` (driven by the `/speckit-aide-status-report`
+`scripts/aide_status_report.py` (driven by the `/aide-status-report`
 skill). It is a *living* artifact: regenerate it as development progresses.
 
 ## Generate
@@ -15,7 +15,7 @@ skill). It is a *living* artifact: regenerate it as development progresses.
 
 This writes `index.html` here. Open it in a browser for a high-level snapshot of
 work completed, work queued, roadmap-phase and vision-objective alignment, the
-test suite, and QC feature highlights. See the `speckit-aide-status-report` skill
+test suite, and QC feature highlights. See the `aide-status-report` skill
 for options (`--junit`, `--qc-images`, `--distributions`).
 
 ## Files

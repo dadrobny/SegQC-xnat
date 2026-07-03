@@ -1,5 +1,5 @@
 ---
-description: Iterate one AIDE queue to completion — a scout claims each item, then /aide-run-item drives it (spec → tests → build → validate → merge) — looping until that queue is empty, then stops. Does NOT create the next queue. Pauses only for PRs and major structural changes.
+description: Iterate one AIDE queue to completion — `aide claim` claims each item, then /aide-run-item drives it (spec → tests → build → validate → merge) — looping until that queue is empty, then stops. Does NOT create the next queue. Pauses only for PRs and major structural changes.
 argument-hint: "[queue number, e.g. 001 — optional; defaults to the highest-numbered queue]"
 ---
 
@@ -10,7 +10,8 @@ queue**, then **stop**. This command is **queue-scoped**: it does *not* generate
 the next queue — that is `/aide-run-roadmap`'s job (the loop *over* queues). This
 session is only the orchestrator — do **not** author specs, write code, write
 tests, or run tests yourself in the main thread. You **delegate each item to
-`/aide-run-item`** and only handle claiming and approval gates between items.
+`/aide-run-item`** and only handle claiming (via the `aide claim` CLI) and
+approval gates between items.
 
 Arguments: **$ARGUMENTS** — a queue number (if empty, the highest-numbered
 `docs/aide/queue/queue-*.md`).
@@ -21,35 +22,35 @@ pin the session model, so `/model sonnet` first if you're on Opus.
 
 **One session, one layer.** Per item, load `/aide-run-item NNN` **inline as a
 skill in *this* session** — it is a prompt expansion, not a subprocess. The only
-parallel/isolated contexts are the `Task` subagents (`scout`, `spec-author`,
-`test-writer`, `builder`, `validator`) that do the leaf work. There is **no
-headless `claude -p` nesting** (an earlier `--continuous` design tried it and was
-removed — see `/aide-run-roadmap` → *Historical note*). The loop runs **in-place
-in the primary checkout**; for parallel human work, isolate in a worktree per
-`/aide-run-roadmap` → *Working in parallel*.
+parallel/isolated contexts are the `Task` subagents (`spec-author`, `test-writer`,
+`builder`, `validator`) that do the leaf work; claiming is a deterministic CLI
+call, not a subagent. There is **no headless `claude -p` nesting** (an earlier
+`--continuous` design tried it and was removed — see `/aide-run-roadmap` →
+*Historical note*). The loop runs **in-place in the primary checkout**; for
+parallel human work, isolate in a worktree per `/aide-run-roadmap` → *Working in
+parallel*.
 
 ## Division of labour
 
 | Concern | Owner | Notes |
 |---|---|---|
-| Claim the next 📋 item | `scout` (Haiku) | syncs, checks `aide/*` branches, picks the first unclaimed unblocked 📋 item, pushes `aide/NNN-*`; returns item number + branch + title |
+| Claim the next 📋 item | `aide claim` (CLI) | `python .aide/scripts/aide.py claim [--queue NNN]` — syncs, checks `aide/*` branches, picks the first unclaimed unblocked 📋 item, creates + pushes `aide/NNN-*`; prints item number + branch + title. Deterministic, no subagent. |
 | Run one item end-to-end | **`/aide-run-item NNN`** | spec-author (Opus) → test-writer → builder → validator+merge, incl. the ≤3-round validate cycle. See that command for the per-item detail. |
 | Approval gates, looping | *orchestrator* | stays in the main thread |
-| Generating the **next** queue | **not here** | only `/aide-run-roadmap` (or a manual `/speckit-aide-create-queue`) does that |
+| Generating the **next** queue | **not here** | only `/aide-run-roadmap` (or a manual `/aide-create-queue`) does that |
 
 The per-item mechanics (which agent does what, the build↔validate cycle, the
 Opus escalation on round 3) live in **`/aide-run-item`** — this command does not
 restate them. Keeping a single source of truth for the item loop is the point of
 the split.
 
-**Command hygiene** applies to any git command you issue from this thread too: no
-`cd` prefix, one command per Bash call, no `2>&1`, no command substitution in
-commit messages, recon via the Bash tool with `grep`. See `CLAUDE.md` →
-*Command hygiene*.
+**Command hygiene** applies to any git command you issue from this thread too. See
+`.aide/conventions.md` §3 (no `cd`, one command per Bash call, no `2>&1`, no
+command substitution in commits, recon via the Bash tool with `grep`).
 
 ## Pre-loop: resume in-flight branches
 
-Before claiming new items, resume any interrupted ones. The scout skips item
+Before claiming new items, resume any interrupted ones. `aide claim` skips item
 numbers that already have an `aide/*` branch, so an interrupted item would be
 stranded otherwise.
 
@@ -68,17 +69,19 @@ stranded otherwise.
 
 ## Loop
 
-Repeat until the `scout` reports no remaining unclaimed 📋 item **in this queue**:
+Repeat until `aide claim` reports no remaining unclaimed 📋 item **in this queue**:
 
-1. **Claim → spawn `scout`** with the queue number:
-   > Sync the repo, check `git branch -r` for existing `aide/*` branches, read
-   > `docs/aide/queue/queue-NNN.md` and `docs/aide/progress.md`, find the first
-   > unclaimed 📋 item with no blocking dependency still 📋/🚧, then create and
-   > push `aide/NNN-short-name`. Return: item number, branch name, item title.
-   > If none left in this queue, say "none left".
+1. **Claim → run the CLI** (orchestrator, not a subagent):
+   ```
+   python .aide/scripts/aide.py claim --queue NNN
+   ```
+   It syncs, checks `aide/*` branches, picks the first unclaimed 📋 item with no
+   blocking dependency still 📋/🚧, creates + pushes `aide/NNN-short-name`, and
+   prints the item number, branch name, and title. Prints `none left` when the
+   queue is exhausted.
 
 2. **Decide (orchestrator).**
-   - **Item returned** → go to step 3.
+   - **Item claimed** → go to step 3.
    - **"none left"** → the queue is exhausted; go to **On queue exhaustion**.
 
 3. **Run the item** — load `/aide-run-item NNN aide/NNN-short-name` inline as a
@@ -91,7 +94,7 @@ Repeat until the `scout` reports no remaining unclaimed 📋 item **in this queu
 
 ## On queue exhaustion
 
-When `scout` reports no 📋 items remain in this queue, **stop** and report:
+When `aide claim` reports no 📋 items remain in this queue, **stop** and report:
 items completed, branches merged, and final test status. Then point the user at
 the next move (do **not** generate the next queue yourself):
 
@@ -99,7 +102,7 @@ the next move (do **not** generate the next queue yourself):
   next queue behind a human-reviewed PR, then re-enters this command for that
   queue once you merge it.
 - **Working a single batch manually?** Start a fresh chat and run
-  `/speckit-aide-create-queue` for the next batch.
+  `/aide-create-queue` for the next batch.
 
 Permission prompts hit during the batch are auto-logged (`docs/aide/permissions/`);
 suggest the user run **`/aide-review-permissions`** to promote recurring safe
@@ -109,8 +112,7 @@ prompts (it also **rotates** the log).
 
 - `/aide-run-item` hands back needing a **PR**, **force-push**, or history rewrite.
 - An item needs a **major structural change** or an edit to a framework/process
-  file (`CLAUDE.md`, `vision.md`, `roadmap.md`, `constitution.md`,
-  `.claude/skills|commands|agents/**`, `.specify/extensions/**`) — needs a
-  reviewed PR, never a direct merge.
+  file (`CLAUDE.md`, `aide.toml`, `.aide/**`, `vision.md`, `roadmap.md`,
+  `.claude/skills|commands|agents/**`) — needs a reviewed PR, never a direct merge.
 - The build↔validate cycle for an item exceeds 3 rounds, or an item is blocked /
-  contradictory — document the blocker and suggest `/speckit-aide-feedback-loop`.
+  contradictory — document the blocker and suggest `/aide-feedback-loop`.

@@ -1,0 +1,26 @@
+# AIDE project configuration — the single seam between the reusable framework
+# (.aide/, .claude/) and this repository. Adopting AIDE in a new project means
+# copying .aide/ + the .claude/ glue and editing THIS file; nothing else is
+# project-specific. Parsed with the stdlib `tomllib` by .aide/scripts/aide.py.
+
+[project]
+name = "SegQC-xnat"
+source_dir = "src/segqc"     # where production code lives (builder scope)
+tests_dir = "tests"          # where tests live (test-writer scope)
+docs_dir = "docs/aide"       # living documents; scripts derive queue/ items/ from it
+
+[python]
+venv = ".venv"                                   # venv directory name (per-machine, gitignored)
+bootstrap = "pip install -e .[dev]"              # command to populate a fresh venv
+test_command = "python -m pytest"                # run relative to the resolved venv (aide.py prefixes .venv/Scripts or .venv/bin)
+import_check = "segqc"                            # module `aide env` imports to prove the venv is live
+
+[git]
+mode = "auto-merge"          # auto-merge | pr | local  — see .aide/conventions.md > Git modes
+main_branch = "main"
+branch_prefix = "aide/"      # claim branches are <branch_prefix>NNN-short-name
+
+[loop]
+queue_cap = 10               # ~max items a queue-planner batch may hold
+validation_rounds = 3        # build<->validate cap before escalating/pausing
+clarify = "assume"           # interactive | assume — see .aide/conventions.md > Clarify mode

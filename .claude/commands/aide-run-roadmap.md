@@ -23,9 +23,9 @@ session** (which in turn loads `/aide-run-item` inline), and delegates only the
 loop pauses at the queue PR, and the human re-invokes for the next queue, giving a
 fresh session per batch.
 
-**Command hygiene** applies to any git you issue: no `cd` prefix, one command per
-Bash call, no `2>&1`, no command substitution in commit messages, recon via
-Bash + `grep`.
+**Command hygiene** applies to any git you issue — see `.aide/conventions.md` §3
+(no `cd` prefix, one command per Bash call, no `2>&1`, no command substitution in
+commit messages, recon via Bash + `grep`).
 
 ## Orchestration model & session scope
 
@@ -57,7 +57,8 @@ Bash + `grep`.
 > in-flight background subagent's state**. Net: it produced little reliable work.
 > The single-session, git-commit-as-checkpoint model below is what replaced it —
 > unattended long runs are instead handled by an *external* supervisor that
-> relaunches this gated command (see the personal `watch_and_resume` script), with
+> relaunches this gated command (`.aide/loop/loop.py`, personal config in the
+> gitignored `loop.local.toml`), with
 > git commits + the resume logic below providing durable, restartable state.
 
 ## Determine current state first (resumable)
@@ -79,7 +80,7 @@ isolation).
 ## Generate the next queue
 
 Queue authoring is delegated to the **`queue-planner` (Opus)** subagent — never
-run `/speckit-aide-create-queue` inline in the orchestrator (it would pollute this
+run `/aide-create-queue` inline in the orchestrator (it would pollute this
 session's context and tie queue quality to the orchestration model). The planner
 writes + commits `queue-NNN.md` **and** tidies the superseded `queue-(NNN-1).md`
 on whatever branch it's on, then returns a one-line summary. **You** (orchestrator)
@@ -121,12 +122,13 @@ for a solo, sequential session. It switches branches constantly (`aide/NNN-*` �
 while the loop runs**, give the loop its own **git worktree** so your HEADs don't
 collide:
 
-- Create a sibling worktree that owns `main`: `git worktree add ../segqc-aide-loop main`,
+- Create a sibling worktree that owns `main`: `git worktree add ../<project>-aide-loop main`,
   and keep **your** primary checkout on your own branch (git forbids `main` in two
   worktrees — that mutual exclusion is what prevents collisions).
-- Give the worktree its **own `.venv`** (`python -m venv .venv` then
-  `.venv/Scripts/pip install -e .[dev]`) — the editable install otherwise resolves
-  `import segqc` to the primary `src/`, silently testing the wrong tree.
+- Give the worktree its **own venv** (`python .aide/scripts/aide.py env
+  --bootstrap`, or a manual `python -m venv` + the `python.bootstrap` command from
+  `aide.toml`) — an editable install otherwise resolves the project package to the
+  primary `source_dir`, silently testing the wrong tree.
 - Run the loop from the worktree. **Caveat:** the Bash tool resets cwd to the repo
   root between calls in this environment, so you cannot rely on a one-time `cd`;
   launch the loop *from* the worktree directory, or use `git -C <worktree>` /
@@ -139,7 +141,7 @@ flow.
 
 The queue PR is the checkpoint to reshape a batch *before* any code is built, so
 prefer editing the plan there. If a queue was already merged and items built, run
-`/speckit-aide-feedback-loop`: adjust `vision.md`/`roadmap.md`/`progress.md` as
+`/aide-feedback-loop`: adjust `vision.md`/`roadmap.md`/`progress.md` as
 needed, and because merged work can't be cleanly un-merged, **identify which
 already-implemented items need adapting and capture them as new corrective items**
 in the next queue rather than rewriting history.
@@ -148,7 +150,7 @@ in the next queue rather than rewriting history.
 
 - **Always, after opening each queue PR** — that pause is the whole point.
 - A queue or item needs an edit to a **framework/process** file (`vision.md`,
-  `roadmap.md`, `constitution.md`, `CLAUDE.md`, `.claude/**`,
-  `.specify/extensions/**`) — reviewed PR, never auto-merge.
+  `roadmap.md`, `aide.toml`, `.aide/**`, `CLAUDE.md`, `.claude/**`) — reviewed
+  PR, never auto-merge.
 - `/aide-run-queue` reports an item blocked, a PR/force-push need, or a
   build↔validate cycle exceeding 3 rounds — surface it and pause.

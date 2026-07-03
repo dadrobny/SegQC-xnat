@@ -1,399 +1,75 @@
-<!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
-<!-- SPECKIT END -->
+# CLAUDE.md — SegQC-xnat
 
-## Team workflow: spec-kit + AIDE
+Project-specific notes for Claude Code. The **development workflow** (the AIDE
+loop, agents, claim protocol, merge policy, command hygiene, orchestrators) is a
+reusable framework that lives in **[`.aide/`](.aide/README.md)** — read that
+first. This file holds only what is specific to *this* repository.
 
-This project uses [spec-kit](https://github.com/github/spec-kit) with the
-**AIDE** (AI-Driven Engineering) extension. The framework is **committed to the
-repo and shared via GitHub** — it is the single source of truth.
+## What this project is
 
-### Setup is already done — do not re-initialize
+**SegQC-xnat** is an automated quality-control tool for vertebra instance
+segmentations of spine CT. It extracts geometric/topological features from label
+maps, applies an explainable heuristic rule set to judge anatomical plausibility,
+and emits JSON + human-readable QC reports; it is packaged for deployment as an
+XNAT Container Service command. Full intent is in
+[`docs/aide/vision.md`](docs/aide/vision.md); the staged plan and status are in
+[`roadmap.md`](docs/aide/roadmap.md) and [`progress.md`](docs/aide/progress.md).
 
-- The framework lives in `.specify/` and `.claude/skills/` and is version
-  controlled. A teammate only needs to `git clone` and use Claude Code; the
-  `/speckit-*` and `/speckit-aide-*` commands work immediately.
-- **Do not run `specify init` or `specify extension add`** in this project.
-  That re-scaffolds and can overwrite our committed adaptations. The `specify`
-  CLI is only needed by whoever deliberately upgrades the framework version
-  (pinned at `0.11.7.dev0` in `.specify/init-options.json`); they do it once,
-  commit, and everyone pulls.
+CPU-only, cross-platform (Windows/macOS/Linux), Python 3.9+.
 
-### The AIDE loop (preferred workflow)
+## Project configuration
 
-Living documents under `docs/aide/`. Start a fresh chat per step:
-
-1. `/speckit-aide-create-vision` → `docs/aide/vision.md`   (once)
-2. `/speckit-aide-create-roadmap` → `docs/aide/roadmap.md`  (once)
-3. `/speckit-aide-create-progress` → `docs/aide/progress.md` (once)
-4. `/speckit-aide-create-queue` → `docs/aide/queue/queue-NNN.md`
-5. `/speckit-aide-create-item` → `docs/aide/items/NNN-*.md`
-6. `/speckit-aide-execute-item` → implements + updates `progress.md`
-7. `/speckit-aide-feedback-loop` → refine process at any step
-
-Repeat 5–6 until the queue is empty, then back to 4. AIDE commands are pure
-markdown — they call no helper scripts, so they run on Windows, macOS, and
-Linux alike.
-
-### Parallel work across machines (avoid merge conflicts)
-
-`docs/aide/progress.md` and the active `queue-NNN.md` are shared, single files
-that everyone touches — they are the main conflict hotspots. Conventions:
-
-- **One person owns a work item at a time.** Each `docs/aide/items/NNN-*.md`
-  has its own file, so two people working different items rarely collide.
-- **Branch per work item, pushed immediately.** `git switch -c aide/NNN-short-name`,
-  then `git push -u origin aide/NNN-short-name` **before doing real work** — the
-  pushed branch is the shared "in progress" signal (see *Claiming a work item*
-  below). Do the item on that branch; once it's green you may merge it **straight
-  to `main` with no PR** (see *Merge policy* below). Don't work directly on `main`
-  itself.
-- **Pull before you start, and before `execute-item` writes `progress.md`.**
-  Always `git pull --rebase` first so progress edits stack cleanly.
-- **Keep `progress.md` edits scoped to your item's rows.** If two PRs both
-  touch it, resolve by keeping both status changes (it's an additive log, not a
-  rewrite).
-- **Regenerate the queue from `main`, not a stale branch** (`create-queue`
-  reads vision/roadmap/progress, so it must see the latest committed state).
-- **Framework / process changes require a reviewed PR** — vision, roadmap,
-  constitution, `CLAUDE.md`, skills, and AIDE commands. They cascade into every
-  future queue, so they need team agreement before landing (see *Merge policy*
-  below).
-
-### Claiming a work item (how "in progress" is signalled)
-
-`progress.md` is **not** a reliable mid-flight status board: its `📋 → 🚧`
-edit is made on your feature branch and stays invisible on `main` until the PR
-merges, and it tracks stage deliverables rather than individual items. The
-reliable, shared "this item is taken" signal is therefore the **pushed
-`aide/NNN-*` branch** (and its open/draft PR). Protocol — follow it whenever you
-pick up an item (i.e. at `create-item` / `execute-item`):
-
-1. **Before you pick, sync and check what's already claimed:**
-   - `git fetch --all --prune`
-   - `git branch -r | grep aide/` — remote work-item branches
-   - `gh pr list --state open` — open/draft PRs (if using a GitHub remote)
-
-   If a branch or PR already exists for that item number, it's claimed — pick
-   another item or coordinate with the owner.
-2. **Claim by pushing the branch *before* real work:**
-   `git switch -c aide/NNN-short-name && git push -u origin aide/NNN-short-name`
-   (an empty/WIP commit is fine). Now anyone who fetches sees the item is owned.
-   Opening a **draft PR** at this point is encouraged — it makes the claim more
-   visible and shows mergeable status.
-3. **Do the work on that branch**, then merge it to `main` — a work item may
-   merge directly, no PR required (see *Merge policy* below).
-4. **Release / hand off:** if you abandon an item, delete the remote branch
-   (`git push origin --delete aide/NNN-short-name`) and close its PR so the item
-   returns to the pool.
-
-> ⚠️ A branch only signals ownership **after you push it and others fetch**.
-> Push at the *start*, not the end, and always `git fetch` before picking — a
-> local-only branch tells collaborators nothing.
-
-### Merge policy: PR vs. direct merge
-
-Two categories, two rules:
-
-- **Framework / process changes require a reviewed PR** (team agreement). These
-  change *how everyone works* and cascade into every future queue and item:
-  `docs/aide/vision.md`, `docs/aide/roadmap.md`,
-  `.specify/memory/constitution.md`, `CLAUDE.md`, `.claude/skills/`, and the
-  `.specify/extensions/` AIDE commands. Put them on their own branch and merge
-  **only after PR review**.
-- **Work-item execution may merge straight to `main` — no PR**, to keep the loop
-  streamlined. The code, tests, the item spec (`docs/aide/items/NNN-*.md`), and
-  your scoped `progress.md` status edits for a single item can be merged directly
-  into `main` once green (`git switch main && git pull --rebase && git merge
-  aide/NNN-short-name && git push`). You still **branch per item** (`aide/NNN-*`,
-  pushed immediately) for the claim signal and isolation — direct merge relaxes
-  the *review gate*, not the branch.
-
-> Rule of thumb: if the change would alter a *future* queue or item (process,
-> docs, commands), it needs a PR. If it only *executes* the current item, merge it.
-
-### Shared vs. personal
-
-- **Shared (committed):** `.specify/`, `.claude/skills/`, `.claude/commands/`,
-  `.claude/agents/`, `.claude/settings.json`, `CLAUDE.md`, `docs/aide/`,
-  `specs/`, `.specify/memory/constitution.md`.
-- **Personal (git-ignored):** `.claude/settings.local.json`, any
-  `.claude/*.local.*`, and credential files. Never commit credentials.
+All framework↔project settings live in **[`aide.toml`](aide.toml)**: source/test
+paths (`src/segqc`, `tests`), the venv layout and bootstrap, the test command,
+the git merge mode, and loop knobs. Agents and scripts read it; edit `aide.toml`
+(not the framework) to change project facts.
 
 ## Virtual environment
 
-All code (tests, CLI, scripts) runs inside a **local `.venv`** at the project
-root. This directory is gitignored and never committed — each machine builds its
-own on first use.
+All code (tests, CLI, scripts) runs inside a local **`.venv`** at the project
+root — gitignored, built per machine. Bootstrap or verify it with:
 
-**Bootstrap (first time, after a fresh clone, or when `.venv` is missing):**
+```
+python .aide/scripts/aide.py env              # check
+python .aide/scripts/aide.py env --bootstrap  # create + install if missing/stale
+```
+
+Equivalently, by hand:
+
 ```powershell
-# Windows (PowerShell or Git Bash)
 python -m venv .venv
-.venv\Scripts\pip install -e .[dev]
+.venv\Scripts\pip install -e .[dev]   # Windows
 ```
 ```bash
-# macOS / Linux
 python -m venv .venv
-.venv/bin/pip install -e .[dev]
+.venv/bin/pip install -e .[dev]       # macOS / Linux
 ```
 
-**Staleness check.** Before running tests or starting a new item, verify the
-env is current:
-```bash
-.venv/Scripts/python -c "import segqc"   # Windows Git Bash
-.venv/bin/python -c "import segqc"       # macOS/Linux
-```
-If the import fails (or `.venv` does not exist), re-run the bootstrap above.
+Invoke Python/pytest via the venv in the relative form —
+`.venv/Scripts/python -m pytest` (Windows) or `.venv/bin/python -m pytest`
+(macOS/Linux). The `aide` CLI itself is stdlib-only and runs on **any** Python
+3.11+ via `python .aide/scripts/aide.py …` (it must work before the venv exists).
 
-**Worktrees need their own `.venv`.** Each git worktree (e.g. an optional
-parallel-work loop worktree, see *Working in parallel* below) has its own `src/`,
-but an editable install (`pip install -e .`) resolves `import segqc` to the checkout it
-was built in — so a venv built in the primary checkout would make a worktree
-silently test the *primary's* code. Bootstrap a fresh `.venv` inside each
-worktree; never share one across worktrees.
+## The framework, in one line each
 
-**Agent rule — builders and validators MUST:**
-1. Check whether `.venv` exists and `import segqc` succeeds inside it.
-2. If not, rebuild with the bootstrap commands before writing or running any code.
-3. Invoke all Python and pytest via the venv:
-   - Windows (Git Bash): `.venv/Scripts/python -m pytest`, `.venv/Scripts/pip`
-   - macOS/Linux: `.venv/bin/python -m pytest`, `.venv/bin/pip`
+- **Loop & agents** — see [`.aide/README.md`](.aide/README.md).
+- **Format contract, claim protocol, command hygiene, git/clarify modes** — see
+  [`.aide/conventions.md`](.aide/conventions.md). Follow the command-hygiene rules
+  there or unattended runs stall on permission prompts.
+- **Document templates** — [`.aide/templates/`](.aide/templates/).
+- **CLI** — `python .aide/scripts/aide.py {check,progress,queue,claim,merge,env}`.
+- **Skills / commands** — `/aide-*` (create-vision … feedback-loop, spec-queue)
+  and the `/aide-run-{item,queue,roadmap}` orchestrators.
 
-The `Bash(python -m venv:*)`, `Bash(.venv/Scripts/python:*)`,
-`Bash(.venv/bin/python:*)`, and `Bash(.venv/Scripts/pip:*)` entries in
-`settings.json` cover these invocations without further prompts.
+## Shared vs. personal
 
----
+- **Shared (committed):** `.aide/` (minus `loop/loop.local.toml`), `aide.toml`,
+  `.claude/{agents,commands,skills,hooks,settings.json}`, `CLAUDE.md`,
+  `docs/aide/` living documents.
+- **Personal (git-ignored):** `.aide/loop/loop.local.toml`,
+  `.claude/settings.local.json`, `docs/aide/permissions/*.jsonl`,
+  `docs/aide/status/*`, credentials. Never commit credentials.
 
-## Model routing, approval policy & queue runner
-
-These three pieces tune *how* the agent works on this repo. They live in shared,
-committed config so the whole team gets them.
-
-### Model routing by task complexity (`.claude/agents/`)
-
-Six committed subagents split work by role and cost. Each pins **both** a `model`
-and an `effort` level in its frontmatter — effort is set *as high as necessary, as
-low as adequate*, scaled by reasoning complexity × blast radius, so the stronger
-new models don't silently over-spend tokens on mechanical work:
-
-| Agent | Model | Effort | Rationale |
-|---|---|---|---|
-| `scout` | Haiku | `low` | fixed mechanical git recon/claim — no judgment |
-| `builder` | Sonnet | `medium` | codes against a spec + tests that already fix the target |
-| `test-writer` | Sonnet | `medium` | spec's Testing Strategy pre-enumerates most cases |
-| `validator` | Sonnet | `medium` | verification against fixed artifacts; no lower than those it audits |
-| `spec-author` | Opus | `high` | authors the per-item source of truth; cascades into 4 downstream agents |
-| `queue-planner` | Opus | `xhigh` | one plan cascades into ~10 items — the highest-leverage decision |
-
-`max` is deliberately unused — reserved for genuinely intractable one-off problems,
-not routine batch/spec work. The per-agent files carry the full reasoning; the
-list below summarises each role.
-
-- **`scout` (Haiku)** — narrow **recon + claim**: syncs the repo, reads the
-  queue and progress files, checks `aide/*` branches to find the next unclaimed
-  📋 item, then creates and pushes the claim branch. Returns only item number,
-  branch name, and title. Never searches source code; file locations are known.
-- **`queue-planner` (Opus)** — **queue authoring only**: generates the next batch
-  into `docs/aide/queue/queue-NNN.md` from vision/roadmap/progress, tidies the
-  superseded previous queue, and commits both (no push/PR). The batch is **scoped
-  to one cohesive roadmap unit — a single stage (or a small phase) — capped at ~10
-  items, whichever is smaller**: a stage that fits in ≤ ~10 items is queued whole
-  and the queue stops at the stage boundary (small stages → small queues, so each
-  stage becomes a checkpoint where its lessons inform the next); a stage needing
-  more spans multiple queues at the ~10 cap. On Opus because a batch plan cascades
-  into its items — high-leverage planning, the queue-level analogue of
-  `spec-author`. The roadmap orchestrator spawns it rather than running
-  `create-queue` inline.
-- **`spec-author` (Opus)** — **work-item spec authoring only**: turns the queued
-  one-liner into a complete, testable `docs/aide/items/NNN-*.md` (atomic AC,
-  steps, testing strategy, deps), commits it. Runs on Opus deliberately — the
-  spec is the single source of truth every later agent depends on, so stronger
-  up-front guidance pays off. Does **not** write code or tests, no pytest. The
-  item spec is a **static** artifact and carries **no implementation-status
-  field** (only a `Created` date + a pointer to progress); implementation status
-  (📋 / 🚧 / ✅) lives **only** in `progress.md`, the single source of truth the
-  builder (🚧) and validator (✅) update — a header status would just drift, since
-  no step owns it.
-- **`builder` (Sonnet, escalates to Opus on 3rd attempt)** — **implementation
-  only**: implements production code in `src/` per the item spec, records
-  decisions, sets progress 🚧, commits. Does **not** write tests and does **not**
-  run pytest. The orchestrator escalates to Opus only when a validator has FAILed
-  the item twice already.
-- **`test-writer` (Sonnet)** — **test definition only**: reads the item spec and
-  AC, writes tests covering every AC plus adversarial/edge-case inputs, commits.
-  Does **not** touch `src/` and does **not** run pytest.
-- **`validator` (Sonnet)** — independent **quality gate**: runs pytest, checks
-  that every AC has a test, verifies code scope, confirms vision fit. Does **not**
-  write or modify tests. On PASS it **reconciles `progress.md`** (the item row,
-  the stage's acceptance checkboxes, and the stage rollup — so status flags don't
-  go stale), direct-merges, then deletes the merged `aide/NNN-*` claim branch
-  (local + remote, safe `-d`); on FAIL hands back identifying which agent (builder
-  or test-writer) needs to fix it.
-
-Delegate recon/claim to `scout`; queue authoring to `queue-planner`; spec
-authoring to `spec-author`; implementation to `builder`; test authoring to
-`test-writer`; verification to `validator`.
-Claude Code does **not** auto-detect
-complexity and swap the main model — routing happens by delegating to these agents
-(and by your own `/model` choice).
-
-### Approval policy (`.claude/settings.json` permissions)
-
-- **Auto-approved (no prompt):** read-only shell (git status/log/diff/show/branch,
-  ls/grep/find), `pytest`, `pip install`, `python`, `python -m venv`,
-  `.venv/Scripts/python`, `.venv/bin/python` (and their `pip`/`pytest` siblings),
-  and routine git writes — `add`, `commit`, `switch`/`checkout`, `merge`,
-  `pull`, and (non-force) `push`.
-- **Always prompts (`ask`):** opening a **PR** (`gh pr …`), **force-push** /
-  `reset --hard` / `rebase` (history rewrite), and **edits to framework/process
-  files** — `CLAUDE.md`, `docs/aide/vision.md`, `docs/aide/roadmap.md`,
-  `.specify/memory/constitution.md`, and everything under `.claude/skills`,
-  `.claude/commands`, `.claude/agents`, `.specify/extensions`.
-- **Default mode is `default`** — anything not explicitly allowed still prompts,
-  so novel/major actions are gated by default.
-
-Rule of thumb: *executing* a work item (code, tests, commit, direct-merge) flows
-without prompts; anything that changes *how everyone works*, or touches the
-remote in a hard-to-reverse way, asks first.
-
-### Command hygiene (so the allow-list actually matches)
-
-The approval rules match a command **prefix** (`git fetch`, `git commit`, …) and
-auto-approve a compound (`A && B`, `A | B`) only when it can be split cleanly
-*and every part* matches. Agents must therefore emit commands in a shape the
-matcher recognises, or an unattended `/aide-run-queue` batch stalls on prompts
-even though the rule "exists". Required form for all agents:
-
-- **No `cd` prefix, and no `git -C "<abs path>"`.** The Bash tool's working
-  directory is already the repo root, so both are redundant. `cd "<abs path>" &&
-  …` turns a bare allowed command into a fragile multi-part compound, and
-  `git -C "<abs path>" …` re-injects the path needlessly — and this repo's path
-  contains spaces and an apostrophe (`King's`), which makes either worse. Run the
-  bare command.
-- **One command per Bash call.** Don't chain with `&&` or `;`. Separate calls
-  each match their own rule (e.g. `git add …`, then `git commit …`, then
-  `git push`), and a failure is easier to localise.
-- **No `2>&1` (or other redirections).** The Bash tool already captures stderr.
-- **No command substitution in commits.** `git commit -m "$(cat <<'EOF' … EOF)"`
-  is **never** auto-approved — the matcher can't see inside `$(…)`. Use a
-  single-line `-m "msg"`, repeated `-m "summary" -m "body"` for multiple
-  paragraphs, or `git commit -F <file>`.
-- **Recon goes through the Bash tool with `grep`** (`git branch -r | grep aide/`),
-  never the PowerShell tool / `Select-String` — only `Bash(...)` rules are in the
-  allow-list, so PowerShell-tool calls always prompt.
-- **Python and pytest run through the Bash tool in the *relative* form** —
-  `.venv/Scripts/python -m pytest`, `.venv/Scripts/python -c "import segqc"` (or
-  the `.venv/bin/python` equivalents). The allow rule is `Bash(.venv/Scripts/python:*)`,
-  which matches only the relative prefix; a PowerShell call operator or an absolute
-  `& "c:\…\.venv\Scripts\python" …` path matches nothing and always prompts.
-
-These rules are repeated in each agent spec (`.claude/agents/*.md`) so a
-cold-started sub-agent sees them. After a batch, `/aide-review-permissions` is
-still the backstop for anything that slipped through.
-
-### Running items, queues, and the roadmap (`/aide-run-item` · `/aide-run-queue` · `/aide-run-roadmap`)
-
-Three **nested** orchestrator commands — item ⊂ queue ⊂ roadmap. The invoking
-session is purely an **orchestrator**: it **spawns a sub-agent per task** and/or
-delegates to the next command down, rather than working inline.
-
-**`/aide-run-item NNN [branch]`** drives a **single already-claimed item**
-end-to-end and stops. It is the reusable unit:
-
-1. a `spec-author` (Opus) — authors `docs/aide/items/NNN-*.md` and commits it
-   (skipped if a complete spec already exists);
-2. a **fresh `test-writer`** — reads the spec, writes AC + adversarial tests,
-   commits (no production code, no pytest);
-3. a **fresh `builder`** — implements `src/` per every AC, sets progress 🚧,
-   commits (no tests, no pytest);
-4. a **fresh `validator`** (a *different* agent) — runs pytest, checks AC
-   coverage / scope / vision fit, **reconciles `progress.md`**, then on PASS
-   flips ✅, direct-merges, and deletes the merged claim branch; on FAIL it
-   identifies which agent must fix it and the orchestrator re-spawns accordingly
-   (cap: 3 validation rounds, builder escalates to Opus on round 3).
-
-**`/aide-run-queue [NNN]`** iterates **one queue**: a `scout` per item claims the
-next unclaimed 📋 item (creates + pushes `aide/NNN-*`), then hands it to
-`/aide-run-item`. It **stops when that queue is empty** and does **not** create
-the next queue — that is the roadmap loop's job.
-
-**`/aide-run-roadmap`** loops **over queues** across the whole roadmap: generate a
-queue → `/aide-run-queue` it → generate the next → … until no stage remains. The
-**queue is the human checkpoint** (review the batch plan once per queue — a stage
-or small phase, up to ~10 items — not every item): each new queue lands via a
-**human-reviewed PR**; the loop **pauses**
-until the human merges it, then runs that queue. It spans sessions and is
-resumable — on each invocation it detects open queue PRs, merged-but-unrun queues,
-in-flight `aide/NNN-*` branches, and exhausted queues, and picks up from there.
-
-Generating queue NNN also **tidies the superseded queue NNN-1** (status line +
-final item states) so exactly one queue is ever live.
-
-Each item is isolated like "fresh chat per item"; the orchestrator passes only the
-item number + short summaries between agents and **pauses for your approval at
-PRs and major structural changes** (including at every queue PR). Use
-`/aide-run-roadmap` to drive the whole project, `/aide-run-queue` for one batch,
-`/aide-run-item` for a single item, or the per-step `/speckit-aide-*` commands
-(fresh chat each) for tighter manual control.
-
-**Orchestration model & session scope — one session, one layer.** The
-orchestrator's own job — dispatch a subagent, read its short summary, decide the
-next step, gate approvals — is light, so **run the orchestrator on Sonnet**; all
-heavy cognition lives in the subagents (`queue-planner`/`spec-author` on Opus,
-builder/validator on Sonnet, scout on Haiku). A slash command can't pin the
-session model, so `/model sonnet` before a long run if you're on Opus.
-`/aide-run-roadmap` → `/aide-run-queue` → `/aide-run-item` are logically nested
-but load each other **as skills in the *same* interactive session** (they are
-prompt expansions, not subprocesses); the only parallel/isolated contexts are the
-`Task` subagents that do the leaf work (scout, spec-author, test-writer, builder,
-validator, queue-planner). The loop runs **in-place in the primary checkout**, and
-git commits are the durable checkpoint — a restart re-enters cleanly via the
-resume logic. The human re-invokes per queue at the PR gate, so context stays
-bounded without any headless machinery.
-
-> **Historical note — the removed `--continuous` / headless-worktree mode.** An
-> earlier design added a `--continuous` flag to run the roadmap unattended by
-> nesting headless `claude -p` subprocesses (one per layer) inside a dedicated git
-> **worktree** that owned `main`. It was **removed** because on Windows the Bash
-> tool resets cwd to the repo root between calls (breaking the worktree `cd`-once
-> contract), headless `-p` children stalled on clarifying questions they couldn't
-> answer, deep process nesting multiplied cold-start/failure points, and a parent
-> death lost in-flight subagent state — so it produced little reliable work.
-> Unattended long runs are now handled by an **external supervisor** (the personal,
-> git-ignored `watch_and_resume` script) that relaunches the gated
-> `/aide-run-roadmap` when usage limits allow, relying on git commits + the resume
-> logic for durable state — not on in-process nesting.
-
-**Working in parallel (optional worktree).** The loop runs in-place, which is right
-for a solo session. If **you** want to keep working in the repo while a loop runs,
-give the loop its own **git worktree** so your HEADs don't collide: a sibling
-checkout owning `main` (`git worktree add ../segqc-aide-loop main`) while you stay
-on your own branch, with its **own `.venv`** (an editable install resolves `segqc`
-to *its* source, so a shared venv would test the wrong tree). Launch the loop
-*from* that directory — don't rely on a one-time `cd`, since the Bash tool resets
-cwd between calls; use `git -C <worktree>` / absolute paths if needed. Remove it
-when done (`git worktree remove <path>`). This is a manual convenience for genuine
-parallel work, not part of the automated flow.
-
-### Permission tracking & review (`/aide-review-permissions`)
-
-Even with the approval policy above, unattended `/aide-run-queue` batches still
-stall on the occasional permission prompt. To close that loop:
-
-- **Auto-logging (hook).** A `PreToolUse`/`PostToolUse` hook
-  (`.claude/hooks/log_permission_event.py`, registered in `.claude/settings.json`)
-  records every prompt-eligible tool call (Bash/Edit/Write/Web…) and its grant/deny
-  outcome — **including inside sub-agents**, which the orchestrator never sees. The
-  hook only records: it never blocks or alters a tool, and always exits 0.
-- **Per-machine log.** Records go to `docs/aide/permissions/log.jsonl`, which is
-  **gitignored** (an append-only log written from many machines would conflict like
-  `progress.md`). Only the *reviewed outcome* — allow-list edits — is shared.
-- **Review.** `/aide-review-permissions` (also folded into
-  `/speckit-aide-feedback-loop`) runs `.claude/scripts/review_permissions.py` to rank
-  the prompts hit, infer grant/deny, drop already-allowed calls, and suggest rules.
-  Promote the safe, recurring ones into `permissions.allow`; keep destructive /
-  outward-facing ones under `ask`. The `settings.json` change is a framework edit —
-  it lands **via PR**.
+Framework/process changes (`.aide/**`, `aide.toml`, `CLAUDE.md`, `vision.md`,
+`roadmap.md`, `.claude/**`) land via a **reviewed PR**; work-item execution
+merges straight to `main` per the merge policy in `.aide/README.md`.
