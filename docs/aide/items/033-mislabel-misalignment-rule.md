@@ -501,4 +501,36 @@ share only the already-merged item-026 interface.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- Implemented as a single `src/segqc/heuristics/mislabel.py` module with
+  `MislabelRule(Rule)` (`rule_id = "mislabel"`), registered via
+  `@register_rule` and imported from `segqc/heuristics/__init__.py` alongside
+  the other rule families, exactly mirroring the item 027–032 pattern.
+- Detector A (`_detect_offset_outliers`) and Detector B
+  (`_detect_order_inconsistency`) are implemented as static helper methods on
+  the rule class rather than free functions, to keep the shared `severity`
+  read-once-up-front logic in `evaluate` and the two detectors clearly
+  scoped; both re-sort their normalised working lists defensively so output
+  never depends on caller input order (AC11, AC12, AC17).
+- Reused the sibling `_LABEL_TO_SEVERITY` / `_severity_from_param` helper
+  verbatim (mirroring `border.py` / `sequence.py`) and a `_label_for_level`
+  helper identical to `sequence.py`'s, to resolve Detector B's level names to
+  integer labels via `per_label`.
+- `stage3` is normalised to `{}` once in `evaluate` (non-dict treated as
+  absent) and passed to both detector helpers; each detector independently
+  re-validates its own sub-fields (`per_label_offsets` a list,
+  `monotonic_consistency` a dict, `non_monotonic_pairs` a list) so a
+  malformed field in one sub-block cannot suppress the other detector.
+- Detector B's `labels` frozenset always excludes `None` (an unresolved
+  name), and the reason interpolates the raw resolved label (`la`/`lb`,
+  which is `None` when unresolved) alongside the level name string, so an
+  unmappable name is never silently dropped from the reason even though it
+  is absent from `labels` (AC18).
+- No changes were needed to `config.py`, `rule.py`, `runner.py`,
+  `finding.py`, `feature_report.py`, or any extractor — all parameters flow
+  through the existing `rule_param` accessor with in-line defaults
+  (`flagged-for-review`, `15.0`, `True`, `True`).
+- Left the package docstring's item-range prose in `segqc/heuristics/__init__.py`
+  as-is (a pre-existing "027–035" reference unrelated to this item's own
+  concrete-family list, which already named `mislabel`); this is prose only,
+  not asserted by any test, so it was not touched to avoid an out-of-scope
+  edit.
