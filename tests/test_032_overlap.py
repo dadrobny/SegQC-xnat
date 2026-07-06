@@ -38,6 +38,7 @@ import pytest
 
 import segqc.heuristics.overlap  # noqa: F401 — triggers OverlapRule registration
 from segqc.heuristics import Finding, Rule, get_rule, iter_rules, run_rules
+from segqc.heuristics.overlap import OverlapRule
 from segqc.heuristics.rule import _RULES
 from segqc.verdict import Severity
 from segqc.config import (
@@ -416,7 +417,12 @@ def test_ac13_no_per_label_or_relationships_keys_no_raise():
 
 def test_ac14_spacing_agnostic_identical_findings():
     """AC14: Two records with identical overlaps but different per_label /
-    relationships / stage3 / mm fields yield identical finding lists."""
+    relationships / stage3 / mm fields yield identical finding lists.
+
+    Evaluated directly via OverlapRule().evaluate() (rather than run_rules)
+    so the comparison isolates AC14's claim about the overlap rule alone —
+    it must not be perturbed by sibling rules (e.g. item 031's BorderRule)
+    that also inspect per_label but expect a different shape."""
     entries = [_make_overlap_entry(_LABEL_L1, _LABEL_L2, 37, "L1", "L2")]
     record_a = _make_record(
         entries,
@@ -432,8 +438,8 @@ def test_ac14_spacing_agnostic_identical_findings():
         stage3=None,
         spacing_mm=[9.9, 8.8, 7.7],
     )
-    findings_a = _overlap_findings(run_rules(record_a, default_config()))
-    findings_b = _overlap_findings(run_rules(record_b, default_config()))
+    findings_a = OverlapRule().evaluate(record_a, default_config())
+    findings_b = OverlapRule().evaluate(record_b, default_config())
     assert len(findings_a) == 1 and len(findings_b) == 1
     assert findings_a[0].rule_id == findings_b[0].rule_id
     assert findings_a[0].severity == findings_b[0].severity
