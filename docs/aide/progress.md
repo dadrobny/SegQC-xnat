@@ -154,7 +154,7 @@ mislabelling heuristics.
 - ✅ Rule family — label-sequence continuity (e.g. L1→T12→L2→L5). *(Item 030)*
 - ✅ Rule family — border-partial-vertebra flag. *(Item 031)*
 - ✅ Rule family — overlap flag. *(Item 032)*
-- 🚧 Rule family — mislabel / misalignment (centroid vs expected level ordering / spline). *(Item 033)*
+- ✅ Rule family — mislabel / misalignment (centroid vs expected level ordering / spline). *(Item 033)*
 - 📋 Verdict aggregation: combine flags → pass / flag / fail with severity. *(Item 034)*
 - 📋 Heuristic thresholds in a documented, versioned config file; pipeline/report integration & per-failure-mode tests. *(Item 035)*
 
