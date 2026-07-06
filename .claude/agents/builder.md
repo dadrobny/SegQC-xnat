@@ -75,8 +75,20 @@ rewrite; a **major structural change**; or edits to **framework/process** files
 
 ## Command hygiene
 
-Emit git/CLI commands in the allow-list-friendly shape defined **once** in
-[`.aide/conventions.md` §3](../../.aide/conventions.md) (no `cd`, one command per
-Bash call, no `2>&1`, no command substitution in commits, venv Python in relative
-form, the `aide` CLI as `python .aide/scripts/aide.py …`). Follow it or the run
-stalls on prompts.
+Emit shell commands in the shape the allow-list auto-approves, or an unattended
+run stalls on a prompt. Full contract + rationale:
+[`.aide/conventions.md` §3](../../.aide/conventions.md); a `PreToolUse` hook
+enforces the mechanical rules and will bounce a violating shape back with the
+fix. Get them right first time to skip that round-trip:
+
+- **Use the Bash tool, not PowerShell**, for git/`aide`/venv/grep commands —
+  only `Bash(...)` rules are allow-listed.
+- **One command per Bash call** — never chain with `&&`, `||`, or `;` (a single
+  `|` pipe like `git branch -r | grep aide/` is fine).
+- **No `cd`/`git -C` prefix** — the cwd is already the repo root.
+- **No `2>&1`** or other stderr redirection — the tool captures stderr.
+- **No `$(…)`/backticks in a commit message** — use `-m "msg"` (repeat `-m` for
+  paragraphs) or `git commit -F <file>`.
+- **Python via the relative venv path** (`.venv/Scripts/python …` on Windows,
+  `.venv/bin/python …` on macOS/Linux); the `aide` CLI as
+  `python .aide/scripts/aide.py …`.

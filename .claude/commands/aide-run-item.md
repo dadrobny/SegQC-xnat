@@ -37,10 +37,13 @@ agents.** No agent signs off its own work. Spawn a **new** instance of each per
 item — never reuse across items. Pass only the **minimum** between agents: the
 item number, the branch name, and (from spec-author) the list of AC.
 
-**Command hygiene.** Sub-agents emit git/CLI commands in the allow-list-friendly
-shape defined once in `.aide/conventions.md` §3 (no `cd`, one command per Bash
-call, no `2>&1`, no command substitution in commits, venv Python in relative form,
-the `aide` CLI as `python .aide/scripts/aide.py …`).
+**Command hygiene.** Sub-agents (and you) emit git/CLI commands in the
+allow-list-friendly shape defined once in `.aide/conventions.md` §3 (no `cd`, one
+command per Bash call, no `2>&1`, no command substitution in commits, venv Python
+in relative form, the `aide` CLI as `python .aide/scripts/aide.py …`). A
+`PreToolUse` hook (`.claude/hooks/command_hygiene_guard.py`) enforces the
+mechanical rules — a violating shape is blocked and bounced back with the fix, so
+prefer the right shape first time.
 
 ## Steps
 

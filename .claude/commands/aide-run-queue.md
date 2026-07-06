@@ -46,7 +46,9 @@ the split.
 
 **Command hygiene** applies to any git command you issue from this thread too. See
 `.aide/conventions.md` §3 (no `cd`, one command per Bash call, no `2>&1`, no
-command substitution in commits, recon via the Bash tool with `grep`).
+command substitution in commits, recon via the Bash tool with `grep`). A
+`PreToolUse` hook (`.claude/hooks/command_hygiene_guard.py`) enforces the
+mechanical rules — a violating shape is blocked and bounced back with the fix.
 
 ## Pre-loop: resume in-flight branches
 

@@ -61,4 +61,8 @@ $ARGUMENTS — a queue number (optional; defaults to the Live queue).
 
 ## Command hygiene
 
-Follow `.aide/conventions.md` §3.
+Follow `.aide/conventions.md` §3 (no `cd`, one command per Bash call, no `2>&1`,
+no command substitution in commits, recon via the Bash tool with `grep`, the
+`aide` CLI as `python .aide/scripts/aide.py …`). A `PreToolUse` hook
+(`.claude/hooks/command_hygiene_guard.py`) enforces the mechanical rules — a
+violating shape is blocked and bounced back with the fix.
