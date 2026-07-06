@@ -99,11 +99,25 @@ claim branch whose item is already ✅ (stale claim).
 
 ---
 
-## 3. Command hygiene (stated once; agents point here)
+## 3. Command hygiene (canonical rules; enforced by a hook)
 
 The permission allow-list matches a command **prefix** and auto-approves a
 compound only if every part matches. Emit commands in the shape the matcher
-recognises, or an unattended run stalls on prompts:
+recognises, or an unattended run stalls on prompts.
+
+**Two layers keep this followed without copy-drift.** This section is the single
+canonical statement of the rules and their rationale. Each agent/command carries
+a short *positive-form primer* of the same rules so the correct shape is in
+context up front (fewer wasted retries) — but the primers are not load-bearing:
+a `PreToolUse` hook (`.claude/hooks/command_hygiene_guard.py`, wired in
+`.claude/settings.json`) **enforces** the mechanical rules below. A violating
+shape is blocked before it reaches the permission prompt and bounced back to the
+agent with the fix, so the run self-corrects and stays unattended rather than
+stalling. The hook is deliberately narrow (it rejects wrong shapes; it cannot
+supply the right one — that is what the primer prose is for) and fail-open (a
+guard error defers to the ordinary permission flow, never wedges the loop).
+
+The rules:
 
 - **No `cd` prefix and no `git -C "<path>"`.** The Bash tool's cwd is already the
   repo root; both are redundant and break prefix matching (this repo's path has

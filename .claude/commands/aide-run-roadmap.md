@@ -25,7 +25,9 @@ fresh session per batch.
 
 **Command hygiene** applies to any git you issue — see `.aide/conventions.md` §3
 (no `cd` prefix, one command per Bash call, no `2>&1`, no command substitution in
-commit messages, recon via Bash + `grep`).
+commit messages, recon via Bash + `grep`). A `PreToolUse` hook
+(`.claude/hooks/command_hygiene_guard.py`) enforces the mechanical rules — a
+violating shape is blocked and bounced back with the fix.
 
 ## Orchestration model & session scope
 
