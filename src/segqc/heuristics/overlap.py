@@ -139,10 +139,10 @@ class OverlapRule(Rule):
                 continue
             raw_a = entry.get("label_a")
             raw_b = entry.get("label_b")
-            if raw_a is None and raw_b is None:
-                continue  # no offender to attribute
-            label_a = int(raw_a) if raw_a is not None else None
-            label_b = int(raw_b) if raw_b is not None else None
+            if raw_a is None or raw_b is None:
+                continue  # AC13 — both labels required to attribute a finding
+            label_a = int(raw_a)
+            label_b = int(raw_b)
             voxels = int(entry.get("overlap_voxels", 0) or 0)
             name_a = entry.get("name_a", str(label_a) if label_a is not None else "?")
             name_b = entry.get("name_b", str(label_b) if label_b is not None else "?")

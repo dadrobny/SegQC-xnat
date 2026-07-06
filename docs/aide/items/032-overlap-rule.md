@@ -263,8 +263,9 @@ changes to engine core, config schema, or extractors.
      return `[]` (AC2, AC13 — tolerates absent / `None` / `{}` placeholder).
    - Build a normalised, sorted working list: for each `entry` in `overlaps` that
      is a mapping, read `label_a = entry.get("label_a")`,
-     `label_b = entry.get("label_b")`; skip the entry if **both** are `None` (no
-     offender to attribute). Coerce present labels via `int(...)`. Read
+     `label_b = entry.get("label_b")`; skip the entry if **either** is `None`
+     (AC13 — both labels are required to attribute a finding). Coerce both via
+     `int(...)`. Read
      `voxels = int(entry.get("overlap_voxels", 0) or 0)`. Read `name_a`, `name_b`
      (default to `str(label)` / `"?"` when absent).
    - Sort the working entries by `(label_a, label_b)` with `None` sorted last, for
@@ -381,17 +382,22 @@ or extractors.
   non-list value (absent, `None`, `{}`) short-circuits to `[]`, satisfying
   AC2/AC13 without inspecting the value further.
 - Entries are normalised into `(label_a, label_b, voxels, name_a, name_b)`
-  tuples with `int(...)` coercion; an entry with both labels missing is
-  skipped (no offender to attribute); a missing `overlap_voxels` coerces to
-  `0` via `int(entry.get("overlap_voxels", 0) or 0)`, which the default
-  threshold of `1` then suppresses.
+  tuples with `int(...)` coercion; an entry missing **either** `label_a` or
+  `label_b` is skipped entirely (AC13 requires both labels to attribute a
+  finding — corrected in round 2 after validation found the original
+  Implementation Steps wording, "skip if both are `None`", contradicted the
+  binding AC13 text; an entry with exactly one label present previously
+  produced a bogus `None (?)`-labelled `Finding`). A missing `overlap_voxels`
+  on a fully-labelled entry still coerces to `0` via
+  `int(entry.get("overlap_voxels", 0) or 0)`, which the default threshold of
+  `1` then suppresses.
 - The normalised list is defensively re-sorted by `(label_a, label_b)` with
   `None` sorted last (`_sort_key`), independent of the input order — matching
   item 015's own sort but re-derived for determinism (AC7/AC12) per the
   build_features_block precedent.
 - `labels` on each `Finding` is `frozenset({label_a, label_b})` filtering out
-  any `None` member (defensive; in practice both members are always present
-  once an entry contributes a finding, since entries with both labels absent
-  are skipped earlier).
+  any `None` member defensively, though after the round-2 fix both members are
+  always present for any entry that reaches finding construction (entries
+  missing either label are now skipped earlier, per AC13).
 - No mutation: the rule only reads from `record`/`overlaps`/entries and
   builds fresh tuples and `Finding` objects (AC15).
