@@ -367,4 +367,31 @@ they share only the already-merged item-026 interface.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implemented exactly per the Implementation Steps: a single new module
+`src/segqc/heuristics/overlap.py` plus a one-line registration import in
+`src/segqc/heuristics/__init__.py`. No changes to engine core, config schema,
+or extractors.
+
+- `OverlapRule.evaluate` reads `severity` and `min_overlap_voxels` once
+  up-front (via `_severity_from_param`, mirroring `border.py` /
+  `sequence.py` / `coverage.py`), so an invalid severity string raises
+  `ValueError` before any per-record processing, satisfying AC11 even for a
+  record with an empty/absent `overlaps`.
+- `record.get("overlaps")` is checked with `isinstance(..., list)`; any
+  non-list value (absent, `None`, `{}`) short-circuits to `[]`, satisfying
+  AC2/AC13 without inspecting the value further.
+- Entries are normalised into `(label_a, label_b, voxels, name_a, name_b)`
+  tuples with `int(...)` coercion; an entry with both labels missing is
+  skipped (no offender to attribute); a missing `overlap_voxels` coerces to
+  `0` via `int(entry.get("overlap_voxels", 0) or 0)`, which the default
+  threshold of `1` then suppresses.
+- The normalised list is defensively re-sorted by `(label_a, label_b)` with
+  `None` sorted last (`_sort_key`), independent of the input order — matching
+  item 015's own sort but re-derived for determinism (AC7/AC12) per the
+  build_features_block precedent.
+- `labels` on each `Finding` is `frozenset({label_a, label_b})` filtering out
+  any `None` member (defensive; in practice both members are always present
+  once an entry contributes a finding, since entries with both labels absent
+  are skipped earlier).
+- No mutation: the rule only reads from `record`/`overlaps`/entries and
+  builds fresh tuples and `Finding` objects (AC15).
