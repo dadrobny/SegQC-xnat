@@ -156,7 +156,7 @@ mislabelling heuristics.
 - ✅ Rule family — overlap flag. *(Item 032)*
 - ✅ Rule family — mislabel / misalignment (centroid vs expected level ordering / spline). *(Item 033)*
 - ✅ Verdict aggregation: combine flags → pass / flag / fail with severity. *(Item 034)*
-- 📋 Heuristic thresholds in a documented, versioned config file; pipeline/report integration & per-failure-mode tests. *(Item 035)*
+- 🚧 Heuristic thresholds in a documented, versioned config file; pipeline/report integration & per-failure-mode tests. *(Item 035)*
 
 **Acceptance.**
 - [ ] Each of the 8 §6 failure modes has ≥1 heuristic firing on a crafted example (**G2**).
