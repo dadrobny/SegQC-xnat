@@ -83,6 +83,11 @@ _DEFAULTS: Dict[str, Any] = {
     # An absent or empty "rules" section means all rules are enabled with
     # their built-in defaults.
     "rules": {},
+    # Case-level verdict-aggregation policy (item 034).  Keys are read via
+    # ``policy_param``.  An absent or empty "verdict" section leaves the
+    # aggregator at pure severity dominance (``flag_escalation_count`` == 0,
+    # i.e. disabled).
+    "verdict": {},
 }
 
 
@@ -130,6 +135,10 @@ class HeuristicConfig:
     #   { <rule_id>: { "enabled": bool, "params": { <key>: <value> } } }
     # Access via rule_enabled / rule_param / rule_params rather than directly.
     rules: Dict[str, Any] = field(default_factory=dict)
+    # Case-level verdict-aggregation policy section (item 034).  Shape:
+    #   { <policy_key>: <value> }, e.g. {"flag_escalation_count": 3}.
+    # Access via policy_param rather than directly.
+    verdict: Dict[str, Any] = field(default_factory=dict)
 
     # ------------------------------------------------------------------ #
     # Per-rule accessors (item 026)
@@ -191,6 +200,29 @@ class HeuristicConfig:
         Any
         """
         return self.rule_params(rule_id).get(key, default)
+
+    # ------------------------------------------------------------------ #
+    # Verdict-aggregation policy accessor (item 034)
+    # ------------------------------------------------------------------ #
+
+    def policy_param(self, key: str, default: Any) -> Any:
+        """Return a single verdict-aggregation policy value, or *default*.
+
+        Convenience accessor: reads ``verdict[key]``; returns *default* when
+        the ``verdict`` section or *key* is absent.
+
+        Parameters
+        ----------
+        key:
+            The policy parameter name (e.g. ``"flag_escalation_count"``).
+        default:
+            Value returned when the key is absent.
+
+        Returns
+        -------
+        Any
+        """
+        return self.verdict.get(key, default)
 
 
 # ---- Public API ------------------------------------------------------------- #

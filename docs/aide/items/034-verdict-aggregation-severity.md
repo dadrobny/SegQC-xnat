@@ -484,4 +484,20 @@ between the Stage 4 rule families (027–033) and the Stage 1 verdict/report mod
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- Implemented exactly as specced: `src/segqc/aggregate.py` with
+  `finding_to_reason`, `aggregate_verdict`, `CaseResult`, `build_case_result`;
+  `HeuristicConfig` extended with a `verdict: Dict[str, Any]` field, the
+  `_DEFAULTS["verdict"] = {}` entry, and a `policy_param(key, default)`
+  accessor mirroring `rule_param`.
+- `has_fail` (the gate on escalation) is computed over **all** case-level and
+  per-label reasons accumulated so far — base reasons/per_label plus
+  finding-derived ones — not just over the raw `findings` severities. This
+  matches AC17/AC11: a base-supplied `FAIL` reason must also suppress
+  escalation, not only a `FAIL` finding, keeping "escalation never fires when
+  any FAIL reason exists anywhere" a single coherent rule.
+- `int(label)` coercion is applied when copying `base_per_label` keys (in case
+  a caller passes numpy integers or similar), matching the item-026 precedent
+  of defensive int coercion at boundaries.
+- The escalation message text is
+  `f"{n_flag} review-level findings meet the escalation threshold ({threshold}); verdict escalated to fail."`,
+  matching the spec's worked example verbatim.
