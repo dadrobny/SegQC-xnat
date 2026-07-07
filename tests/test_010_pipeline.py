@@ -242,7 +242,16 @@ def test_ac12_empty_fixture_human_report_nonempty(empty_labelmap_files, tmp_path
 # =========================================================================== #
 
 def test_ac13_populated_fixture_json_verdict_is_pass(labelled_blocks_files, tmp_path, capsys):
-    """JSON report for the labelled-blocks fixture has verdict='pass'."""
+    """JSON report for the labelled-blocks fixture wires through to a real verdict.
+
+    Item 035 wired the ``bounds``/``border`` heuristic rules into ``segqc run``.
+    The labelled-blocks fixture's 4x4x4 mm cubes are item-002 geometric
+    placeholders, not tuned to the anatomical ``bounds`` thresholds (e.g. lumbar
+    ``min_volume_mm3``), so they now legitimately fire ``bounds`` findings and the
+    verdict is ``flagged-for-review`` rather than ``pass`` (exit code stays 0).
+    What this test actually verifies is that the CLI wiring produces a
+    schema-shaped, non-empty ``findings`` list alongside the verdict.
+    """
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     code, _stdout, _stderr = _run(
@@ -251,9 +260,12 @@ def test_ac13_populated_fixture_json_verdict_is_pass(labelled_blocks_files, tmp_
     )
     assert code == 0
     data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
-    assert data["verdict"] == "pass", (
-        f"Expected verdict='pass' for well-formed segmentation, got {data['verdict']!r}"
+    assert data["verdict"] == "flagged-for-review", (
+        f"Expected verdict='flagged-for-review' (bounds fires on the item-002 "
+        f"placeholder cubes), got {data['verdict']!r}"
     )
+    assert data["findings"], "Expected non-empty findings for the out-of-bounds fixture"
+    assert all(f["rule_id"] == "bounds" for f in data["findings"])
 
 
 def test_ac13_populated_fixture_exits_zero(labelled_blocks_files, tmp_path, capsys):
@@ -461,8 +473,14 @@ def test_adv_empty_fixture_human_report_has_reason_text(empty_labelmap_files, tm
     )
 
 
-def test_adv_populated_fixture_human_report_contains_pass(labelled_blocks_files, tmp_path, capsys):
-    """Human report for labelled-blocks fixture contains 'pass'."""
+def test_adv_populated_fixture_human_report_contains_flagged(labelled_blocks_files, tmp_path, capsys):
+    """Human report for labelled-blocks fixture contains the wired verdict.
+
+    As in ``test_ac13_populated_fixture_json_verdict_is_pass`` above, the
+    labelled-blocks fixture's placeholder cubes now legitimately fire ``bounds``
+    findings once the rule engine is wired into ``segqc run`` (item 035), so the
+    rendered verdict is ``flagged-for-review``, not ``pass``.
+    """
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     _run(
@@ -470,7 +488,7 @@ def test_adv_populated_fixture_human_report_contains_pass(labelled_blocks_files,
         capsys,
     )
     content = (out_dir / "segqc_report.txt").read_text(encoding="utf-8")
-    assert "pass" in content.lower()
+    assert "flagged-for-review" in content.lower()
 
 
 def test_adv_json_report_verdict_field_is_string(labelled_blocks_files, tmp_path, capsys):

@@ -112,12 +112,15 @@ def test_run_json_fields(labelled_blocks_files, tmp_path, capsys):
 
 
 def test_run_json_inventory_matches_fixture(labelled_blocks_files, tmp_path, capsys):
-    """v0 JSON report for labelled-blocks fixture has pass verdict and correct case_id.
+    """v0 JSON report for labelled-blocks fixture has the correct case_id and shape.
 
     The labelled-blocks fixture has labels 1, 2, 3 (192 foreground voxels total).
     With default config thresholds (min_foreground_voxels=0, min_label_count=0),
-    the empty check does not fire, so the overall verdict must be 'pass'.
-    The case_id is derived from the scan filename stem ('scan').
+    the empty check does not fire. Since item 035 wired the ``bounds``/``border``
+    heuristics into ``segqc run``, the fixture's item-002 placeholder cubes (4x4x4
+    mm, far below the anatomical bounds thresholds) now legitimately produce
+    ``bounds`` findings, so the overall verdict is 'flagged-for-review' (exit code
+    stays 0). The case_id is derived from the scan filename stem ('scan').
     """
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
@@ -128,8 +131,11 @@ def test_run_json_inventory_matches_fixture(labelled_blocks_files, tmp_path, cap
     assert code == 0
     with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
         data = json.load(fh)
-    # labelled-blocks has 3 non-zero labels -> no empty condition fires -> pass
-    assert data["verdict"] == "pass"
+    # labelled-blocks has 3 non-zero labels -> no empty condition fires, but the
+    # tiny placeholder cubes fall outside the anatomical bounds -> flagged
+    assert data["verdict"] == "flagged-for-review"
+    assert data["findings"]
+    assert all(f["rule_id"] == "bounds" for f in data["findings"])
     # case_id is derived from the scan filename 'scan.nii.gz' -> 'scan'
     assert data["case_id"] == "scan"
     # per_label is a dict (may be empty at Stage 1; what matters is the type)
@@ -380,12 +386,16 @@ def test_run_shape_mismatch_exits_one(tmp_path, capsys):
 
 
 def test_run_anisotropic_spacing_pass_verdict(tmp_path, capsys):
-    """``segqc run`` on the anisotropic fixture exits 0 with a pass verdict.
+    """``segqc run`` on the anisotropic fixture exits 0 and reports correctly.
 
     The anisotropic case has 2 labels and 96 foreground voxels. With default
-    thresholds the empty check does not fire, so the verdict must be 'pass'
-    and the exit code 0. This confirms the CLI handles non-isotropic affines
-    without crashing and the v0 report is written correctly.
+    thresholds the empty check does not fire. Since item 035 wired ``bounds``
+    into ``segqc run``, this fixture's item-002 placeholder cubes are far below
+    the anatomical bounds thresholds even after the (correct) anisotropic
+    physical-volume computation, so the verdict is 'flagged-for-review' with
+    ``bounds`` findings (exit code stays 0). This still confirms the CLI handles
+    non-isotropic affines without crashing and the v0 report is written
+    correctly.
     """
     import sys
     sys.path.insert(0, str(pathlib.Path(__file__).parent))
@@ -401,18 +411,24 @@ def test_run_anisotropic_spacing_pass_verdict(tmp_path, capsys):
     assert code == 0
     with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
         data = json.load(fh)
-    # anisotropic_case has foreground labels -> no empty condition fires -> pass
-    assert data["verdict"] == "pass"
+    # anisotropic_case has foreground labels -> no empty condition fires, but the
+    # tiny placeholder cubes fall outside the anatomical bounds -> flagged
+    assert data["verdict"] == "flagged-for-review"
+    assert data["findings"]
+    assert all(f["rule_id"] == "bounds" for f in data["findings"])
     assert data["schema_version"] == "0.1"
 
 
 def test_run_unknown_labels_pass_verdict(tmp_path, capsys):
-    """``segqc run`` with unknown labels still exits 0 at Stage 1 (empty check only).
+    """``segqc run`` with unknown labels still exits 0 (empty check does not fire).
 
     Labels 100 and 200 are not in the TotalSegmentator/VerSe convention. The
-    Stage 1 pipeline only checks for emptiness; unknown labels do not trigger a
-    fail. With 250 foreground voxels and default thresholds, the verdict is 'pass'
-    and the exit code 0. The stdout inventory must show those labels as unknown.
+    Stage 1 empty-check does not trigger a fail here (250 foreground voxels).
+    Since item 035 wired ``border`` into ``segqc run``, these two blocks (each
+    occupying a corner octant of the 10x10x10 volume, so each touches multiple
+    image faces) now legitimately fire ``border`` findings, so the verdict is
+    'flagged-for-review' rather than 'pass' (exit code stays 0). The stdout
+    inventory must still show those labels as unknown.
     """
     import nibabel as nib
     import numpy as np
@@ -432,12 +448,15 @@ def test_run_unknown_labels_pass_verdict(tmp_path, capsys):
          "--out", str(out_dir)],
         capsys,
     )
-    # Non-empty segmentation -> no empty condition fires -> pass verdict -> exit 0
+    # Non-empty segmentation -> empty check does not fire -> exit 0, but the
+    # corner-touching blocks legitimately fire border findings
     assert code == 0
     with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
         report = json.load(fh)
     assert report["schema_version"] == "0.1"
-    assert report["verdict"] == "pass"
+    assert report["verdict"] == "flagged-for-review"
+    assert report["findings"]
+    assert all(f["rule_id"] == "border" for f in report["findings"])
     # The stdout inventory line must mention the unknown labels
     assert "100" in stdout or "200" in stdout, (
         "Expected unknown label values (100, 200) to appear in stdout inventory"
@@ -447,9 +466,12 @@ def test_run_unknown_labels_pass_verdict(tmp_path, capsys):
 def test_run_single_voxel_volume(tmp_path, capsys):
     """``segqc run`` handles a 1x1x1 volume without crashing and writes a v0 report.
 
-    A single non-zero voxel is non-empty by definition. With default thresholds
-    the empty check does not fire, so the verdict is 'pass' and exit code 0.
-    The v0 report must contain all required schema fields.
+    A single non-zero voxel is non-empty by definition, so the Stage 1
+    empty-check does not fire. Since item 035 wired ``bounds``/``border`` into
+    ``segqc run``, a single-voxel label is both far below the anatomical bounds
+    thresholds and touches every image face, so it legitimately fires both
+    rules and the verdict is 'flagged-for-review' rather than 'pass' (exit code
+    stays 0). The v0 report must still contain all required schema fields.
     """
     import nibabel as nib
     import numpy as np
@@ -472,7 +494,9 @@ def test_run_single_voxel_volume(tmp_path, capsys):
         report = json.load(fh)
     # v0 schema required fields must all be present
     assert report["schema_version"] == "0.1"
-    assert report["verdict"] == "pass"
+    assert report["verdict"] == "flagged-for-review"
+    assert report["findings"]
+    assert {f["rule_id"] for f in report["findings"]} <= {"bounds", "border"}
     assert isinstance(report["reasons"], list)
     assert isinstance(report["per_label"], dict)
 
