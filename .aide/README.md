@@ -23,6 +23,9 @@ facts live in `aide.toml` and `docs/aide/`.
 
 - **`conventions.md`** — the format contract, claim protocol, command hygiene,
   git modes, clarify mode. Read it; the loop assumes it.
+- **`ADAPTER-SPEC.md`** — the engine↔adapter contract: what any runtime must
+  express (seven entry-points, five role tiers, three orchestrators, the shared
+  CLI) to drive this engine. The `.claude/` adapter is its reference implementation.
 - **`templates/`** — the mandatory-core document templates (vision, roadmap,
   progress, queue, item). Every section is annotated with its downstream consumer.
 - **`scripts/aide.py`** — the stdlib-only CLI: `check`, `progress`, `queue`,
@@ -126,3 +129,10 @@ gitignored `loop.local.toml`) relaunches the gated command when usage limits
 allow, relying on git commits + the resume logic for durable state. There is no
 in-process headless nesting (an earlier `--continuous` design was removed — it
 lost in-flight state on cutoff and stalled on prompts it couldn't answer).
+
+The supervisor is **provider-agnostic**: its RUN/WAIT/STOP decision loop lives in
+`loop.py`, but the usage numbers come from a **pluggable probe** selected by
+`[loop] usage_probe`. The Claude adapter ships `usage_probe.py` (`"anthropic-oauth"`,
+the OAuth usage endpoint); any runtime without a usage API sets `usage_probe = "none"`
+and the loop relaunches on a plain time cadence. This is the one core/adapter seam
+in the loop — see `ADAPTER-SPEC.md` §6.

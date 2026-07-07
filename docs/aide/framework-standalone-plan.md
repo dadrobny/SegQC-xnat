@@ -1,6 +1,6 @@
 # Plan: AIDE as a standalone, multi-provider framework repo
 
-> **Status:** 📝 Draft — for review · **Created:** 2026-07-03 · **Updated:** 2026-07-07
+> **Status:** 🚧 In progress — §6 step 1 landed · **Created:** 2026-07-03 · **Updated:** 2026-07-07
 > Motivation and a concrete, reversible plan to lift the AIDE framework out of
 > this repo into a standalone, multi-provider repository — with SegQC-xnat as its
 > first consumer. Records the exact core/adapter boundary, the target repo shape,
@@ -276,6 +276,11 @@ until a consumer actually needs them.
    write `ADAPTER-SPEC.md` and the core/adapter refactor of `loop.py` **here**,
    validated against the working Claude adapter. If the contract can't describe
    the thing that already works, it's wrong — cheaper to learn now.
+   **✅ Done (2026-07-07).** `.aide/ADAPTER-SPEC.md` written; `loop.py` split into a
+   provider-agnostic decision loop + a pluggable `usage_probe` seam, with the
+   Anthropic OAuth probe extracted to the Claude-adapter `.aide/loop/usage_probe.py`
+   (selected by `[loop] usage_probe`, default `"none"` = time cadence). Engine test
+   suite green (51 passed), including new seam tests.
 2. **Create `aide-loop` by clean copy**, not history surgery: copy `.aide/**`
    into `core/` and the `aide-*` `.claude/**` files into `adapters/claude/`, and
    leave a pointer in the new repo's README back to this repo's history for

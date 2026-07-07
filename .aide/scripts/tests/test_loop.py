@@ -68,6 +68,36 @@ def test_load_config_uses_defaults_when_missing(tmp_path: Path):
     cfg = loop.load_loop_config(tmp_path / "nope.toml")
     assert cfg["max_weekly_pct"] == 95.0
     assert cfg["interval"] == 300
+    assert cfg["usage_probe"] == "none"  # engine default is provider-neutral
+
+
+def test_load_probe_none_is_time_cadence():
+    assert loop.load_probe({"usage_probe": "none"})() is None
+    assert loop.load_probe({})() is None  # unset behaves as "none"
+
+
+def test_load_probe_selects_adapter_module(monkeypatch):
+    class _FakeProbe:
+        @staticmethod
+        def get_usage(cfg):
+            return {"five_hour": {"utilization": 1}, "seven_day": {"utilization": 2}}
+
+    monkeypatch.setattr(loop, "_import_probe_module", lambda: _FakeProbe)
+    usage = loop.load_probe({"usage_probe": "anthropic-oauth"})()
+    assert usage["five_hour"]["utilization"] == 1
+
+
+def test_load_probe_degrades_when_module_absent(monkeypatch):
+    monkeypatch.setattr(loop, "_import_probe_module", lambda: None)
+    assert loop.load_probe({"usage_probe": "anthropic-oauth"})() is None
+
+
+def test_adapter_probe_module_conforms_to_contract():
+    # The shipped Claude adapter probe must expose get_usage(cfg) — importing is
+    # side-effect-free (no network until get_usage is called).
+    module = loop._import_probe_module()
+    assert module is not None
+    assert callable(getattr(module, "get_usage", None))
 
 
 def test_parse_toml_reads_loop_table():
