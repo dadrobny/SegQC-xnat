@@ -1,21 +1,23 @@
 # Plan: AIDE as a standalone, multi-provider framework repo
 
-> **Status:** 📝 Draft — for review · **Created:** 2026-07-03
-> Expands the deferred step 8 of [PR #21](https://github.com/dadrobny/SegQC-xnat/pull/21)
-> (the standalone-framework refactor). Answers: *what is actually needed to
-> install AIDE, how do `.aide/` and `.claude/` relate, what is provider-agnostic
-> vs. Claude-specific, and how do we ship this as its own repo usable from other
-> LLM runtimes?* Investigation-first; no extraction is performed unattended.
+> **Status:** 📝 Draft — for review · **Created:** 2026-07-03 · **Updated:** 2026-07-07
+> Motivation and a concrete, reversible plan to lift the AIDE framework out of
+> this repo into a standalone, multi-provider repository — with SegQC-xnat as its
+> first consumer. Records the exact core/adapter boundary, the target repo shape,
+> the language/platform dependencies, and the extraction steps.
+> Investigation-first; no extraction is performed unattended.
 
 ---
 
-## 1. The packaging question, answered
+## 1. Motivation and the three-layer model
 
-The current README says the framework is "installed by copying `.aide/` + the
-`.claude/` glue + writing one `aide.toml`." That is correct but **under-frames
-the `.claude/` half** — it reads as optional "glue" when it is in fact the entire
-control surface for the intended (Claude Code) workflow. AIDE is really **three
-layers**, and an install needs all three:
+AIDE currently lives *inside* this repo, hand-maintained in-tree. The goal is to
+lift it into its own repository so any project — and eventually any LLM runtime —
+can install it and pull updates, while SegQC-xnat becomes its **first consumer**
+rather than its owner. This document records the motivation, the exact
+core/adapter boundary, and a concrete, reversible plan to get there.
+
+A working install is **three layers**, and it needs all three:
 
 | Layer | What it is | This repo | Depends on Claude? |
 |---|---|---|---|
@@ -23,21 +25,19 @@ layers**, and an install needs all three:
 | **Adapter** (provider harness) | How one specific agent runtime *drives* the engine: role agents, workflow entry-points, orchestrators, permissions | all of `.claude/` **+** `loop.py`'s usage-probe | **Yes — 100% Claude Code** |
 | **Project config** (per-repo) | This project's facts and living documents | `aide.toml`, `docs/aide/**` | No |
 
-The key realisation: **`.aide/` is the engine, `.claude/` is the *Claude
-adapter*.** They are co-equal halves of "the framework," not core + optional
-extras. A different runtime (Cursor, Copilot, Gemini CLI, a raw SDK driver) would
-**replace `.claude/` wholesale** while reusing `.aide/` unchanged. That is the
-whole reason the engine was built as a stdlib CLI with no Claude coupling —
-verified: `grep -i "claude\|anthropic" .aide/scripts/aide.py` → nothing.
-
-So the README fix is a **reframe, not a correction**: install = **engine +
-one provider adapter + project config**. §6 lands it.
+The load-bearing distinction: **`.aide/` is the provider-agnostic engine,
+`.claude/` is the *Claude adapter*.** They are co-equal halves of "the framework,"
+not core + optional glue. A different runtime (Cursor, Copilot, Gemini CLI, a raw
+SDK driver) **replaces `.claude/` wholesale** while reusing `.aide/` unchanged.
+The engine was deliberately built as a stdlib CLI with no Claude coupling to make
+this possible — verified: `grep -i "claude\|anthropic" .aide/scripts/aide.py` →
+nothing.
 
 ---
 
 ## 2. Core vs. adapter — the exact inventory
 
-Drawn from the actual tree, so the extraction in §5 is mechanical, not
+Drawn from the actual tree, so the extraction in §6 is mechanical, not
 guesswork.
 
 ### 2.1 Provider-agnostic engine (moves to `core/`, unchanged)
@@ -79,8 +79,8 @@ guesswork.
 
 ## 3. Standalone-repo design
 
-A new repo, working name **`aide-loop`** (final name is an open decision, §7).
-Structure makes the three-layer split *physical*:
+A new repo named **`aide-loop`**. Structure makes the three-layer split
+*physical*:
 
 ```
 aide-loop/                          # the framework repo
@@ -97,9 +97,9 @@ aide-loop/                          # the framework repo
 │   │   ├── settings.json
 │   │   ├── usage_probe.py          # the Anthropic OAuth probe, lifted out of loop.py
 │   │   └── README.md               # AIDE-concept → Claude-Code-primitive map
-│   ├── cursor/README.md            # porting guide (contract → Cursor primitives)
-│   ├── copilot/README.md           # porting guide (→ .github/prompts, agents)
-│   └── generic-sdk/                # a minimal, runnable non-Claude adapter (§4.2)
+│   ├── copilot/                    # second adapter — future work (§4.2)
+│   ├── cursor/README.md            # porting stub (contract → Cursor primitives)
+│   └── gemini/README.md            # porting stub (→ .gemini/commands)
 ├── docs/  (quickstart.md · concepts.md)
 ├── install.py                      # cross-OS installer (§3.2)
 └── README.md  · LICENSE
@@ -164,29 +164,33 @@ An adapter must provide, in whatever form its runtime uses:
 3. **Three orchestrators** (item ⊂ queue ⊂ roadmap) — or, where a runtime can't
    nest prompt-expansions, a manual runbook that calls the same `aide.py` steps
    in the same order.
-4. **The shared CLI invocation** — every adapter runs `python .aide/scripts/aide.py`.
-   This is the contract's anchor: identical across providers.
+4. **The shared CLI invocation** — every adapter invokes the aide CLI (today
+   `python .aide/scripts/aide.py`). This is the contract's anchor: identical
+   across providers, and implementation-agnostic (§5.3).
 5. **Optional** — permission pre-approval + logging (only runtimes that have a
    permission model; Claude Code does, most others don't).
 
-### 4.2 Prove it with one non-Claude adapter
+### 4.2 The second adapter: GitHub Copilot (future work)
 
-`adapters/generic-sdk/` — a **minimal but runnable** adapter (e.g. a thin Python
-driver over any chat API, or Aider) that fulfils the contract without Claude
-Code's skill/agent machinery. Building it to a working degree is the **only real
-test** that `core/` is genuinely provider-agnostic; a spec with just Claude behind
-it can silently smuggle in Claude assumptions. This is the highest-value item in
-Phase C.
+The first non-Claude adapter targets **GitHub Copilot** — `.github/prompts/` for
+the seven workflow entry-points, `.github/agents/` for the five role definitions,
+and no permission allow-list (Copilot has none). Building it to a working degree
+is the **only real test** that `core/` is genuinely provider-agnostic: a contract
+with just Claude behind it can silently smuggle in Claude assumptions, and a
+second concrete runtime is what flushes them out.
+
+This is **explicitly future work — the next step after extraction lands**, not
+part of the initial extraction. Sequencing it after SegQC becomes a consumer (§6)
+keeps the first PR focused on "did extraction preserve a working install?" before
+generality is exercised for real.
 
 ### 4.3 Porting guides (stubs, honest about gaps)
 
-`adapters/{cursor,copilot}/README.md` map the contract to each runtime's
+`adapters/{cursor,gemini}/README.md` map the contract to each runtime's
 primitives and state what does **not** translate:
 
 - **Cursor** — rules/commands, **no true sub-agents** → orchestrators become
   guided single-agent role-prompts; skills → `.cursor/commands/`.
-- **Copilot** — `.github/prompts/` (commands), `.github/agents/` (limited
-  agents); no permission allow-list.
 - **Gemini CLI** — `.gemini/commands/`.
 
 The command-hygiene section's "permission allow-list" framing is Claude-specific
@@ -209,53 +213,83 @@ Small refactor, already eased by `command`/`credentials_path` being config today
 
 ---
 
-## 5. Extraction sketch (history-preserving, reversible)
+## 5. Language dependence: Python in the engine
+
+The engine is Python end to end — `aide.py` (CLI), `loop.py` (supervisor),
+`install.py` (installer), and the Claude hooks are all stdlib Python 3.11+ — and
+every adapter, whatever its runtime, shells out to `python .aide/scripts/aide.py`.
+So a consuming project needs a Python interpreter on the machine even when its own
+code is in another language. Worth being explicit about what that buys and what
+dropping it would cost.
+
+### 5.1 Reasons to rely on Python
+
+- **Usually already present.** The interpreter is a given for Python projects
+  (this repo included) and near-universal on developer/CI machines; for the common
+  case it costs nothing to require.
+- **Stdlib-only, zero install.** `aide.py` imports nothing outside the standard
+  library, so the engine runs on a stock interpreter with no dependency
+  resolution — the reason it works *before* the project venv exists.
+- **Cross-platform for free.** One `aide.py` behaves identically on
+  Windows/macOS/Linux; the shell-script alternative would need per-OS variants and
+  careful quoting.
+- **Legible contribution surface.** The deterministic logic (TOML parse, git
+  plumbing, markdown-section edits) stays readable to the people most likely to
+  extend it.
+
+### 5.2 What full Python-independence would cost
+
+- The realistic path to "no interpreter at all" is a **compiled single binary** —
+  reimplement `aide.py`'s subcommands in Go/Rust, or freeze with
+  PyInstaller/Nuitka, and ship per-OS binaries. That adds a build-and-release
+  matrix and, for a rewrite, a second language to maintain.
+- Only the executable triad (`aide.py`, `loop.py`, `install.py`) plus the two
+  Python hooks would move; `conventions.md` and the templates are already
+  language-neutral markdown.
+- Net: **moderate effort, low near-term payoff** — it matters only for adopters
+  with no Python whatsoever, which is neither this repo nor most LLM-tooling
+  environments. Defer until a real no-Python consumer actually appears.
+
+### 5.3 Platform independence without Python
+
+If the aim is "no Python dependency," not "no interpreter of any kind," the move is
+smaller than a full rewrite, because the adapter contract (§4.1) anchors on
+*invoking the aide CLI*, not on how it is implemented:
+
+- Reimplement the ~six subcommands (`check`, `progress`, `queue`, `claim`,
+  `merge`, `env`) as a compiled binary exposing the identical CLI surface. Every
+  adapter's "run the aide CLI" step becomes a drop-in substitution — `aide check`
+  in place of `python .aide/scripts/aide.py check` — with no change to any adapter.
+- Replace the two Python hooks with the target runtime's native hook mechanism
+  (they are Claude-adapter-local anyway, §2.2).
+- Templates, conventions, and document formats carry over unchanged.
+
+So platform independence is a bounded, mechanical swap; full *language*
+independence (§5.2) is the larger, lower-value undertaking. Both stay deferred
+until a consumer actually needs them.
+
+---
+
+## 6. Extraction sketch (clean copy, reversible)
 
 1. **Prove the split in-place first** (this repo, before any new repo exists):
    write `ADAPTER-SPEC.md` and the core/adapter refactor of `loop.py` **here**,
    validated against the working Claude adapter. If the contract can't describe
    the thing that already works, it's wrong — cheaper to learn now.
-2. **Create `aide-loop`** with `git filter-repo` (or subtree) so `.aide/**` and
-   the `aide-*` `.claude/**` files carry their commit history into `core/` and
-   `adapters/claude/`. Clean-copy fallback if history-surgery on the shared paths
-   is fiddly.
+2. **Create `aide-loop` by clean copy**, not history surgery: copy `.aide/**`
+   into `core/` and the `aide-*` `.claude/**` files into `adapters/claude/`, and
+   leave a pointer in the new repo's README back to this repo's history for
+   provenance. (History-preserving `git filter-repo` was considered and rejected —
+   more effort than the faithful-history payoff is worth for a fresh framework
+   repo.)
 3. **Write `install.py`** + `--update`; dogfood by installing into a scratch repo
    and running `aide check` + one item end-to-end.
 4. **Convert SegQC to a consumer** (§3.2): replace the in-tree framework with an
    `install.py` materialisation pinned to `VERSION`; confirm the full suite +
    `aide check` still green. This PR is where "did extraction break anything?" is
    answered.
-5. **Only then** build the generic-sdk adapter (§4.2) and the porting stubs.
+5. **Only then, as follow-on work,** build the GitHub Copilot adapter (§4.2) and
+   the remaining porting stubs.
 
 Reversible: until step 4 merges, SegQC still has its working in-tree copy; the new
 repo is additive.
-
----
-
-## 6. The immediate, in-this-PR fix
-
-Independent of the whole extraction, one small correction belongs now, because it
-addresses the exact confusion that prompted this plan: **reframe the README
-install line** from "`.aide/` + `.claude/` glue" to "**engine (`.aide/`) + one
-provider adapter (`.claude/` = Claude Code) + `aide.toml`**", and add a one-line
-"Providers" note that the Claude adapter is the reference and others are portable
-via the (coming) adapter contract. No structural change — just honest framing.
-*(Also already done in this PR: removed the 11 empty, untracked `speckit-*` skill
-dirs left behind by the earlier `git rm`.)*
-
----
-
-## 7. Open decisions for you
-
-1. **Repo name** — `aide-loop`? `aide-framework`? something else. (Plan uses
-   `aide-loop` as a placeholder.)
-2. **Extraction method** — history-preserving `git filter-repo` (more faithful,
-   more effort) vs. clean copy with a pointer back to this repo's history
-   (simpler). Recommend `filter-repo` for the engine, clean-copy tolerable for
-   the adapter.
-3. **How far to build the second adapter** — a runnable `generic-sdk` (best proof,
-   more work) vs. porting-guide stubs only (cheaper, weaker guarantee). Recommend
-   at least a minimal runnable one; it's the only true portability test.
-4. **Scope of THIS PR** — land just the §6 README reframe here, and keep the
-   extraction (Phases A–D) as a follow-up, or fold more in? Recommend: README
-   reframe only here; extraction is its own repo + PR.
