@@ -92,6 +92,7 @@ def serialize_report(
     case_id: str,
     config: "HeuristicConfig",
     features: "dict | None" = None,
+    findings: "list | None" = None,
 ) -> dict:
     """Serialize a :class:`~segqc.verdict.Verdict` to a v0 report dict.
 
@@ -114,6 +115,13 @@ def serialize_report(
         with the rest of the report. When ``None`` (default) no ``features`` key
         is emitted and the report is exactly the item-009 shape, preserving
         backward compatibility.
+    findings:
+        Optional Stage 4 ``findings`` list (item 035) -- a list of dicts as
+        produced by ``segqc.heuristics.finding.Finding.to_dict()``. When
+        non-``None`` (including an empty list) it is embedded verbatim under
+        the report's ``findings`` key and validated together with the rest of
+        the report. When ``None`` (default) no ``findings`` key is emitted,
+        preserving the item-009/016 report shape.
 
     Returns
     -------
@@ -152,6 +160,11 @@ def serialize_report(
     if features is not None:
         report["features"] = features
 
+    # Optional Stage 4 findings block (item 035) — added before validation for
+    # the same reason. Omitting it (None) keeps the prior report shape intact.
+    if findings is not None:
+        report["findings"] = findings
+
     jsonschema.validate(report, _SCHEMA)
     return report
 
@@ -162,6 +175,7 @@ def serialize_report_json(
     config: "HeuristicConfig",
     indent: int = 2,
     features: "dict | None" = None,
+    findings: "list | None" = None,
 ) -> str:
     """Serialize a :class:`~segqc.verdict.Verdict` to a JSON string.
 
@@ -182,11 +196,16 @@ def serialize_report_json(
     features:
         Optional Stage 2 ``features`` block, forwarded to
         :func:`serialize_report`.
+    findings:
+        Optional Stage 4 ``findings`` list (item 035), forwarded to
+        :func:`serialize_report`.
 
     Returns
     -------
     str
         Serialized JSON string.
     """
-    report = serialize_report(verdict, case_id, config, features=features)
+    report = serialize_report(
+        verdict, case_id, config, features=features, findings=findings
+    )
     return json.dumps(report, indent=indent)

@@ -36,10 +36,56 @@ if TYPE_CHECKING:
 __all__ = ["render_human_report", "render_feature_table"]
 
 
+def _finding_fields(finding) -> tuple:
+    """Read ``(rule_id, severity_label, reason, sorted_labels)`` from a finding.
+
+    Accepts either a :class:`~segqc.heuristics.finding.Finding` object or its
+    ``to_dict()`` dict, read defensively so this module stays stdlib-only (no
+    import of ``segqc.heuristics``).
+    """
+    if isinstance(finding, dict):
+        rule_id = finding.get("rule_id", "")
+        severity_label = finding.get("severity", "")
+        reason = finding.get("reason", "")
+        labels = finding.get("labels", []) or []
+    else:
+        rule_id = finding.rule_id
+        severity_label = finding.severity.label
+        reason = finding.reason
+        labels = finding.labels
+    return rule_id, severity_label, reason, sorted(labels)
+
+
+def _render_findings_section(findings) -> "list[str]":
+    """Build the 'Findings' section lines for ``render_human_report``.
+
+    One block per finding: ``[severity] (rule_id) reason`` followed by a
+    sorted-integer labels line, or an explicit case-level marker when the
+    finding has no offending labels. Renders "(none)" for an empty list.
+    """
+    lines: list[str] = ["Findings:"]
+    if not findings:
+        lines.append("  (none)")
+        lines.append("")
+        return lines
+
+    for finding in findings:
+        rule_id, severity_label, reason, labels = _finding_fields(finding)
+        lines.append(f"  [{severity_label}] ({rule_id}) {reason}")
+        if labels:
+            labels_txt = ", ".join(str(label) for label in labels)
+            lines.append(f"    Labels: {labels_txt}")
+        else:
+            lines.append("    Labels: (case-level)")
+    lines.append("")
+    return lines
+
+
 def render_human_report(
     verdict: "Verdict",
     case_id: str,
     config: "HeuristicConfig",
+    findings: "list | None" = None,
 ) -> str:
     """Render a human-readable QC report string.
 
@@ -53,6 +99,12 @@ def render_human_report(
         The :class:`~segqc.config.HeuristicConfig` used for this run.
         Carried as a parameter for future use (e.g. threshold display);
         currently used only for structural consistency with ``serialize_report``.
+    findings:
+        Optional Stage 4 findings (item 035) — an iterable of
+        :class:`~segqc.heuristics.finding.Finding` objects or their
+        ``to_dict()`` dicts. When ``None`` (default) no "Findings" section is
+        rendered, preserving the item-010 report shape exactly. When an empty
+        list, a "Findings" section is rendered with a "(none)" body.
 
     Returns
     -------
@@ -95,6 +147,13 @@ def render_human_report(
     else:
         lines.append("  (none)")
     lines.append("")
+
+    # ------------------------------------------------------------------ #
+    # Findings section (item 035) — only rendered when explicitly requested,
+    # so the omitted-findings case is byte-for-byte the item-010 report.
+    # ------------------------------------------------------------------ #
+    if findings is not None:
+        lines.extend(_render_findings_section(findings))
 
     return "\n".join(lines)
 

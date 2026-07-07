@@ -70,6 +70,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Output directory for the QC report.",
     )
     run_parser.add_argument(
+        "--config",
+        default=None,
+        metavar="<yaml>",
+        help=(
+            "Path to a custom heuristic-config YAML file. When omitted, the "
+            "bundled default_config.yaml (item 035) is used."
+        ),
+    )
+    run_parser.add_argument(
         "--log-level",
         default="WARNING",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
@@ -111,14 +120,22 @@ def _print_inventory(summary) -> None:
 
 
 def _handle_run(args: argparse.Namespace) -> int:
-    """Handler for ``segqc run`` — full Stage 1 pipeline.
+    """Handler for ``segqc run`` — full Stage 1 + Stage 4 pipeline (item 035).
 
-    Loads the scan and segmentation, runs the empty/near-empty check, builds
-    a :class:`~segqc.verdict.Verdict`, and writes both a JSON report and a
-    human-readable plain-text report to the output directory.
+    Loads the scan and segmentation, runs the empty/near-empty check, then
+    extracts the Stage 2/3 feature block and runs the Stage 4 rule engine over
+    it (:func:`segqc.pipeline.run_qc`), threading the empty-check's reasons in
+    as case-level ``base_reasons`` so the aggregated verdict reflects both.
+    Writes a JSON report (:func:`segqc.report.serialize_report_json`,
+    carrying ``features`` + ``findings``) and a human-readable plain-text
+    report (:func:`segqc.human_report.render_human_report`, carrying a
+    Findings section) to ``<out>/segqc_report.json`` and
+    ``<out>/segqc_report.txt`` respectively.
 
-    Returns 0 on pass or flagged-for-review; returns 1 on fail or input error.
-    Both report files are always written before the process exits (even on fail).
+    Returns 0 on pass or flagged-for-review; returns 1 on fail or input/config
+    error. Both report files are always written before the process exits on a
+    successful run (even on an aggregated fail); no report is written when the
+    config or input fails to load.
     """
     # Set up logging first so any subsequent log messages respect the level.
     from segqc._logging import setup_logging  # noqa: PLC0415
@@ -127,15 +144,31 @@ def _handle_run(args: argparse.Namespace) -> int:
 
     from segqc.io import SegQCInputError, load_case  # noqa: PLC0415
     from segqc.labels import LabelConvention, summarise_inventory  # noqa: PLC0415
-    from segqc.config import default_config  # noqa: PLC0415
+    from segqc.config import (  # noqa: PLC0415
+        SegQCConfigError,
+        bundled_default_config,
+        load_config,
+    )
     from segqc.empty import check_empty  # noqa: PLC0415
-    from segqc.verdict import Reason, Severity, Verdict  # noqa: PLC0415
+    from segqc.verdict import Reason, Severity  # noqa: PLC0415
     from segqc.report import serialize_report_json  # noqa: PLC0415
     from segqc.human_report import render_human_report  # noqa: PLC0415
+    from segqc.pipeline import run_qc  # noqa: PLC0415
 
     logger.debug(
-        "segqc run: scan=%r  seg=%r  out=%r", args.scan, args.seg, args.out
+        "segqc run: scan=%r  seg=%r  out=%r  config=%r",
+        args.scan, args.seg, args.out, args.config,
     )
+
+    # --- 0. Load config (bundled default, or --config override) -------------- #
+    if args.config:
+        try:
+            cfg = load_config(args.config)
+        except SegQCConfigError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+    else:
+        cfg = bundled_default_config()
 
     # --- 1. Load inputs ------------------------------------------------------ #
     try:
@@ -162,26 +195,28 @@ def _handle_run(args: argparse.Namespace) -> int:
     # loaded Volume array so we avoid a second disk read.
     import nibabel as nib  # noqa: PLC0415
 
-    cfg = default_config()
     seg_img = nib.Nifti1Image(case.seg.data.astype("int32"), case.seg.affine)
     check_result = check_empty(seg_img, cfg)
 
-    # --- 4. Build Verdict from CheckResult ------------------------------------ #
+    # --- 4. Convert CheckResult into Stage-1 base reasons --------------------- #
     # check_empty returns plain strings; convert them into Reason objects.
     # Severity is FAIL when is_empty=True (any condition fired), PASS otherwise.
     if check_result.is_empty:
-        reasons = [
+        base_reasons = [
             Reason(message=msg, severity=Severity.FAIL)
             for msg in check_result.reasons
         ]
     else:
-        reasons = [
+        base_reasons = [
             Reason(message=msg, severity=Severity.PASS)
             for msg in check_result.reasons
         ]
-    verdict = Verdict.build(reasons=reasons, per_label={})
 
-    # --- 5. Derive case_id from scan filename stem ---------------------------- #
+    # --- 5. Extract features, run the Stage 4 rules, aggregate the verdict --- #
+    case_result, features_block = run_qc(seg_img, cfg, base_reasons=base_reasons)
+    verdict = case_result.verdict
+
+    # --- 6. Derive case_id from scan filename stem ---------------------------- #
     # Strip double extension (.nii.gz) or single extension (.nii).
     scan_stem = pathlib.Path(args.scan).name
     if scan_stem.endswith(".nii.gz"):
@@ -191,14 +226,20 @@ def _handle_run(args: argparse.Namespace) -> int:
     else:
         case_id = pathlib.Path(args.scan).stem
 
-    # --- 6. Write both reports ------------------------------------------------ #
+    # --- 7. Write both reports ------------------------------------------------ #
     out_path.mkdir(parents=True, exist_ok=True)
 
-    json_str = serialize_report_json(verdict, case_id, cfg)
+    findings_dicts = [f.to_dict() for f in case_result.findings]
+
+    json_str = serialize_report_json(
+        verdict, case_id, cfg, features=features_block, findings=findings_dicts
+    )
     json_path = out_path / "segqc_report.json"
     json_path.write_text(json_str, encoding="utf-8")
 
-    txt_str = render_human_report(verdict, case_id, cfg)
+    txt_str = render_human_report(
+        verdict, case_id, cfg, findings=case_result.findings
+    )
     txt_path = out_path / "segqc_report.txt"
     txt_path.write_text(txt_str, encoding="utf-8")
 
@@ -207,8 +248,8 @@ def _handle_run(args: argparse.Namespace) -> int:
         verdict.overall.label, json_path, txt_path,
     )
 
-    # --- 7. Exit code --------------------------------------------------------- #
-    # fail → 1; pass or flagged-for-review → 0.
+    # --- 8. Exit code --------------------------------------------------------- #
+    # fail → 1; pass or flagged-for-review → 0 (from the aggregated verdict).
     if verdict.overall == Severity.FAIL:
         return 1
     return 0

@@ -53,6 +53,13 @@
     "features": {
       "description": "Optional Stage 2 geometric/topological feature block. Absent for verdict-only (item 009) reports; present when the pipeline serialises computed features.",
       "$ref": "#/definitions/features"
+    },
+    "findings": {
+      "type": "array",
+      "description": "Optional Stage 4 rule-engine findings (item 035), embedded verbatim from Finding.to_dict(). Absent for reports that did not run the rule engine.",
+      "items": {
+        "$ref": "#/definitions/finding"
+      }
     }
   },
   "definitions": {
@@ -74,6 +81,35 @@
         "labels": {
           "type": "array",
           "description": "Integer label values that contributed to this finding. Empty for case-level findings.",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "description": "A single heuristic rule-engine finding (item 026), embedded verbatim from Finding.to_dict().",
+      "additionalProperties": false,
+      "required": ["rule_id", "severity", "reason", "labels"],
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "description": "Identifier of the rule that produced this finding (e.g. 'bounds').",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "description": "Severity level of this finding.",
+          "enum": ["pass", "flagged-for-review", "fail"]
+        },
+        "reason": {
+          "type": "string",
+          "description": "Human-readable explanation of why this finding was raised."
+        },
+        "labels": {
+          "type": "array",
+          "description": "Offending vertebra integer label values. Empty for a case-level finding.",
           "items": {
             "type": "integer"
           }

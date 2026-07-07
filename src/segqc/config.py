@@ -56,6 +56,8 @@ __all__ = [
     "HeuristicConfig",
     "default_config",
     "load_config",
+    "default_config_path",
+    "bundled_default_config",
 ]
 
 # The only schema version this loader accepts. Bump this string and provide a
@@ -305,3 +307,40 @@ def load_config(path: Union[str, "pathlib.Path"]) -> HeuristicConfig:
         # fields that an older loader doesn't know about).
 
     return HeuristicConfig(**merged)
+
+
+def default_config_path() -> pathlib.Path:
+    """Return the absolute path to the bundled ``default_config.yaml`` (item 035).
+
+    This is the documented, versioned materialisation of every rule family's
+    shipped code defaults plus the verdict-aggregation policy (see the file's
+    own header comment). Resolved via ``importlib.resources`` -- the same
+    pattern ``segqc.report._load_schema`` already uses for
+    ``report_schema_v0.json`` -- so the path is correct both from the source
+    tree and from an installed wheel.
+
+    Returns
+    -------
+    pathlib.Path
+        Absolute path to ``default_config.yaml`` inside the installed
+        ``segqc`` package.
+    """
+    import importlib.resources as _pkg_resources
+
+    import segqc as _segqc_pkg  # local import to avoid circular deps at module level
+
+    ref = _pkg_resources.files(_segqc_pkg).joinpath("default_config.yaml")
+    return pathlib.Path(str(ref))
+
+
+def bundled_default_config() -> HeuristicConfig:
+    """Return the :class:`HeuristicConfig` loaded from the bundled default file.
+
+    Convenience wrapper equal to ``load_config(default_config_path())``. This
+    is what ``segqc run`` loads when no ``--config`` flag is given (item 035).
+
+    Returns
+    -------
+    HeuristicConfig
+    """
+    return load_config(default_config_path())

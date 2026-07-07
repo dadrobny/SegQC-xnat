@@ -1,0 +1,140 @@
+# Default heuristic-config file (item 035).
+#
+# This file documents, in one place, the shipped code-default thresholds for
+# every Stage 4 rule family (items 027-033) plus the verdict-aggregation
+# policy (item 034). Loading it through segqc.config.load_config produces a
+# HeuristicConfig that is behaviourally identical to the baked-in
+# segqc.config.default_config() -- it MATERIALISES the existing hand-set
+# defaults, it does not change them (see item 035 AC5). Each threshold below
+# carries a one-line justification comment.
+#
+# Version policy: this file's schema_version must always equal
+# segqc.config.SUPPORTED_SCHEMA_VERSION. Bump both together, in lock-step,
+# only for an incompatible schema change, and update this comment.
+schema_version: "0.1"
+
+# Stage 1 empty-detection thresholds (item 007). Kept at their "no threshold
+# applied" defaults so bundling this file changes no CLI behaviour beyond
+# adding the features/findings report blocks (item 035 wiring).
+min_foreground_voxels: 0
+min_label_count: 0
+
+rules:
+  # ------------------------------------------------------------------ #
+  # bounds (item 027) -- level-aware min/max physical volume + extent.
+  # Values copied verbatim from heuristics/bounds.py::DEFAULT_BOUNDS --
+  # conservative placeholder ranges superseded by Stage 6/7 calibration.
+  # ------------------------------------------------------------------ #
+  bounds:
+    enabled: true
+    params:
+      severity: flagged-for-review
+      cervical:
+        min_volume_mm3: 3000.0
+        max_volume_mm3: 35000.0
+        min_extent_x_mm: 10.0
+        max_extent_x_mm: 80.0
+        min_extent_y_mm: 10.0
+        max_extent_y_mm: 80.0
+        min_extent_z_mm: 5.0
+        max_extent_z_mm: 60.0
+      thoracic:
+        min_volume_mm3: 5000.0
+        max_volume_mm3: 70000.0
+        min_extent_x_mm: 15.0
+        max_extent_x_mm: 100.0
+        min_extent_y_mm: 15.0
+        max_extent_y_mm: 100.0
+        min_extent_z_mm: 8.0
+        max_extent_z_mm: 80.0
+      lumbar:
+        min_volume_mm3: 8000.0
+        # max_volume_mm3 pinned by item 035 AC3 -- must equal
+        # heuristics/bounds.py::DEFAULT_BOUNDS["lumbar"]["max_volume_mm3"].
+        max_volume_mm3: 120000.0
+        min_extent_x_mm: 20.0
+        max_extent_x_mm: 120.0
+        min_extent_y_mm: 20.0
+        max_extent_y_mm: 120.0
+        min_extent_z_mm: 15.0
+        max_extent_z_mm: 100.0
+
+  # ------------------------------------------------------------------ #
+  # fragmentation (item 028) -- connected-components fragmentation /
+  # rogue-island detector.
+  # ------------------------------------------------------------------ #
+  fragmentation:
+    enabled: true
+    params:
+      # Below this fraction, the largest component no longer dominates the
+      # label -- judged split into comparable pieces (item 028 default).
+      fragmentation_index_threshold: 0.75
+      # A non-dominant component smaller than this voxel count is a rogue
+      # island rather than meaningful anatomy (item 028 default).
+      island_min_voxels: 50
+      severity: flagged-for-review
+
+  # ------------------------------------------------------------------ #
+  # coverage (item 029) -- missing-level / incomplete-span detector.
+  # Opt-in checks (expected_levels / expected_count) stay disabled: coverage
+  # is structural, not a hand-set numeric threshold.
+  # ------------------------------------------------------------------ #
+  coverage:
+    enabled: true
+    params:
+      border_aware: true
+      expected_levels: []
+      expected_count: null
+      severity: flagged-for-review
+
+  # ------------------------------------------------------------------ #
+  # sequence (item 030) -- non-continuous anatomical label-order detector.
+  # No numeric threshold: fires on relationships.out_of_order_labels.
+  # ------------------------------------------------------------------ #
+  sequence:
+    enabled: true
+    params:
+      severity: flagged-for-review
+
+  # ------------------------------------------------------------------ #
+  # border (item 031) -- partial-vertebra-at-FOV-border detector.
+  # Expected FOV-end truncations are suppressed by default
+  # (report_expected_ends: false); only unexpected/in-plane clips flag.
+  # ------------------------------------------------------------------ #
+  border:
+    enabled: true
+    params:
+      severity: flagged-for-review
+      report_expected_ends: false
+      end_severity: pass
+
+  # ------------------------------------------------------------------ #
+  # overlap (item 032) -- voxel-level label overlap detector.
+  # ------------------------------------------------------------------ #
+  overlap:
+    enabled: true
+    params:
+      # A single shared voxel already indicates overlapping labels
+      # (item 032 default) -- no tolerance for accidental voxel sharing.
+      min_overlap_voxels: 1
+      severity: flagged-for-review
+
+  # ------------------------------------------------------------------ #
+  # mislabel (item 033) -- spline-offset misalignment + ordering-
+  # inconsistency detector.
+  # ------------------------------------------------------------------ #
+  mislabel:
+    enabled: true
+    params:
+      # A centroid >= 15 mm off the fitted spinal curve is judged
+      # misaligned (item 033 default).
+      max_offset_mm: 15.0
+      flag_offset_outliers: true
+      flag_order_inconsistency: true
+      severity: flagged-for-review
+
+# Case-level verdict-aggregation policy (item 034).
+verdict:
+  # 0 = escalation disabled -- pure severity dominance, matching the
+  # built-in aggregate_verdict default.
+  flag_escalation_count: 0

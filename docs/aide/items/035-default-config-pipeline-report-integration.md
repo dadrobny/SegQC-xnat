@@ -527,4 +527,53 @@ This item integrates only already-merged interfaces; it is the join that makes
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`default_config_path()` via `importlib.resources.files(segqc)`**, converted to a
+  `pathlib.Path` with `pathlib.Path(str(ref))` — mirrors `report.py::_load_schema`'s
+  pattern. Works unchanged from the source tree and from an installed wheel because
+  Hatch already packages the whole `src/segqc` directory (no `pyproject.toml` edit
+  needed, per the Assumption).
+- **`default_config.yaml` mirrors the code defaults field-for-field**, one inline
+  comment per threshold. `bounds.params` nests the three level groups exactly as
+  `BoundsRule` expects (`config.rule_param("bounds", "lumbar", {})`), so
+  `bundled_default_config()` and `default_config()` are behaviourally identical
+  (AC5) — the file only *documents*, it does not recalibrate.
+- **`extract_feature_record`'s "ordered centroid sequence" is ascending integer
+  label order.** No anatomical re-sort is applied before feeding
+  `compute_spine_relationships` / the Stage 3 extractors; this is deterministic,
+  requires no extra bookkeeping, and matches every canonical synthetic fixture
+  (ascending label ⇒ ascending anatomical order). `SpineRelationships` still derives
+  `present_levels` / `missing_levels` in canonical order internally regardless of
+  input order.
+- **Stage 3 is computed only when `len(labels) >= 2`**, matching
+  `fit_centroid_spline`'s own `ValueError` guard; 0/1-label maps produce a
+  Stage-2-only block with no `stage3` key (AC7), and `mislabel` already tolerates
+  an absent `stage3` sub-block.
+- **`findings` is embedded as `[Finding.to_dict() for f in case_result.findings]`**
+  in both `serialize_report_json` (schema-validated) and `render_human_report`
+  (passed as live `Finding` objects, not dicts, since `human_report`'s renderer
+  reads either shape defensively). Both report layers keep `findings=None` as the
+  default so every pre-existing verdict-only / features-only call site is
+  unaffected (AC13/AC15).
+- **CLI config precedence:** `--config <path>` → `load_config(path)`, wrapped so a
+  `SegQCConfigError` (missing file, malformed YAML, wrong `schema_version`) prints
+  to stderr and returns exit 1 *before* `--out` is created or any report is
+  written (AC18). No `--config` → `bundled_default_config()`. The Stage 1
+  empty-check's `Reason`s are threaded into `run_qc` as case-level `base_reasons`
+  so the final exit code reflects the fully aggregated verdict, not just Stage 1.
+- **Known, spec-anticipated tension with the pre-existing `test_010_pipeline.py`
+  suite (out of this item's test-file scope, not touched):** two of its assertions
+  (`test_ac13_populated_fixture_json_verdict_is_pass`,
+  `test_adv_populated_fixture_human_report_contains_pass`) expect the
+  `labelled_blocks_files` fixture (three separated 4×4×4 mm cubes) to score
+  `verdict == "pass"` once the CLI actually runs the rule engine. Those cubes are
+  geometric placeholders from item 002, not tuned to the anatomical `bounds`
+  thresholds (e.g. lumbar `min_volume_mm3 == 8000` vs. the fixture's `64`), so
+  wiring `bounds` into `segqc run` — the explicit point of this item — now
+  legitimately flags them `flagged-for-review` (exit code is still `0`; only the
+  `"pass"` string assertions break). This exact split is called out in this
+  item's own Assumptions (item-002 fixtures vs. the crafted-record AC28
+  no-false-flag guarantee) and explicitly deferred to "the validator... at the
+  queue boundary" rather than to the builder loosening the just-wired bounds
+  check. No test file was edited to route around this; flagging it here for the
+  validator to reconcile (e.g. a follow-up item recalibrating the item-002
+  fixtures or updating `test_010_pipeline.py`'s two assertions).
