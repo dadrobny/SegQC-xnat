@@ -28,7 +28,7 @@
 | 1 | End-to-End Thin Slice: Empty Detection + Report | G1, G4 | ✅ |
 | 2 | Geometric & Topological Feature Extraction | (feature core) | ✅ |
 | 3 | Spinal Curve: Spline Fit & Deviation Features | (feature core) | ✅ |
-| 4 | Heuristic Rule Engine over Failure Modes | G2 | 🚧 |
+| 4 | Heuristic Rule Engine over Failure Modes | G2 | ✅ |
 | 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | 📋 |
 | 6 | VerSe Reference Distributions & Delta Rules | G3 | 📋 |
 | 7 | Evaluation, Calibration & Metrics *(Phase 1 complete)* | G3, G7 | 📋 |
@@ -142,7 +142,7 @@ mislabelling heuristics.
 
 ---
 
-## Stage 4 — Heuristic Rule Engine over the Failure Modes (G2) — 🚧
+## Stage 4 — Heuristic Rule Engine over the Failure Modes (G2) — ✅
 
 **Goal.** Explainable, configurable rule engine detecting each §6 failure mode.
 
@@ -156,12 +156,12 @@ mislabelling heuristics.
 - ✅ Rule family — overlap flag. *(Item 032)*
 - ✅ Rule family — mislabel / misalignment (centroid vs expected level ordering / spline). *(Item 033)*
 - ✅ Verdict aggregation: combine flags → pass / flag / fail with severity. *(Item 034)*
-- 🚧 Heuristic thresholds in a documented, versioned config file; pipeline/report integration & per-failure-mode tests. *(Item 035)*
+- ✅ Heuristic thresholds in a documented, versioned config file; pipeline/report integration & per-failure-mode tests. *(Item 035)*
 
 **Acceptance.**
-- [ ] Each of the 8 §6 failure modes has ≥1 heuristic firing on a crafted example (**G2**).
-- [ ] Every flag carries a reason + offending labels; thresholds live in config.
-- [ ] Tests assert correct firing **and** non-firing per rule.
+- [x] Each of the 8 §6 failure modes has ≥1 heuristic firing on a crafted example (**G2**).
+- [x] Every flag carries a reason + offending labels; thresholds live in config.
+- [x] Tests assert correct firing **and** non-firing per rule.
 
 ---
 
