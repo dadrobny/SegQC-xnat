@@ -1,6 +1,6 @@
 # Seg-QC-xnat — Work Queue 003
 
-> **Status:** Live · **Created:** 2026-06-29
+> **Status:** ✅ Completed — superseded by queue-004 (2026-07-07).
 > Step 4 of the AIDE workflow. Derived from [`../vision.md`](../vision.md),
 > [`../roadmap.md`](../roadmap.md), and [`../progress.md`](../progress.md).
 > Follows [`queue-002.md`](queue-002.md) (items 014, 016–025).
@@ -200,12 +200,15 @@ golden-stable.
 
 ---
 
-## Current state (2026-06-29)
+## Current state (2026-07-07)
 
-Freshly generated. No items claimed yet. **Item 026 (engine core + config model)
-must merge first** — it defines the `Rule`/finding interface that 027–035 build
-on. After 026, items 027–033 (the seven rule families) are parallelisable; 034
-(verdict aggregation) then 035 (default config + integration) close the stage.
+✅ **Stage 4 complete.** All items **026–035 are done** (✅ in `progress.md`): the
+rule-engine core + config model (026), the seven rule families (027–033), verdict
+aggregation (034), and the default heuristic config with pipeline/report
+integration and per-failure-mode tests (035) are all merged. Each of the eight §6
+failure modes has ≥1 heuristic firing on a crafted example while a ground-truth
+fixture passes. Superseded by [`queue-004.md`](queue-004.md), which delivers
+Stage 5 (synthetic failure corpus & regression suite) on top of this engine.
 
 ## Next Step
 
