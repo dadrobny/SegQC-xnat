@@ -23,6 +23,14 @@ interval = 300
 # Fallback wait (seconds) if a WAIT is chosen but no reset time is available.
 wait_fallback = 900
 
+# Which usage probe supplies the RUN/WAIT/STOP numbers.
+#   "anthropic-oauth" — the Claude adapter's probe (.aide/loop/usage_probe.py):
+#                       reads the OAuth usage endpoint and gates on the caps above.
+#   "none"            — no usage API; relaunch on a plain time cadence (`interval`),
+#                       ignoring the weekly/session caps. Use for runtimes/plans
+#                       without a usage endpoint.
+usage_probe = "anthropic-oauth"
+
 # Deadline: once the clock passes this, the loop finishes the current run and
 # exits without restarting. Any ISO-8601 datetime (e.g. "2026-06-30T09:00" or
 # "2026-06-30 09:00"). Empty = run indefinitely.

@@ -1,41 +1,42 @@
 #!/usr/bin/env python3
-"""loop — usage-gated supervisor for unattended AIDE roadmap runs.
+"""loop — usage-gated supervisor for unattended AIDE roadmap runs (engine).
 
-Relaunches the human-gated ``/aide-run-roadmap`` command whenever Claude's usage
-limits allow, so a long roadmap can make progress across the 5-hour and weekly
-windows without a person watching. It reads **hard** usage numbers from the OAuth
-usage endpoint (no output scraping) and decides RUN / WAIT / STOP_WEEKLY / ERR —
-a 1:1 stdlib port of the old ``check_usage.ps1`` + ``watch_and_resume.bat`` pair.
+Relaunches the human-gated ``/aide-run-roadmap`` command whenever usage limits
+allow, so a long roadmap can make progress across a provider's rate windows
+without a person watching. It reads **hard** usage numbers from a *pluggable
+usage probe* (no output scraping) and decides RUN / WAIT / STOP_WEEKLY.
 
-Stdlib-only (``urllib``); config comes from the gitignored
-``.aide/loop/loop.local.toml`` (see ``loop.local.toml.example``). The framework
-ships the script; the caps and deadlines are personal.
+**Provider-agnostic.** This is engine code: it contains no Anthropic/Claude
+specifics. The usage numbers come from an adapter-supplied ``usage_probe.py``
+sitting next to this file, selected by ``[loop] usage_probe`` in
+``loop.local.toml`` (``"anthropic-oauth"`` for the Claude adapter, ``"none"`` for
+any runtime lacking a usage API). A probe exposes ``get_usage(cfg) -> dict | None``
+and this module interprets the dict; see ``.aide/ADAPTER-SPEC.md``.
+
+Stdlib-only; config comes from the gitignored ``.aide/loop/loop.local.toml`` (see
+``loop.local.toml.example``). The framework ships the script; the caps and
+deadlines are personal.
 
 Decision loop, each pass:
   0. If a ``stop_after`` deadline is set and reached, exit without restarting.
-  1. Read usage → RUN / WAIT / STOP_WEEKLY / ERR.
+  1. Ask the probe for usage → RUN / WAIT / STOP_WEEKLY.
   2. STOP_WEEKLY → weekly ceiling hit; exit.
      WAIT <secs> → 5-hour window exhausted; sleep until it resets.
-     RUN        → run the command, then re-check after ``interval``.
-     ERR        → couldn't read usage (e.g. stale token); run the command once
-                  anyway — Claude Code refreshes the on-disk token for next pass.
+     RUN         → run the command, then re-check after ``interval``.
+     no reading  → probe returned None (``usage_probe="none"``, no token, or a
+                   fetch error); run the command once on the time cadence anyway
+                   (for token-based probes this also re-auths for next pass).
 """
 from __future__ import annotations
 
 import datetime as _dt
-import json
+import importlib.util
 import math
 import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
 from pathlib import Path
-from typing import Dict, Optional, Tuple
-
-USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
-OAUTH_BETA = "oauth-2025-04-20"
-ANTHROPIC_VERSION = "2023-06-01"
+from typing import Callable, Dict, Optional, Tuple
 
 DEFAULTS: Dict[str, object] = {
     "max_weekly_pct": 95.0,
@@ -45,7 +46,8 @@ DEFAULTS: Dict[str, object] = {
     "interval": 300,
     "wait_fallback": 900,
     "stop_after": "",
-    "credentials_path": "",   # empty -> ~/.claude/.credentials.json
+    "usage_probe": "none",    # "none" -> time cadence; adapters set e.g. "anthropic-oauth"
+    "credentials_path": "",   # consumed by a token-based probe (empty -> its own default)
     "command": "",            # empty -> claude "/aide-run-roadmap"
 }
 
@@ -98,35 +100,46 @@ def load_loop_config(path: Optional[Path] = None) -> Dict[str, object]:
 
 
 # --------------------------------------------------------------------------- #
-# usage endpoint
+# usage probe (pluggable — the one core/adapter seam)
 # --------------------------------------------------------------------------- #
-def _credentials_path(cfg: Dict[str, object]) -> Path:
-    raw = str(cfg.get("credentials_path") or "").strip()
-    if raw:
-        return Path(raw).expanduser()
-    return Path.home() / ".claude" / ".credentials.json"
+# The engine defines the slot; an adapter fills it. When ``usage_probe`` is not
+# "none", the engine imports the ``usage_probe.py`` module sitting next to this
+# file and calls its ``get_usage(cfg) -> dict | None``. That indirection is what
+# keeps the engine provider-neutral: it names a file, never a provider.
+UsageProbe = Callable[[], Optional[Dict[str, object]]]
 
 
-def read_access_token(cfg: Dict[str, object]) -> Optional[str]:
-    path = _credentials_path(cfg)
+def _import_probe_module():
+    """Import the adapter's ``usage_probe.py`` sibling, or return None if absent."""
+    path = Path(__file__).resolve().parent / "usage_probe.py"
     if not path.is_file():
         return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    spec = importlib.util.spec_from_file_location("aide_usage_probe", path)
+    if spec is None or spec.loader is None:
         return None
-    token = (data.get("claudeAiOauth") or {}).get("accessToken")
-    return token or None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
-def fetch_usage(token: str, timeout: int = 30) -> Dict[str, object]:
-    req = urllib.request.Request(USAGE_URL, headers={
-        "Authorization": f"Bearer {token}",
-        "anthropic-beta": OAUTH_BETA,
-        "anthropic-version": ANTHROPIC_VERSION,
-    })
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - fixed https host
-        return json.loads(resp.read().decode("utf-8"))
+def load_probe(cfg: Dict[str, object]) -> UsageProbe:
+    """Resolve ``[loop] usage_probe`` to a zero-arg ``() -> dict | None`` callable.
+
+    ``"none"`` (or unset) → a probe that always returns None, so the loop relaunches
+    on the plain time cadence. Any other value selects the adapter-supplied
+    ``usage_probe.py`` sibling module; if that module is missing or lacks
+    ``get_usage``, the loop logs once and degrades to the same time cadence rather
+    than crashing.
+    """
+    probe_id = str(cfg.get("usage_probe") or "none").strip().lower()
+    if probe_id in ("", "none"):
+        return lambda: None
+    module = _import_probe_module()
+    if module is None or not hasattr(module, "get_usage"):
+        _log(f"usage_probe={probe_id!r} but no usage_probe.py with get_usage() "
+             f"found next to loop.py — running on time cadence.")
+        return lambda: None
+    return lambda: module.get_usage(cfg)
 
 
 # --------------------------------------------------------------------------- #
@@ -207,23 +220,27 @@ def run_forever(cfg: Dict[str, object]) -> int:
     command = _command(cfg)
     interval = int(cfg.get("interval", 300) or 300)
     wait_fallback = int(cfg.get("wait_fallback", 900) or 900)
+    probe = load_probe(cfg)
     while True:
         now = _dt.datetime.now(_dt.timezone.utc)
         if _past_deadline(cfg, now):
             _log(f"Reached stop_after deadline ({cfg.get('stop_after')}). Not restarting.")
             return 0
 
-        token = read_access_token(cfg)
-        if not token:
-            _log("Could not read usage (no access token). Running command to re-auth…")
+        usage: Optional[Dict[str, object]] = None
+        try:
+            usage = probe()
+        except Exception as exc:  # noqa: BLE001 - a broken probe must not wedge the loop
+            _log(f"Usage probe raised ({exc}). Running command on time cadence…")
+        if usage is None:
+            _log("No usage reading (probe none/unavailable). Running command on time cadence…")
             subprocess.run(command)
             time.sleep(interval)
             continue
         try:
-            usage = fetch_usage(token)
             action, arg, five, seven = decide_action(usage, cfg, now)
-        except (urllib.error.URLError, OSError, ValueError, KeyError) as exc:
-            _log(f"Could not read usage ({exc}). Running command to re-auth…")
+        except (ValueError, KeyError) as exc:
+            _log(f"Could not interpret usage ({exc}). Running command on time cadence…")
             subprocess.run(command)
             time.sleep(interval)
             continue
@@ -249,14 +266,14 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     cfg = load_loop_config(args.config)
     if args.once:
-        token = read_access_token(cfg)
-        if not token:
-            print("ERR no-access-token")
-            return 0
+        probe = load_probe(cfg)
         try:
-            usage = fetch_usage(token)
-        except (urllib.error.URLError, OSError) as exc:
+            usage = probe()
+        except Exception as exc:  # noqa: BLE001 - report, don't crash the diagnostic
             print(f"ERR {exc}")
+            return 0
+        if usage is None:
+            print("ERR no-usage")
             return 0
         action, arg, five, seven = decide_action(usage, cfg)
         print(action, arg if arg is not None else "", round(five), round(seven))
