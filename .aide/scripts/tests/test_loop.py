@@ -91,13 +91,11 @@ def test_load_probe_degrades_when_module_absent(monkeypatch):
     monkeypatch.setattr(loop, "_import_probe_module", lambda: None)
     assert loop.load_probe({"usage_probe": "anthropic-oauth"})() is None
 
-
-def test_adapter_probe_module_conforms_to_contract():
-    # The shipped Claude adapter probe must expose get_usage(cfg) — importing is
-    # side-effect-free (no network until get_usage is called).
-    module = loop._import_probe_module()
-    assert module is not None
-    assert callable(getattr(module, "get_usage", None))
+# NOTE: the "shipped Claude probe conforms to get_usage()" check is a *consumer/adapter*
+# invariant — it asserts usage_probe.py sits next to loop.py, which is only true after
+# install.py co-locates them. The engine (core/) and the Claude probe
+# (adapters/claude/usage_probe.py) are deliberately separate, so that invariant is
+# verified at the adapter/installer level: adapters/claude/tests/test_usage_probe.py.
 
 
 def test_parse_toml_reads_loop_table():

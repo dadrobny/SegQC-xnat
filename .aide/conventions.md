@@ -99,42 +99,30 @@ claim branch whose item is already ✅ (stale claim).
 
 ---
 
-## 3. Command hygiene (canonical rules; enforced by a hook)
+## 3. Command hygiene (canonical rules)
 
-The permission allow-list matches a command **prefix** and auto-approves a
-compound only if every part matches. Emit commands in the shape the matcher
-recognises, or an unattended run stalls on prompts.
+These rules keep shell commands robust, legible, and failure-localised on **any**
+runtime — they hold whether or not a runtime has a permission model. This section
+is the single canonical statement of the rules and their rationale; each
+agent/command carries a short *positive-form primer* of the same rules so the
+correct shape is in context up front (fewer wasted retries). How these rules are
+**enforced**, and any provider-specific **command shaping** a permission policy
+demands on top of them, are *adapter* concerns — see the adapter's README.
 
-**Two layers keep this followed without copy-drift.** This section is the single
-canonical statement of the rules and their rationale. Each agent/command carries
-a short *positive-form primer* of the same rules so the correct shape is in
-context up front (fewer wasted retries) — but the primers are not load-bearing:
-a `PreToolUse` hook (`.claude/hooks/command_hygiene_guard.py`, wired in
-`.claude/settings.json`) **enforces** the mechanical rules below. A violating
-shape is blocked before it reaches the permission prompt and bounced back to the
-agent with the fix, so the run self-corrects and stays unattended rather than
-stalling. The hook is deliberately narrow (it rejects wrong shapes; it cannot
-supply the right one — that is what the primer prose is for) and fail-open (a
-guard error defers to the ordinary permission flow, never wedges the loop).
+The rules (runtime-general):
 
-The rules:
+- **One command per call.** Never chain with `&&` or `;` — separate calls localise
+  failures and keep each invocation legible.
+- **No `cd` prefix and no directory-changing wrapper** (`git -C "<path>"`). The
+  tool's working directory is already the repo root; both are redundant and brittle
+  when the repo path contains spaces or apostrophes. Run the bare command.
+- **No `2>&1`** or other redirections — the tool already captures stderr.
+- **No command substitution in commits.** Avoid `$(…)`/backticks; use single-line
+  `-m "msg"`, repeated `-m` for paragraphs, or `git commit -F <file>`.
 
-- **No `cd` prefix and no `git -C "<path>"`.** The Bash tool's cwd is already the
-  repo root; both are redundant and break prefix matching (this repo's path has
-  spaces and an apostrophe). Run the bare command.
-- **One command per Bash call.** Never chain with `&&` or `;` — separate calls
-  each match their own rule and localise failures.
-- **No `2>&1`** or other redirections — the Bash tool already captures stderr.
-- **No command substitution in commits.** `$(…)`/backticks are never
-  auto-approved. Use single-line `-m "msg"`, repeated `-m` for paragraphs, or
-  `git commit -F <file>`.
-- **Recon via the Bash tool with `grep`** (`git branch -r | grep aide/`), never
-  the PowerShell tool / `Select-String` — only `Bash(...)` rules are allow-listed.
-- **Python/pytest via the venv in relative form** — `.venv/Scripts/python …`
-  (Windows) or `.venv/bin/python …`. Not an absolute path, not the PowerShell
-  call operator: only the relative prefix is allow-listed.
-- **The `aide` CLI** runs as `python .aide/scripts/aide.py <cmd>` (stdlib-only,
-  venv-independent) — one allow rule covers every subcommand.
+The `aide` CLI always runs as `python .aide/scripts/aide.py <cmd>` — stdlib-only
+and venv-independent, so it works before any project venv exists and identically
+across runtimes.
 
 ---
 
