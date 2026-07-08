@@ -503,4 +503,52 @@ import in `src/segqc/synth/__init__.py`. No edits to existing production modules
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`fragment` split mechanics.** Carves `n_pieces - 1` interior 1-voxel-thick
+  slabs along axis 0, spaced evenly across the target's bounding-box span via
+  `round(i * span / n_pieces)`, clamped strictly inside `(x_min, x_max)`. Only
+  the slab's masked voxels are zeroed (`data[split_x][mask[split_x]] = 0`), not
+  the entire y/z plane, so the operation is safe even if a label's cross-section
+  is non-rectangular. For the default `n_pieces=2` on the clean GT's 25-voxel
+  bodies this yields two ~9000-voxel pieces (`fragmentation_index == 0.5`),
+  comfortably satisfying AC2's `>= island_min_voxels` floor. Raises
+  `SegQCInputError` if the target's axis-0 span is too thin for the requested
+  `n_pieces` (defensive; not exercised by the clean-GT-sized fixtures in the
+  committed tests).
+
+- **`fuse` adjacency is defined as consecutive position in the sorted
+  present-label list**, not `neighbour == target + 1` by integer value. These
+  coincide for the default lumbar convention (labels 20-24, contiguous), but
+  the list-index definition is the more general/defensible one and is what the
+  adversarial non-adjacent test (`target=20, neighbour=23`) exercises.
+
+- **`inject_islands` placement axis.** Islands are placed along image axis 1
+  (left-right) rather than axis 0 or axis 2: measured against the actual
+  `build_clean_spine()` output, axis-1 margin below/above each body is >= 15
+  voxels regardless of spacing (`sy` is untouched by the anisotropic
+  `spacing=(1,1,3)` fixture used in the adversarial test), while axis-2 margin
+  shrinks to 5 voxels under that same anisotropic spacing — too tight to
+  reliably fit a 3x3x3 block plus gap plus inset. Verified empty-space checks
+  (`np.all(block == 0)`) still guard correctness generically; the axis-1
+  choice is a placement heuristic tuned to the item-036 geometry, not a
+  hard-coded offset.
+
+- **Island block shape.** A perfect-cube `island_voxels` (e.g. the default 27)
+  is placed as a solid cube; a non-cube count falls back to a 1-voxel-wide
+  line along axis 2 (trivially 6-connected, exact voxel count). Only the cube
+  path is exercised by the committed tests (default `island_voxels=27`).
+
+- **No `Rule`/heuristics/config edits.** Verified by smoke-running all three
+  operators (fragment/fuse/inject_islands, including the anisotropic-spacing
+  and unspecified-target/seed-3 self-consistency cases) against the real
+  `run_qc(labelmap, bundled_default_config())` pipeline unchanged — every
+  operator drives the existing `FragmentationRule` exactly as the spec
+  predicts, with no spurious `bounds`/`border`/`overlap` findings.
+
+- **No stochastic behaviour beyond target/pair selection.** Once a target (or
+  target/neighbour pair) is resolved, all three operators are fully
+  determined by body geometry — no further `seeded_rng` draws are needed for
+  the split-plane position, the fuse merge, or the island placement. This
+  keeps AC20/AC21 (same-seed reproducibility, non-mutation) trivially true for
+  the explicit-target case while AC22's unspecified-target determinism still
+  flows solely from `seeded_rng(seed)` via `_choose_label` /
+  `_choose_adjacent_pair`.

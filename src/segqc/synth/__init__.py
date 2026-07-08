@@ -15,7 +15,10 @@ downstream Stage 5 item (037-042) imports against:
 Importing this package (``import segqc.synth``) imports
 ``segqc.synth.perturbation``, which self-registers ``IdentityPerturbation``
 under ``"identity"`` -- mirroring how ``segqc.heuristics.__init__`` imports
-its rule modules so every rule self-registers on import.
+its rule modules so every rule self-registers on import. It also imports
+``segqc.synth.component_shape`` (item 037), which self-registers
+``FragmentPerturbation``/``FusePerturbation``/``InjectIslandsPerturbation``
+under ``"fragment"``/``"fuse"``/``"inject_islands"``.
 """
 
 from __future__ import annotations
@@ -34,6 +37,11 @@ from segqc.synth.perturbation import (
     register_perturbation,
     seeded_rng,
 )
+from segqc.synth.component_shape import (
+    FragmentPerturbation,
+    FusePerturbation,
+    InjectIslandsPerturbation,
+)
 
 __all__ = [
     "DEFAULT_LEVELS",
@@ -50,4 +58,7 @@ __all__ = [
     "perturbation_names",
     "seeded_rng",
     "IdentityPerturbation",
+    "FragmentPerturbation",
+    "FusePerturbation",
+    "InjectIslandsPerturbation",
 ]
