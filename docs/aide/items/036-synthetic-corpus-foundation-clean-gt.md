@@ -562,4 +562,48 @@ is the critical-path foundation gating the rest of queue-004.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implementation notes (builder), recorded against the spec's Assumptions:
+
+- **Fixed body size shared across all level groups.** Rather than choosing a
+  per-group physical body size, the builder uses one fixed
+  ``(axis0, axis1, axis2) = (25, 30, 25)`` mm block for every vertebra
+  regardless of level group. Checked against `DEFAULT_BOUNDS`, this size (and
+  its resulting 18750 mm³ volume) sits comfortably inside the cervical,
+  thoracic, *and* lumbar ranges simultaneously, so the same builder code path
+  satisfies AC5/AC6 without a group-size lookup table. Simpler and still
+  correct; a future item can widen this if group-specific extremes are
+  needed.
+- **Contiguity check alone enforces the transitional-vertebra trap.**
+  `_validate_span` resolves each requested level name to its
+  `CANONICAL_ORDER` rank and requires consecutive ranks (`rank[i+1] ==
+  rank[i] + 1`). Because `CANONICAL_ORDER` already interleaves T13 between
+  T12/L1 and L6 between L5/S, this single check is sufficient to reject any
+  span crossing those junctions (e.g. `["T12", "L1"]` skips over `T13` and
+  fails the consecutive-rank test) — no separate "single anatomical group"
+  check was needed on top of it.
+- **Smooth curve is a one-sided (non-negative) lateral hump.** The centroid
+  path shifts only in the left-right (axis 1) direction, via
+  ``amplitude_mm * sin(pi * frac)`` where ``frac`` is each body's fractional
+  position along the stack (0 at the ends, peaking at the middle body). Since
+  this is always `>= 0`, only a single extra margin allowance on axis 1 is
+  needed (no anterior-posterior curvature was added — unnecessary for
+  satisfying AC11, and it keeps the margin/shape arithmetic one-directional
+  and easy to reason about).
+- **Why `mislabel` offsets land near-zero regardless of curve amplitude.**
+  `fit_centroid_spline` interpolates through every input centroid exactly
+  (`splprep(..., s=0)`), and `compute_spline_offsets` measures each
+  centroid's distance to its own closest point on that same spline — so any
+  smooth, monotonic path (not just a straight line) yields near-zero offsets
+  by construction. Verified empirically: offsets on the default clean GT are
+  all `< 1e-3` mm, far under the 15 mm threshold.
+- **Scan texture mirrors `tests/synthetic.py`'s `make_scan(gradient=True)`
+  idiom** (a simple int16 ramp along axis 0) but is implemented locally in
+  `synth/clean_gt.py` rather than importing the `tests/` module from
+  production code — production code must not depend on the test package.
+- **Verified against the real pipeline, not just constructed.** Beyond the
+  committed tests, the builder was smoke-tested directly against
+  `segqc.pipeline.run_qc` (findings `== ()`, verdict `PASS`) for the default
+  lumbar span, an anisotropic `(1,1,3)` spacing, and a thoracic `T5-T10`
+  span, and end-to-end through `segqc.cli.main(["run", ...])` (exit code 0,
+  `segqc_report.json` verdict `"pass"`, empty `"findings"`) before this
+  implementation was committed.
