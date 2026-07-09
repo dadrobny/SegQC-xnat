@@ -670,4 +670,33 @@ production modules.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- Implemented exactly as pinned: `src/segqc/synth/identity_ordering_alignment.py`
+  (three classes) plus one additive import block in `src/segqc/synth/__init__.py`
+  (import + three `__all__` entries). No edits to `perturbation.py`, `clean_gt.py`,
+  `component_shape.py`, or `coverage_border_overlap.py`.
+- `displace`'s diagonal translation splits `displacement_mm` evenly across axis-1
+  and axis-2 (`displacement_mm / sqrt(2)` per axis, converted to voxels via each
+  axis's spacing, `max(1, round(...))`), always toward the higher-index face of
+  each axis, rejecting (`SegQCInputError`) if the shifted body would land within
+  1 voxel of either face. Verified empirically against the real pipeline: default
+  lumbar isotropic leave-one-out offset for label 22 ≈ 18.87 mm; anisotropic
+  `(1,1,3)` ≈ 18.19 mm — both comfortably clear the 15.0 mm threshold and both
+  leave `run_qc` silent on `mislabel` (AC5), matching the spec's verified figures.
+- `relabel_swap` swaps voxels via a temporary sentinel value
+  (`int(data.max()) + 1`), which is guaranteed absent from the present-label set
+  since it's derived from the map's own max present label — no collision risk
+  even when the map contains labels near the top of the convention's range.
+- `sequence_break`'s degenerate-input check (`len(present_labels) < 2`) is
+  evaluated before target resolution, so a single-label map raises
+  `SegQCInputError` regardless of whether `target_label` was given explicitly;
+  matches `RelabelSwapPerturbation`'s ordering too.
+- Manually verified (outside pytest, per the builder's no-test-run constraint)
+  against the real Stage 3/4 pipeline that: `displace` and `relabel_swap` both
+  produce a real leave-one-out offset / reconstructed non-monotonic pair
+  respectively while leaving plain `run_qc` silent; `sequence_break` fires a real
+  `run_qc` "sequence" finding (`Non-continuous label sequence: T13 out of
+  anatomical order.`, `labels == {28}`) with no `coverage` co-fire on the default
+  tail-lumbar target. All adversarial rejects (`displace` explicit-target-absent,
+  too-large `displacement_mm`; `relabel_swap` single-label and non-adjacent pair;
+  `sequence_break` single-label and `new_label`-already-present) raise
+  `SegQCInputError` as specified.

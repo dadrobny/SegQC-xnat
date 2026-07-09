@@ -47,6 +47,11 @@ from segqc.synth.coverage_border_overlap import (
     ForceOverlapPerturbation,
     RemoveLevelPerturbation,
 )
+from segqc.synth.identity_ordering_alignment import (
+    DisplacePerturbation,
+    RelabelSwapPerturbation,
+    SequenceBreakPerturbation,
+)
 
 __all__ = [
     "DEFAULT_LEVELS",
@@ -69,4 +74,7 @@ __all__ = [
     "RemoveLevelPerturbation",
     "CropAtBorderPerturbation",
     "ForceOverlapPerturbation",
+    "DisplacePerturbation",
+    "RelabelSwapPerturbation",
+    "SequenceBreakPerturbation",
 ]
