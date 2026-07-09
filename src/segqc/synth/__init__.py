@@ -42,6 +42,11 @@ from segqc.synth.component_shape import (
     FusePerturbation,
     InjectIslandsPerturbation,
 )
+from segqc.synth.coverage_border_overlap import (
+    CropAtBorderPerturbation,
+    ForceOverlapPerturbation,
+    RemoveLevelPerturbation,
+)
 
 __all__ = [
     "DEFAULT_LEVELS",
@@ -61,4 +66,7 @@ __all__ = [
     "FragmentPerturbation",
     "FusePerturbation",
     "InjectIslandsPerturbation",
+    "RemoveLevelPerturbation",
+    "CropAtBorderPerturbation",
+    "ForceOverlapPerturbation",
 ]

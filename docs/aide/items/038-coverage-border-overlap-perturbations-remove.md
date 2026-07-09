@@ -619,4 +619,70 @@ modules.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`remove_level`'s unspecified-target choice is the literal middle interior
+  label, not a `seeded_rng` draw.** The Implementation Steps offered either
+  option ("defaults to the middle interior label (or a `seeded_rng(seed)` pick
+  among interior labels)"). Chose the literal middle (`interior[len(interior)
+  // 2]`) for simplicity and because the Public-interface bullet and
+  Assumptions both independently state "Default target: the middle interior
+  label" / "The default target is the middle interior label (label 22 = L3 for
+  the default lumbar span)" without qualification. `seed` is still accepted
+  and threaded per the `Perturbation` signature but unused by this operator's
+  selection logic; determinism (AC27) holds trivially since the choice never
+  varies. `crop_at_border` and `force_overlap` do use `seeded_rng`/`_choose_
+  label`/`_choose_adjacent_pair` for their unspecified-target/pair selection,
+  matching item 037's precedent, since the spec's Assumptions single out only
+  `remove_level`'s default as "the middle interior label."
+
+- **`crop_at_border` realises "translate by margin + crop_depth, then clip"
+  via an `np.argwhere` shift-and-filter on the target's own voxel coordinates**
+  (mirroring `InjectIslandsPerturbation`'s fancy-indexing idiom in
+  `component_shape.py`, reimplemented locally per the scope boundary). `margin`
+  is computed dynamically from the target's own bounding box distance to the
+  chosen face (not the clean-GT's fixed `_MARGIN_MM`), so the operator is
+  robust to any starting position. Because bodies in `build_clean_spine` are
+  separated only along axis 0 and share axis-1/axis-2 footprints, an in-plane
+  crop (axis 1 or 2) can never alias into a neighbouring vertebra's voxels;
+  this was verified but not needed for the axis-0 (`superior`/`inferior`) face
+  arms, which are supported (per the pinned six-face interface, reject only an
+  unknown string) but not exercised by any AC/adversarial test — a large
+  axis-0 translation on a mid-spine target could in principle intrude on an
+  adjacent vertebra's footprint; this is accepted as an unexercised corner of
+  the six-face contract, consistent with the spec defaulting `face` to an
+  in-plane value specifically to sidestep axis-0 semantics.
+
+- **Under anisotropic spacing (`spacing=(1.0, 1.0, 3.0)`), `crop_at_border`'s
+  default `crop_depth=5` can additionally trip the `bounds` rule's
+  `min_extent_z_mm` floor** (verified: label 22's z-extent drops from 27 mm to
+  12 mm against lumbar's 15 mm minimum, because the anisotropic z-spacing
+  shrinks the body to only 9 voxels along that axis, and cropping 5 of them
+  removes over half the extent). AC13 (no spurious `bounds` finding) is scoped
+  to the default-spacing fixture only, and AC28's anisotropic assertion checks
+  only that the `border` rule fires (via `_designated_rule_fires`), which it
+  does; both are satisfied as verified via manual smoke tests during
+  implementation. Not treated as a defect — `crop_depth` is a caller-supplied
+  constructor parameter and a caller targeting extreme anisotropic spacing can
+  pass a smaller value.
+
+- **`force_overlap`'s target-shift direction and gap are computed from the
+  target/neighbour bounding boxes at `apply` time** (not hardcoded to a fixed
+  sign), so the same operator instance works correctly regardless of which of
+  the pair sits at the lower or higher axis-0 position. The contested overhang
+  is reassigned to the target by erasing the target's original footprint and
+  writing the shifted coordinates last, so any neighbour voxels the shifted
+  block lands on are overwritten to the target label — exactly the
+  "reassign contested voxels from neighbour to target" behaviour AC19 checks.
+
+- **Added lightweight constructor-time guards not explicitly required by an
+  AC** (`crop_depth >= 1` for `CropAtBorderPerturbation`, `overlap_depth >= 1`
+  for `ForceOverlapPerturbation`, and a "would clip the entire body away" /
+  "would shift the target outside the image bounds" guard in each `apply`).
+  These raise `SegQCInputError` for degenerate parameterisations that no test
+  exercises (all tests use the documented defaults or small explicit depths
+  well within body extents); added defensively per the class's role as a
+  reusable operator for the not-yet-built corpus generator (items 040/041).
+
+- Implemented exactly the three classes, local shared helpers (not imported
+  from `component_shape.py`), and the one additive `synth/__init__.py` import
+  block, per the spec's scope boundary. No edits to `perturbation.py`,
+  `clean_gt.py`, or `component_shape.py`.
