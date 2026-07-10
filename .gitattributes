@@ -1,2 +1,3 @@
 tests/corpus/manifest.json text eol=lf
+tests/corpus/golden/*.json text eol=lf
 tests/corpus/fixtures/*.nii.gz binary
