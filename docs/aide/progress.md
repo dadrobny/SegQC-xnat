@@ -177,7 +177,7 @@ mislabelling heuristics.
   alignment perturbations — displace, relabel/swap, sequence-break *(Item 039)*.
 - ✅ Small committed fixture set spanning all 8 failure modes. *(Item 040)*
 - ✅ Regression suite asserting expected verdict + which heuristic fired per case. *(Item 041)*
-- 📋 Golden-file JSON snapshots for stability/determinism. *(Item 042)*
+- 🚧 Golden-file JSON snapshots for stability/determinism. *(Item 042)*
 
 **Acceptance.**
 - [ ] Every §6 failure mode has ≥1 synthetic case and is detected (**G7**, **G2**).
