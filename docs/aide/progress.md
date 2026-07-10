@@ -29,7 +29,7 @@
 | 2 | Geometric & Topological Feature Extraction | (feature core) | ✅ |
 | 3 | Spinal Curve: Spline Fit & Deviation Features | (feature core) | ✅ |
 | 4 | Heuristic Rule Engine over Failure Modes | G2 | ✅ |
-| 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | 🚧 |
+| 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | ✅ |
 | 6 | VerSe Reference Distributions & Delta Rules | G3 | 📋 |
 | 7 | Evaluation, Calibration & Metrics *(Phase 1 complete)* | G3, G7 | 📋 |
 | 8 | Image-Based / Radiomics Features | (Phase 2) | 📋 |
@@ -42,7 +42,7 @@
 | Objective | Delivered by | Status |
 |-----------|--------------|--------|
 | G1 Detect empty / trivially-failed | Stage 1 | ✅ |
-| G2 Detect catalogued failure modes (§6) | Stages 4, 5 | 🚧 |
+| G2 Detect catalogued failure modes (§6) | Stages 4, 5 | ✅ |
 | G3 Distinguish failure from variation | Stages 6, 7 | 📋 |
 | G4 Per-case QC report (JSON + human) | Stage 1 (ext. 2–4) | ✅ |
 | G5 Deploy on XNAT *(deferred)* | Stage 9 | 📋 |
@@ -165,7 +165,7 @@ mislabelling heuristics.
 
 ---
 
-## Stage 5 — Synthetic Failure Corpus & Regression Suite (G7) — 🚧
+## Stage 5 — Synthetic Failure Corpus & Regression Suite (G7) — ✅
 
 **Goal.** Reproducible corpus + automated tests covering every failure mode.
 
@@ -177,11 +177,11 @@ mislabelling heuristics.
   alignment perturbations — displace, relabel/swap, sequence-break *(Item 039)*.
 - ✅ Small committed fixture set spanning all 8 failure modes. *(Item 040)*
 - ✅ Regression suite asserting expected verdict + which heuristic fired per case. *(Item 041)*
-- 🚧 Golden-file JSON snapshots for stability/determinism. *(Item 042)*
+- ✅ Golden-file JSON snapshots for stability/determinism. *(Item 042)*
 
 **Acceptance.**
-- [ ] Every §6 failure mode has ≥1 synthetic case and is detected (**G7**, **G2**).
-- [ ] Full-pipeline regression suite green; golden JSON stable across repeated runs.
+- [x] Every §6 failure mode has ≥1 synthetic case and is detected (**G7**, **G2**).
+- [x] Full-pipeline regression suite green; golden JSON stable across repeated runs.
 
 ---
 
