@@ -29,7 +29,7 @@
 | 2 | Geometric & Topological Feature Extraction | (feature core) | ✅ |
 | 3 | Spinal Curve: Spline Fit & Deviation Features | (feature core) | ✅ |
 | 4 | Heuristic Rule Engine over Failure Modes | G2 | ✅ |
-| 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | 📋 |
+| 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | 🚧 |
 | 6 | VerSe Reference Distributions & Delta Rules | G3 | 📋 |
 | 7 | Evaluation, Calibration & Metrics *(Phase 1 complete)* | G3, G7 | 📋 |
 | 8 | Image-Based / Radiomics Features | (Phase 2) | 📋 |
@@ -47,7 +47,7 @@
 | G4 Per-case QC report (JSON + human) | Stage 1 (ext. 2–4) | ✅ |
 | G5 Deploy on XNAT *(deferred)* | Stage 9 | 📋 |
 | G6 Portable / GPU *(deferred)* | Stage 10 | 📋 |
-| G7 Evaluable & regression-testable | Stages 5, 7 | 📋 |
+| G7 Evaluable & regression-testable | Stages 5, 7 | 🚧 |
 | G8 Extensible / classification *(deferred)* | Stage 11 | 📋 |
 
 ---
@@ -165,12 +165,12 @@ mislabelling heuristics.
 
 ---
 
-## Stage 5 — Synthetic Failure Corpus & Regression Suite (G7) — 📋
+## Stage 5 — Synthetic Failure Corpus & Regression Suite (G7) — 🚧
 
 **Goal.** Reproducible corpus + automated tests covering every failure mode.
 
 **Deliverables.**
-- 📋 Synthetic-failure generator: clean-GT spine builder & perturbation
+- ✅ Synthetic-failure generator: clean-GT spine builder & perturbation
   framework *(Item 036)*; component/shape perturbations — fragment, fuse,
   inject islands *(Item 037)*; coverage/border/overlap perturbations — remove
   level, crop at border, force overlap *(Item 038)*; identity/ordering/
