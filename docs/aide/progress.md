@@ -175,7 +175,7 @@ mislabelling heuristics.
   inject islands *(Item 037)*; coverage/border/overlap perturbations — remove
   level, crop at border, force overlap *(Item 038)*; identity/ordering/
   alignment perturbations — displace, relabel/swap, sequence-break *(Item 039)*.
-- 📋 Small committed fixture set spanning all 8 failure modes. *(Item 040)*
+- ✅ Small committed fixture set spanning all 8 failure modes. *(Item 040)*
 - 📋 Regression suite asserting expected verdict + which heuristic fired per case. *(Item 041)*
 - 📋 Golden-file JSON snapshots for stability/determinism. *(Item 042)*
 
