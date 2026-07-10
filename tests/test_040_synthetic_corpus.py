@@ -137,7 +137,7 @@ def _seg_nifti_from_case(case):
     """A fresh nib.Nifti1Image built from the *loaded* seg's data/affine, so
     run_qc exercises exactly the Stage-0-loaded content (per AC9/AC14)."""
     seg = _loaded_case(case).seg
-    return nib.Nifti1Image(seg.data, seg.affine)
+    return nib.Nifti1Image(seg.data, seg.affine, dtype=seg.data.dtype)
 
 
 def _findings(seg_img):
