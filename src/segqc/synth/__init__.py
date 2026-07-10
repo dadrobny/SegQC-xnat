@@ -61,6 +61,18 @@ from segqc.synth.corpus import (
     load_manifest,
     write_corpus,
 )
+from segqc.synth.regression import (
+    RECONSTRUCTIONS,
+    designated_findings,
+    designated_rule_fired,
+    loaded_seg_image,
+    offending_labels_match,
+    pipeline_findings,
+    pipeline_hides_designated_rule,
+    pipeline_verdict_label,
+    reconstructed_findings,
+    verify_case,
+)
 
 __all__ = [
     "DEFAULT_LEVELS",
@@ -93,4 +105,14 @@ __all__ = [
     "build_corpus",
     "load_manifest",
     "write_corpus",
+    "RECONSTRUCTIONS",
+    "loaded_seg_image",
+    "pipeline_findings",
+    "pipeline_verdict_label",
+    "reconstructed_findings",
+    "designated_findings",
+    "designated_rule_fired",
+    "offending_labels_match",
+    "pipeline_hides_designated_rule",
+    "verify_case",
 ]

@@ -457,4 +457,42 @@ Intended code path: new `src/segqc/synth/regression.py` + an additive re-export 
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- Implemented `src/segqc/synth/regression.py` exactly per the Public
+  interface / Implementation Steps: `loaded_seg_image`, `pipeline_findings`,
+  `pipeline_verdict_label`, the three `_recon_*` handlers registered in
+  `RECONSTRUCTIONS`, `reconstructed_findings` (raises `ValueError` on an
+  unrecognised technique per AC12), `designated_findings`,
+  `designated_rule_fired`, `offending_labels_match`,
+  `pipeline_hides_designated_rule`, and `verify_case`. All names are
+  additively re-exported from `src/segqc/synth/__init__.py` (imported after
+  `corpus`, so its submodule dependencies — `clean_gt`, `corpus` — are
+  already resolved by that point; no circular import).
+- The three reconstruction handlers reuse the exact technique items 038/039
+  established in their own test modules (`_loo_offset` /
+  `_reconstruct_mono_pairs` in `tests/test_039_...py`, the
+  `force_overlap` branch of `_designated_rule_fires` in
+  `tests/test_038_...py`), translated from test-local helpers into the
+  importable library functions the spec calls for — no behavioural
+  deviation.
+- `designated_findings` dispatches on `case["detection"]` (`"pipeline"` ->
+  `pipeline_findings`; `"reconstructed_record"` -> `reconstructed_findings`)
+  and raises `ValueError` for any other value, mirroring `reconstructed_
+  findings`'s AC12 loud-failure contract rather than silently returning
+  nothing for a future unhandled `detection` value; `verify_case` does the
+  same for its own dispatch. Not required by an explicit AC but consistent
+  with AC2's "no silent skip" intent and cheap to add.
+- `verify_case`'s pipeline branch treats `failure_mode == 0` (the clean
+  control) as the "clean" case per the interface block's phrasing
+  ("clean -> no findings"), rather than re-deriving cleanliness from
+  `expected_labels`/`expected_rule_ids` being empty — matches the manifest's
+  only clean case (`clean_control`) and keeps the dispatch simple.
+- Verified end-to-end against the real committed corpus (`tests/corpus/
+  manifest.json`, 9 cases): `verify_case(case)` is `True` for all 9, and
+  `reconstructed_findings` raises `ValueError` for a mutated unknown
+  `reconstruction` string — exercised via direct Python calls (not pytest,
+  per this agent's constraints) before handing off to the validator.
+- No production module outside `src/segqc/synth/regression.py` and the
+  additive re-export in `src/segqc/synth/__init__.py` was touched;
+  `corpus.py`, `clean_gt.py`, `perturbation.py`, `component_shape.py`,
+  `coverage_border_overlap.py`, and `identity_ordering_alignment.py` are
+  unmodified.
