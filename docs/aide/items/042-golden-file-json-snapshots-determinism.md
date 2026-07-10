@@ -527,4 +527,43 @@ operator/rule module.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implemented as specified, with no deviations from the pinned public
+interface or Implementation Steps:
+
+- `src/segqc/synth/golden.py` was written importing `check_empty`/`Reason`/
+  `Severity`/`run_qc`/`serialize_report`/`load_manifest`/`CORPUS_DIR`/
+  `loaded_seg_image`/`bundled_default_config` from their concrete submodules
+  (not the `segqc.synth` package), matching item 040/041's circular-import
+  avoidance convention. `build_report_for_case` mirrors `cli._handle_run`
+  steps 3-7 verbatim (same `Reason`/`Severity` construction from
+  `check_empty`'s `CheckResult`, same `run_qc(seg_img, cfg,
+  base_reasons=...)` call, same `[f.to_dict() for f in
+  case_result.findings]` then `serialize_report(...)`), with `case_id` fixed
+  to `case["case_id"]` per Material Decision/Assumption in the spec.
+- `canonical_json` normalises `VOLATILE_POINTERS` (empty tuple by default)
+  via a small pointer-walk helper (`_normalise_pointer`) that is a no-op if
+  any segment of the pointer path is absent, then serializes with
+  `json.dumps(..., indent=2, sort_keys=True, ensure_ascii=False) + "\n"`.
+  Verified this is a byte-for-byte no-op relative to plain `json.dumps` under
+  the production default `volatile_pointers=()`.
+- `write_goldens`/`main` write via `Path.write_bytes` on the UTF-8-encoded
+  canonical text (not `write_text`), matching item 040's line-ending
+  determinism decision (`write_text(newline=...)` is 3.10+-only; this
+  project targets 3.9+).
+- Generated the nine committed golden files by running
+  `.venv/Scripts/python -m segqc.synth.golden` once and committing the
+  output verbatim (no hand edits). Verified independently: (a) no `\r` bytes
+  in any golden file; (b) regenerating into a fresh temp directory via
+  `write_goldens` reproduces every committed golden byte-for-byte; (c) the
+  three `reconstructed_record` goldens (`mode1_displace`,
+  `mode4_relabel_swap`, `mode8_force_overlap`) all have `verdict == "pass"`
+  and empty `findings`, confirming the documented pipeline-blind behaviour
+  (AC16) ahead of the test-writer's assertions.
+- `src/segqc/synth/__init__.py` was extended additively (new import block +
+  `__all__` entries for `GOLDEN_DIR`, `GOLDEN_DIRNAME`, `VOLATILE_POINTERS`,
+  `VOLATILE_SENTINEL`, `build_report_for_case`, `canonical_json`,
+  `check_case_golden`, `golden_path`, `load_golden`, `read_golden_text`,
+  `write_goldens`) — no existing re-exports were touched.
+- No edits were made to `report.py`, `pipeline.py`, `cli.py`, `corpus.py`,
+  `regression.py`, or any operator/rule/extractor/config module, per the
+  item's scope boundary.

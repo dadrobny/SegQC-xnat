@@ -73,6 +73,19 @@ from segqc.synth.regression import (
     reconstructed_findings,
     verify_case,
 )
+from segqc.synth.golden import (
+    GOLDEN_DIR,
+    GOLDEN_DIRNAME,
+    VOLATILE_POINTERS,
+    VOLATILE_SENTINEL,
+    build_report_for_case,
+    canonical_json,
+    check_case_golden,
+    golden_path,
+    load_golden,
+    read_golden_text,
+    write_goldens,
+)
 
 __all__ = [
     "DEFAULT_LEVELS",
@@ -115,4 +128,15 @@ __all__ = [
     "offending_labels_match",
     "pipeline_hides_designated_rule",
     "verify_case",
+    "GOLDEN_DIR",
+    "GOLDEN_DIRNAME",
+    "VOLATILE_POINTERS",
+    "VOLATILE_SENTINEL",
+    "build_report_for_case",
+    "canonical_json",
+    "check_case_golden",
+    "golden_path",
+    "load_golden",
+    "read_golden_text",
+    "write_goldens",
 ]
