@@ -52,6 +52,15 @@ from segqc.synth.identity_ordering_alignment import (
     RelabelSwapPerturbation,
     SequenceBreakPerturbation,
 )
+from segqc.synth.corpus import (
+    CORPUS_DIR,
+    FIXTURES_DIRNAME,
+    MANIFEST_PATH,
+    MANIFEST_VERSION,
+    build_corpus,
+    load_manifest,
+    write_corpus,
+)
 
 __all__ = [
     "DEFAULT_LEVELS",
@@ -77,4 +86,11 @@ __all__ = [
     "DisplacePerturbation",
     "RelabelSwapPerturbation",
     "SequenceBreakPerturbation",
+    "CORPUS_DIR",
+    "FIXTURES_DIRNAME",
+    "MANIFEST_PATH",
+    "MANIFEST_VERSION",
+    "build_corpus",
+    "load_manifest",
+    "write_corpus",
 ]

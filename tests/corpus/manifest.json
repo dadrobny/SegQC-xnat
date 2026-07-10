@@ -1,0 +1,334 @@
+{
+  "cases": [
+    {
+      "base": {
+        "curve_amplitude_mm": 6.0,
+        "levels": [
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "spacing": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "case_id": "clean_control",
+      "detail": "",
+      "detection": "pipeline",
+      "expected_labels": [],
+      "expected_rule_ids": [],
+      "expected_verdict": "pass",
+      "failure_mode": 0,
+      "failure_mode_name": "clean control (no failure)",
+      "perturbation": "identity",
+      "perturbation_params": {},
+      "reconstruction": null,
+      "scan_fixture": "fixtures/base_scan.nii.gz",
+      "seed": 0,
+      "seg_fixture": "fixtures/clean_control_seg.nii.gz"
+    },
+    {
+      "base": {
+        "curve_amplitude_mm": 6.0,
+        "levels": [
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "spacing": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "case_id": "mode1_displace",
+      "detail": "displace: translated label 22 by (13, 13) voxels along (axis-1, axis-2), off the spinal curve defined by the remaining vertebrae. Not surfaced by plain run_qc (the interpolating spline refit absorbs the displaced centroid) -- asserted via a reconstructed leave-one-out offset fed to MislabelRule directly (see item 039 Assumptions).",
+      "detection": "reconstructed_record",
+      "expected_labels": [
+        22
+      ],
+      "expected_rule_ids": [
+        "mislabel"
+      ],
+      "expected_verdict": "flagged-for-review",
+      "failure_mode": 1,
+      "failure_mode_name": "label not aligned with the vertebra it names",
+      "perturbation": "displace",
+      "perturbation_params": {
+        "target_label": 22
+      },
+      "reconstruction": "leave_one_out_offset",
+      "scan_fixture": "fixtures/base_scan.nii.gz",
+      "seed": 0,
+      "seg_fixture": "fixtures/mode1_displace_seg.nii.gz"
+    },
+    {
+      "base": {
+        "curve_amplitude_mm": 6.0,
+        "levels": [
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "spacing": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "case_id": "mode2_fragment",
+      "detail": "fragment: split label 22 into 2 pieces via interior slab cut(s) at axis-0 index(es) [107].",
+      "detection": "pipeline",
+      "expected_labels": [
+        22
+      ],
+      "expected_rule_ids": [
+        "fragmentation"
+      ],
+      "expected_verdict": "flagged-for-review",
+      "failure_mode": 2,
+      "failure_mode_name": "over-/under-segmentation (fused / fragmented)",
+      "perturbation": "fragment",
+      "perturbation_params": {
+        "target_label": 22
+      },
+      "reconstruction": null,
+      "scan_fixture": "fixtures/base_scan.nii.gz",
+      "seed": 0,
+      "seg_fixture": "fixtures/mode2_fragment_seg.nii.gz"
+    },
+    {
+      "base": {
+        "curve_amplitude_mm": 6.0,
+        "levels": [
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "spacing": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "case_id": "mode3_inject_islands",
+      "detail": "inject_islands: added 1 tiny island(s) of 27 voxel(s) each to label 22.",
+      "detection": "pipeline",
+      "expected_labels": [
+        22
+      ],
+      "expected_rule_ids": [
+        "fragmentation"
+      ],
+      "expected_verdict": "flagged-for-review",
+      "failure_mode": 3,
+      "failure_mode_name": "disconnected components / rogue islands",
+      "perturbation": "inject_islands",
+      "perturbation_params": {
+        "target_label": 22
+      },
+      "reconstruction": null,
+      "scan_fixture": "fixtures/base_scan.nii.gz",
+      "seed": 0,
+      "seg_fixture": "fixtures/mode3_inject_islands_seg.nii.gz"
+    },
+    {
+      "base": {
+        "curve_amplitude_mm": 6.0,
+        "levels": [
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "spacing": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "case_id": "mode4_relabel_swap",
+      "detail": "relabel_swap: exchanged the voxel identities of adjacent labels 21 and 22. Not surfaced by plain run_qc (the ascending-label refit yields a monotonic spline parameter) -- asserted via a reconstructed monotonic-consistency record fed to MislabelRule directly (see item 039 Assumptions).",
+      "detection": "reconstructed_record",
+      "expected_labels": [
+        21,
+        22
+      ],
+      "expected_rule_ids": [
+        "mislabel"
+      ],
+      "expected_verdict": "flagged-for-review",
+      "failure_mode": 4,
+      "failure_mode_name": "semantic mislabelling (wrong identification)",
+      "perturbation": "relabel_swap",
+      "perturbation_params": {
+        "neighbour_label": 22,
+        "target_label": 21
+      },
+      "reconstruction": "monotonic_true_spatial_order",
+      "scan_fixture": "fixtures/base_scan.nii.gz",
+      "seed": 0,
+      "seg_fixture": "fixtures/mode4_relabel_swap_seg.nii.gz"
+    },
+    {
+      "base": {
+        "curve_amplitude_mm": 6.0,
+        "levels": [
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "spacing": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "case_id": "mode5_remove_level",
+      "detail": "remove_level: deleted interior level L3 (label 22) from the span [20, 21, 22, 23, 24].",
+      "detection": "pipeline",
+      "expected_labels": [],
+      "expected_rule_ids": [
+        "coverage"
+      ],
+      "expected_verdict": "flagged-for-review",
+      "failure_mode": 5,
+      "failure_mode_name": "not all vertebrae segmented (missing levels)",
+      "perturbation": "remove_level",
+      "perturbation_params": {
+        "target_label": 22
+      },
+      "reconstruction": null,
+      "scan_fixture": "fixtures/base_scan.nii.gz",
+      "seed": 0,
+      "seg_fixture": "fixtures/mode5_remove_level_seg.nii.gz"
+    },
+    {
+      "base": {
+        "curve_amplitude_mm": 6.0,
+        "levels": [
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "spacing": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "case_id": "mode6_crop_at_border",
+      "detail": "crop_at_border: translated label 22 toward the 'anterior' face by 5 voxel(s) beyond touching, clipping the overhang.",
+      "detection": "pipeline",
+      "expected_labels": [
+        22
+      ],
+      "expected_rule_ids": [
+        "border"
+      ],
+      "expected_verdict": "flagged-for-review",
+      "failure_mode": 6,
+      "failure_mode_name": "partial vertebra at the image border",
+      "perturbation": "crop_at_border",
+      "perturbation_params": {
+        "face": "anterior",
+        "target_label": 22
+      },
+      "reconstruction": null,
+      "scan_fixture": "fixtures/base_scan.nii.gz",
+      "seed": 0,
+      "seg_fixture": "fixtures/mode6_crop_at_border_seg.nii.gz"
+    },
+    {
+      "base": {
+        "curve_amplitude_mm": 6.0,
+        "levels": [
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "spacing": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "case_id": "mode7_sequence_break",
+      "detail": "sequence_break: relabelled 24 to 28 (a transitional label whose canonical rank diverges from its integer value), producing a genuine non-continuous label sequence caught directly by run_qc's sequence rule.",
+      "detection": "pipeline",
+      "expected_labels": [
+        28
+      ],
+      "expected_rule_ids": [
+        "sequence"
+      ],
+      "expected_verdict": "flagged-for-review",
+      "failure_mode": 7,
+      "failure_mode_name": "non-continuous label sequence",
+      "perturbation": "sequence_break",
+      "perturbation_params": {},
+      "reconstruction": null,
+      "scan_fixture": "fixtures/base_scan.nii.gz",
+      "seed": 0,
+      "seg_fixture": "fixtures/mode7_sequence_break_seg.nii.gz"
+    },
+    {
+      "base": {
+        "curve_amplitude_mm": 6.0,
+        "levels": [
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "spacing": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "case_id": "mode8_force_overlap",
+      "detail": "force_overlap: shifted label 20 by 18 voxel(s) along axis 0 toward neighbour label 21, reassigning the contested overhang from 21 to 20.",
+      "detection": "reconstructed_record",
+      "expected_labels": [
+        20,
+        21
+      ],
+      "expected_rule_ids": [
+        "overlap"
+      ],
+      "expected_verdict": "flagged-for-review",
+      "failure_mode": 8,
+      "failure_mode_name": "overlapping segments",
+      "perturbation": "force_overlap",
+      "perturbation_params": {
+        "neighbour_label": 21,
+        "target_label": 20
+      },
+      "reconstruction": "overlap_mask_stack",
+      "scan_fixture": "fixtures/base_scan.nii.gz",
+      "seed": 0,
+      "seg_fixture": "fixtures/mode8_force_overlap_seg.nii.gz"
+    }
+  ],
+  "generator": "segqc.synth.corpus",
+  "manifest_version": 1
+}

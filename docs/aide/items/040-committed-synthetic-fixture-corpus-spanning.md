@@ -524,4 +524,77 @@ edits to existing operator/rule/extractor/config/CLI modules.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Manifest JSON key order.** `write_corpus` serialises each case dict via
+  `json.dumps(..., indent=2, sort_keys=True)`. `sort_keys` alphabetises the
+  keys *within* each case object (and within `base`/`perturbation_params`)
+  but does not reorder the top-level `cases` list, which stays in
+  `CASE_RECIPE` (case-table) order. This keeps `manifest.json` diffs stable
+  and reviewable regardless of dict-construction order, at the cost of the
+  on-disk key order not matching the illustrative order in the item spec's
+  schema example (`case_id` first, etc.) — semantically identical, since the
+  manifest is consumed as a dict, not positionally.
+
+- **Extra `reconstruction` key.** The manifest schema table (AC4) lists 14
+  required keys; this implementation additionally writes a `reconstruction`
+  key (`str` value for the three reconstructed-record cases, `null` for the
+  six pipeline cases) alongside `detection`, matching the schema example in
+  the "Manifest schema" section of this spec (which shows `"reconstruction":
+  "overlap_mask_stack"` on the mode-8 case) and AC8's
+  `case.get("reconstruction")` check. This is additive and does not violate
+  AC4 (extra keys are not forbidden).
+
+- **`Path.write_text(..., newline=...)` is Python >= 3.10-only.** The project
+  targets Python 3.9+ (`aide.toml`); `write_corpus` therefore writes the
+  manifest via `manifest_path.write_bytes(text.encode("utf-8"))` rather than
+  `write_text(..., newline="\n")`, guaranteeing exact `\n` line endings (no
+  platform-dependent translation) on every supported Python version,
+  including the installed 3.9.13.
+
+- **nibabel gzip determinism verified as pinned.** The installed environment
+  has nibabel **5.3.3** (matching the Assumptions' pin exactly); measured
+  directly: two successive `nib.save` calls of the same content produce
+  byte-identical `.nii.gz` files with no extra normalisation needed. AC16 is
+  satisfied by plain `nib.save` with no custom gzip wrapper.
+
+- **Known limitation, out of this item's authority to fix: nibabel 5.3.3
+  hard-errors on `nib.Nifti1Image(int64_array, affine)` without an explicit
+  `dtype=`.** `segqc.io.load_volume(..., integer_labels=True)` (item 003,
+  pinned "unchanged" for this item) unconditionally casts loaded label data
+  to `int64` (`io.py` line ~168-170), even though its docstring says it
+  "preserves the header's native dtype." Since nibabel 5.0, constructing a
+  fresh `Nifti1Image` from an `int64`/`uint64` array without passing an
+  explicit `dtype` argument raises `ValueError` (a former `FutureWarning`
+  promoted to a hard error — see `nibabel/nifti1.py`'s
+  `alert_future_error(..., '5.0', ...)` and `nibabel/deprecated.py`). This
+  item's own generator (`corpus.py`) never hits this path — `build_corpus`/
+  `write_corpus` build every `Nifti1Image` from `build_clean_spine`'s/the
+  operators' own uint16 arrays, not from a `load_case`-round-tripped array —
+  and all fixtures verified to load correctly via `load_case` and to satisfy
+  AC1-AC8, AC10-AC13, AC15-AC18 in a standalone script exercising the same
+  logic as the committed manifest. However, the committed
+  `tests/test_040_synthetic_corpus.py`'s own `_seg_nifti_from_case` helper
+  (used by AC9 and AC14) does
+  `nib.Nifti1Image(seg.data, seg.affine)` on the `load_case`-loaded (`int64`)
+  seg array **without** an explicit `dtype`, which will raise this same
+  `ValueError` under the installed nibabel 5.3.3 — independent of the
+  corpus's content or correctness (confirmed with a standalone repro: a bare
+  `nib.Nifti1Image(np.zeros((3,3,3), dtype=np.int64), np.eye(4))` raises
+  identically; passing `dtype=seg.data.dtype` explicitly resolves it and the
+  reconstructed-record/clean-control assertions all pass as expected). This
+  is a test-file/environment interaction this builder is not authorised to
+  patch (hard limit: do not modify tests; and `load_case`/`io.py` is pinned
+  "unchanged" for this item's scope). Flagged prominently for the validator
+  and/or test-writer — the one-line fix is passing an explicit
+  `dtype=seg.data.dtype` (or `seg.data.dtype`) in `_seg_nifti_from_case`.
+
+- **`python -m segqc.synth.corpus` emits a benign `RuntimeWarning`.** Because
+  `segqc/synth/__init__.py` additively imports `segqc.synth.corpus` (per the
+  spec's Public interface / step 9 re-export), running
+  `python -m segqc.synth.corpus` triggers Python's standard "module found in
+  sys.modules before execution of `__main__`" warning (the package import
+  and the `-m` execution create two separate module objects for the same
+  file). This is cosmetic — the regeneration still completes correctly and
+  deterministically (verified byte-identical across runs) — but is noted
+  here since it is a direct, unavoidable consequence of also re-exporting
+  `corpus` from `segqc.synth.__init__`, as the spec's Implementation Step 9
+  requires.
