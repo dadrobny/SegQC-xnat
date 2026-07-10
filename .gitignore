@@ -226,6 +226,8 @@ __marimo__/
 .claude/credentials.json
 #   Personal loop supervisor config (caps, deadlines, credentials path).
 .aide/loop/loop.local.toml
+#   Transient settings.json reconciliation diff emitted by aide-loop install.py --update.
+.aide-merge
 #   Per-machine permission-prompt logs (the committed README stays tracked).
 docs/aide/permissions/*.jsonl
 #   Generated project-status report (regenerable; the committed README stays tracked).

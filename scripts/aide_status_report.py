@@ -38,6 +38,7 @@ import argparse
 import base64
 import datetime as _dt
 import html
+import json
 import re
 import sys
 from dataclasses import dataclass, field
@@ -94,6 +95,18 @@ class WorkItem:
 
 
 @dataclass
+class CorpusCase:
+    """One committed synthetic-failure corpus case (from tests/corpus/manifest.json)."""
+    case_id: str
+    failure_mode: int
+    failure_mode_name: str
+    detection: str  # "pipeline" | "reconstructed_record"
+    perturbation: str
+    expected_verdict: str
+    expected_rule_ids: List[str] = field(default_factory=list)
+
+
+@dataclass
 class TestSummary:
     file_count: int = 0
     test_count: int = 0
@@ -117,6 +130,7 @@ class ReportModel:
     tests: TestSummary = field(default_factory=TestSummary)
     qc_images: List[Tuple[str, str]] = field(default_factory=list)  # (label, data-uri or path)
     distributions: List[Tuple[str, str]] = field(default_factory=list)
+    corpus: List[CorpusCase] = field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #
@@ -234,6 +248,35 @@ def parse_queues(queue_dir: Path) -> List[int]:
             if num not in seen:
                 seen.append(num)
     return seen
+
+
+def parse_corpus_manifest(manifest_path: Path) -> List[CorpusCase]:
+    """Parse ``tests/corpus/manifest.json`` (item 040) into corpus cases, sorted by
+    failure mode. Returns an empty list if the manifest is absent or malformed —
+    the corpus panel then renders its "not yet available" placeholder."""
+    if not manifest_path.is_file():
+        return []
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    cases: List[CorpusCase] = []
+    for c in data.get("cases", []):
+        try:
+            cases.append(
+                CorpusCase(
+                    case_id=str(c["case_id"]),
+                    failure_mode=int(c["failure_mode"]),
+                    failure_mode_name=str(c.get("failure_mode_name", "")),
+                    detection=str(c.get("detection", "")),
+                    perturbation=str(c.get("perturbation", "")),
+                    expected_verdict=str(c.get("expected_verdict", "")),
+                    expected_rule_ids=[str(r) for r in c.get("expected_rule_ids", [])],
+                )
+            )
+        except (KeyError, TypeError, ValueError):
+            continue
+    return sorted(cases, key=lambda c: (c.failure_mode, c.case_id))
 
 
 def summarise_tests(tests_dir: Path, junit_xml: Optional[Path] = None) -> TestSummary:
@@ -354,6 +397,7 @@ def build_report_model(
         tests=summarise_tests(tests_dir, junit_xml),
         qc_images=_collect_images(qc_images_dir, embed_images),
         distributions=_collect_images(distributions_dir, embed_images),
+        corpus=parse_corpus_manifest(tests_dir / "corpus" / "manifest.json"),
     )
     return model
 
@@ -398,12 +442,31 @@ th { color: #57606a; font-weight: 600; }
 .placeholder strong { color: #1f2328; }
 .progress-bar { height: 10px; background: var(--line); border-radius: 999px; overflow: hidden; }
 .progress-bar > span { display: block; height: 100%; background: var(--done); }
+details.fold { border: 1px solid var(--line); border-radius: 8px; background: var(--bg); margin: 8px 0; }
+details.fold > summary { cursor: pointer; padding: 8px 12px; font-size: 13px; font-weight: 600;
+         color: #1f2328; list-style: revert; }
+details.fold > summary::-webkit-details-marker { display: revert; }
+details.fold[open] > summary { border-bottom: 1px solid var(--line); }
+details.fold > table { margin: 0; }
+details.fold > table th, details.fold > table td { padding-left: 12px; }
+.b-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px;
+         font-weight: 600; background: #eaeef2; color: #24292f; white-space: nowrap; }
+.b-pill.recon { background: #fff1e5; color: #9a5b00; }
 footer { text-align: center; color: #57606a; font-size: 12px; padding: 24px; }
 """
 
 
 def _badge(status: str) -> str:
     return f'<span class="badge b-{status}">{html.escape(status)}</span>'
+
+
+_VERDICT_BADGE = {"pass": "complete", "flagged-for-review": "in-progress", "fail": "excluded"}
+
+
+def _badge_verdict(verdict: str) -> str:
+    """Render a QC verdict as a coloured badge (pass/flag/fail)."""
+    cls = _VERDICT_BADGE.get(verdict, "planned")
+    return f'<span class="badge b-{cls}">{html.escape(verdict or "—")}</span>'
 
 
 def _esc(text: str) -> str:
@@ -450,19 +513,37 @@ def _render_objectives_section(model: ReportModel) -> str:
 </section>"""
 
 
-def _render_queue_section(model: ReportModel) -> str:
-    finished = [i for i in model.items if i.status == "complete"]
-    active = [i for i in model.items if i.status == "in-progress"]
-    upcoming = [i for i in model.items if i.status not in {"complete", "in-progress"}]
+# A listing longer than this many rows is wrapped in a collapsed <details> box so
+# the dashboard stays scannable as the finished-work log grows.
+_FOLD_THRESHOLD = 12
 
-    def _rows(items: Sequence[WorkItem]) -> str:
-        if not items:
-            return '<tr><td colspan="4"><em>none</em></td></tr>'
-        return "\n".join(
+
+def _item_table(items: Sequence[WorkItem]) -> str:
+    if not items:
+        rows = '<tr><td colspan="4"><em>none</em></td></tr>'
+    else:
+        rows = "\n".join(
             f"<tr><td>{i.number:03d}</td><td>{_esc(i.title)}</td>"
             f"<td>{_esc(i.stage or '—')}</td><td>{_badge(i.status)}</td></tr>"
             for i in items
         )
+    return f"<table><tr><th>#</th><th>Title</th><th>Stage</th><th>Status</th></tr>{rows}</table>"
+
+
+def _maybe_fold(label: str, count: int, table_html: str) -> str:
+    """Wrap a long table in a collapsed <details>; render short ones inline."""
+    if count <= _FOLD_THRESHOLD:
+        return f"<h3>{_esc(label)}</h3>{table_html}"
+    return (
+        f'<details class="fold"><summary>{_esc(label)} ({count}) — click to expand'
+        f"</summary>{table_html}</details>"
+    )
+
+
+def _render_queue_section(model: ReportModel) -> str:
+    finished = [i for i in model.items if i.status == "complete"]
+    active = [i for i in model.items if i.status == "in-progress"]
+    upcoming = [i for i in model.items if i.status not in {"complete", "in-progress"}]
 
     return f"""
 <section id="queue">
@@ -472,12 +553,54 @@ def _render_queue_section(model: ReportModel) -> str:
     <div class="card"><div class="n">{len(active)}</div><div class="l">In progress</div></div>
     <div class="card"><div class="n">{len(upcoming)}</div><div class="l">Upcoming</div></div>
   </div>
-  <h3>Finished work items</h3>
-  <table><tr><th>#</th><th>Title</th><th>Stage</th><th>Status</th></tr>{_rows(finished)}</table>
+  {_maybe_fold("Finished work items", len(finished), _item_table(finished))}
   <h3>In progress</h3>
-  <table><tr><th>#</th><th>Title</th><th>Stage</th><th>Status</th></tr>{_rows(active)}</table>
-  <h3>Upcoming / planned</h3>
-  <table><tr><th>#</th><th>Title</th><th>Stage</th><th>Status</th></tr>{_rows(upcoming)}</table>
+  {_item_table(active)}
+  {_maybe_fold("Upcoming / planned", len(upcoming), _item_table(upcoming))}
+</section>"""
+
+
+def _render_corpus_section(model: ReportModel) -> str:
+    """Stage-5 synthetic failure corpus coverage (tests/corpus/manifest.json)."""
+    if not model.corpus:
+        return """
+<section id="corpus">
+  <h2>Synthetic Failure Corpus</h2>
+  <p class="placeholder"><strong>Extension point.</strong> The committed synthetic-failure
+  corpus (roadmap Stage 5, item 040) populates here once
+  <code>tests/corpus/manifest.json</code> exists — one row per §6 failure mode plus the
+  clean-GT positive control, with its detection path and expected verdict.</p>
+</section>"""
+
+    modes = {c.failure_mode for c in model.corpus}
+    non_clean_modes = sorted(m for m in modes if m != 0)
+    recon = sum(1 for c in model.corpus if c.detection == "reconstructed_record")
+    rows = "\n".join(
+        f"<tr><td>{c.failure_mode}</td><td>{_esc(c.failure_mode_name)}</td>"
+        f"<td>{_esc(c.case_id)}</td><td>{_esc(c.perturbation)}</td>"
+        f'<td><span class="b-pill{" recon" if c.detection == "reconstructed_record" else ""}">'
+        f'{_esc(c.detection or "—")}</span></td>'
+        f"<td>{_badge_verdict(c.expected_verdict)}</td>"
+        f"<td>{_esc(', '.join(c.expected_rule_ids) or '—')}</td></tr>"
+        for c in model.corpus
+    )
+    table = (
+        "<table><tr><th>Mode</th><th>§6 failure mode</th><th>Case</th><th>Perturbation</th>"
+        "<th>Detection</th><th>Expected verdict</th><th>Rule(s)</th></tr>"
+        f"{rows}</table>"
+    )
+    return f"""
+<section id="corpus">
+  <h2>Synthetic Failure Corpus</h2>
+  <div class="cards">
+    <div class="card"><div class="n">{len(model.corpus)}</div><div class="l">Committed cases</div></div>
+    <div class="card"><div class="n">{len(non_clean_modes)}/8</div><div class="l">§6 modes covered</div></div>
+    <div class="card"><div class="n">{recon}</div><div class="l">Reconstructed-record</div></div>
+  </div>
+  <p>Each §6 failure mode has ≥1 committed case; <em>reconstructed-record</em> cases
+  (modes 1/4/8) are pipeline-blind by design and asserted via a reconstructed feature
+  record (see items 038–041).</p>
+  {table}
 </section>"""
 
 
@@ -554,6 +677,7 @@ def render_html(model: ReportModel) -> str:
             _render_queue_section(model),
             _render_stage_section(model),
             _render_objectives_section(model),
+            _render_corpus_section(model),
             _render_tests_section(model),
             _render_highlights_section(model),
         ]

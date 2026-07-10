@@ -61,6 +61,49 @@ Invoke Python/pytest via the venv in the relative form —
 - **Skills / commands** — `/aide-*` (create-vision … feedback-loop, spec-queue)
   and the `/aide-run-{item,queue,roadmap}` orchestrators.
 
+## Updating the framework (the `aide-loop` repo)
+
+The framework is **not maintained in-tree here** — it is developed in the
+standalone **`aide-loop`** repo (locally `C:\Users\david\aide-loop`) and
+*materialised* into this repo by its installer. In `aide-loop`, `core/` is the
+provider-agnostic engine (→ `.aide/`) and `adapters/claude/` is the Claude
+adapter (→ `.claude/`). **Never hand-edit `.aide/**` or the `aide-*` files under
+`.claude/**` in this repo** — they are generated, and a manual edit is silently
+overwritten on the next update.
+
+Clean workflow to change the framework (no push required — the installer copies
+from the local working tree):
+
+1. **Edit + test in `aide-loop`.** Change `core/…` or `adapters/claude/…`; run its
+   suite (`python -m pytest`, stdlib-only core + pytest). Bump `core/VERSION` for
+   an engine change. Commit on a branch there.
+2. **Reinstall into this repo** from the local checkout:
+   ```bash
+   python C:/Users/david/aide-loop/install.py --adapter claude --into . --update
+   ```
+   `--update` re-copies the engine + adapter but **never touches `aide.toml` or
+   `docs/aide/`** (project-owned); `settings.json` is non-clobbering (an existing
+   one is kept and a `.aide-merge` diff is emitted for you to reconcile by hand).
+3. **Review the `git diff`** — it should be exactly the intended change (most
+   copied files are byte-identical no-ops git shows nothing for). Run the suite.
+4. **Land via a reviewed PR** (framework/process files are PR-gated — see the last
+   paragraph of this file). Pushing the change to `aide-loop`'s own remote is a
+   separate, optional step for sharing the framework itself.
+
+## Gotchas
+
+- **Byte-reproducible committed fixtures need a `.gitattributes` LF pin.** This
+  repo commits generated data whose tests assert byte-identity between a
+  regenerated file and its committed copy (`tests/corpus/manifest.json`,
+  `tests/corpus/golden/*.json`; items 040/042). On Windows, `core.autocrlf=true`
+  rewrites committed LF text to CRLF **on checkout**, so a file that was byte-clean
+  when committed fails its own determinism test after a fresh checkout (e.g. during
+  `aide merge`'s branch switch). Any new committed byte-reproducible text fixture
+  **must** be pinned in [`.gitattributes`](.gitattributes) with `text eol=lf` (or
+  `binary` for compressed blobs like `.nii.gz`), and the generator should write
+  bytes with `\n` (`write_bytes`, not `write_text`, since Python 3.9 can't set
+  `newline=` on `Path.write_text`).
+
 ## Shared vs. personal
 
 - **Shared (committed):** `.aide/` (minus `loop/loop.local.toml`), `aide.toml`,

@@ -220,6 +220,82 @@ def test_highlights_populate_when_images_supplied(tmp_path: Path):
     assert "data:image/png;base64," in doc
 
 
+CORPUS_SAMPLE = """{
+  "manifest_version": 1,
+  "cases": [
+    {"case_id": "mode2_fragment", "failure_mode": 2, "failure_mode_name": "over/under-seg",
+     "detection": "pipeline", "perturbation": "fragment", "expected_verdict": "fail",
+     "expected_rule_ids": ["fragmentation"]},
+    {"case_id": "clean_control", "failure_mode": 0, "failure_mode_name": "clean control",
+     "detection": "pipeline", "perturbation": "identity", "expected_verdict": "pass",
+     "expected_rule_ids": []},
+    {"case_id": "mode8_force_overlap", "failure_mode": 8, "failure_mode_name": "overlap",
+     "detection": "reconstructed_record", "perturbation": "force_overlap",
+     "expected_verdict": "flagged-for-review", "expected_rule_ids": ["overlap"]}
+  ]
+}"""
+
+
+def test_parse_corpus_manifest_reads_and_sorts_cases(tmp_path: Path):
+    path = tmp_path / "manifest.json"
+    path.write_text(CORPUS_SAMPLE, encoding="utf-8")
+    cases = asr.parse_corpus_manifest(path)
+    assert [c.failure_mode for c in cases] == [0, 2, 8]  # sorted by mode
+    clean = cases[0]
+    assert clean.case_id == "clean_control" and clean.expected_verdict == "pass"
+    recon = cases[-1]
+    assert recon.detection == "reconstructed_record"
+    assert recon.expected_rule_ids == ["overlap"]
+
+
+def test_parse_corpus_manifest_missing_returns_empty(tmp_path: Path):
+    assert asr.parse_corpus_manifest(tmp_path / "nope.json") == []
+
+
+def test_parse_corpus_manifest_malformed_returns_empty(tmp_path: Path):
+    path = tmp_path / "manifest.json"
+    path.write_text("{ not valid json ", encoding="utf-8")
+    assert asr.parse_corpus_manifest(path) == []
+
+
+def test_render_corpus_section_placeholder_when_absent():
+    model = asr.ReportModel(generated_at="now")  # no corpus
+    doc = asr.render_html(model)
+    assert "Synthetic Failure Corpus" in doc
+    assert "Extension point" in doc
+
+
+def test_render_corpus_section_populated_shows_coverage_and_badges():
+    model = asr.ReportModel(generated_at="now")
+    model.corpus = [
+        asr.CorpusCase("clean_control", 0, "clean control", "pipeline", "identity", "pass", []),
+        asr.CorpusCase("mode8_force_overlap", 8, "overlap", "reconstructed_record",
+                       "force_overlap", "flagged-for-review", ["overlap"]),
+    ]
+    doc = asr.render_html(model)
+    assert "Synthetic Failure Corpus" in doc
+    assert "mode8_force_overlap" in doc
+    assert "reconstructed_record" in doc
+    assert "1/8" in doc  # one non-clean §6 mode covered
+    assert 'class="badge b-complete">pass' in doc  # verdict badge for pass
+
+
+def test_long_finished_listing_is_collapsible():
+    model = asr.ReportModel(generated_at="now")
+    for n in range(asr._FOLD_THRESHOLD + 5):
+        model.items.append(asr.WorkItem(number=n, title=f"Item {n}", status="complete"))
+    doc = asr.render_html(model)
+    assert 'details class="fold"' in doc
+    assert "Finished work items (" in doc
+
+
+def test_short_finished_listing_is_not_collapsed():
+    model = asr.ReportModel(generated_at="now")
+    model.items.append(asr.WorkItem(number=1, title="Only one", status="complete"))
+    doc = asr.render_html(model)
+    assert "<h3>Finished work items</h3>" in doc
+
+
 def test_main_writes_output(tmp_path: Path):
     out = tmp_path / "status.html"
     rc = asr.main(["--out", str(out)])

@@ -307,6 +307,19 @@ def test_cli_progress_set_edits_file(tmp_path: Path):
     assert "- [x] Rules fire." in text
 
 
+def test_cli_progress_set_untracked_item_errors(tmp_path: Path, capsys):
+    """An item no deliverable bullet references must fail loudly, not silently
+    no-op as 'already >= done' (the Stage-5 tracking-blind-spot regression)."""
+    root = _docs(tmp_path)
+    rc = aide.main(["--repo", str(root), "progress", "set", "777", "done", "--no-commit"])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "no deliverable in progress.md references 'Item 777'" in err
+    # progress.md is left untouched.
+    text = (root / "docs" / "aide" / "progress.md").read_text(encoding="utf-8")
+    assert text == PROGRESS
+
+
 def test_cli_queue_tidy_edits_file(tmp_path: Path):
     root = _docs(tmp_path)
     rc = aide.main(["--repo", str(root), "queue", "tidy", "1", "--date", "2026-07-02"])

@@ -552,6 +552,20 @@ def cmd_progress(args: argparse.Namespace) -> int:
         print(f"error: {progress_path} not found", file=sys.stderr)
         return 1
     text = progress_path.read_text(encoding="utf-8")
+    # An item is only trackable if some deliverable bullet references it. Without
+    # this guard a missing "*(Item NNN)*" reference makes set_item_status a silent
+    # no-op that is indistinguishable from "already at that status" — so a whole
+    # stage's items can look reconciled while progress.md tracks nothing. Treat an
+    # untracked item as a loud, blocking error instead.
+    if not _item_ref_re(args.number).search(text):
+        print(
+            f"item {args.number:03d}: ERROR — no deliverable in progress.md "
+            f"references 'Item {args.number:03d}'; status NOT recorded. Add the "
+            f"reference to the owning stage's deliverable bullet "
+            f"(e.g. '- 📋 <deliverable>. *(Item {args.number:03d})*'), then re-run.",
+            file=sys.stderr,
+        )
+        return 1
     updated = set_item_status(text, args.number, status_map[args.status])
     if updated == text:
         print(f"item {args.number:03d}: no change (already >= {args.status})")
