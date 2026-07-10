@@ -170,11 +170,14 @@ mislabelling heuristics.
 **Goal.** Reproducible corpus + automated tests covering every failure mode.
 
 **Deliverables.**
-- 📋 Synthetic-failure generator (relabel, remove/add segment, inject islands, fuse/fragment,
-  swap order, crop at border, overlap).
-- 📋 Small committed fixture set spanning all 8 failure modes.
-- 📋 Regression suite asserting expected verdict + which heuristic fired per case.
-- 📋 Golden-file JSON snapshots for stability/determinism.
+- 📋 Synthetic-failure generator: clean-GT spine builder & perturbation
+  framework *(Item 036)*; component/shape perturbations — fragment, fuse,
+  inject islands *(Item 037)*; coverage/border/overlap perturbations — remove
+  level, crop at border, force overlap *(Item 038)*; identity/ordering/
+  alignment perturbations — displace, relabel/swap, sequence-break *(Item 039)*.
+- 📋 Small committed fixture set spanning all 8 failure modes. *(Item 040)*
+- 📋 Regression suite asserting expected verdict + which heuristic fired per case. *(Item 041)*
+- 📋 Golden-file JSON snapshots for stability/determinism. *(Item 042)*
 
 **Acceptance.**
 - [ ] Every §6 failure mode has ≥1 synthetic case and is detected (**G7**, **G2**).
