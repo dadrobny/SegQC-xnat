@@ -44,6 +44,23 @@ Read vision, roadmap, and progress, then write the queue from the template
    ```
 6. **Exactly one Live queue** — the new file carries `> **Status:** Live`;
    `python .aide/scripts/aide.py check` enforces uniqueness.
+7. **Wire every item into `progress.md`** — this is where item numbers are born,
+   so it is also where they must be recorded in the progress tracker. For each
+   `### Item NNN` you add, ensure the number appears as an `*(Item NNN)*`
+   reference on the matching **deliverable bullet** under that item's roadmap
+   **stage section** in `docs/aide/progress.md`:
+   - Append to an existing reference when a deliverable maps to several items
+     (`… *(Items 006, NNN)*`); add the reference to the bullet that has none; or,
+     if the item delivers something not yet listed, add a new
+     `- 📋 <deliverable>. *(Item NNN)*` bullet under the right stage.
+   - **Never change a deliverable's status icon** — leave it 📋. This step only
+     makes the item *trackable*; status transitions (📋→🚧→✅) are
+     `aide progress set`'s job during execution.
+   - Why: `aide progress set NNN` finds the bullet to flip by its `*(Item NNN)*`
+     reference. An item with no reference is untracked, and `progress set` now
+     hard-errors on it (engine ≥ 1.0.1) rather than silently no-op'ing — so a
+     future stage's deliverables, authored (step 3) before this queue assigned
+     numbers, must be back-filled here.
 
 ### Tidy the previous queue first
 
@@ -63,11 +80,11 @@ Save to `docs/aide/queue/queue-NNN.md` (next sequential number).
 ### Commit the queue immediately (do not leave it untracked)
 
 The queue is a shared project document; `aide claim` reads the committed file.
-Commit the new queue and the tidy-up on the current branch, each a separate Bash
-call:
+Commit the new queue, the `progress.md` item-reference back-fill (requirement 7),
+and the tidy-up on the current branch, each a separate Bash call:
 
 ```
-git add docs/aide/queue/queue-NNN.md docs/aide/queue/queue-<NNN-1>.md
+git add docs/aide/queue/queue-NNN.md docs/aide/queue/queue-<NNN-1>.md docs/aide/progress.md
 git commit -m "docs(aide): add work queue NNN"
 ```
 

@@ -58,21 +58,36 @@ Follow the `aide-create-queue` skill in full. In brief:
    pad with the following stage. A stage needing more spans multiple queues at the
    cap. The cap is a context budget, not a target. Prioritise by roadmap order and
    unblocked dependencies.
-5. **Commit** the new queue **and** the tidy-up on the **current branch** (each a
-   separate Bash call). Do **not** push and do **not** open a PR:
+5. **Wire every item into `progress.md`.** For each `### Item NNN` you just wrote,
+   ensure the number appears as an `*(Item NNN)*` reference on the matching
+   **deliverable bullet** under that item's roadmap **stage section** in
+   `docs/aide/progress.md` — append to an existing reference (`*(Items 006, NNN)*`),
+   add it to a bullet that has none, or add a new `- 📋 <deliverable>. *(Item NNN)*`
+   bullet if the item delivers something not yet listed. **Never change a status
+   icon** (leave deliverables 📋 — status transitions are `aide progress set`'s job
+   during execution). Item numbers are born here, so their `progress.md` references
+   must be recorded here: `aide progress set NNN` locates the bullet to flip by its
+   reference and now **hard-errors** on an unreferenced item (engine ≥ 1.0.1)
+   instead of silently no-op'ing.
+6. **Commit** the new queue, the `progress.md` back-fill, **and** the tidy-up on
+   the **current branch** (each a separate Bash call). Do **not** push and do
+   **not** open a PR:
    ```
-   git add docs/aide/queue/queue-NNN.md docs/aide/queue/queue-<NNN-1>.md
+   git add docs/aide/queue/queue-NNN.md docs/aide/queue/queue-<NNN-1>.md docs/aide/progress.md
    git commit -m "docs(aide): add work queue NNN"
    ```
-6. **Return** a tight summary: queue number, the item-number range and one-line
-   titles, and confirmation the previous queue was tidied.
+7. **Return** a tight summary: queue number, the item-number range and one-line
+   titles, and confirmation the previous queue was tidied and every item wired
+   into `progress.md`.
 
 ## Hard limits
 
 - **Do NOT write item specs** (`docs/aide/items/`), production code, or tests.
 - **Do NOT push or open a PR.** Commit only; the orchestrator handles push/PR.
 - **Do NOT run `pytest`.**
-- Edit only `docs/aide/queue/*.md`.
+- Edit only `docs/aide/queue/*.md` and `docs/aide/progress.md` — and in
+  `progress.md` only the item-reference back-fill (step 5) and the tidy reflection
+  (step 3), never a deliverable's status icon and never new stages/acceptance.
 
 ## Stop and hand back (needs human approval)
 
