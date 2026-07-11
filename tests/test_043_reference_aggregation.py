@@ -450,7 +450,7 @@ def test_adv_empty_tracked_features_serialises_with_empty_feature_stats():
 
 def test_adv_non_mutation_deep_copy_comparison():
     records = [
-        _rec("s0", "A", {"vol": 10.0}),
+        _rec("s0", "A", {"vol": 10.0}, size_proxy=1.0),
         _rec("s1", "B", {"vol": 20.0}, size_proxy=5.0),
     ]
     snapshot = copy.deepcopy(records)
