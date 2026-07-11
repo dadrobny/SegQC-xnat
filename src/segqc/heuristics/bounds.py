@@ -23,14 +23,17 @@ Design decisions (recorded per item 027 spec):
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from segqc.heuristics.finding import Finding
 from segqc.heuristics.rule import Rule, register_rule
 from segqc.labels import CANONICAL_ORDER
 from segqc.verdict import Severity
 
-__all__ = ["BoundsRule", "DEFAULT_BOUNDS"]
+if TYPE_CHECKING:  # pragma: no cover - type-only import, no runtime dependency
+    from segqc.reference.schema import ReferenceDistribution
+
+__all__ = ["BoundsRule", "DEFAULT_BOUNDS", "reference_bounds_for_level"]
 
 
 # --------------------------------------------------------------------------- #
@@ -119,6 +122,99 @@ _METRICS: List[Tuple[str, str, str, str]] = [
     ("extent_z_mm", "min_extent_z_mm", "max_extent_z_mm", "extent_z (mm)"),
 ]
 
+# Feature name -> (min_key, max_key), kept in step with _METRICS (item 048
+# step 1). Used by reference_bounds_for_level to derive a bounds-dict from a
+# ReferenceDistribution's stored percentiles.
+_FEATURE_BOUNDS_KEYS: Dict[str, Tuple[str, str]] = {
+    field_name: (min_key, max_key) for field_name, min_key, max_key, _ in _METRICS
+}
+
+
+# --------------------------------------------------------------------------- #
+# Reference-derived bounds switch (item 048)
+# --------------------------------------------------------------------------- #
+
+#: Recognised ``rules.bounds.params.source`` values.
+_SOURCE_HAND_SET = "hand-set"
+_SOURCE_REFERENCE = "reference"
+_VALID_SOURCES = frozenset({_SOURCE_HAND_SET, _SOURCE_REFERENCE})
+
+#: Default percentile pair and stratum for reference mode (matches
+#: segqc.reference.delta.DEFAULT_LOWER_PCT/DEFAULT_UPPER_PCT and
+#: segqc.reference.schema.ALL_STRATUM).
+DEFAULT_REFERENCE_LOWER_PCT = 1
+DEFAULT_REFERENCE_UPPER_PCT = 99
+DEFAULT_REFERENCE_STRATUM = "all"
+
+
+def reference_bounds_for_level(
+    reference: "ReferenceDistribution",
+    level_name: str,
+    *,
+    lower_pct: int,
+    upper_pct: int,
+    stratum: str = DEFAULT_REFERENCE_STRATUM,
+) -> Optional[Dict[str, float]]:
+    """Derive a bounds-dict for *level_name* from *reference* (item 048).
+
+    For each of the four bounds features present in the level/stratum's
+    ``feature_stats``, reads ``percentiles[f"p{lower_pct}"]`` /
+    ``percentiles[f"p{upper_pct}"]`` into the matching ``min_*``/``max_*``
+    keys (see ``_FEATURE_BOUNDS_KEYS``). The result may be partial when the
+    level's reference lacks stats for some tracked metric.
+
+    Parameters
+    ----------
+    reference:
+        The already-loaded ``ReferenceDistribution`` (attribute access only;
+        no file I/O, no import of ``segqc.reference`` at runtime).
+    level_name:
+        The anatomical level to look up (e.g. ``"L3"``).
+    lower_pct, upper_pct:
+        The percentile pair to use as the effective min/max. Must both be
+        present in ``reference.percentiles``.
+    stratum:
+        The stratum to look up (default ``"all"``).
+
+    Returns
+    -------
+    dict[str, float] | None
+        The bounds-dict for a covered level (possibly partial), or ``None``
+        when *level_name* (or *stratum* for that level) is absent from
+        *reference*.
+
+    Raises
+    ------
+    ValueError
+        If ``lower_pct`` or ``upper_pct`` is not one of ``reference.percentiles``.
+    """
+    if lower_pct not in reference.percentiles:
+        raise ValueError(
+            f"lower_pct={lower_pct!r} is not in "
+            f"reference.percentiles={reference.percentiles!r}"
+        )
+    if upper_pct not in reference.percentiles:
+        raise ValueError(
+            f"upper_pct={upper_pct!r} is not in "
+            f"reference.percentiles={reference.percentiles!r}"
+        )
+
+    level_strata = reference.levels.get(level_name)
+    if level_strata is None:
+        return None
+    level_dist = level_strata.get(stratum)
+    if level_dist is None:
+        return None
+
+    bounds: Dict[str, float] = {}
+    for field_name, (min_key, max_key) in _FEATURE_BOUNDS_KEYS.items():
+        stats = level_dist.feature_stats.get(field_name)
+        if stats is None:
+            continue
+        bounds[min_key] = stats.percentiles[f"p{lower_pct}"]
+        bounds[max_key] = stats.percentiles[f"p{upper_pct}"]
+    return bounds
+
 
 # --------------------------------------------------------------------------- #
 # Severity helper
@@ -192,13 +288,46 @@ class BoundsRule(Rule):
         Raises
         ------
         ValueError
-            If ``rules.bounds.params.severity`` is an unrecognised string.
+            If ``rules.bounds.params.severity`` is an unrecognised string, if
+            ``rules.bounds.params.source`` is neither ``"hand-set"`` nor
+            ``"reference"`` (item 048), or — in reference mode — if a
+            configured percentile is not one of ``reference.percentiles``
+            (item 048).
         """
         # Read severity once (raises ValueError for an unrecognised label).
         sev_label: str = config.rule_param(
             self.rule_id, "severity", default="flagged-for-review"
         )
         severity = _severity_from_param(sev_label)
+
+        # Read the bounds-source switch (item 048). Validated up-front, before
+        # any per-label processing, even for an empty per_label (AC10).
+        source: str = config.rule_param(
+            self.rule_id, "source", default=_SOURCE_HAND_SET
+        )
+        if source not in _VALID_SOURCES:
+            raise ValueError(
+                f"Unknown bounds source {source!r} in bounds rule config. "
+                f"Known sources: {sorted(_VALID_SOURCES)}."
+            )
+
+        reference: Optional["ReferenceDistribution"] = None
+        lower_pct = upper_pct = None
+        stratum = DEFAULT_REFERENCE_STRATUM
+        if source == _SOURCE_REFERENCE:
+            lower_pct = int(config.rule_param(
+                self.rule_id, "reference_lower_pct",
+                default=DEFAULT_REFERENCE_LOWER_PCT,
+            ))
+            upper_pct = int(config.rule_param(
+                self.rule_id, "reference_upper_pct",
+                default=DEFAULT_REFERENCE_UPPER_PCT,
+            ))
+            stratum = config.rule_param(
+                self.rule_id, "reference_stratum",
+                default=DEFAULT_REFERENCE_STRATUM,
+            )
+            reference = record.get("reference")
 
         findings: List[Finding] = []
         per_label = record.get("per_label", {})
@@ -218,6 +347,20 @@ class BoundsRule(Rule):
             config_group: dict = config.rule_param(self.rule_id, group, default={})
             bounds = {**group_defaults, **config_group}
 
+            # Reference mode: merge reference-derived bounds *over* the
+            # hand-set bounds so covered metrics use reference values and any
+            # metric/level the reference lacks falls back to hand-set
+            # (per-metric/per-level fallback, item 048 AC5/AC12).
+            reference_bounds: Dict[str, float] = {}
+            if reference is not None:
+                derived = reference_bounds_for_level(
+                    reference, level_name,
+                    lower_pct=lower_pct, upper_pct=upper_pct, stratum=stratum,
+                )
+                if derived is not None:
+                    reference_bounds = derived
+                    bounds = {**bounds, **reference_bounds}
+
             geometry: dict = entry.get("geometry", {})
             label_int = int(label_key)
 
@@ -229,28 +372,47 @@ class BoundsRule(Rule):
                 value: float = geometry[field_name]
                 lo: float = bounds[min_key]
                 hi: float = bounds[max_key]
+                from_reference = min_key in reference_bounds
 
                 # Inclusive bounds: strictly < min or > max fires (AC adv).
                 if value < lo:
-                    findings.append(Finding(
-                        rule_id=self.rule_id,
-                        severity=severity,
-                        reason=(
+                    if from_reference:
+                        reason = (
+                            f"Label {label_int} ({level_name}): "
+                            f"{human_name} = {value:.6g} is below "
+                            f"reference minimum {lo:.6g} (p{lower_pct}) "
+                            f"for level {level_name}"
+                        )
+                    else:
+                        reason = (
                             f"Label {label_int} ({level_name}): "
                             f"{human_name} = {value:.6g} is below "
                             f"minimum {lo:.6g} for {group} group"
-                        ),
-                        labels=frozenset({label_int}),
-                    ))
-                elif value > hi:
+                        )
                     findings.append(Finding(
                         rule_id=self.rule_id,
                         severity=severity,
-                        reason=(
+                        reason=reason,
+                        labels=frozenset({label_int}),
+                    ))
+                elif value > hi:
+                    if from_reference:
+                        reason = (
+                            f"Label {label_int} ({level_name}): "
+                            f"{human_name} = {value:.6g} exceeds "
+                            f"reference maximum {hi:.6g} (p{upper_pct}) "
+                            f"for level {level_name}"
+                        )
+                    else:
+                        reason = (
                             f"Label {label_int} ({level_name}): "
                             f"{human_name} = {value:.6g} exceeds "
                             f"maximum {hi:.6g} for {group} group"
-                        ),
+                        )
+                    findings.append(Finding(
+                        rule_id=self.rule_id,
+                        severity=severity,
+                        reason=reason,
                         labels=frozenset({label_int}),
                     ))
 

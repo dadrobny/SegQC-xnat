@@ -28,6 +28,30 @@ rules:
   bounds:
     enabled: true
     params:
+      # -------------------------------------------------------------- #
+      # Bounds-source switch (item 048) -- documented here as COMMENTS
+      # ONLY. Adding an active `source` (or `reference_*`) key would change
+      # this file's parsed `rules` dict and hence `config_hash` (item 045
+      # provenance) and could regress the Stage 5 golden snapshots, so the
+      # code-side default is supplied instead via
+      # HeuristicConfig.rule_param(..., default="hand-set"). Uncomment and
+      # adjust to opt a deployment into reference-derived bounds once a
+      # reference is attached to the record (item 049).
+      #
+      # source: hand-set | reference
+      #   hand-set (default) -- today's behaviour: coarse per-group
+      #   (cervical/thoracic/lumbar) bounds below, unchanged.
+      #   reference -- per-level bounds derived from the
+      #   ReferenceDistribution attached at record["reference"] (item 045),
+      #   using the level's stored reference_lower_pct/reference_upper_pct
+      #   percentiles. Any level the reference does not cover (or does not
+      #   cover for reference_stratum), and any tracked metric a covered
+      #   level lacks, falls back to the hand-set group bounds below --
+      #   never crashes.
+      #
+      # reference_lower_pct: 1
+      # reference_upper_pct: 99
+      # reference_stratum: all
       severity: flagged-for-review
       cervical:
         min_volume_mm3: 3000.0
