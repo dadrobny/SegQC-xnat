@@ -341,3 +341,34 @@ spec into code:
   unchanged (not deep-copied) since it is read-only in this module; `to_dict()`
   wraps it in a plain `dict(...)` only for the JSON-serialisable output, not to
   guard against mutation elsewhere.
+
+### Validator round-trip fixes (post-implementation)
+
+- **`to_dict()` full JSON round-trippability (AC12).** The original
+  `dataclasses.asdict` + enum-reducing `dict_factory` left tuple-typed fields
+  (`OverlapResult.per_label`, `FeatureMatchResult.per_label`,
+  `CaseOutcome.expected_rule_ids`/`expected_labels`/`fired_rule_ids`) as Python
+  tuples in the returned dict. `json.dumps` encodes a tuple identically to a
+  list, but `json.loads` always yields a list back, so `round_tripped ==
+  dict_a` failed even though the JSON *text* was stable. Fixed by adding
+  `_tuples_to_lists`, a small recursive post-pass applied inside
+  `_asdict_enum_safe` that walks the `asdict()` output and coerces every
+  `tuple` (arbitrarily nested inside dicts/lists) to a `list`, so the returned
+  dict is already in plain-JSON shape *before* any dump/load round trip.
+- **`_resolve_seg` and a zero (or otherwise degenerate) spacing component.**
+  Building `nib.Nifti1Image(data, affine, dtype=...)` directly from a diagonal
+  affine with a zero component makes the affine singular; nibabel's
+  constructor tries to decompose it into a qform rotation/quaternion during
+  `update_header()` and raises `nibabel.spatialimages.HeaderDataError` ("Could
+  not decompose affine"). `spacing` carries no documented non-zero
+  restriction (mirrors item 050/051's spacing-invariance handling, which
+  already treats zero spacing as a legitimate degrade-gracefully edge case).
+  Fixed by catching `HeaderDataError` around the direct-construction fast
+  path and falling back to: construct the image with `affine=None` (skips
+  the implicit qform derivation), set the affine directly via `set_sform(...,
+  code=1)` (sform assignment does not require decomposition), explicitly
+  `set_qform(None, code=0)` to leave the qform unset/unknown, and
+  `header.set_zooms((sx, sy, sz))` so `header.get_zooms()` still reports the
+  exact requested (including zero) spacing for downstream physical-volume
+  calculations. The common non-degenerate case is unaffected — it still goes
+  through the original single-call construction.

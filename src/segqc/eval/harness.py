@@ -152,7 +152,24 @@ def _resolve_seg(source: SegSource, spacing: Optional[Tuple[float, float, float]
     if isinstance(source, np.ndarray):
         sx, sy, sz = (float(s) for s in (spacing or _DEFAULT_SPACING))
         affine = np.diag([sx, sy, sz, 1.0]).astype(np.float64)
-        return nib.Nifti1Image(np.asanyarray(source), affine, dtype=source.dtype)
+        data = np.asanyarray(source)
+        try:
+            return nib.Nifti1Image(data, affine, dtype=source.dtype)
+        except nib.spatialimages.HeaderDataError:
+            # A degenerate affine (e.g. a zero spacing component) is
+            # singular and cannot be decomposed into a qform rotation --
+            # nibabel raises trying to derive one during construction.
+            # ``spacing`` carries no documented non-zero restriction, so
+            # degrade gracefully instead: build the image without an
+            # implicit qform, set the affine directly via sform, and record
+            # the exact requested spacing on the header so downstream
+            # ``header.get_zooms()`` reads (e.g. for physical-volume
+            # calculations) still see the degenerate component.
+            img = nib.Nifti1Image(data, None, dtype=source.dtype)
+            img.set_sform(affine, code=1)
+            img.set_qform(None, code=0)
+            img.header.set_zooms((sx, sy, sz))
+            return img
 
     # Path-like: load a single seg NIfTI, integer labels preserved.
     return nib.load(os.fspath(source))
@@ -163,15 +180,41 @@ def _resolve_seg(source: SegSource, spacing: Optional[Tuple[float, float, float]
 # --------------------------------------------------------------------------- #
 
 
+def _tuples_to_lists(obj: Any) -> Any:
+    """Recursively coerce any ``tuple`` in *obj* to a ``list``.
+
+    ``dataclasses.asdict`` preserves tuple-typed fields (e.g.
+    ``OverlapResult.per_label``) as Python tuples. ``json.dumps`` encodes a
+    tuple identically to a list, but ``json.loads`` always comes back as a
+    list -- so a pre-dump dict containing tuples never compares equal to its
+    own post-round-trip counterpart. Applying this pass makes the dict
+    already "plain JSON" shaped before any dump/load round trip.
+    """
+    if isinstance(obj, tuple):
+        return [_tuples_to_lists(v) for v in obj]
+    if isinstance(obj, list):
+        return [_tuples_to_lists(v) for v in obj]
+    if isinstance(obj, dict):
+        return {k: _tuples_to_lists(v) for k, v in obj.items()}
+    return obj
+
+
 def _asdict_enum_safe(obj: Any) -> Any:
-    """``dataclasses.asdict``-like conversion that reduces ``Outcome`` to ``.value``."""
+    """``dataclasses.asdict``-like conversion that reduces ``Outcome`` to ``.value``.
+
+    All tuple-typed fields (nested arbitrarily deep) are also coerced to
+    lists so the result is already in plain-JSON shape -- see
+    :func:`_tuples_to_lists`.
+    """
     if obj is None:
         return None
-    return dataclasses.asdict(
-        obj,
-        dict_factory=lambda pairs: {
-            k: (v.value if isinstance(v, Outcome) else v) for k, v in pairs
-        },
+    return _tuples_to_lists(
+        dataclasses.asdict(
+            obj,
+            dict_factory=lambda pairs: {
+                k: (v.value if isinstance(v, Outcome) else v) for k, v in pairs
+            },
+        )
     )
 
 
