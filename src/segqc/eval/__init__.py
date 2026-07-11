@@ -7,9 +7,11 @@ package performs no cohort aggregation, correlation, or verdict-interpretation
 logic of its own.
 
 Currently exposes the level-2 **DICE-vs-GT** segmentation-overlap primitive
-(item 050; see :mod:`segqc.eval.overlap`) and the level-3 **feature-set
+(item 050; see :mod:`segqc.eval.overlap`), the level-3 **feature-set
 match / divergence-by-label** primitive (item 051; see
-:mod:`segqc.eval.feature_match`).
+:mod:`segqc.eval.feature_match`), and the level-1 **QC-verdict comparison /
+per-case outcome classification** primitive (item 052; see
+:mod:`segqc.eval.outcome`).
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from .feature_match import (
     TRACKED_FEATURES,
     compute_feature_match,
 )
+from .outcome import CaseOutcome, Outcome, classify_outcome
 from .overlap import LabelOverlap, OverlapResult, compute_overlap
 
 __all__ = [
@@ -32,4 +35,7 @@ __all__ = [
     "FeatureDifference",
     "LabelFeatureDivergence",
     "FeatureMatchResult",
+    "classify_outcome",
+    "Outcome",
+    "CaseOutcome",
 ]

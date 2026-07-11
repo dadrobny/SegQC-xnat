@@ -444,4 +444,34 @@ default threshold.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Implemented exactly as pinned in Assumptions/Implementation Steps** — no
+  divergence found in the actual `Severity`/`Verdict`/`CaseResult`/`Finding`/
+  `SegQCInputError` APIs vs. what the spec described; no hand-back needed.
+- **`Outcome` uses `enum.Enum` (string-valued), not `IntEnum`** — unlike
+  `Severity`, the four confusion-matrix cells have no natural total ordering,
+  so a plain `Enum` (mirroring `Severity.label`'s property pattern) is the
+  right fit; member identity/equality is all `CaseOutcome` needs.
+  `Outcome.from_flags(expected_failure, actual_flagged)` is added as a
+  classmethod per Implementation Step 2, used internally by
+  `classify_outcome` and exposed for any future direct caller.
+- **`_extract_actual` returns the validated `findings` tuple alongside
+  `(overall, fired_rule_ids)`** (not spelled out verbatim in Implementation
+  Step 6, which only mentions returning `(overall_severity,
+  findings_tuple)` conceptually) so `classify_outcome`'s
+  `caught_by_designated_rule` computation iterates the same
+  already-type-checked tuple rather than re-reading `actual.findings`
+  a second time — avoids a second unguarded attribute/iteration pass over
+  caller input and keeps validation centralized in one helper.
+- **`_severity_of` reused for expected-verdict validation directly inside
+  `_extract_expected`** (Implementation Step 4/5 combined) — calling it once
+  both validates `expected_verdict` against the three recognised labels
+  (AC15) and supplies the severity used later for the binary reduction,
+  avoiding a duplicate label-recognition check.
+- **Malformed `actual.findings` (non-iterable, or items lacking `.rule_id`)
+  also raises `SegQCInputError`** — AC16 only enumerates `None` / mapping /
+  missing-`.findings` cases explicitly, but Implementation Step 6's "raises
+  `SegQCInputError` unless ... an iterable `.findings` whose items each
+  expose `.rule_id`" covers these too; added defensive `try/except
+  TypeError`/`AttributeError` wrapping for robustness beyond the committed
+  tests' exact inputs, consistent with AC16's intent ("not a raw
+  `AttributeError`").
