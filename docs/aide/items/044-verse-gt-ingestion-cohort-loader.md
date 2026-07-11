@@ -454,4 +454,43 @@ Intended code path (all new, under `source_dir = src/segqc`): a new
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implementation notes (added by the builder; the Assumptions block above
+already pinned the interface — these are the concrete choices made while
+writing `src/segqc/reference/ingest.py`):
+
+- **Re-normalisation ignores `extract_feature_record`'s own `level_name`.**
+  `extract_feature_record` → `feature_report.build_features_block` sources
+  each `per_label[*]["level_name"]` from `compute_centroid`, which is called
+  by `pipeline.py` with no `convention` argument — i.e. it is **always** the
+  default `LabelConvention`, never the one `ingest_subject`/`ingest_cohort`
+  received. Per the spec's Implementation Steps, the driver therefore
+  discards that string and re-derives `level_name` from `entry["label"]`
+  (the integer) via the **caller-supplied** `convention.name_of(...)` /
+  `convention.is_known(...)`, so a custom convention passed to
+  `ingest_subject` is actually honoured for skip/normalise decisions, even
+  though the underlying pipeline call is convention-blind. This matches
+  AC2/AC3 (which compare against the block's `geometry`/`offset_mm` values,
+  not its `level_name` string) and keeps AC4/AC6/AC7 correct for a custom
+  convention.
+- **`ingest_subject` loads the seg image via `nibabel.load` directly**
+  (not `segqc.io.load_volume`), since `extract_feature_record` only needs a
+  `Nifti1Image`-like object exposing `.dataobj`/`.affine`/`.header` and the
+  driver does no additional validation beyond what the feature engine
+  already performs; this keeps the read path minimal and matches the
+  Assumptions' "or `nibabel.load`" alternative.
+- **`scan_path` is accepted but unread**, exactly as the Assumptions
+  describe — `extract_feature_record` takes only the seg image today, so
+  the parameter is pure interface-forward-compatibility, threaded through
+  `ingest_cohort` (which locates a sibling `<subject_id>_scan.nii.gz` when
+  present) down to `ingest_subject`.
+- **`skipped_labels` and the per-subject size proxy are computed before the
+  final canonical-rank sort**, then the collected `(level_name, features)`
+  pairs are sorted once by `(CANONICAL_ORDER index, level_name)` — giving a
+  single, total, deterministic ordering (AC11/AC12) with no reliance on
+  `per_label` dict iteration order (which is already ascending-integer-label
+  per `build_features_block`, but the driver does not depend on that).
+- **A nonexistent `cohort_dir` is not special-cased** — `ingest_cohort` calls
+  `os.listdir(cohort_dir)` directly, so a missing directory raises the
+  stdlib `FileNotFoundError` naturally, matching the adversarial test's
+  expectation (`pytest.raises((FileNotFoundError, OSError))`) without extra
+  code.
