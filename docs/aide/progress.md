@@ -31,7 +31,7 @@
 | 4 | Heuristic Rule Engine over Failure Modes | G2 | ✅ |
 | 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | ✅ |
 | 6 | VerSe Reference Distributions & Delta Rules | G3 | ✅ |
-| 7 | Evaluation, Calibration & Metrics *(Phase 1 complete)* | G3, G7 | 📋 |
+| 7 | Evaluation, Calibration & Metrics *(Phase 1 complete)* | G3, G7 | 🚧 |
 | 8 | Image-Based / Radiomics Features | (Phase 2) | 📋 |
 | 9 | Containerisation & XNAT Command | G5 | 📋 |
 | 10 | Portable Compute: GPU Acceleration Path | G6 | 📋 |
@@ -205,13 +205,13 @@ mislabelling heuristics.
 
 ---
 
-## Stage 7 — Evaluation, Calibration & Metrics (G3, G7) — 📋 *(Phase 1 complete)*
+## Stage 7 — Evaluation, Calibration & Metrics (G3, G7) — 🚧 *(Phase 1 complete)*
 
 **Goal.** Quantify performance and calibrate thresholds against VerSe GT,
 TotalSegmentator output, and the synthetic corpus.
 
 **Deliverables.**
-- 📋 Evaluation harness comparing QC verdict; DICE vs GT; feature-set match by label. *(Items 050, 051, 052)*
+- 🚧 Evaluation harness comparing QC verdict; DICE vs GT; feature-set match by label. *(Items 050, 051, 052)*
 - 📋 Runs on VerSe GT (positive control), TotalSegmentator outputs, synthetic failures. *(Item 053)*
 - 📋 Metrics: FPR on GT, sensitivity per failure mode, DICE-vs-flag correlation. *(Item 054)*
 - 📋 Threshold-calibration loop; chosen thresholds + metrics recorded here / evaluation report. *(Items 055, 056)*
