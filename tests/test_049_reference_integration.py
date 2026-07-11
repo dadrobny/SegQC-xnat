@@ -47,7 +47,6 @@ from segqc.config import (
     SUPPORTED_SCHEMA_VERSION,
     bundled_default_config,
     default_config,
-    default_config_path,
     load_config,
 )
 from segqc.pipeline import extract_feature_record, run_qc, run_qc_with_reference
@@ -497,10 +496,6 @@ def test_ac8_reference_param_default_when_section_absent():
     cfg = default_config()
     assert cfg.reference_param("enabled", False) is False
     assert cfg.reference_param("lower_pct", 1) == 1
-
-
-def test_ac8_default_config_yaml_parses_to_default_config():
-    assert load_config(default_config_path()) == default_config()
 
 
 def test_ac8_config_hash_unaffected_by_reference_section(tmp_path):

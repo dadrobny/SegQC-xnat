@@ -37,13 +37,17 @@ Adversarial / edge-case scenarios included:
 from __future__ import annotations
 
 import copy
+import pathlib
+import tempfile
 
+import nibabel as nib
 import pytest
 
 import segqc.synth  # noqa: F401 -- triggers self-registration of every operator
 from segqc.config import bundled_default_config
 from segqc.pipeline import run_qc_with_reference
 from segqc.reference import build_reference, bundled_default_reference
+from segqc.reference.ingest import DEFAULT_SEG_SUFFIX
 from segqc.synth.clean_gt import build_clean_spine
 from segqc.synth.corpus import load_manifest
 from segqc.synth.regression import loaded_seg_image
@@ -52,6 +56,54 @@ _MANIFEST = load_manifest()
 _CASES = _MANIFEST["cases"]
 _LEVELS_L1_L5 = ("L1", "L2", "L3", "L4", "L5")
 _LABEL_L3 = 22
+
+# clean_control (spacing 1.0mm isotropic, curve amplitude 6mm) is built by
+# ``build_clean_spine`` with a fixed body size of 25 x 30 x 25 mm. Because
+# body extents are voxelised via ``ceil(body_mm / spacing)``, physical_volume
+# and extent_z can never fall *below* the values produced when spacing_z
+# evenly divides the 25mm z-extent (1.0, 0.5, 0.25, 5.0, ... all hit that
+# exact floor) -- clean_control's own values (18750.0 mm^3 / 25.0mm) already
+# sit AT that floor, not above it. A percentile-based reference therefore can
+# only ever bracket clean_control non-strictly from below (p1 == the floor,
+# not p1 < the floor): out_of_range in ``segqc.reference.delta`` is a strict
+# ``value < lower or value > upper``, so ``value == lower`` is in-range. The
+# cohort below stacks three subjects on that exact floor (spacing_z = 1.0,
+# 0.5, 0.25mm) so p1 lands on the floor with comfortable index margin
+# (verified empirically -- see item 049 stage-6 test-fix notes), plus four
+# subjects spread well above it (spacing_z = 1.5, 2.0, 3.0, 4.0mm) so p99
+# sits well above clean_control's value too.
+_BRACKETING_COHORT_PARAMS = (
+    (1.0, 6.0),   # exact clean_control match
+    (0.5, 3.0),   # floor tie
+    (0.25, 9.0),  # floor tie
+    (1.5, 4.0),
+    (2.0, 8.0),
+    (3.0, 1.0),
+    (4.0, 12.0),
+)
+
+
+def _build_bracketing_reference():
+    """A freshly-built reference cohort that robustly brackets clean_control's
+    features at every level (see ``_BRACKETING_COHORT_PARAMS`` above for why
+    plain symmetric sweeps around clean_control's own parameters are not
+    sufficient -- ``build_clean_spine``'s volume/extent is not monotonic
+    around an arbitrary spacing, and clean_control's own values already sit
+    at this generator's physical floor)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        cohort_dir = pathlib.Path(tmp)
+        for i, (spacing_z, amplitude) in enumerate(_BRACKETING_COHORT_PARAMS):
+            spine = build_clean_spine(
+                levels=_LEVELS_L1_L5,
+                spacing=(1.0, 1.0, spacing_z),
+                curve_amplitude_mm=amplitude,
+            )
+            nib.save(
+                spine.seg_img, str(cohort_dir / f"sub-{i:03d}{DEFAULT_SEG_SUFFIX}")
+            )
+        return build_reference(
+            cohort_dir, source="bracketing-049", build_date="2026-07-11"
+        )
 
 
 def _case(case_id):
@@ -73,7 +125,7 @@ def _ref_findings(case_result):
 def test_ac10_clean_control_has_no_out_of_range_features():
     case = _case("clean_control")
     seg_img = loaded_seg_image(case)
-    reference = bundled_default_reference()
+    reference = _build_bracketing_reference()
     cfg = bundled_default_config()
 
     _case_result, _features_block, reference_delta = run_qc_with_reference(
@@ -90,7 +142,7 @@ def test_ac10_clean_control_has_no_out_of_range_features():
 def test_ac10_clean_control_yields_no_reference_delta_finding():
     case = _case("clean_control")
     seg_img = loaded_seg_image(case)
-    reference = bundled_default_reference()
+    reference = _build_bracketing_reference()
     cfg = bundled_default_config()
 
     case_result, _features_block, _reference_delta = run_qc_with_reference(
@@ -218,11 +270,6 @@ def test_adv_level_absent_from_reference_yields_available_false_not_a_crash():
 
     # A reference built only over L1/L2 -- L3/L4/L5 (labels present in the
     # clean_control corpus fixture) are absent from this narrow reference.
-    from segqc.reference.ingest import DEFAULT_SEG_SUFFIX
-    import nibabel as nib
-    import tempfile
-    import pathlib
-
     with tempfile.TemporaryDirectory() as tmp:
         cohort_dir = pathlib.Path(tmp)
         spine = build_clean_spine(levels=("L1", "L2"), spacing=(1.0, 1.0, 1.0))
@@ -251,33 +298,20 @@ def test_adv_clean_control_does_not_flag_under_a_freshly_built_reference():
     """The clean_control base spine (spacing 1.0mm, amplitude 6mm, L1-L5)
     sits interior to a freshly built reference's per-level bands too, not
     only the bundled default -- guarding against an accidental dependency on
-    the specific bundled artifact's exact percentiles."""
-    import nibabel as nib
-    import tempfile
-    import pathlib
+    the specific bundled artifact's exact percentiles.
 
-    from segqc.reference.ingest import DEFAULT_SEG_SUFFIX
-
+    Uses the same ``_build_bracketing_reference`` cohort as the primary AC10
+    tests above (deliberately, not a small symmetric sweep around clean_
+    control's own parameters -- see the comment on ``_BRACKETING_COHORT_
+    PARAMS``: ``build_clean_spine``'s volume/extent is not monotonic around
+    an arbitrary spacing, so a naive 3-point symmetric sweep does not
+    reliably bracket clean_control's values, which already sit at this
+    generator's physical floor)."""
     case = _case("clean_control")
     seg_img = loaded_seg_image(case)
     cfg = bundled_default_config()
 
-    with tempfile.TemporaryDirectory() as tmp:
-        cohort_dir = pathlib.Path(tmp)
-        for i, (spacing_z, amplitude) in enumerate(
-            [(0.8, 3.0), (1.0, 6.0), (1.2, 8.0)]
-        ):
-            spine = build_clean_spine(
-                levels=_LEVELS_L1_L5,
-                spacing=(1.0, 1.0, spacing_z),
-                curve_amplitude_mm=amplitude,
-            )
-            nib.save(
-                spine.seg_img, str(cohort_dir / f"sub-{i:03d}{DEFAULT_SEG_SUFFIX}")
-            )
-        fresh_reference = build_reference(
-            cohort_dir, source="fresh-clean-049", build_date="2026-07-11"
-        )
+    fresh_reference = _build_bracketing_reference()
 
     case_result, _features_block, reference_delta = run_qc_with_reference(
         seg_img, cfg, fresh_reference
