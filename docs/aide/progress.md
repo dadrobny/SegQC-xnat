@@ -191,10 +191,12 @@ mislabelling heuristics.
 
 **Deliverables.**
 - 📋 VerSe GT ingestion → per-level feature aggregation into reference distributions
-  (mean/percentiles), stratified by level (+ subject-size proxy where feasible).
-- 📋 Versioned reference-data artifact (committed or mounted) + builder script.
-- 📋 Delta-to-reference rules: per-vertebra distribution distance / out-of-range vs reference.
-- 📋 Heuristic config can switch from hand-set bounds to reference-derived bounds.
+  (mean/percentiles), stratified by level (+ subject-size proxy where feasible). *(Items 043, 044)*
+- 📋 Versioned reference-data artifact (committed or mounted) + builder script. *(Item 045)*
+- 📋 Delta-to-reference rules: per-vertebra distribution distance / out-of-range vs reference. *(Items 046, 047)*
+- 📋 Heuristic config can switch from hand-set bounds to reference-derived bounds. *(Item 048)*
+- 📋 Reference artifact + delta rules wired into `segqc run`; Stage-6 acceptance suite
+  (GT in-range, perturbations out-of-range). *(Item 049)*
 
 **Acceptance.**
 - [ ] Reference artifact builds reproducibly from VerSe and is versioned.

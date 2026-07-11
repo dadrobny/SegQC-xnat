@@ -1,6 +1,6 @@
 # Seg-QC-xnat — Work Queue 004
 
-> **Status:** Live · **Created:** 2026-07-07
+> **Status:** ✅ Completed — superseded by queue-005 (2026-07-11).
 > Step 4 of the AIDE workflow. Derived from [`../vision.md`](../vision.md),
 > [`../roadmap.md`](../roadmap.md), and [`../progress.md`](../progress.md).
 > Follows [`queue-003.md`](queue-003.md) (items 026–035).
@@ -193,20 +193,22 @@ report schema.
 
 ---
 
-## Current state (2026-07-07)
+## Current state (2026-07-11)
 
-Freshly generated; supersedes [`queue-003.md`](queue-003.md) (Stage 4, items
-026–035, all ✅). No Stage 5 items claimed yet. **Item 036 (clean-GT builder +
-perturbation framework) must merge first** — it defines the `Perturbation`
-interface and the clean-GT positive control that 037–042 build on. After 036,
-items 037–039 (the three operator families) are parallelisable; 040 (committed
-corpus + manifest), then 041 (regression suite), then 042 (golden snapshots +
-determinism) close the stage.
+✅ **Stage 5 complete.** All items **036–042 are done** (✅ in `progress.md`): the
+clean-GT spine builder + perturbation framework (036), the three operator families
+— component/shape (037), coverage/border/overlap (038), identity/ordering/
+alignment (039) — the committed fixture corpus + manifest (040), the full-pipeline
+regression suite (041), and the golden-file JSON snapshots + determinism harness
+(042) are all merged. Every §6 failure mode has ≥1 committed synthetic case that
+the regression suite asserts is detected, while the clean-GT positive control
+passes, and golden JSON is stable across repeated runs. Superseded by
+[`queue-005.md`](queue-005.md), which delivers Stage 6 (VerSe reference
+distributions & delta-to-reference rules) on top of this corpus.
 
 ## Next Step
 
 Per `CLAUDE.md`: `git fetch --all --prune` and check `aide/*` branches first, then
 branch per item (`aide/NNN-short-name`) and push immediately to claim it;
-`git pull --rebase` before any `progress.md` edit. Start with **item 036**. Two
-ways to proceed: spec the whole queue now with `/aide-spec-queue 004` in one
-interactive sitting, or spec per-item during execution via `/aide-run-queue 004`.
+`git pull --rebase` before any `progress.md` edit. Stage 5 is complete — proceed
+to [`queue-005.md`](queue-005.md).
