@@ -534,4 +534,30 @@ module.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- Implemented exactly per the spec's pinned interface: `src/segqc/heuristics/reference_delta.py`
+  defines `ReferenceDeltaRule` (`rule_id = "reference_delta"`), registered via
+  `@register_rule` and imported (for side effect) from
+  `src/segqc/heuristics/__init__.py` after the `mislabel` import line, mirroring
+  items 027–033. No other module was touched (no `segqc.reference`, `segqc.pipeline`,
+  `segqc.cli`, `segqc.config`, `default_config.yaml`, `segqc.report`, or
+  `segqc.aggregate` edits).
+- `severity` is read via `config.rule_param` and validated first via
+  `_severity_from_param` (copied pattern from `mislabel.py`/`bounds.py`), so an
+  unrecognised severity string raises `ValueError` before the `reference_delta`
+  block is even inspected (AC12, including on a record with no block at all).
+- The three conditions are evaluated in the spec's fixed order
+  (distribution-distance -> out-of-range -> robust-z) per available label, with
+  labels processed in ascending integer-label order and per-feature findings
+  ascending by feature name (`out_of_range_features` and `features` keys are both
+  defensively re-sorted rather than trusted to arrive pre-sorted).
+- Malformed/defensive reads follow the `mislabel`/`bounds` pattern: a non-dict
+  `reference_delta`, a non-dict `per_label`, a non-dict label entry, a falsy
+  `available`, a non-dict `features`, or a non-list `out_of_range_features` are
+  all tolerated by skipping rather than raising — only the up-front severity
+  validation can raise.
+- No deviation from the spec's Assumptions or Public interface section was
+  needed; the committed tests' `_block`/`_label_entry` fixture shape matched the
+  spec's documented `reference_delta_to_dict` shape exactly (`available`,
+  `distribution_distance`, `out_of_range_features`, `features`), including the
+  reason-string tag prefixes (`"Reference out-of-range:"`,
+  `"Reference robust-z outlier:"`, `"Reference distribution-distance outlier:"`).
