@@ -434,4 +434,25 @@ Intended code path (all new, under `source_dir = src/segqc`): a new
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Package layout matches the Implementation Steps exactly:** `src/segqc/reference/{__init__.py,schema.py,aggregate.py}`.
+  `schema.py` imports only `json`/`dataclasses`/`typing` (no NumPy); `aggregate.py` imports `bisect`, `numpy as np`, and
+  the dataclasses/constants from `.schema`. `__init__.py` re-exports the full public surface with an explicit `__all__`.
+- **`FeatureRecord.size_proxy` and `Provenance.size_proxy_name` are typed `Optional[...] = None`** (the interface block's
+  `float | None` / `str | None` syntax is Python 3.10+; this project targets 3.9+, so `typing.Optional` is used instead —
+  behaviourally identical).
+- **`present strata order`** in `ReferenceDistribution.strata` is derived by filtering the caller's/default `stratum_labels`
+  bucket order down to labels that have at least one `(level, stratum)` group actually present in the aggregated records —
+  satisfies "`dist.strata` lists only the labels actually present, in bucket order" (empty input therefore yields
+  `strata == ()`, which is consistent with "well-formed empty distribution" though AC9 does not assert on `strata`
+  directly).
+- **Per-record grouping key is `(level_name, stratum)`** with a `record_count` incremented unconditionally per record
+  (independent of which of that record's feature keys are in the tracked set), so `features=[]` still yields a
+  `LevelDistribution` with the correct `record_count` and an empty `feature_stats` dict, matching AC14's "omitted, not
+  null" requirement and the adversarial empty-tracked-features case.
+- **Stratum-label length validation runs before per-record `None`-proxy validation** inside `_resolve_strata`, so a
+  wrong-length `stratum_labels` raises `ValueError` immediately regardless of whether any record's `size_proxy` is `None`
+  — both are documented failure modes and the tests only assert `pytest.raises(ValueError)` without requiring a
+  particular precedence when both conditions could apply simultaneously.
+- No deviations from the spec's pinned interface, JSON shape, or Assumptions were needed; the committed tests
+  (`tests/test_043_reference_aggregation.py`) exercise exactly the public surface described above with no conflicts
+  found.
