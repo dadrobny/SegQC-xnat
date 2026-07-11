@@ -211,7 +211,7 @@ mislabelling heuristics.
 TotalSegmentator output, and the synthetic corpus.
 
 **Deliverables.**
-- 🚧 Evaluation harness comparing QC verdict; DICE vs GT; feature-set match by label. *(Items 050, 051, 052)*
+- ✅ Evaluation harness comparing QC verdict; DICE vs GT; feature-set match by label. *(Items 050, 051, 052)*
 - 📋 Runs on VerSe GT (positive control), TotalSegmentator outputs, synthetic failures. *(Item 053)*
 - 📋 Metrics: FPR on GT, sensitivity per failure mode, DICE-vs-flag correlation. *(Item 054)*
 - 📋 Threshold-calibration loop; chosen thresholds + metrics recorded here / evaluation report. *(Items 055, 056)*
