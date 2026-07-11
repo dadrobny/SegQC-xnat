@@ -267,7 +267,10 @@ def test_ac5_single_label_perturbation_is_localised():
     """AC5: only the perturbed label has a non-zero divergence score."""
     from segqc.eval.feature_match import compute_feature_match
 
-    gt = _block([_entry(20, "L1", volume=1000.0), _entry(21, "L2", volume=2000.0)])
+    gt = _block(
+        [_entry(20, "L1", volume=1000.0), _entry(21, "L2", volume=2000.0)],
+        offsets=[(20, 1.0), (21, 2.0)],
+    )
     cand = copy.deepcopy(gt)
     cand["per_label"]["20"]["geometry"]["physical_volume_mm3"] = 1500.0
 
@@ -329,7 +332,12 @@ def test_ac7_divergence_score_hand_computed():
     entry = result.per_label[0]
     rel_vol = 100.0 / 1000.0
     rel_ex = -2.0 / 10.0
-    expected = (abs(rel_vol) + abs(rel_ex)) / 2.0
+    rel_ey = 0.0 / 10.0
+    rel_ez = 0.0 / 10.0
+    # spline_offset_mm has no stage3 on either side -> unavailable, excluded.
+    # The remaining four tracked features (volume, ex, ey, ez) are all
+    # available with a defined relative -> denominator is 4, not 2.
+    expected = (abs(rel_vol) + abs(rel_ex) + abs(rel_ey) + abs(rel_ez)) / 4.0
     assert entry.divergence_score == pytest.approx(expected)
 
 
