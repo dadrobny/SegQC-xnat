@@ -7,6 +7,21 @@ statistics; results are stored as builtin ``float``).
 """
 
 from .aggregate import aggregate_reference
+from .artifact import (
+    ARTIFACT_SCHEMA_VERSION,
+    DEFAULT_ARTIFACT_NAME,
+    DEFAULT_BUILD_DATE,
+    DEFAULT_SOURCE,
+    ReferenceArtifactError,
+    build_and_write_default,
+    build_default_cohort,
+    build_reference,
+    bundled_default_reference,
+    config_hash,
+    default_artifact_path,
+    load_artifact,
+    write_artifact,
+)
 from .ingest import (
     DEFAULT_SCAN_SUFFIX,
     DEFAULT_SEG_SUFFIX,
@@ -52,4 +67,17 @@ __all__ = [
     "CohortIngest",
     "ingest_subject",
     "ingest_cohort",
+    "ARTIFACT_SCHEMA_VERSION",
+    "DEFAULT_ARTIFACT_NAME",
+    "DEFAULT_SOURCE",
+    "DEFAULT_BUILD_DATE",
+    "ReferenceArtifactError",
+    "config_hash",
+    "build_reference",
+    "write_artifact",
+    "load_artifact",
+    "default_artifact_path",
+    "bundled_default_reference",
+    "build_default_cohort",
+    "build_and_write_default",
 ]

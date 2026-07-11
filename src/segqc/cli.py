@@ -90,6 +90,74 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     run_parser.set_defaults(handler=_handle_run)
 
+    build_reference_parser = subparsers.add_parser(
+        "build-reference",
+        help="Build a versioned reference-data artifact from a cohort directory.",
+        description=(
+            "Chain cohort ingestion (item 044) and aggregation (item 043) "
+            "into a versioned reference-data artifact JSON file, ready for "
+            "the delta-to-reference rules (items 046-049) to consume."
+        ),
+    )
+    build_reference_parser.add_argument(
+        "--cohort",
+        required=True,
+        metavar="<dir>",
+        help="Path to the cohort directory to ingest.",
+    )
+    build_reference_parser.add_argument(
+        "--out",
+        required=True,
+        metavar="<json>",
+        help="Destination path for the written reference artifact JSON.",
+    )
+    build_reference_parser.add_argument(
+        "--source",
+        default="synthetic-verse-cohort",
+        metavar="<label>",
+        help="Free-text provenance label for the cohort (default: %(default)s).",
+    )
+    build_reference_parser.add_argument(
+        "--build-date",
+        default="2026-07-11",
+        metavar="<YYYY-MM-DD>",
+        help=(
+            "Fixed ISO build-date stamped into the artifact's provenance "
+            "(default: %(default)s -- a fixed value, not 'today', to keep "
+            "rebuilds reproducible)."
+        ),
+    )
+    build_reference_parser.add_argument(
+        "--config",
+        default=None,
+        metavar="<yaml>",
+        help=(
+            "Path to a custom heuristic-config YAML file. When omitted, the "
+            "bundled default_config.yaml (item 035) is used."
+        ),
+    )
+    build_reference_parser.add_argument(
+        "--seg-suffix",
+        default=None,
+        metavar="<suffix>",
+        help=(
+            "Filename suffix identifying a subject's label map within "
+            "--cohort (default: the item 044 convention '_seg.nii.gz')."
+        ),
+    )
+    build_reference_parser.add_argument(
+        "--size-strata-edges",
+        default=None,
+        nargs="+",
+        type=float,
+        metavar="<edge>",
+        help=(
+            "Optional size-proxy stratum edges (one or more floats); when "
+            "given, the artifact is size-stratified."
+        ),
+    )
+    build_reference_parser.set_defaults(handler=_handle_build_reference)
+
     return parser
 
 
@@ -252,6 +320,50 @@ def _handle_run(args: argparse.Namespace) -> int:
     # fail → 1; pass or flagged-for-review → 0 (from the aggregated verdict).
     if verdict.overall == Severity.FAIL:
         return 1
+    return 0
+
+
+def _handle_build_reference(args: argparse.Namespace) -> int:
+    """Handler for ``segqc build-reference`` (item 045).
+
+    Loads the config (bundled default or ``--config``), calls
+    :func:`segqc.reference.build_reference` then
+    :func:`segqc.reference.write_artifact`, prints the written path, and
+    returns 0. Returns 1 (writing no ``--out`` file) on a bad ``--config``
+    or a cohort-ingestion error (e.g. a nonexistent ``--cohort`` directory) --
+    a caller error is reported, not a traceback.
+    """
+    from segqc.config import SegQCConfigError, bundled_default_config, load_config
+    from segqc.reference import ReferenceArtifactError
+    from segqc.reference.artifact import build_reference, write_artifact
+    from segqc.reference.ingest import DEFAULT_SEG_SUFFIX
+
+    if args.config:
+        try:
+            cfg = load_config(args.config)
+        except SegQCConfigError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+    else:
+        cfg = bundled_default_config()
+
+    seg_suffix = args.seg_suffix if args.seg_suffix is not None else DEFAULT_SEG_SUFFIX
+
+    try:
+        dist = build_reference(
+            args.cohort,
+            source=args.source,
+            build_date=args.build_date,
+            config=cfg,
+            seg_suffix=seg_suffix,
+            size_strata_edges=args.size_strata_edges,
+        )
+    except (OSError, ReferenceArtifactError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    out_path = write_artifact(dist, args.out)
+    print(f"Wrote reference artifact to {out_path}")
     return 0
 
 
