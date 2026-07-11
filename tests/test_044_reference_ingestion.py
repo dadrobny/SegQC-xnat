@@ -468,7 +468,11 @@ def test_ac14_no_mutation_and_no_writes(tmp_path):
     config = bundled_default_config()
     config_before = copy.deepcopy(config)
     convention = LabelConvention.default()
-    convention_before = copy.deepcopy(convention)
+    # LabelConvention is a frozen dataclass whose maps are MappingProxyType,
+    # which copy.deepcopy cannot pickle. Snapshot the mapping as a plain dict
+    # instead -- picklable, and sufficient to prove the convention's contents
+    # are unchanged after the call.
+    convention_before = dict(convention.value_to_name)
 
     listing_before = sorted(os.listdir(cohort_dir))
 
@@ -477,7 +481,7 @@ def test_ac14_no_mutation_and_no_writes(tmp_path):
     listing_after = sorted(os.listdir(cohort_dir))
     assert listing_after == listing_before
     assert config == config_before
-    assert convention == convention_before
+    assert dict(convention.value_to_name) == convention_before
 
 
 # =========================================================================== #
