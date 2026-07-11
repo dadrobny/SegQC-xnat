@@ -88,6 +88,27 @@ def _build_parser() -> argparse.ArgumentParser:
             "(DEBUG/INFO/WARNING/ERROR/CRITICAL; default: WARNING)."
         ),
     )
+    run_parser.add_argument(
+        "--reference",
+        action="store_true",
+        default=False,
+        help=(
+            "Enable reference mode (item 049): compute a delta-to-reference "
+            "block against a VerSe-style reference distribution and embed it "
+            "in the report. OFF by default -- falls back to config "
+            "reference.enabled when the flag itself is not given."
+        ),
+    )
+    run_parser.add_argument(
+        "--reference-artifact",
+        default=None,
+        metavar="<json>",
+        help=(
+            "Path to a reference artifact JSON (item 045) to load when "
+            "reference mode is enabled. When omitted, the bundled default "
+            "artifact (bundled_default_reference()) is used."
+        ),
+    )
     run_parser.set_defaults(handler=_handle_run)
 
     build_reference_parser = subparsers.add_parser(
@@ -221,7 +242,7 @@ def _handle_run(args: argparse.Namespace) -> int:
     from segqc.verdict import Reason, Severity  # noqa: PLC0415
     from segqc.report import serialize_report_json  # noqa: PLC0415
     from segqc.human_report import render_human_report  # noqa: PLC0415
-    from segqc.pipeline import run_qc  # noqa: PLC0415
+    from segqc.pipeline import run_qc, run_qc_with_reference  # noqa: PLC0415
 
     logger.debug(
         "segqc run: scan=%r  seg=%r  out=%r  config=%r",
@@ -281,7 +302,46 @@ def _handle_run(args: argparse.Namespace) -> int:
         ]
 
     # --- 5. Extract features, run the Stage 4 rules, aggregate the verdict --- #
-    case_result, features_block = run_qc(seg_img, cfg, base_reasons=base_reasons)
+    # Reference mode (item 049) -- OFF by default; enabled via --reference or
+    # config reference.enabled.
+    reference_enabled = bool(args.reference) or bool(
+        cfg.reference_param("enabled", False)
+    )
+    reference_delta = None
+    if reference_enabled:
+        from segqc.reference import (  # noqa: PLC0415
+            ReferenceArtifactError,
+            bundled_default_reference,
+            load_artifact,
+        )
+
+        artifact_path = args.reference_artifact or cfg.reference_param(
+            "artifact_path", None
+        )
+        try:
+            if artifact_path:
+                reference = load_artifact(artifact_path)
+            else:
+                reference = bundled_default_reference()
+        except (ReferenceArtifactError, OSError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+
+        stratum = cfg.reference_param("stratum", "all")
+        lower_pct = cfg.reference_param("lower_pct", 1)
+        upper_pct = cfg.reference_param("upper_pct", 99)
+
+        case_result, features_block, reference_delta = run_qc_with_reference(
+            seg_img,
+            cfg,
+            reference,
+            base_reasons=base_reasons,
+            stratum=stratum,
+            lower_pct=lower_pct,
+            upper_pct=upper_pct,
+        )
+    else:
+        case_result, features_block = run_qc(seg_img, cfg, base_reasons=base_reasons)
     verdict = case_result.verdict
 
     # --- 6. Derive case_id from scan filename stem ---------------------------- #
@@ -300,7 +360,12 @@ def _handle_run(args: argparse.Namespace) -> int:
     findings_dicts = [f.to_dict() for f in case_result.findings]
 
     json_str = serialize_report_json(
-        verdict, case_id, cfg, features=features_block, findings=findings_dicts
+        verdict,
+        case_id,
+        cfg,
+        features=features_block,
+        findings=findings_dicts,
+        reference_delta=reference_delta,
     )
     json_path = out_path / "segqc_report.json"
     json_path.write_text(json_str, encoding="utf-8")

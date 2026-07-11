@@ -90,6 +90,13 @@ _DEFAULTS: Dict[str, Any] = {
     # aggregator at pure severity dominance (``flag_escalation_count`` == 0,
     # i.e. disabled).
     "verdict": {},
+    # Reference-mode switch (item 049).  Keys are read via ``reference_param``.
+    # An absent or empty "reference" section leaves reference mode disabled
+    # (``enabled`` == False) -- the item-042 goldens and every reference-less
+    # caller are unaffected. Not part of ``config_hash``'s canonical field
+    # list (see ``reference/artifact.py::config_hash``), so adding this
+    # section never changes an artifact's provenance hash.
+    "reference": {},
 }
 
 
@@ -141,6 +148,11 @@ class HeuristicConfig:
     #   { <policy_key>: <value> }, e.g. {"flag_escalation_count": 3}.
     # Access via policy_param rather than directly.
     verdict: Dict[str, Any] = field(default_factory=dict)
+    # Reference-mode config section (item 049).  Shape:
+    #   { <key>: <value> }, e.g. {"enabled": True, "lower_pct": 5}.
+    # Access via reference_param rather than directly. Deliberately excluded
+    # from config_hash's canonical field list (reference/artifact.py).
+    reference: Dict[str, Any] = field(default_factory=dict)
 
     # ------------------------------------------------------------------ #
     # Per-rule accessors (item 026)
@@ -225,6 +237,31 @@ class HeuristicConfig:
         Any
         """
         return self.verdict.get(key, default)
+
+    # ------------------------------------------------------------------ #
+    # Reference-mode accessor (item 049)
+    # ------------------------------------------------------------------ #
+
+    def reference_param(self, key: str, default: Any) -> Any:
+        """Return a single reference-mode config value, or *default*.
+
+        Convenience accessor: reads ``reference[key]``; returns *default*
+        when the ``reference`` section or *key* is absent.
+
+        Parameters
+        ----------
+        key:
+            The reference-mode parameter name (e.g. ``"enabled"``,
+            ``"artifact_path"``, ``"lower_pct"``, ``"upper_pct"``,
+            ``"stratum"``).
+        default:
+            Value returned when the key is absent.
+
+        Returns
+        -------
+        Any
+        """
+        return self.reference.get(key, default)
 
 
 # ---- Public API ------------------------------------------------------------- #

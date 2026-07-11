@@ -162,3 +162,18 @@ verdict:
   # 0 = escalation disabled -- pure severity dominance, matching the
   # built-in aggregate_verdict default.
   flag_escalation_count: 0
+
+# Reference-mode switch (item 049) -- documented here as COMMENTS ONLY. An
+# active `reference:` section would change this file's parsed dict and hence
+# `load_config(default_config_path()) == default_config()` (AC8) plus
+# `config_hash`-adjacent expectations, so the code-side defaults are supplied
+# instead via HeuristicConfig.reference_param(key, default). Uncomment and
+# adjust to opt a deployment into reference mode without the `--reference`
+# CLI flag.
+#
+# reference:
+#   enabled: false          # off by default -- see item 049's Assumptions.
+#   artifact_path: null     # null/absent -- loads bundled_default_reference().
+#   lower_pct: 1
+#   upper_pct: 99
+#   stratum: all

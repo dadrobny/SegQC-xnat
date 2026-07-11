@@ -53,9 +53,10 @@ if TYPE_CHECKING:
 
     from segqc.aggregate import CaseResult
     from segqc.config import HeuristicConfig
+    from segqc.reference.schema import ReferenceDistribution
     from segqc.verdict import Reason
 
-__all__ = ["extract_feature_record", "run_qc"]
+__all__ = ["extract_feature_record", "run_qc", "run_qc_with_reference"]
 
 
 def extract_feature_record(seg_img: "nib.Nifti1Image", config: "HeuristicConfig") -> dict:
@@ -201,3 +202,88 @@ def run_qc(
         findings, config, base_reasons=base_reasons, base_per_label=base_per_label
     )
     return case_result, features_block
+
+
+def run_qc_with_reference(
+    seg_img: "nib.Nifti1Image",
+    config: "HeuristicConfig",
+    reference: "ReferenceDistribution",
+    *,
+    base_reasons: Sequence["Reason"] = (),
+    base_per_label: Optional[Mapping[int, Sequence["Reason"]]] = None,
+    stratum: str = "all",
+    lower_pct: float = 1,
+    upper_pct: float = 99,
+) -> Tuple["CaseResult", dict, dict]:
+    """Extract features, compute a reference delta, run the Stage 4 rules
+    over a reference-aware record, and aggregate a verdict (item 049).
+
+    A reference-aware sibling of :func:`run_qc`: additionally computes item
+    046's delta-to-reference block and attaches both the reference and its
+    delta to the record fed to the rule engine (under ``"reference"`` and
+    ``"reference_delta"`` respectively), so item 047's ``ReferenceDeltaRule``
+    and item 048's reference-mode ``BoundsRule`` can act on them. The
+    returned ``features_block`` never carries those keys -- they live only on
+    the transient rule-evaluation record -- so it stays schema-clean and
+    identical in shape to :func:`extract_feature_record`'s plain output.
+
+    ``run_qc`` itself is untouched: this is an additive code path, not a
+    modification, so the ~40 existing 2-tuple call sites and the item-042
+    golden snapshots stay byte-identical.
+
+    Parameters
+    ----------
+    seg_img:
+        A NiBabel ``Nifti1Image`` carrying an integer instance label map.
+    config:
+        A :class:`~segqc.config.HeuristicConfig`.
+    reference:
+        A :class:`~segqc.reference.schema.ReferenceDistribution` to compare
+        *seg_img*'s per-label geometry against. Not mutated.
+    base_reasons:
+        Optional pre-existing case-level reasons, threaded through to
+        ``aggregate.build_case_result``. Not mutated.
+    base_per_label:
+        Optional pre-existing per-vertebra reasons, keyed by integer label.
+        Threaded through to ``aggregate.build_case_result``. Not mutated.
+    stratum:
+        The reference stratum to compare against (default ``"all"``, item
+        043's ``ALL_STRATUM``).
+    lower_pct, upper_pct:
+        The percentile pair defining the reference's in-range band (default
+        ``1``/``99``, matching item 046's ``DEFAULT_LOWER_PCT``/
+        ``DEFAULT_UPPER_PCT``).
+
+    Returns
+    -------
+    tuple[CaseResult, dict, dict]
+        ``(case_result, features_block, reference_delta)`` where
+        ``features_block`` carries no ``reference``/``reference_delta`` keys
+        and ``reference_delta`` equals
+        ``reference_delta_to_dict(compute_reference_delta(features_block,
+        reference, stratum=stratum, lower_pct=lower_pct,
+        upper_pct=upper_pct))``. Deterministic and non-mutating: repeated
+        calls on the same inputs return equal results, and neither
+        ``seg_img``, ``config``, nor ``reference`` is modified.
+    """
+    from segqc.aggregate import build_case_result
+    from segqc.heuristics import run_rules
+    from segqc.reference import compute_reference_delta, reference_delta_to_dict
+
+    features_block = extract_feature_record(seg_img, config)
+
+    delta = compute_reference_delta(
+        features_block, reference, stratum=stratum, lower_pct=lower_pct, upper_pct=upper_pct
+    )
+    reference_delta = reference_delta_to_dict(delta)
+
+    rule_record = {
+        **features_block,
+        "reference": reference,
+        "reference_delta": reference_delta,
+    }
+    findings = run_rules(rule_record, config)
+    case_result = build_case_result(
+        findings, config, base_reasons=base_reasons, base_per_label=base_per_label
+    )
+    return case_result, features_block, reference_delta

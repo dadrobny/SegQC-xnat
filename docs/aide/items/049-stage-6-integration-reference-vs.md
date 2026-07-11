@@ -419,4 +419,30 @@ Item 049 completes Stage 6. On validated merge, the validator (via
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **No shared private `_evaluate` helper.** `run_qc` and `run_qc_with_reference`
+  each stay a short, linear, independently-readable function; the only
+  duplicated lines are the three-call `extract_feature_record` /
+  `run_rules` / `build_case_result` sequence, which is small enough that
+  factoring it out would trade a few duplicated lines for an extra
+  indirection without a real DRY win. `run_qc` itself is untouched — not a
+  single line inside it changed.
+- **CLI flag resolution uses OR, not tri-state.** `--reference` is a plain
+  `store_true` (default `False`); reference mode is enabled when
+  `args.reference OR cfg.reference_param("enabled", False)` — i.e. either the
+  flag or the config can turn it on, and there is no `--no-reference`
+  override to force it off when the config enables it. This matches every
+  AC/test (AC5-AC7 pass the flag; the adversarial config-only test expects
+  config alone to enable it) and keeps the flag semantics simple. A
+  `--no-reference` override was not requested by any AC and was left out to
+  avoid scope creep; a future item can add one if a deployment needs to force
+  reference mode off despite an enabling config.
+- **`--reference-artifact` also falls back to `cfg.reference_param("artifact_path",
+  None)`** when the CLI flag is absent, so config-only reference mode
+  (`reference.enabled: true`) can still point at a custom artifact via YAML,
+  consistent with `reference_param` being the general accessor for the whole
+  section.
+- **Reference-artifact load errors (`ReferenceArtifactError`, `OSError`) are
+  caught only around the load call**, mirroring `_handle_build_reference`'s
+  existing error-wrapping pattern — any other unexpected error still
+  surfaces as a traceback (intentional: only caller-facing input errors are
+  converted to a clean exit 1, per item 045's precedent).
