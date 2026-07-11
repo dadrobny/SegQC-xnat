@@ -9,9 +9,11 @@ logic of its own.
 Currently exposes the level-2 **DICE-vs-GT** segmentation-overlap primitive
 (item 050; see :mod:`segqc.eval.overlap`), the level-3 **feature-set
 match / divergence-by-label** primitive (item 051; see
-:mod:`segqc.eval.feature_match`), and the level-1 **QC-verdict comparison /
+:mod:`segqc.eval.feature_match`), the level-1 **QC-verdict comparison /
 per-case outcome classification** primitive (item 052; see
-:mod:`segqc.eval.outcome`).
+:mod:`segqc.eval.outcome`), and the **evaluation cohort model & harness
+driver** (item 053; see :mod:`segqc.eval.harness`) that assembles the three
+per case against the real pipeline.
 """
 
 from __future__ import annotations
@@ -22,6 +24,13 @@ from .feature_match import (
     LabelFeatureDivergence,
     TRACKED_FEATURES,
     compute_feature_match,
+)
+from .harness import (
+    CaseEvaluation,
+    CohortEvaluation,
+    EvaluationCase,
+    evaluate_case,
+    evaluate_cohort,
 )
 from .outcome import CaseOutcome, Outcome, classify_outcome
 from .overlap import LabelOverlap, OverlapResult, compute_overlap
@@ -38,4 +47,9 @@ __all__ = [
     "classify_outcome",
     "Outcome",
     "CaseOutcome",
+    "EvaluationCase",
+    "CaseEvaluation",
+    "CohortEvaluation",
+    "evaluate_case",
+    "evaluate_cohort",
 ]

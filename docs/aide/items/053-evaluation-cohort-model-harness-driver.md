@@ -308,4 +308,36 @@ datasets — using `segqc.config.bundled_default_config()` as `config`:
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implemented as specified; no divergence from the pinned Assumptions/
+Implementation Steps was needed. Notes on choices made while translating the
+spec into code:
+
+- **`CaseEvaluation.to_dict()` reduction.** Used `dataclasses.asdict` with a
+  custom `dict_factory` that maps an `Outcome` enum member to its `.value`
+  string wherever it appears (only inside the nested `outcome` dict, on the
+  `CaseOutcome.outcome` field) rather than a bespoke recursive walker;
+  `dataclasses.asdict` already recurses through nested dataclasses/tuples, so
+  this keeps `OverlapResult`/`FeatureMatchResult`/`CaseOutcome` reduction to a
+  single one-line hook instead of three separate serialisers.
+- **Feature-match GT block is recomputed via `extract_feature_record(gt_img,
+  config)`, not reused from anywhere else** — there is no prior call that
+  produces it (the GT is not separately run through `run_qc` when a candidate
+  is present), matching the Assumptions' explicit "GT block is
+  `extract_feature_record(gt, config)`" pin. Only the *candidate* side reuses
+  the block already computed by its `run_qc` call (`subject_block`), as
+  specified.
+- **Path-like seg-source resolution** (`_resolve_seg` on a `str`/`os.PathLike`)
+  uses a plain `nib.load(...)`, matching the Stage-0 loader's integer-label
+  preservation convention. This path is implemented per the Assumptions but,
+  per the queue's local-testability note, is not exercised by the committed
+  tests (no VerSe/TotalSegmentator fixtures in-repo).
+- **`_resolve_seg` never copies array data unnecessarily.** For an
+  `ndarray` source it passes the array straight to `nib.Nifti1Image(...,
+  dtype=source.dtype)` (mirroring `segqc.synth.regression.loaded_seg_image`'s
+  int-safe rebuild) rather than defensively copying; NiBabel/`run_qc` never
+  mutate their input, so this stays non-mutating (AC13) without extra
+  allocation.
+- **`CaseEvaluation.metadata`** is carried through from `EvaluationCase.metadata`
+  unchanged (not deep-copied) since it is read-only in this module; `to_dict()`
+  wraps it in a plain `dict(...)` only for the JSON-serialisable output, not to
+  guard against mutation elsewhere.
