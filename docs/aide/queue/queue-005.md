@@ -1,6 +1,6 @@
 # Seg-QC-xnat — Work Queue 005
 
-> **Status:** Live · **Created:** 2026-07-11
+> **Status:** ✅ Completed — superseded by queue-006 (2026-07-11).
 > Step 4 of the AIDE loop. Derived from [`../vision.md`](../vision.md),
 > [`../roadmap.md`](../roadmap.md), and [`../progress.md`](../progress.md).
 > Follows [`queue-004.md`](queue-004.md) (items 036–042).
@@ -217,19 +217,20 @@ block; the extended JSON validates against the schema; deterministic / golden-st
 
 ## Current state (2026-07-11)
 
-Freshly generated; supersedes [`queue-004.md`](queue-004.md) (Stage 5, items
-036–042, all ✅). No Stage 6 items claimed yet. **Item 043 (reference-distribution
-schema + aggregation core) must merge first** — it defines the feature-record
-contract and the versioned distribution data model that 044–049 build on. After 043,
-**044** (VerSe ingestion driver) feeds it and **045** (artifact + builder + loader)
-chains the two into a committed, versioned artifact; then **046** (delta computation)
-→ **047** (delta rule family) with **048** (bounds config switch) in parallel, and
-**049** (integration + acceptance) closes the stage.
+✅ **Stage 6 complete.** All items **043–049 are done** (✅ in `progress.md`): the
+reference-distribution schema + per-level aggregation core (043), the VerSe GT
+ingestion cohort driver (044), the versioned reference-data artifact + builder +
+loader (045), the delta-to-reference feature computation (046), the delta-to-
+reference rule family (047), the reference-vs-hand-set bounds config switch (048),
+and the Stage-6 integration + reference-vs-perturbation acceptance suite (049) are
+all merged. GT fixtures fall within the reference ranges (pass) while perturbed
+cases fall outside (flagged) — the reference-grounded half of **G3**. Superseded by
+[`queue-006.md`](queue-006.md), which delivers Stage 7 (evaluation, calibration &
+metrics) on top of this reference substrate and closes Phase 1.
 
 ## Next Step
 
 Per `CLAUDE.md`: `git fetch --all --prune` and check `aide/*` branches first, then
 branch per item (`aide/NNN-short-name`) and push immediately to claim it;
-`git pull --rebase` before any `progress.md` edit. Start with **item 043**. Two
-ways to proceed: spec the whole queue now with `/aide-spec-queue 005` in one
-interactive sitting, or spec per-item during execution via `/aide-run-queue 005`.
+`git pull --rebase` before any `progress.md` edit. Stage 6 is complete — proceed
+to [`queue-006.md`](queue-006.md).
