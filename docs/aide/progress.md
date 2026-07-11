@@ -30,7 +30,7 @@
 | 3 | Spinal Curve: Spline Fit & Deviation Features | (feature core) | ✅ |
 | 4 | Heuristic Rule Engine over Failure Modes | G2 | ✅ |
 | 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | ✅ |
-| 6 | VerSe Reference Distributions & Delta Rules | G3 | 📋 |
+| 6 | VerSe Reference Distributions & Delta Rules | G3 | 🚧 |
 | 7 | Evaluation, Calibration & Metrics *(Phase 1 complete)* | G3, G7 | 📋 |
 | 8 | Image-Based / Radiomics Features | (Phase 2) | 📋 |
 | 9 | Containerisation & XNAT Command | G5 | 📋 |
@@ -43,7 +43,7 @@
 |-----------|--------------|--------|
 | G1 Detect empty / trivially-failed | Stage 1 | ✅ |
 | G2 Detect catalogued failure modes (§6) | Stages 4, 5 | ✅ |
-| G3 Distinguish failure from variation | Stages 6, 7 | 📋 |
+| G3 Distinguish failure from variation | Stages 6, 7 | 🚧 |
 | G4 Per-case QC report (JSON + human) | Stage 1 (ext. 2–4) | ✅ |
 | G5 Deploy on XNAT *(deferred)* | Stage 9 | 📋 |
 | G6 Portable / GPU *(deferred)* | Stage 10 | 📋 |
@@ -185,12 +185,12 @@ mislabelling heuristics.
 
 ---
 
-## Stage 6 — VerSe Reference Distributions & Delta-to-Reference Rules (G3) — 📋
+## Stage 6 — VerSe Reference Distributions & Delta-to-Reference Rules (G3) — 🚧
 
 **Goal.** Ground heuristics in VerSe-derived expected distributions.
 
 **Deliverables.**
-- 📋 VerSe GT ingestion → per-level feature aggregation into reference distributions
+- 🚧 VerSe GT ingestion → per-level feature aggregation into reference distributions
   (mean/percentiles), stratified by level (+ subject-size proxy where feasible). *(Items 043, 044)*
 - 📋 Versioned reference-data artifact (committed or mounted) + builder script. *(Item 045)*
 - 📋 Delta-to-reference rules: per-vertebra distribution distance / out-of-range vs reference. *(Items 046, 047)*
