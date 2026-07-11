@@ -30,7 +30,7 @@
 | 3 | Spinal Curve: Spline Fit & Deviation Features | (feature core) | ✅ |
 | 4 | Heuristic Rule Engine over Failure Modes | G2 | ✅ |
 | 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | ✅ |
-| 6 | VerSe Reference Distributions & Delta Rules | G3 | 🚧 |
+| 6 | VerSe Reference Distributions & Delta Rules | G3 | ✅ |
 | 7 | Evaluation, Calibration & Metrics *(Phase 1 complete)* | G3, G7 | 📋 |
 | 8 | Image-Based / Radiomics Features | (Phase 2) | 📋 |
 | 9 | Containerisation & XNAT Command | G5 | 📋 |
@@ -185,7 +185,7 @@ mislabelling heuristics.
 
 ---
 
-## Stage 6 — VerSe Reference Distributions & Delta-to-Reference Rules (G3) — 🚧
+## Stage 6 — VerSe Reference Distributions & Delta-to-Reference Rules (G3) — ✅
 
 **Goal.** Ground heuristics in VerSe-derived expected distributions.
 
@@ -195,13 +195,13 @@ mislabelling heuristics.
 - ✅ Versioned reference-data artifact (committed or mounted) + builder script. *(Item 045)*
 - ✅ Delta-to-reference rules: per-vertebra distribution distance / out-of-range vs reference. *(Items 046, 047)*
 - ✅ Heuristic config can switch from hand-set bounds to reference-derived bounds. *(Item 048)*
-- 🚧 Reference artifact + delta rules wired into `segqc run`; Stage-6 acceptance suite
+- ✅ Reference artifact + delta rules wired into `segqc run`; Stage-6 acceptance suite
   (GT in-range, perturbations out-of-range). *(Item 049)*
 
 **Acceptance.**
-- [ ] Reference artifact builds reproducibly from VerSe and is versioned.
-- [ ] GT fixtures fall within reference ranges; perturbed cases fall outside (**G3**).
-- [ ] Tests cover reference loading + delta rules.
+- [x] Reference artifact builds reproducibly from VerSe and is versioned.
+- [x] GT fixtures fall within reference ranges; perturbed cases fall outside (**G3**).
+- [x] Tests cover reference loading + delta rules.
 
 ---
 
