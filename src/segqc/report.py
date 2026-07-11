@@ -93,6 +93,7 @@ def serialize_report(
     config: "HeuristicConfig",
     features: "dict | None" = None,
     findings: "list | None" = None,
+    reference_delta: "dict | None" = None,
 ) -> dict:
     """Serialize a :class:`~segqc.verdict.Verdict` to a v0 report dict.
 
@@ -122,6 +123,13 @@ def serialize_report(
         the report's ``findings`` key and validated together with the rest of
         the report. When ``None`` (default) no ``findings`` key is emitted,
         preserving the item-009/016 report shape.
+    reference_delta:
+        Optional Stage 6 ``reference_delta`` block (item 046), as produced by
+        ``segqc.reference.reference_delta_to_dict``. When non-``None`` it is
+        embedded verbatim under the report's ``reference_delta`` key and
+        validated together with the rest of the report. When ``None``
+        (default) no ``reference_delta`` key is emitted, preserving every
+        prior report shape (including the Stage 5 golden snapshots).
 
     Returns
     -------
@@ -165,6 +173,12 @@ def serialize_report(
     if findings is not None:
         report["findings"] = findings
 
+    # Optional Stage 6 reference_delta block (item 046) -- added before
+    # validation for the same reason. Omitting it (None) keeps the prior
+    # report shape intact.
+    if reference_delta is not None:
+        report["reference_delta"] = reference_delta
+
     jsonschema.validate(report, _SCHEMA)
     return report
 
@@ -176,6 +190,7 @@ def serialize_report_json(
     indent: int = 2,
     features: "dict | None" = None,
     findings: "list | None" = None,
+    reference_delta: "dict | None" = None,
 ) -> str:
     """Serialize a :class:`~segqc.verdict.Verdict` to a JSON string.
 
@@ -199,6 +214,9 @@ def serialize_report_json(
     findings:
         Optional Stage 4 ``findings`` list (item 035), forwarded to
         :func:`serialize_report`.
+    reference_delta:
+        Optional Stage 6 ``reference_delta`` block (item 046), forwarded to
+        :func:`serialize_report`.
 
     Returns
     -------
@@ -206,6 +224,11 @@ def serialize_report_json(
         Serialized JSON string.
     """
     report = serialize_report(
-        verdict, case_id, config, features=features, findings=findings
+        verdict,
+        case_id,
+        config,
+        features=features,
+        findings=findings,
+        reference_delta=reference_delta,
     )
     return json.dumps(report, indent=indent)

@@ -550,4 +550,50 @@ Intended code path (all under `source_dir = src/segqc`): a new
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Implemented exactly per the Assumptions/Implementation Steps with no
+  interface deviation.** `src/segqc/reference/delta.py` defines
+  `REFERENCE_DELTA_VERSION`, `DEFAULT_LOWER_PCT`, `DEFAULT_UPPER_PCT`,
+  `IQR_TO_SIGMA`, the frozen dataclasses `FeatureDelta`/`LabelDelta`/
+  `ReferenceDelta`, `compute_reference_delta`, and `reference_delta_to_dict`,
+  all re-exported from `src/segqc/reference/__init__.py`. Confirmed against
+  the committed `tests/test_046_reference_delta.py` — no test imports a
+  symbol or calls a signature this spec didn't already pin.
+
+- **Percentile-rank interpolation implemented as a single left-to-right scan
+  over consecutive `(value, rank)` anchor pairs, returning on the first
+  bracketing pair.** This mechanically realises both "exact at anchors" (a
+  value equal to an anchor is the right endpoint of the *preceding* segment,
+  found first) and "flat-segment ties resolve to the lower rank" (a
+  zero-width segment `v0 == v1 == value` returns `r0` immediately) without a
+  separate special case — the anchors list already encodes `min`/`max` plus
+  every percentile in `sorted(reference.percentiles)`.
+
+- **Case-side feature extraction reads `entry.get("geometry", {})` directly**
+  (whichever of the four `INGESTED_FEATURES` geometry scalars are present)
+  rather than requiring a full `labelFeatures`-schema geometry dict. The
+  spec's own test fixtures build minimal hand-rolled `geometry` dicts
+  (`{"physical_volume_mm3": ...}` only), so the extraction is written to
+  tolerate a partial dict — consistent with AC10 ("a tracked feature absent
+  from the case block is omitted, not fabricated") and with real
+  `extract_feature_record` output (which always carries the full geometry
+  dict) working unchanged.
+
+- **`lower_pct`/`upper_pct` validated against `reference.percentiles` (not
+  against a per-level `feature_stats` percentile dict) up front, once per
+  call**, exactly as Implementation Step 3.1 specifies — this fails fast
+  (AC14) before any label is processed, independent of which labels/levels
+  are actually available.
+
+- **No changes to 043/044/045 modules, `segqc.heuristics.bounds`,
+  `segqc.config`/`default_config.yaml`, or `segqc run` wiring** — verified by
+  diff: only `src/segqc/reference/delta.py` (new), `src/segqc/reference/__init__.py`,
+  `src/segqc/report.py`, and `src/segqc/report_schema_v0.json` were touched.
+
+- **Manually smoke-verified (not via pytest, per the builder's remit)**:
+  module import, flat-percentile tie-break, far-tail z/percentile/out-of-range,
+  empty-case serialisation, `ValueError` on an out-of-grid bound percentile,
+  `serialize_report(reference_delta=...)` schema validation plus the
+  `reference_delta`-omitted back-compat path, and the bundled-default-reference
+  smoke composition over a real `build_clean_spine` case — all behaved as the
+  spec and committed tests require. The validator agent runs the actual
+  `pytest` suite.

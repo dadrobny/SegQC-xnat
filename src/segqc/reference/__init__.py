@@ -7,6 +7,17 @@ statistics; results are stored as builtin ``float``).
 """
 
 from .aggregate import aggregate_reference
+from .delta import (
+    DEFAULT_LOWER_PCT,
+    DEFAULT_UPPER_PCT,
+    IQR_TO_SIGMA,
+    REFERENCE_DELTA_VERSION,
+    FeatureDelta,
+    LabelDelta,
+    ReferenceDelta,
+    compute_reference_delta,
+    reference_delta_to_dict,
+)
 from .artifact import (
     ARTIFACT_SCHEMA_VERSION,
     DEFAULT_ARTIFACT_NAME,
@@ -80,4 +91,13 @@ __all__ = [
     "bundled_default_reference",
     "build_default_cohort",
     "build_and_write_default",
+    "REFERENCE_DELTA_VERSION",
+    "DEFAULT_LOWER_PCT",
+    "DEFAULT_UPPER_PCT",
+    "IQR_TO_SIGMA",
+    "FeatureDelta",
+    "LabelDelta",
+    "ReferenceDelta",
+    "compute_reference_delta",
+    "reference_delta_to_dict",
 ]

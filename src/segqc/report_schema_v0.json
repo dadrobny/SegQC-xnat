@@ -60,6 +60,10 @@
       "items": {
         "$ref": "#/definitions/finding"
       }
+    },
+    "reference_delta": {
+      "description": "Optional Stage 6 delta-to-reference block (item 046): per-label distribution-relative metrics scored against a loaded reference distribution. Absent for reports that did not run the delta-to-reference computation.",
+      "$ref": "#/definitions/referenceDelta"
     }
   },
   "definitions": {
@@ -464,6 +468,119 @@
           "type": "array",
           "description": "Per-centroid spline parameter values (length n_centroids).",
           "items": {"type": "number"}
+        }
+      }
+    },
+    "referenceDelta": {
+      "type": "object",
+      "description": "Stage 6 delta-to-reference block (item 046): per-label distribution-relative metrics scored against a loaded reference distribution.",
+      "additionalProperties": false,
+      "required": [
+        "reference_delta_version",
+        "reference_schema_version",
+        "reference_source",
+        "stratum",
+        "lower_pct",
+        "upper_pct",
+        "per_label"
+      ],
+      "properties": {
+        "reference_delta_version": {
+          "type": "string",
+          "description": "Version discriminator for this block, independent of the report and reference schema versions.",
+          "minLength": 1
+        },
+        "reference_schema_version": {
+          "type": "string",
+          "description": "The schema_version of the reference distribution used to compute this block.",
+          "minLength": 1
+        },
+        "reference_source": {
+          "type": "string",
+          "description": "The reference distribution's provenance.source (traceability)."
+        },
+        "stratum": {
+          "type": "string",
+          "description": "The size stratum requested when computing this block (e.g. 'all')."
+        },
+        "lower_pct": {
+          "type": "integer",
+          "description": "Lower out-of-range bound percentile used."
+        },
+        "upper_pct": {
+          "type": "integer",
+          "description": "Upper out-of-range bound percentile used."
+        },
+        "per_label": {
+          "type": "object",
+          "description": "Per-label delta results, keyed by the string representation of the integer label value.",
+          "additionalProperties": {
+            "$ref": "#/definitions/referenceLabelDelta"
+          }
+        }
+      }
+    },
+    "referenceLabelDelta": {
+      "type": "object",
+      "description": "One label's delta-to-reference result.",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "level_name",
+        "available",
+        "distribution_distance",
+        "out_of_range_features",
+        "features"
+      ],
+      "properties": {
+        "label": {"type": "integer", "description": "The integer label value."},
+        "level_name": {"type": "string", "description": "Anatomical vertebra name looked up in the reference."},
+        "available": {
+          "type": "boolean",
+          "description": "False when the (level_name, stratum) pair is absent from the reference; features/distribution_distance are then empty/null, not an error."
+        },
+        "distribution_distance": {
+          "type": ["number", "null"],
+          "description": "RMS of the defined per-feature robust_z values. Null when unavailable or no feature has a defined robust_z."
+        },
+        "out_of_range_features": {
+          "type": "array",
+          "description": "Feature names flagged out_of_range, sorted.",
+          "items": {"type": "string"}
+        },
+        "features": {
+          "type": "object",
+          "description": "Per-feature deltas, keyed by feature name. Only features the reference tracks and the case carries are present.",
+          "additionalProperties": {
+            "$ref": "#/definitions/referenceFeatureDelta"
+          }
+        }
+      }
+    },
+    "referenceFeatureDelta": {
+      "type": "object",
+      "description": "One tracked feature's delta-to-reference result for one label.",
+      "additionalProperties": false,
+      "required": ["value", "z_score", "robust_z", "percentile_rank", "out_of_range"],
+      "properties": {
+        "value": {"type": "number", "description": "The case's value for this (label, feature)."},
+        "z_score": {
+          "type": ["number", "null"],
+          "description": "(value - mean) / std. Null when the reference std == 0."
+        },
+        "robust_z": {
+          "type": ["number", "null"],
+          "description": "(value - p50) / (IQR / 1.349). Null when the reference IQR == 0."
+        },
+        "percentile_rank": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "0..100, piecewise-linear interpolation over the stored percentile grid."
+        },
+        "out_of_range": {
+          "type": "boolean",
+          "description": "True when value is below the lower_pct bound or above the upper_pct bound."
         }
       }
     }
