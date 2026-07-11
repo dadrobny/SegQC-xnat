@@ -211,10 +211,13 @@ mislabelling heuristics.
 TotalSegmentator output, and the synthetic corpus.
 
 **Deliverables.**
-- 📋 Evaluation harness comparing QC verdict; DICE vs GT; feature-set match by label.
-- 📋 Runs on VerSe GT (positive control), TotalSegmentator outputs, synthetic failures.
-- 📋 Metrics: FPR on GT, sensitivity per failure mode, DICE-vs-flag correlation.
-- 📋 Threshold-calibration loop; chosen thresholds + metrics recorded here / evaluation report.
+- 📋 Evaluation harness comparing QC verdict; DICE vs GT; feature-set match by label. *(Items 050, 051, 052)*
+- 📋 Runs on VerSe GT (positive control), TotalSegmentator outputs, synthetic failures. *(Item 053)*
+- 📋 Metrics: FPR on GT, sensitivity per failure mode, DICE-vs-flag correlation. *(Item 054)*
+- 📋 Threshold-calibration loop; chosen thresholds + metrics recorded here / evaluation report. *(Items 055, 056)*
+- 📋 Stage-7 integration into a reproducible `segqc evaluate` entry point + acceptance suite
+  (GT low-FPR, injected failures caught, DICE-vs-flag correlation) closing Phase 1;
+  calibrated thresholds + metrics recorded. *(Item 057)*
 
 **Acceptance.**
 - [ ] GT passes at a high rate (low FPR) (**G3**).
