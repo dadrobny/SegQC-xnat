@@ -407,4 +407,30 @@ features still compared.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- Implemented exactly per the Assumptions/Implementation Steps with no
+  deviations. `_require_block` checks `isinstance(obj, Mapping)` (from
+  `typing`, matching runtime `collections.abc.Mapping` semantics for plain
+  dicts) and that `per_label` is itself a `Mapping`, raising
+  `SegQCInputError` before any attribute access — matches AC13's "not a raw
+  `KeyError`/`TypeError`/`AttributeError`" requirement.
+- `LabelFeatureDivergence.name` resolution: GT entry's `level_name` is used
+  when present (even for the trivial single-sided case within an unmatched
+  entry, since only one side's entry exists there); falls back to the
+  candidate entry's `level_name`; defaults to `segqc.labels.UNKNOWN` only if
+  neither side supplies a name. This satisfies both AC9 (unmatched — present
+  side's name) and AC12 (matched — GT authoritative) with one code path.
+  Verified against the test fixtures — `_entry()` in the test helper always
+  supplies `level_name`, so the `UNKNOWN` fallback branch is exercised only
+  by entries explicitly built with `level_name=UNKNOWN`.
+- `_offset_map` and `_scalar_value` read defensively with `.get(...)` and
+  `or {}`/`or []` at each hop so a missing `stage3`, missing
+  `per_label_offsets`, missing `geometry`, or missing `centroid` block never
+  raises — only the top-level `candidate`/`gt` mapping and `per_label`
+  mapping are validated per AC13; everything nested is treated as
+  optionally-shaped feature-engine output (mirrors AC10's "unavailable, not
+  fabricated" contract).
+- No new dependencies added; reused `segqc.io.SegQCInputError` and
+  `segqc.labels.CANONICAL_ORDER`/`UNKNOWN` exactly as pinned. No divergence
+  from the spec's Assumptions was found — item 050's sibling style
+  (`overlap.py`) was followed for the `_order_key`/`_CANONICAL_RANK`
+  ordering helpers and the frozen-dataclass/`__all__` package shape.

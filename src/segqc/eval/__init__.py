@@ -7,15 +7,29 @@ package performs no cohort aggregation, correlation, or verdict-interpretation
 logic of its own.
 
 Currently exposes the level-2 **DICE-vs-GT** segmentation-overlap primitive
-(item 050); see :mod:`segqc.eval.overlap`.
+(item 050; see :mod:`segqc.eval.overlap`) and the level-3 **feature-set
+match / divergence-by-label** primitive (item 051; see
+:mod:`segqc.eval.feature_match`).
 """
 
 from __future__ import annotations
 
+from .feature_match import (
+    FeatureDifference,
+    FeatureMatchResult,
+    LabelFeatureDivergence,
+    TRACKED_FEATURES,
+    compute_feature_match,
+)
 from .overlap import LabelOverlap, OverlapResult, compute_overlap
 
 __all__ = [
     "compute_overlap",
     "LabelOverlap",
     "OverlapResult",
+    "compute_feature_match",
+    "TRACKED_FEATURES",
+    "FeatureDifference",
+    "LabelFeatureDivergence",
+    "FeatureMatchResult",
 ]
