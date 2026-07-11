@@ -190,7 +190,7 @@ mislabelling heuristics.
 **Goal.** Ground heuristics in VerSe-derived expected distributions.
 
 **Deliverables.**
-- 🚧 VerSe GT ingestion → per-level feature aggregation into reference distributions
+- ✅ VerSe GT ingestion → per-level feature aggregation into reference distributions
   (mean/percentiles), stratified by level (+ subject-size proxy where feasible). *(Items 043, 044)*
 - 📋 Versioned reference-data artifact (committed or mounted) + builder script. *(Item 045)*
 - 📋 Delta-to-reference rules: per-vertebra distribution distance / out-of-range vs reference. *(Items 046, 047)*
