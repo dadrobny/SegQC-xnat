@@ -306,4 +306,15 @@ component making `physical_volume_mm3 == 0` while ratio DICE is unaffected
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Implemented as specified**, no deviations from the Assumptions/Implementation
+  Steps. `_order_key(value, name)` keys on `value` (not `name`) for the tie-break
+  so two distinct unrecognised labels (both named `UNKNOWN`) never collide onto
+  the same sort slot and stay in ascending-value order, per AC11.
+- `candidate`/`gt` are coerced via `np.asarray` but never copied; the module only
+  reads them (`==`, `logical_and`, `.sum()` all allocate new arrays), so inputs
+  are left byte-for-byte unchanged (AC13) without the cost of a defensive copy.
+- `voxel_volume`/`physical_volume_mm3` are computed from `gt_voxels`, so a `0`
+  spacing component correctly zeroes `physical_volume_mm3` (and, if it zeroes
+  every matched entry's weight, falls back `volume_weighted_dice` to `None`)
+  while leaving the ratio-based `dice`/`jaccard` unaffected — matches the
+  adversarial case in the Testing Strategy.
