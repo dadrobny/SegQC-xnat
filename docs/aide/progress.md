@@ -195,7 +195,7 @@ mislabelling heuristics.
 - ✅ Versioned reference-data artifact (committed or mounted) + builder script. *(Item 045)*
 - ✅ Delta-to-reference rules: per-vertebra distribution distance / out-of-range vs reference. *(Items 046, 047)*
 - ✅ Heuristic config can switch from hand-set bounds to reference-derived bounds. *(Item 048)*
-- 📋 Reference artifact + delta rules wired into `segqc run`; Stage-6 acceptance suite
+- 🚧 Reference artifact + delta rules wired into `segqc run`; Stage-6 acceptance suite
   (GT in-range, perturbations out-of-range). *(Item 049)*
 
 **Acceptance.**
