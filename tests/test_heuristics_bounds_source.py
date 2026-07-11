@@ -50,7 +50,7 @@ from segqc.config import (
 from segqc.heuristics import run_rules
 from segqc.heuristics.bounds import BoundsRule, DEFAULT_BOUNDS, reference_bounds_for_level
 from segqc.heuristics.rule import _RULES
-from segqc.reference.artifact import config_hash
+from segqc.reference.artifact import bundled_default_reference, config_hash
 from segqc.reference.schema import (
     ALL_STRATUM,
     FeatureStats,
@@ -453,14 +453,22 @@ def test_ac6_reference_reason_distinct_from_hand_set_group_reason(tmp_path):
 # =========================================================================== #
 
 
-def test_ac7_bundled_default_config_rules_match_code_defaults():
+def test_ac7_bundled_default_config_rules_match_pre_048_provenance_hash():
+    # default_config().rules is {} by design (item 026: an absent/empty
+    # ``rules`` section means all rules use their built-in code-side
+    # defaults), so it is not a valid baseline for "unchanged by item 048".
+    # Instead assert the bundled YAML's rules still hash to the config_hash
+    # recorded in the bundled reference artifact's provenance -- captured
+    # before item 048 and unaffected by a comments-only change.
     bundled = load_config(default_config_path())
-    assert bundled.rules == default_config().rules
+    expected_hash = bundled_default_reference().provenance.config_hash
+    assert config_hash(bundled) == expected_hash
 
 
 def test_ac7_bundled_default_config_hash_matches_code_default_hash():
     bundled = load_config(default_config_path())
-    assert config_hash(bundled) == config_hash(default_config())
+    expected_hash = bundled_default_reference().provenance.config_hash
+    assert config_hash(bundled) == expected_hash
 
 
 def test_ac7_bundled_default_schema_version_unchanged():
