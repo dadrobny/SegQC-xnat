@@ -452,7 +452,7 @@ def test_ac11_build_default_cohort_writes_aligned_reproducible_scans(tmp_path):
         assert (dest1 / scan_name).exists()
 
         case = load_case(dest1 / scan_name, dest1 / seg_name)  # must not raise
-        assert case.seg.shape == case.scan.shape
+        assert case.seg.data.shape == case.scan.data.shape
 
         # int16 array byte-reproducible across the two independent builds.
         scan_img_1 = nib.load(str(dest1 / scan_name))
