@@ -321,4 +321,46 @@ metrics), **057** (`segqc evaluate` entry point + Stage-7 acceptance).
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`apply_assignment` signature confirmed as 3-arg
+  `apply_assignment(base_config, assignment, axes)`**, with `assignment` a
+  plain `{axis.name: value}` mapping. This matches the committed
+  `tests/test_055_calibrate.py` exactly (every call site passes all three
+  positional args) and resolves the test-writer's flagged assumption: the
+  builder followed the tests as the binding interface contract, and the
+  spec's Implementation Steps §3 already documented this same shape as the
+  primary option ("or fold axis metadata into the assignment"), so no
+  conflict — just confirmation.
+- **`evaluate_cohort` imported at module level** (`from segqc.eval.harness
+  import evaluate_cohort`) and called as a bare module-global inside
+  `calibrate_thresholds`, rather than via a per-call local import. This
+  makes `segqc.eval.calibrate.evaluate_cohort` a real attribute that
+  `monkeypatch.setattr(calibrate_mod, "evaluate_cohort", stub,
+  raising=False)` can target directly (one of the two patch points the test
+  suite tries), while `evaluate_case`'s own lazy-pipeline-import convention
+  is unaffected (unchanged, still inside `harness.py`).
+- **`CalibrationObjective.evaluate` score sentinel**: `None`
+  `false_positive_rate` (no expected-pass cases) is mapped internally to
+  `float("-inf")` so it always sorts as best/lowest in the min-score
+  selection, exactly as the Assumptions section specifies; `CandidateResult
+  .to_dict()` maps that sentinel back to JSON `null` so no `-inf` (not
+  JSON-serialisable) ever appears in `to_dict()` output.
+- **Tie-break implementation**: `calibrate_thresholds` selects `best` via
+  `min(feasible_candidates, key=lambda c: (c.score, -c.metrics.sensitivity
+  or 0.0, c.grid_index))` — ascending score (lower FPR wins), then
+  descending overall `CohortMetrics.sensitivity` (a `None` overall
+  sensitivity, e.g. an all-expected-pass cohort, is treated as neutral via a
+  `0.0` fallback so it never spuriously wins or loses the secondary key),
+  then ascending `grid_index` (earliest grid order) as the final
+  tie-breaker.
+- **`default_calibration_axes()` placeholder values**: `reference_delta
+  .max_robust_z` swept `(2.5, 3.0, 3.5, 4.0, 4.5)` around the shipped
+  default `3.5`; `reference_delta.max_distribution_distance` swept `(2.0,
+  2.5, 3.0, 3.5, 4.0)` around the shipped default `3.0`; one representative
+  `bounds.lumbar.max_volume_mm3` swept `(90_000.0, 105_000.0, 120_000.0,
+  135_000.0, 150_000.0)` around the shipped default `120_000.0`. Grid size
+  5×5×5 = 125, well under the default `max_grid_size` guard (512). Exact
+  production values remain item 057's concern per the Assumptions section.
+- **`max_grid_size` default**: `512`, generous enough for the documented
+  default 3-axis/5-value grid (125) plus headroom for a caller adding a
+  fourth axis, while still catching an accidental combinatorial blow-up
+  (e.g. several 20-value axes multiplied together).

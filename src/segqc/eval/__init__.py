@@ -13,14 +13,25 @@ match / divergence-by-label** primitive (item 051; see
 per-case outcome classification** primitive (item 052; see
 :mod:`segqc.eval.outcome`), the **evaluation cohort model & harness driver**
 (item 053; see :mod:`segqc.eval.harness`) that assembles the three per case
-against the real pipeline, and the **cohort-level metrics aggregation** (item
+against the real pipeline, the **cohort-level metrics aggregation** (item
 054; see :mod:`segqc.eval.metrics`) that reduces a harness cohort to
 FPR-on-GT, per-§6-mode sensitivity, and DICE-vs-flag / feature-divergence-vs-
-flag correlations.
+flag correlations, and the **threshold-calibration loop** (item 055; see
+:mod:`segqc.eval.calibrate`) that sweeps a config-parameter grid through 053
++ 054 and selects the best feasible setting against a documented objective.
 """
 
 from __future__ import annotations
 
+from .calibrate import (
+    CalibrationObjective,
+    CalibrationResult,
+    CandidateResult,
+    ThresholdAxis,
+    apply_assignment,
+    calibrate_thresholds,
+    default_calibration_axes,
+)
 from .feature_match import (
     FeatureDifference,
     FeatureMatchResult,
@@ -67,4 +78,11 @@ __all__ = [
     "PerModeSensitivity",
     "CorrelationResult",
     "CohortMetrics",
+    "ThresholdAxis",
+    "apply_assignment",
+    "CalibrationObjective",
+    "CandidateResult",
+    "CalibrationResult",
+    "calibrate_thresholds",
+    "default_calibration_axes",
 ]
