@@ -226,10 +226,27 @@ TotalSegmentator output, and the synthetic corpus.
 - [x] Injected failures caught; flag rate / feature divergence correlates with DICE (**G7**).
 - [x] Calibrated thresholds + metrics recorded; evaluation reproducible.
 
-**Calibrated metrics (to be filled at completion).**
-- FPR on VerSe GT: _TBD_
-- Sensitivity per §6 failure mode: _TBD_
-- DICE-vs-flag correlation: _TBD_
+**Calibrated metrics (to be filled at completion).** *(Item 057 acceptance run
+over the committed §6 synthetic corpus cohort — GT = `clean_control`,
+candidate = each perturbed seg — plus the purpose-built graded-quality
+correlation cohort per the Assumptions; `bundled_default_config()`,
+uncalibrated.)*
+- FPR on GT (`clean_control`): **0.0** (`metrics.false_positive_rate`, AC8).
+- Sensitivity per §6 failure mode (`metrics.per_mode[*].sensitivity`, AC9):
+  pipeline-detectable modes 2 (fragment), 3 (inject islands), 5 (remove
+  level), 6 (crop at border), 7 (sequence break) — **1.0** each; modes 1
+  (displace), 4 (relabel swap), 8 (force overlap) — **0.0**, structurally
+  invisible to the plain pipeline (`detection == "reconstructed_record"`,
+  documented in the item 057 Assumptions, mirrors item 049). Overall corpus
+  sensitivity 5/8, not over-claimed as 1.0.
+- DICE-vs-flag correlation: **-0.943** (graded-quality cohort,
+  `metrics.dice_vs_flag.coefficient`, AC10 — negative sign as expected: lower
+  DICE ⇔ more likely flagged); feature-divergence-vs-flag: **+0.585**
+  (`metrics.feature_divergence_vs_flag.coefficient`, AC11 — positive sign as
+  expected). The full 9-case §6 corpus does not yield a cleanly-signed
+  DICE-vs-flag correlation (some flagged modes barely move DICE while some
+  unflagged reconstructed modes move it a lot — see Assumptions), which is
+  why AC10/AC11 use the dedicated graded-quality cohort.
 
 ---
 
