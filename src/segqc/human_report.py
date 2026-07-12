@@ -171,7 +171,56 @@ def _fmt_num(value: float) -> str:
     return f"{rounded:.2f}"
 
 
-def render_feature_table(features_block: dict) -> str:
+def _fmt_or_na(value) -> str:
+    """Format a possibly-``None`` number, rendering ``None`` as ``(n/a)``."""
+    if value is None:
+        return "(n/a)"
+    return _fmt_num(value)
+
+
+def _render_image_features_section(image_features: dict) -> "list[str]":
+    """Build the 'Intensity features' section lines for ``render_feature_table``.
+
+    Renders one row per ``per_label`` entry (ascending integer-label order)
+    showing label and mean/median/std/min/max/entropy, formatted via
+    ``_fmt_or_na`` so ``None`` statistics render as ``(n/a)`` rather than raw
+    Python ``None``/``nan`` text. When the block is unavailable (``available``
+    is falsy) or ``per_label`` is empty, a single explicit placeholder line is
+    rendered instead.
+    """
+    lines: list[str] = ["Intensity features:"]
+    per_label = image_features.get("per_label") or {}
+    if not image_features.get("available", False) or not per_label:
+        lines.append("  (unavailable)")
+        lines.append("")
+        return lines
+
+    header = (
+        f"  {'Label':>6}  {'Mean':>10}  {'Median':>10}  {'Std':>10}  "
+        f"{'Min':>10}  {'Max':>10}  {'Entropy':>8}"
+    )
+    lines.append(header)
+    lines.append("  " + "-" * (len(header) - 2))
+    for key in sorted(per_label, key=lambda k: int(k)):
+        entry = per_label[key]
+        first_order = entry.get("first_order", {})
+        lines.append(
+            f"  {entry.get('label', key):>6}  "
+            f"{_fmt_or_na(first_order.get('mean')):>10}  "
+            f"{_fmt_or_na(first_order.get('median')):>10}  "
+            f"{_fmt_or_na(first_order.get('std')):>10}  "
+            f"{_fmt_or_na(first_order.get('min')):>10}  "
+            f"{_fmt_or_na(first_order.get('max')):>10}  "
+            f"{_fmt_or_na(first_order.get('entropy')):>8}"
+        )
+    lines.append("")
+    return lines
+
+
+def render_feature_table(
+    features_block: dict,
+    image_features: "dict | None" = None,
+) -> str:
     """Render a :func:`segqc.feature_report.build_features_block` block as text.
 
     Produces a deterministic, stdlib-only plain-text table: one row per label
@@ -189,6 +238,16 @@ def render_feature_table(features_block: dict) -> str:
         A features block dict as returned by
         :func:`~segqc.feature_report.build_features_block` (or parsed from a
         serialised report's ``features`` key).
+    image_features:
+        Optional Stage 8 ``image_features`` block (item 061), as produced by
+        :func:`~segqc.feature_report.build_image_features_block` (or parsed
+        from a serialised report's ``image_features`` key). When non-``None``,
+        an "Intensity features:" section is appended after the existing
+        sections, listing each present label (ascending) with its
+        mean/median/std/min/max/entropy, formatted null-safely (``None``
+        statistics render as ``(n/a)``; an unavailable/empty block renders a
+        single ``(unavailable)`` line). When ``None`` (default), no section is
+        appended and the output is byte-identical to the pre-item render.
 
     Returns
     -------
@@ -281,5 +340,13 @@ def render_feature_table(features_block: dict) -> str:
         if out_of_order:
             lines.append(f"  Out-of-order labels: {', '.join(out_of_order)}")
     lines.append("")
+
+    # ------------------------------------------------------------------ #
+    # Intensity features (item 061) — only rendered when explicitly
+    # supplied, so the omitted-image_features case is byte-for-byte the
+    # pre-item render.
+    # ------------------------------------------------------------------ #
+    if image_features is not None:
+        lines.extend(_render_image_features_section(image_features))
 
     return "\n".join(lines)

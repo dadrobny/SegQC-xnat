@@ -94,6 +94,7 @@ def serialize_report(
     features: "dict | None" = None,
     findings: "list | None" = None,
     reference_delta: "dict | None" = None,
+    image_features: "dict | None" = None,
 ) -> dict:
     """Serialize a :class:`~segqc.verdict.Verdict` to a v0 report dict.
 
@@ -130,6 +131,13 @@ def serialize_report(
         validated together with the rest of the report. When ``None``
         (default) no ``reference_delta`` key is emitted, preserving every
         prior report shape (including the Stage 5 golden snapshots).
+    image_features:
+        Optional Stage 8 ``image_features`` block (item 061), as produced by
+        ``segqc.feature_report.build_image_features_block``. When non-``None``
+        it is embedded verbatim under the report's ``image_features`` key and
+        validated together with the rest of the report. When ``None``
+        (default) no ``image_features`` key is emitted, preserving every
+        prior report shape (including the item-042 golden snapshots).
 
     Returns
     -------
@@ -179,6 +187,12 @@ def serialize_report(
     if reference_delta is not None:
         report["reference_delta"] = reference_delta
 
+    # Optional Stage 8 image_features block (item 061) -- added before
+    # validation for the same reason. Omitting it (None) keeps the prior
+    # report shape intact.
+    if image_features is not None:
+        report["image_features"] = image_features
+
     jsonschema.validate(report, _SCHEMA)
     return report
 
@@ -191,6 +205,7 @@ def serialize_report_json(
     features: "dict | None" = None,
     findings: "list | None" = None,
     reference_delta: "dict | None" = None,
+    image_features: "dict | None" = None,
 ) -> str:
     """Serialize a :class:`~segqc.verdict.Verdict` to a JSON string.
 
@@ -217,6 +232,9 @@ def serialize_report_json(
     reference_delta:
         Optional Stage 6 ``reference_delta`` block (item 046), forwarded to
         :func:`serialize_report`.
+    image_features:
+        Optional Stage 8 ``image_features`` block (item 061), forwarded to
+        :func:`serialize_report`.
 
     Returns
     -------
@@ -230,5 +248,6 @@ def serialize_report_json(
         features=features,
         findings=findings,
         reference_delta=reference_delta,
+        image_features=image_features,
     )
     return json.dumps(report, indent=indent)

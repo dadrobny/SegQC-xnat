@@ -454,4 +454,32 @@ definitions in `src/segqc/report_schema_v0.json`; an optional parameter added to
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Implemented exactly as specified** — no interface divergence found. All
+  four surfaces (`feature_report.build_image_features_block`/
+  `label_intensity_to_dict`, `report.serialize_report`/
+  `serialize_report_json`, `report_schema_v0.json`, and
+  `human_report.render_feature_table`) match the "Public interface" section
+  and Implementation Steps verbatim.
+- **`label_intensity_to_dict`** uses a fixed `_INTENSITY_FIELD_ORDER` tuple
+  and a dict comprehension over `getattr(li, name)` rather than a literal
+  dict, avoiding field-order duplication with the docstring while still
+  guaranteeing a fixed key order (Python dict insertion order is guaranteed
+  since 3.7, so `json.dumps(..., sort_keys=False)` output is deterministic
+  either way; `sort_keys=True` is used in the AC7 test so the exact
+  insertion order doesn't matter for that assertion).
+- **Render layout**: the "Intensity features:" section reuses the existing
+  `_fmt_num` helper via a new small `_fmt_or_na` wrapper (renders `None` as
+  `(n/a)`) and a new `_render_image_features_section` helper, mirroring the
+  existing `_render_findings_section` pattern. The unavailable/empty case
+  (`available` falsy or `per_label` empty) renders a single `(unavailable)`
+  line, satisfying both the "available=False" and the (unreachable in
+  practice, but defensively handled) "available=True with empty per_label"
+  cases with one code path.
+- **Schema**: `imageFeatures`/`imageLabelFeatures`/`firstOrderIntensity`
+  definitions were inserted immediately before the pre-existing
+  `referenceFeatureDelta` definition (definitions order is irrelevant to
+  `jsonschema` resolution; this placement groups the new Stage-8
+  definitions together, adjacent to the Stage-6 `reference*` definitions).
+- No `pipeline.py`, `cli.py`, `config.py`, `default_config.yaml`, or
+  `features/__init__.py` changes were made, per the Assumptions' scope
+  boundary (065's job).

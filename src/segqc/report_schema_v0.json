@@ -64,6 +64,10 @@
     "reference_delta": {
       "description": "Optional Stage 6 delta-to-reference block (item 046): per-label distribution-relative metrics scored against a loaded reference distribution. Absent for reports that did not run the delta-to-reference computation.",
       "$ref": "#/definitions/referenceDelta"
+    },
+    "image_features": {
+      "description": "Optional Stage 8 image-based feature block (item 061): per-label first-order intensity statistics and optional radiomics extended features. Absent for reports that did not run the intensity extraction.",
+      "$ref": "#/definitions/imageFeatures"
     }
   },
   "definitions": {
@@ -555,6 +559,86 @@
             "$ref": "#/definitions/referenceFeatureDelta"
           }
         }
+      }
+    },
+    "imageFeatures": {
+      "type": "object",
+      "description": "Stage 8 image-based feature block (item 061): per-label first-order intensity statistics and optional radiomics extended features, with block-level provenance.",
+      "additionalProperties": false,
+      "required": [
+        "image_features_version",
+        "available",
+        "radiomics_available",
+        "backend",
+        "per_label"
+      ],
+      "properties": {
+        "image_features_version": {
+          "type": "string",
+          "description": "Version discriminator for this block, independent of the report schema_version.",
+          "minLength": 1
+        },
+        "available": {
+          "type": "boolean",
+          "description": "False when intensity was attempted but unavailable (no scan / no backend); per_label is then empty, not an error."
+        },
+        "radiomics_available": {
+          "type": "boolean",
+          "description": "Whether PyRadiomics produced any extended features for this run."
+        },
+        "backend": {
+          "type": "string",
+          "description": "Provenance marker for the intensity/radiomics backend used (e.g. 'builtin', 'pyradiomics')."
+        },
+        "per_label": {
+          "type": "object",
+          "description": "Per-label image feature records, keyed by the string representation of the integer label value. Empty when available is false.",
+          "additionalProperties": {
+            "$ref": "#/definitions/imageLabelFeatures"
+          }
+        }
+      }
+    },
+    "imageLabelFeatures": {
+      "type": "object",
+      "description": "One label's image-based feature record: first-order intensity statistics plus optional radiomics extended features.",
+      "additionalProperties": false,
+      "required": ["label", "first_order", "extended"],
+      "properties": {
+        "label": {"type": "integer", "description": "The integer label value."},
+        "first_order": {"$ref": "#/definitions/firstOrderIntensity"},
+        "extended": {
+          "type": "object",
+          "description": "Flat radiomics feature map (item 060), keyed by feature name. Empty on the builtin (first-order-only) path.",
+          "additionalProperties": {"type": "number"}
+        }
+      }
+    },
+    "firstOrderIntensity": {
+      "type": "object",
+      "description": "First-order intensity statistics for a single label (item 059).",
+      "additionalProperties": false,
+      "required": [
+        "voxel_count", "n_nonfinite_excluded",
+        "mean", "median", "std", "min", "max",
+        "p05", "p25", "p50", "p75", "p95", "range", "iqr", "entropy"
+      ],
+      "properties": {
+        "voxel_count": {"type": "integer", "minimum": 0},
+        "n_nonfinite_excluded": {"type": "integer", "minimum": 0},
+        "mean": {"type": ["number", "null"]},
+        "median": {"type": ["number", "null"]},
+        "std": {"type": ["number", "null"]},
+        "min": {"type": ["number", "null"]},
+        "max": {"type": ["number", "null"]},
+        "p05": {"type": ["number", "null"]},
+        "p25": {"type": ["number", "null"]},
+        "p50": {"type": ["number", "null"]},
+        "p75": {"type": ["number", "null"]},
+        "p95": {"type": ["number", "null"]},
+        "range": {"type": ["number", "null"]},
+        "iqr": {"type": ["number", "null"]},
+        "entropy": {"type": ["number", "null"]}
       }
     },
     "referenceFeatureDelta": {

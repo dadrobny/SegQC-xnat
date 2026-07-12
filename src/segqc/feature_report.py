@@ -65,6 +65,7 @@ if TYPE_CHECKING:
     from segqc.features.components import ComponentsInfo
     from segqc.features.consistency import MonotonicConsistency, SpacingConsistency
     from segqc.features.geometry import BBox, LabelGeometry
+    from segqc.features.intensity import LabelIntensity
     from segqc.features.orientation import SpineCurvature, VertebralOrientation
     from segqc.features.overlap import OverlapPair
     from segqc.features.relationships import SpineRelationships
@@ -84,6 +85,9 @@ __all__ = [
     "build_features_block",
     "FEATURES_VERSION",
     "FEATURES_VERSION_STAGE3",
+    "IMAGE_FEATURES_VERSION",
+    "label_intensity_to_dict",
+    "build_image_features_block",
 ]
 
 # Version discriminator for the features block, independent of the top-level
@@ -92,6 +96,10 @@ FEATURES_VERSION = "0.1"
 
 # Bumped version when Stage 3 deviation features are included.
 FEATURES_VERSION_STAGE3 = "0.2"
+
+# Version discriminator for the image_features block (item 061), independent
+# of both FEATURES_VERSION and the top-level report schema_version.
+IMAGE_FEATURES_VERSION = "1.0"
 
 
 # --------------------------------------------------------------------------- #
@@ -432,3 +440,109 @@ def build_features_block(
         block["stage3"] = stage3
 
     return block
+
+
+# --------------------------------------------------------------------------- #
+# Stage 8 image-based (intensity/radiomics) assembler (item 061)
+# --------------------------------------------------------------------------- #
+
+# Fixed field order for the first_order sub-dict: mirrors LabelIntensity's
+# dataclass field order exactly.
+_INTENSITY_FIELD_ORDER = (
+    "voxel_count", "n_nonfinite_excluded",
+    "mean", "median", "std", "min", "max",
+    "p05", "p25", "p50", "p75", "p95", "range", "iqr", "entropy",
+)
+
+
+def label_intensity_to_dict(li: "LabelIntensity") -> dict:
+    """Convert a :class:`~segqc.features.intensity.LabelIntensity` to a dict.
+
+    Pure: returns a fresh dict with all 15 fields in a fixed order
+    (``voxel_count``, ``n_nonfinite_excluded``, then the 13 statistic
+    fields). Values are copied verbatim — ``None`` stays ``None`` (never
+    coerced to ``float('nan')``), floats stay floats, and the two count
+    fields stay integers.
+    """
+    return {name: getattr(li, name) for name in _INTENSITY_FIELD_ORDER}
+
+
+def build_image_features_block(
+    intensity: "Mapping[int, LabelIntensity]",
+    *,
+    extended: "Optional[Mapping[int, Mapping[str, float]]]" = None,
+    backend: str = "builtin",
+    radiomics_available: bool = False,
+    available: bool = True,
+    image_features_version: str = IMAGE_FEATURES_VERSION,
+) -> dict:
+    """Assemble the ``image_features`` block from pre-computed intensity
+    (and optional radiomics ``extended``) results (item 061).
+
+    This is a pure serialisation/assembly layer, mirroring
+    :func:`build_features_block`: it does not compute intensity or radiomics
+    statistics itself, it folds already-computed per-label results into a
+    JSON-ready block.
+
+    Parameters
+    ----------
+    intensity:
+        Mapping ``label -> LabelIntensity`` (item 059's per-label first-order
+        results).
+    extended:
+        Optional mapping ``label -> {feature_name: value}`` (item 060's
+        radiomics ``extended`` features per label). A label present in
+        ``intensity`` but absent from ``extended`` (or when ``extended`` is
+        ``None``) gets an empty ``extended`` dict. Labels present only in
+        ``extended`` (not in ``intensity``) are ignored. The per-label
+        mapping is shallow-copied so the block never aliases the caller's
+        dict.
+    backend:
+        Block-level provenance marker: ``"builtin"`` (first-order only) or
+        ``"pyradiomics"``. Echoed verbatim.
+    radiomics_available:
+        Whether PyRadiomics produced any extended features for this run.
+        Echoed verbatim (coerced to ``bool``).
+    available:
+        When ``False``, intensity was attempted but unavailable (no scan /
+        no backend); the block is the explicit unavailable sentinel with
+        ``per_label == {}``. Defaults to ``True``.
+    image_features_version:
+        Version discriminator embedded in the block; defaults to
+        :data:`IMAGE_FEATURES_VERSION`.
+
+    Returns
+    -------
+    dict
+        A fresh, JSON-ready ``image_features`` block. ``per_label`` is keyed
+        by ``str(label)`` in ascending integer-label order. Inputs
+        (``intensity``, ``extended``) are never mutated. No file I/O, no
+        wall clock, no NumPy/NiBabel import.
+    """
+    if not available:
+        return {
+            "image_features_version": image_features_version,
+            "available": False,
+            "radiomics_available": bool(radiomics_available),
+            "backend": backend,
+            "per_label": {},
+        }
+
+    per_label: dict = {}
+    for label in sorted(intensity):
+        label_extended = (
+            dict(extended.get(label, {})) if extended else {}
+        )
+        per_label[str(label)] = {
+            "label": int(label),
+            "first_order": label_intensity_to_dict(intensity[label]),
+            "extended": label_extended,
+        }
+
+    return {
+        "image_features_version": image_features_version,
+        "available": True,
+        "radiomics_available": bool(radiomics_available),
+        "backend": backend,
+        "per_label": per_label,
+    }
