@@ -20,8 +20,10 @@ plumbing to build it, ship a default copy, and load it back:
   incompatible input.
 * :func:`build_default_cohort` / :func:`build_and_write_default` — the fixed,
   deterministic synthetic cohort (via
-  :func:`segqc.synth.clean_gt.build_clean_spine`, no RNG, no wall clock) that
-  produces the bundled default artifact
+  :func:`segqc.synth.clean_gt.build_clean_spine` for the label maps and item
+  058's :func:`segqc.synth.intensity.paint_clean_scan` for a co-registered
+  painted scan per subject, both seeded/no-wall-clock) that produces the
+  bundled default artifact
   (``src/segqc/reference/reference_default.json``), loadable via
   :func:`bundled_default_reference` / :func:`default_artifact_path`
   (``importlib.resources``, mirroring
@@ -62,7 +64,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Sequence, Union
 
-from .ingest import DEFAULT_SEG_SUFFIX, SIZE_PROXY_NAME
+from .ingest import DEFAULT_SCAN_SUFFIX, DEFAULT_SEG_SUFFIX, SIZE_PROXY_NAME
 from .schema import SCHEMA_VERSION, Provenance, ReferenceDistribution, from_dict, to_json_text
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -145,6 +147,7 @@ def build_reference(
     seg_suffix: str = DEFAULT_SEG_SUFFIX,
     size_strata_edges: "Optional[Sequence[float]]" = None,
     stratum_labels: "Optional[Sequence[str]]" = None,
+    with_intensity: bool = True,
 ) -> ReferenceDistribution:
     """Chain ``ingest_cohort`` -> ``aggregate_reference`` into a
     :class:`~segqc.reference.schema.ReferenceDistribution`, stamping a
@@ -172,6 +175,13 @@ def build_reference(
         ``provenance.size_proxy_name`` is set to ``SIZE_PROXY_NAME``;
         otherwise no size proxy is computed and ``size_proxy_name`` is
         ``None``.
+    with_intensity:
+        Forwarded to ``ingest_cohort`` (default ``True``, opt-in at this
+        layer, item 063). When ``True``, per-level intensity statistics are
+        folded into the ingested records for any subject with a grid-aligned
+        sibling scan; subjects with no scan degrade to geometry-only.
+        Purely additive -- the geometric ``feature_stats`` produced are
+        identical regardless of this flag.
 
     Returns
     -------
@@ -195,6 +205,7 @@ def build_reference(
         convention=convention,
         seg_suffix=seg_suffix,
         with_size_proxy=stratifying,
+        with_intensity=with_intensity,
     )
 
     provenance = Provenance(
@@ -353,15 +364,22 @@ _DEFAULT_COHORT_RECIPE = (
 
 def build_default_cohort(dest: Union[str, "os.PathLike"]) -> Path:
     """Write the FIXED synthetic default cohort as
-    ``<subject_id>{DEFAULT_SEG_SUFFIX}`` files under *dest*.
+    ``<subject_id>{DEFAULT_SEG_SUFFIX}`` + ``<subject_id>{DEFAULT_SCAN_SUFFIX}``
+    file pairs under *dest*.
 
     Built from :func:`segqc.synth.clean_gt.build_clean_spine` under the
-    pinned per-subject parameters in ``_DEFAULT_COHORT_RECIPE``. No RNG, no
-    wall clock; deterministic across calls/directories. Returns *dest*.
+    pinned per-subject parameters in ``_DEFAULT_COHORT_RECIPE``. Each
+    subject's seg is paired with a painted, grid-aligned scan via item 058's
+    :func:`segqc.synth.intensity.paint_clean_scan` (fixed ``seed=0``, the
+    default HU model), so the default cohort is intensity-bearing (item
+    063). No RNG beyond the painter's seeded RNG, no wall clock;
+    deterministic across calls/directories -- both the seg and scan bytes
+    are byte-reproducible. Returns *dest*.
     """
     import nibabel as nib
 
     from segqc.synth.clean_gt import build_clean_spine
+    from segqc.synth.intensity import paint_clean_scan
 
     dest_path = Path(dest)
     dest_path.mkdir(parents=True, exist_ok=True)
@@ -374,6 +392,10 @@ def build_default_cohort(dest: Union[str, "os.PathLike"]) -> Path:
         )
         seg_path = dest_path / f"{entry['subject_id']}{DEFAULT_SEG_SUFFIX}"
         nib.save(spine.seg_img, str(seg_path))
+
+        scan_img = paint_clean_scan(spine.seg_img, seed=0)
+        scan_path = dest_path / f"{entry['subject_id']}{DEFAULT_SCAN_SUFFIX}"
+        nib.save(scan_img, str(scan_path))
 
     return dest_path
 

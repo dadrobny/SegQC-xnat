@@ -476,4 +476,29 @@ regenerate `reference/reference_default.json`. **Do not** edit `reference/delta.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implemented exactly per the spec's Public interface / Implementation Steps;
+no deviations from the pinned contract. Notes:
+
+- `_intensity_features_dict` (private helper in `ingest.py`) iterates the 13
+  `LabelIntensity` stat fields in the same order as
+  `INGESTED_INTENSITY_FEATURES` and skips any `None` value, so a sentinel
+  (all-`None`) record contributes zero keys and a partially-`None` record
+  (not currently producible by `LabelIntensity`, but defensive) would only
+  contribute its non-`None` fields — matching AC5's "never insert `None`
+  into a `features` mapping".
+- `build_default_cohort` imports `paint_clean_scan` from
+  `segqc.synth.intensity` (submodule import, avoiding a circular import
+  through `segqc.synth`'s package `__init__`), and writes the scan via
+  `DEFAULT_SCAN_SUFFIX` imported from `.ingest` (kept as the single source of
+  truth for the sibling-scan filename convention rather than a duplicated
+  literal).
+- Regenerated `src/segqc/reference/reference_default.json` via
+  `python -m segqc.reference.artifact`; verified schema_version `"1.1"`,
+  per-level `intensity_*` `feature_stats` present for L1-L5, and
+  byte-identical regeneration against a fresh `build_and_write_default` call
+  into a temp path (43814 bytes, byte-equal). `.gitattributes` already pinned
+  the file `text eol=lf` from item 045 — no new pin needed (filename
+  unchanged).
+- Confirmed `aggregate.py` and `delta.py` are untouched by this diff (`git
+  diff --stat` shows only `ingest.py`, `schema.py`, `artifact.py`, and the
+  regenerated JSON artifact).

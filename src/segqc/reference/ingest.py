@@ -28,16 +28,22 @@ A "subject" is any file in the cohort directory whose name ends with
 ``subject_id`` is the filename stem with that suffix stripped. This mirrors
 the Stage 5 corpus convention (``segqc.synth.corpus.write_corpus``), so a
 synthetic cohort written that way is a conforming directory out of the box.
-An optional sibling scan (``<subject_id><DEFAULT_SCAN_SUFFIX>``) is currently
-unused by the Stage 2/3 geometry features this driver reads, but the
-``scan_path`` parameter is threaded through for a future feature that needs
-it.
+An optional sibling scan (``<subject_id><DEFAULT_SCAN_SUFFIX>``) is discovered
+per subject; it is read only when the caller opts in via ``with_intensity=
+True`` (item 063), in which case per-label first-order intensity statistics
+(item 059's ``compute_label_intensity``) are folded into that level's
+``features``. With the default ``with_intensity=False``, the scan is
+discovered but not read, exactly as before item 063.
 
 Vocabulary
 ----------
-``INGESTED_FEATURES`` is the pinned per-level feature vocabulary: the four
-``LabelGeometry`` scalars plus ``spline_offset_mm`` (present only for
-subjects with >= 2 recognised levels, since Stage 3 is only computed then).
+``INGESTED_FEATURES`` is the pinned per-level *geometric* feature
+vocabulary: the four ``LabelGeometry`` scalars plus ``spline_offset_mm``
+(present only for subjects with >= 2 recognised levels, since Stage 3 is only
+computed then). ``INGESTED_INTENSITY_FEATURES`` is the separate,
+``intensity_``-prefixed per-label *intensity* vocabulary (item 063), folded
+in only when ``with_intensity=True`` and a grid-aligned sibling scan is
+present.
 
 Size proxy
 ----------
@@ -72,6 +78,7 @@ __all__ = [
     "DEFAULT_SCAN_SUFFIX",
     "SIZE_PROXY_NAME",
     "INGESTED_FEATURES",
+    "INGESTED_INTENSITY_FEATURES",
     "SubjectIngest",
     "CohortIngest",
     "ingest_subject",
@@ -98,6 +105,68 @@ INGESTED_FEATURES: Tuple[str, ...] = (
     "extent_z_mm",
     "spline_offset_mm",
 )
+
+# The per-level *intensity* feature-name vocabulary (item 063) -- a
+# deliberately SEPARATE, companion constant. ``INGESTED_FEATURES`` above is
+# NOT widened: ``segqc.reference.delta``'s ``_GEOMETRY_FEATURES`` derives
+# from it, and appending intensity names there would silently reclassify
+# them as "geometry" and prematurely couple this item into item 064's scope
+# (see item 063 spec's Assumptions, "CRITICAL COUPLING"). Mirrors the
+# statistical fields of item 059's ``LabelIntensity`` (excluding the
+# bookkeeping fields ``voxel_count`` / ``n_nonfinite_excluded``, which are
+# counts, not HU statistics), prefixed ``intensity_`` for a self-describing,
+# collision-free vocabulary.
+INGESTED_INTENSITY_FEATURES: Tuple[str, ...] = (
+    "intensity_mean",
+    "intensity_median",
+    "intensity_std",
+    "intensity_min",
+    "intensity_max",
+    "intensity_p05",
+    "intensity_p25",
+    "intensity_p50",
+    "intensity_p75",
+    "intensity_p95",
+    "intensity_range",
+    "intensity_iqr",
+    "intensity_entropy",
+)
+
+# The ``LabelIntensity`` statistical field names, in the same order as
+# ``INGESTED_INTENSITY_FEATURES`` (each prefixed with ``intensity_`` to
+# produce the corresponding vocabulary name).
+_INTENSITY_STAT_FIELDS: Tuple[str, ...] = (
+    "mean",
+    "median",
+    "std",
+    "min",
+    "max",
+    "p05",
+    "p25",
+    "p50",
+    "p75",
+    "p95",
+    "range",
+    "iqr",
+    "entropy",
+)
+
+
+def _intensity_features_dict(label_intensity) -> dict:
+    """Map a populated (non-sentinel) ``LabelIntensity``'s non-``None``
+    statistical fields to their ``intensity_<field>`` keys.
+
+    A field whose value is ``None`` (including every field of the all-``None``
+    sentinel) contributes **no** key -- ``None`` is never inserted into a
+    ``features`` mapping (a downstream ``float(value)`` in
+    ``aggregate_reference`` must never see ``None``).
+    """
+    features = {}
+    for field_name in _INTENSITY_STAT_FIELDS:
+        value = getattr(label_intensity, field_name)
+        if value is not None:
+            features[f"intensity_{field_name}"] = float(value)
+    return features
 
 
 @dataclass(frozen=True)
@@ -143,14 +212,13 @@ def ingest_subject(
     scan_path=None,
     subject_id: Optional[str] = None,
     with_size_proxy: bool = True,
+    with_intensity: bool = False,
 ) -> SubjectIngest:
     """Load one GT label map, run the feature engine, and emit one
     ``FeatureRecord`` per recognised, present level.
 
     Read-only and deterministic: never mutates ``config``/``convention``,
-    reads no wall clock, writes nothing. ``scan_path`` is accepted for
-    interface symmetry with ``ingest_cohort`` but is not currently read (the
-    Stage 2/3 geometry features this driver emits take only the seg image).
+    reads no wall clock, writes nothing.
 
     Parameters
     ----------
@@ -164,7 +232,9 @@ def ingest_subject(
         labels to canonical names. Defaults to
         :meth:`~segqc.labels.LabelConvention.default`.
     scan_path:
-        Optional path to a matching scan; currently unused.
+        Optional path to a matching scan. Read only when ``with_intensity``
+        is ``True``; otherwise accepted for interface symmetry with
+        ``ingest_cohort`` but unused.
     subject_id:
         Explicit subject id; defaults to the filename stem with
         ``DEFAULT_SEG_SUFFIX`` stripped.
@@ -173,6 +243,16 @@ def ingest_subject(
         ``physical_volume_mm3`` across its recognised levels
         (``SIZE_PROXY_NAME``); when ``False``, every record's ``size_proxy``
         is ``None``.
+    with_intensity:
+        When ``True`` (default ``False``, preserving existing callers) and
+        ``scan_path`` is not ``None``, load the scan and fold each
+        recognised level's per-label first-order intensity statistics
+        (item 059's ``compute_label_intensity``) into that level's
+        ``features`` under ``intensity_*`` keys. A sentinel (all-``None``)
+        ``LabelIntensity`` contributes no keys. When ``True`` but
+        ``scan_path`` is ``None``, degrades silently to geometry-only. A
+        grid-misaligned scan raises ``ValueError`` (propagated from the
+        extractor).
 
     Returns
     -------
@@ -203,6 +283,13 @@ def ingest_subject(
         for entry in stage3.get("per_label_offsets", []):
             offsets_by_label[int(entry["label"])] = entry["offset_mm"]
 
+    intensity_by_label = {}
+    if with_intensity and scan_path is not None:
+        from segqc.features.intensity import compute_intensity_features
+
+        scan_img = nib.load(str(scan_path))
+        intensity_by_label = compute_intensity_features(scan_img, seg_img)
+
     skipped_labels = []
     # (level_name, features_dict) pairs for recognised, present levels, built
     # in the per_label block's ascending-integer-label order; the driver
@@ -224,6 +311,9 @@ def ingest_subject(
         }
         if label_value in offsets_by_label:
             features["spline_offset_mm"] = float(offsets_by_label[label_value])
+
+        if label_value in intensity_by_label:
+            features.update(_intensity_features_dict(intensity_by_label[label_value]))
 
         collected.append((level_name, features))
 
@@ -260,6 +350,7 @@ def ingest_cohort(
     convention: "Optional[LabelConvention]" = None,
     seg_suffix: str = DEFAULT_SEG_SUFFIX,
     with_size_proxy: bool = True,
+    with_intensity: bool = False,
 ) -> CohortIngest:
     """Walk ``cohort_dir`` for label maps matching ``seg_suffix``, ingest
     each subject in ascending ``subject_id`` order, and return the
@@ -283,6 +374,9 @@ def ingest_cohort(
         Filename suffix identifying a subject's label map.
     with_size_proxy:
         Forwarded to :func:`ingest_subject` for every discovered subject.
+    with_intensity:
+        Forwarded to :func:`ingest_subject` for every discovered subject
+        (default ``False``, preserving existing callers).
 
     Returns
     -------
@@ -319,6 +413,7 @@ def ingest_cohort(
             scan_path=scan_path,
             subject_id=subject_id,
             with_size_proxy=with_size_proxy,
+            with_intensity=with_intensity,
         )
         for subject_id, seg_path, scan_path in discovered
     )
