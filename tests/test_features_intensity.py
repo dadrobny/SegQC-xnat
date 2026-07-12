@@ -145,13 +145,6 @@ def test_ac1_label_intensity_is_frozen():
         result.mean = 0.0  # type: ignore[misc]
 
 
-def test_ac1_no_pyradiomics_import():
-    """The module's source never mentions pyradiomics."""
-    import segqc.features.intensity as mod
-    source = inspect.getsource(mod)
-    assert "pyradiomics" not in source.lower()
-
-
 def test_ac1_module_imports_only_numpy_scipy_nibabel_stdlib():
     """The module's top-level imports are restricted to NumPy/SciPy/NiBabel
     (+ dataclasses/typing/__future__), no PyRadiomics or file-I/O libraries."""
@@ -504,7 +497,10 @@ def test_ac18_clean_fixture_medians_within_expected_hu_bands():
     seg_path = INTENSITY_CORPUS_DIR / clean_case["seg_fixture"]
     loaded = load_case(scan_path, seg_path)
     scan_img = nib.Nifti1Image(loaded.scan.data, loaded.scan.affine)
-    seg_img = nib.Nifti1Image(loaded.seg.data, loaded.seg.affine)
+    # loaded.seg.data is int64 (segqc.io preserves the label map's native
+    # integer dtype); nibabel 5.x rejects a bare int64 array with no header,
+    # so cast to int32 explicitly when reconstructing the Nifti1Image.
+    seg_img = nib.Nifti1Image(loaded.seg.data.astype(np.int32), loaded.seg.affine)
 
     assert clean_case["expected_label_hu_bands"]  # sanity: bands present
     for label_str, band in clean_case["expected_label_hu_bands"].items():
