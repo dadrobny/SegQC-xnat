@@ -16,9 +16,14 @@ per-case outcome classification** primitive (item 052; see
 against the real pipeline, the **cohort-level metrics aggregation** (item
 054; see :mod:`segqc.eval.metrics`) that reduces a harness cohort to
 FPR-on-GT, per-§6-mode sensitivity, and DICE-vs-flag / feature-divergence-vs-
-flag correlations, and the **threshold-calibration loop** (item 055; see
+flag correlations, the **threshold-calibration loop** (item 055; see
 :mod:`segqc.eval.calibrate`) that sweeps a config-parameter grid through 053
-+ 054 and selects the best feasible setting against a documented objective.
++ 054 and selects the best feasible setting against a documented objective,
+and the **evaluation report (JSON + human) and calibrated-config recorder**
+(item 056; see :mod:`segqc.eval.report`) that renders 054's metrics + 055's
+chosen calibration into a versioned, schema-validated JSON report, a
+stdlib-only plain-text rendering, and a byte-reproducible calibrated
+``HeuristicConfig`` YAML writer.
 """
 
 from __future__ import annotations
@@ -55,6 +60,15 @@ from .metrics import (
 )
 from .outcome import CaseOutcome, Outcome, classify_outcome
 from .overlap import LabelOverlap, OverlapResult, compute_overlap
+from .report import (
+    EVAL_REPORT_SCHEMA_VERSION,
+    EvaluationProvenance,
+    build_evaluation_report,
+    record_calibrated_config,
+    render_evaluation_report,
+    serialize_evaluation_report_json,
+    write_evaluation_report,
+)
 
 __all__ = [
     "compute_overlap",
@@ -85,4 +99,11 @@ __all__ = [
     "CalibrationResult",
     "calibrate_thresholds",
     "default_calibration_axes",
+    "EVAL_REPORT_SCHEMA_VERSION",
+    "EvaluationProvenance",
+    "build_evaluation_report",
+    "serialize_evaluation_report_json",
+    "write_evaluation_report",
+    "render_evaluation_report",
+    "record_calibrated_config",
 ]

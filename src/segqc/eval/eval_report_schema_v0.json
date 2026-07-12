@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SegQC Evaluation Report v0",
+  "description": "Machine-readable Stage-7 evaluation-report schema v0 for segqc.eval.report (item 056). Bundles item 054's cohort-level metrics plus optional item 055 calibration outcome and caller-supplied provenance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "provenance",
+    "metrics"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Version discriminator for this evaluation-report schema. Always '0.1' for v0 reports.",
+      "const": "0.1"
+    },
+    "provenance": {
+      "description": "Caller-supplied identity/reproducibility metadata for this report.",
+      "$ref": "#/definitions/provenance"
+    },
+    "metrics": {
+      "description": "The CohortMetrics.to_dict() bundle (item 054): confusion counts, FPR/sensitivity/specificity, per-failure-mode sensitivity, and the two correlation results.",
+      "$ref": "#/definitions/metrics"
+    },
+    "calibration": {
+      "description": "Optional summary of the chosen calibration outcome (item 055). Absent when the report was built without a CalibrationResult.",
+      "$ref": "#/definitions/calibration"
+    }
+  },
+  "definitions": {
+    "provenance": {
+      "type": "object",
+      "description": "Report provenance: cohort identity/size, the config version that produced the metrics, and a caller-supplied build date. No wall clock is ever read.",
+      "additionalProperties": false,
+      "required": [
+        "cohort_id",
+        "cohort_size",
+        "config_version",
+        "build_date"
+      ],
+      "properties": {
+        "cohort_id": {
+          "type": "string",
+          "description": "Free-text identifier for the evaluated cohort."
+        },
+        "cohort_size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of cases in the cohort; equals metrics.n_cases."
+        },
+        "config_version": {
+          "type": "string",
+          "description": "The HeuristicConfig.schema_version that produced the metrics."
+        },
+        "build_date": {
+          "type": "string",
+          "description": "Caller-supplied ISO 'YYYY-MM-DD' build date. Never derived from the wall clock."
+        },
+        "reference_schema_version": {
+          "type": ["string", "null"],
+          "description": "Optional schema_version of the reference distribution used, if any. Null when not applicable/unknown."
+        },
+        "segqc_version": {
+          "type": ["string", "null"],
+          "description": "Optional segqc package version string. Null when not supplied."
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "The CohortMetrics.to_dict() bundle (item 054). Nested shapes (counts, per_mode entries, correlation results) are already guaranteed by CohortMetrics.to_dict() and are not enumerated leaf-by-leaf here.",
+      "required": [
+        "counts",
+        "false_positive_rate",
+        "sensitivity",
+        "specificity",
+        "per_mode",
+        "dice_vs_flag",
+        "feature_divergence_vs_flag",
+        "n_cases"
+      ],
+      "properties": {
+        "counts": {"type": "object"},
+        "false_positive_rate": {"type": ["number", "null"]},
+        "sensitivity": {"type": ["number", "null"]},
+        "specificity": {"type": ["number", "null"]},
+        "per_mode": {"type": "array"},
+        "dice_vs_flag": {"type": "object"},
+        "feature_divergence_vs_flag": {"type": "object"},
+        "n_cases": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "calibration": {
+      "type": "object",
+      "description": "The chosen calibration summary (item 055): status, objective, and the best candidate's assignment/achieved metrics. Deliberately not the full per-candidate sweep.",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "Machine-readable calibration status, e.g. 'ok' or 'no-feasible-setting'."
+        },
+        "objective": {
+          "type": "object",
+          "description": "The CalibrationObjective used to score every candidate."
+        },
+        "best": {
+          "description": "The selected best feasible candidate's assignment + achieved metrics, or null when no candidate was feasible.",
+          "oneOf": [
+            {"type": "object"},
+            {"type": "null"}
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -367,4 +367,55 @@ acceptance suite; transcribes the recorded numbers into `progress.md`'s
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implemented as specified; the following are the concrete choices made while
+translating the Assumptions into code (all confirmed against the committed
+tests in `tests/test_056_eval_report.py`, which could not be changed):
+
+- **`build_evaluation_report(metrics, provenance, *, calibration=None)`** —
+  `provenance` is positional-or-keyword (not keyword-only), matching the
+  tests' universal `provenance=...` keyword-call style while staying
+  compatible with a hypothetical positional caller. Same shape for
+  `render_evaluation_report`.
+- **Schema depth** — top level and the `provenance` block are strict
+  (`additionalProperties: false` + full `required`); `metrics` lists its
+  eight `CohortMetrics.to_dict()` top-level keys as `required` with
+  `additionalProperties: true` (nested shapes are already guaranteed by
+  054's `to_dict()`); `calibration` is `additionalProperties: false` over
+  exactly the three keys this module ever emits (`status`, `objective`,
+  `best`), with `required: ["status"]` and `best` typed `oneOf [object,
+  null]` to cover the infeasible case. This matches the Assumptions section
+  verbatim and satisfies AC8's "missing key" and the adversarial "wrong
+  type" schema-rejection tests.
+- **`EvaluationProvenance.to_dict()` always emits all six fields** (including
+  `reference_schema_version`/`segqc_version` as JSON `null` when unset)
+  rather than omitting absent optional fields — keeps the provenance block's
+  key-set constant, so `additionalProperties: false` at that level never
+  needs a conditional schema.
+- **Calibration block content** — exactly `status`, `objective.sensitivity_
+  floor`, and (when feasible) `best.assignment` + `best.metrics` (the
+  achieved `CohortMetrics.to_dict()`), per the Assumptions' "chosen summary,
+  not full sweep" decision. `best` is `null` when
+  `calibration_result.best is None`, so `build_evaluation_report` never
+  raises on an infeasible-but-supplied `CalibrationResult` (only
+  `record_calibrated_config` treats infeasibility as an error, per AC15 —
+  the report can still document a failed calibration attempt; recording a
+  config cannot).
+- **`serialize_evaluation_report_json`** uses `json.dumps(report, indent=2,
+  sort_keys=True)` with no trailing-newline contract of its own (AC9 only
+  binds byte-reproducibility on the *written* artifact); `write_evaluation_
+  report` appends exactly one `"\n"` and writes via `Path.write_bytes`,
+  mirroring `segqc.reference.artifact.write_artifact`.
+- **`record_calibrated_config`'s YAML mapping** is exactly the seven public
+  `HeuristicConfig` fields listed in the Assumptions
+  (`schema_version`/`min_foreground_voxels`/`min_label_count`/
+  `min_fragment_voxels`/`rules`/`verdict`/`reference`), written via
+  `yaml.safe_dump(..., sort_keys=True, default_flow_style=False)` then
+  normalised to end in exactly one `"\n"` (`rstrip("\n") + "\n"`, since
+  PyYAML's own trailing-newline behaviour is not itself part of the public
+  contract) and written with `Path.write_bytes`.
+- **No `.gitattributes` change (AC17)** — this item introduces no committed
+  golden fixture; the bundled `eval_report_schema_v0.json` is static source
+  (not a byte-reproducible *generated* artifact under test), and every
+  report/config artifact the tests write lives under pytest's `tmp_path`.
+  AC17's test asserts this by construction (it only checks fixture
+  directories that do not exist in this change).
