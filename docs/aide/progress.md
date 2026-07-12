@@ -32,7 +32,7 @@
 | 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | ✅ |
 | 6 | VerSe Reference Distributions & Delta Rules | G3 | ✅ |
 | 7 | Evaluation, Calibration & Metrics *(Phase 1 complete)* | G3, G7 | ✅ |
-| 8 | Image-Based / Radiomics Features | (Phase 2) | 📋 |
+| 8 | Image-Based / Radiomics Features | (Phase 2) | 🚧 |
 | 9 | Containerisation & XNAT Command | G5 | 📋 |
 | 10 | Portable Compute: GPU Acceleration Path | G6 | 📋 |
 | 11 | Extensibility & Abnormality Classification Arm | G8 | 📋 |
@@ -252,7 +252,7 @@ uncalibrated.)*
 
 # Phase 2 — Extensions (after the pipeline is complete)
 
-## Stage 8 — Image-Based / Radiomics Features — 📋
+## Stage 8 — Image-Based / Radiomics Features — 🚧
 
 **Goal.** Intensity/radiomics features to strengthen heuristics and seed abnormality detection.
 
@@ -260,7 +260,7 @@ uncalibrated.)*
 - 📋 Intensity features over each labelled region (+ original scan); optional PyRadiomics integration. *(Items 059, 060)*
 - 📋 Feature fusion into the report + ≥1 intensity-based heuristic (e.g. implausible-intensity flag). *(Items 061, 062)*
 - 📋 Reference distributions extended with intensity features. *(Items 063, 064)*
-- 📋 Intensity-bearing synthetic scan fixtures (HU-painted GT + implausible-intensity variants) enabling local testing of image features. *(Item 058)*
+- 🚧 Intensity-bearing synthetic scan fixtures (HU-painted GT + implausible-intensity variants) enabling local testing of image features. *(Item 058)*
 - 📋 Stage 8 integration into `segqc run` + acceptance suite (image features on fixtures; ≥1 intensity heuristic fires; tests pass). *(Item 065)*
 
 **Acceptance.**
