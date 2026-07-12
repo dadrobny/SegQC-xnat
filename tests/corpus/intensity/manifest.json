@@ -1,0 +1,167 @@
+{
+  "cases": [
+    {
+      "base": {
+        "curve_amplitude_mm": 6.0,
+        "levels": [
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "spacing": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "case_id": "clean_hu",
+      "expected_label_hu_bands": {
+        "20": [
+          100,
+          1500
+        ],
+        "21": [
+          100,
+          1500
+        ],
+        "22": [
+          100,
+          1500
+        ],
+        "23": [
+          100,
+          1500
+        ],
+        "24": [
+          100,
+          1500
+        ]
+      },
+      "fill": null,
+      "plausible": true,
+      "scan_fixture": "fixtures/clean_hu_scan.nii.gz",
+      "seed": 0,
+      "seg_fixture": "fixtures/clean_spine_seg.nii.gz",
+      "target_label": null,
+      "variant": "clean"
+    },
+    {
+      "base": {
+        "curve_amplitude_mm": 6.0,
+        "levels": [
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "spacing": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "case_id": "implausible_metal",
+      "expected_label_hu_bands": {
+        "22": [
+          2500,
+          32767
+        ]
+      },
+      "fill": {
+        "mean": 3000,
+        "name": "metal",
+        "std": 100
+      },
+      "plausible": false,
+      "scan_fixture": "fixtures/implausible_metal_scan.nii.gz",
+      "seed": 0,
+      "seg_fixture": "fixtures/clean_spine_seg.nii.gz",
+      "target_label": 22,
+      "variant": "metal"
+    },
+    {
+      "base": {
+        "curve_amplitude_mm": 6.0,
+        "levels": [
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "spacing": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "case_id": "implausible_soft_tissue",
+      "expected_label_hu_bands": {
+        "22": [
+          -200,
+          100
+        ]
+      },
+      "fill": {
+        "mean": 40,
+        "name": "soft_tissue",
+        "std": 10
+      },
+      "plausible": false,
+      "scan_fixture": "fixtures/implausible_soft_tissue_scan.nii.gz",
+      "seed": 0,
+      "seg_fixture": "fixtures/clean_spine_seg.nii.gz",
+      "target_label": 22,
+      "variant": "soft_tissue"
+    },
+    {
+      "base": {
+        "curve_amplitude_mm": 6.0,
+        "levels": [
+          "L1",
+          "L2",
+          "L3",
+          "L4",
+          "L5"
+        ],
+        "spacing": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "case_id": "degenerate_uniform",
+      "expected_label_hu_bands": {
+        "22": [
+          0,
+          0
+        ]
+      },
+      "fill": {
+        "mean": 0,
+        "name": "degenerate_uniform",
+        "std": 0
+      },
+      "plausible": false,
+      "scan_fixture": "fixtures/degenerate_uniform_scan.nii.gz",
+      "seed": 0,
+      "seg_fixture": "fixtures/clean_spine_seg.nii.gz",
+      "target_label": 22,
+      "variant": "degenerate_uniform"
+    }
+  ],
+  "generator": "segqc.synth.intensity",
+  "hu_model": {
+    "background_mean": 40,
+    "background_std": 10,
+    "cancellous_mean": 200,
+    "cancellous_std": 40,
+    "cortical_mean": 600,
+    "cortical_std": 120,
+    "dtype": "int16"
+  },
+  "manifest_version": 1
+}

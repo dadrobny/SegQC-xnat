@@ -500,4 +500,48 @@ golden / rule / extractor / config / report / reference modules.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`IMPLAUSIBLE_FILLS` key/name is `"degenerate_uniform"`, not `"degenerate"`.**
+  The committed tests (`tests/test_058_intensity_fixtures.py`) consistently use
+  `IMPLAUSIBLE_FILLS["degenerate_uniform"]` and the interface section's public
+  surface likewise documents `"metal" | "soft_tissue" | "degenerate_uniform"` on
+  `ImplausibleFill.name`; only one prose sentence in the Description shortens it
+  to "degenerate". Implemented as `"degenerate_uniform"` throughout (fill name,
+  case_id, variant) to match the authoritative test interface.
+
+- **Manifest field name is `expected_label_hu_bands`** (as specified) holding a
+  `{str(label): [lo, hi]}` mapping; the clean case's bands are the fixed
+  documented bone-plausible band `[100, 1500]` per present label (this is what
+  AC17's test literally asserts), not a per-run computed band from the actual
+  painted array — the band is generator *ground truth* about what the model is
+  designed to paint, not a post-hoc measurement.
+
+- **Implausible-case bands are fixed per fill type**, matching the manifest
+  schema example in the spec: `metal -> [2500, 32767]` (int16 max),
+  `soft_tissue -> [-200, 100]`, `degenerate_uniform -> [0, 0]` (the fill's
+  constant value). These are copied verbatim by `build_intensity_corpus()`
+  rather than derived from a sampled run, keeping the manifest a fixed,
+  drift-proof contract tied only to `DEFAULT_HU_MODEL`/`IMPLAUSIBLE_FILLS`.
+
+- **Corpus case ids**: `clean_hu`, `implausible_metal`, `implausible_soft_tissue`,
+  `degenerate_uniform` (four cases total: one clean + three implausible,
+  satisfying AC13's "at least two implausible" with headroom). All target label
+  22 (L3), matching the Stage-5 corpus's mode-case convention.
+
+- **Shared seg fixture name**: `fixtures/clean_spine_seg.nii.gz`, written once
+  from the first built case and reused by every case's `seg_fixture` manifest
+  entry (mirrors `segqc.synth.corpus`'s shared `base_scan.nii.gz` dedup
+  pattern, but for the label map instead of the scan, since here the *scan*
+  is what varies across cases).
+
+- **RNG draw ordering in `paint_clean_scan`**: background noise is drawn for
+  the *entire* array first (`size=shape`), then per-label interior/rim regions
+  are overwritten in ascending label order. This keeps the result deterministic
+  for a fixed seed regardless of how many/which labels are present, satisfying
+  AC6's determinism requirement and the all-background adversarial case (no
+  labels to iterate, purely the initial background draw).
+
+- **Verified no regression**: regenerating the existing Stage-5 corpus via
+  `python -m segqc.synth.corpus --out <scratch dir>` still succeeds unchanged;
+  no existing module (`clean_gt.py`, `corpus.py`, `perturbation.py`,
+  `golden.py`, operator modules) was edited, only the additive re-export in
+  `src/segqc/synth/__init__.py`.
