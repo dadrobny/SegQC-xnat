@@ -42,6 +42,15 @@ dev = [
     "pytest>=7",
     "matplotlib>=3.5",
 ]
+# Optional Stage-8 extra (item 060): PyRadiomics (GLCM + shape features) behind
+# an optional-import adapter (segqc.features.radiomics). Kept out of core
+# `dependencies` because it has historically had install friction across
+# platforms/Python versions (it transitively pulls SimpleITK); the default
+# feature set and test suite run fine without it. Install with
+# `pip install segqc[radiomics]`.
+radiomics = [
+    "pyradiomics>=3.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/dadrobny/SegQC-xnat"

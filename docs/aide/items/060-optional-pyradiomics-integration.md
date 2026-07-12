@@ -298,4 +298,42 @@ Gates (do not implement here): 061 (report fusion) consumes `LabelRadiomics`;
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Alignment guard called twice (defense-in-depth), not just transitively.**
+  `compute_radiomics_features` calls `intensity._check_alignment` directly
+  before enumerating labels (mirroring item 059's `compute_intensity_features`
+  pattern), in addition to the guard firing transitively inside each
+  `compute_label_radiomics` -> `compute_label_intensity` call. This matters
+  for the degenerate case of a mismatched-grid pair with **no** overlapping
+  non-zero labels in the (mismatched) segmentation array — without the
+  direct call, the label loop could be empty and the function would return
+  `{}` instead of raising. Cheap and keeps behaviour identical to item 059's
+  convenience-map guard.
+- **PyRadiomics extractor settings.** `binWidth=25.0` (fixed, no auto
+  `binCount`), `interpolator=None`/`resampledPixelSpacing=None` (no
+  resampling — operate on the native grid), `label=1` against a
+  single-label-restricted uint8 mask (rather than passing the original
+  multi-label segmentation with `label=<value>`), and `normalize=False`.
+  Only the `glcm` and `shape` feature classes are enabled (first-order is
+  deliberately left disabled on the PyRadiomics side since item 059 already
+  owns `first_order`). These are declared as module constants
+  (`_PYRADIOMICS_BIN_WIDTH`, `_PYRADIOMICS_ENABLED_FEATURE_CLASSES`) per the
+  spec's pin so present-path output is reproducible (AC14).
+- **SimpleITK image construction.** NumPy arrays are `(x, y, z)`-ordered
+  (NiBabel convention); `SimpleITK.GetImageFromArray` expects `(z, y, x)`, so
+  arrays are transposed accordingly before wrapping, with `SetSpacing` set
+  from `scan_img.header.get_zooms()[:3]` (matching the `(x, y, z)` spacing
+  order SimpleITK expects for `SetSpacing`). This could not be executed in
+  this dev environment (PyRadiomics/SimpleITK absent) and is implemented per
+  the documented PyRadiomics/SimpleITK API surface for inspection; the
+  present-path tests (AC12-14) will validate it once PyRadiomics is
+  installed and exercised in an environment that has it.
+- **`extended` key filtering.** PyRadiomics' `extractor.execute(...)` result
+  dict includes `diagnostics_*` metadata entries (image hashes, timings,
+  etc.) alongside the numeric feature values; these are dropped, and any
+  non-numeric or non-finite values are also dropped, so `extended` is
+  guaranteed to satisfy AC12's "non-empty `Dict[str, float]`, every value a
+  finite float" contract.
+- **`_check_alignment` reuse.** Imported directly from
+  `segqc.features.intensity` (a private module-level function, not in that
+  module's `__all__`) rather than re-implemented, per the spec's explicit
+  "Alignment guard reuse" pin allowing either approach.
