@@ -236,4 +236,23 @@ Gates (do not implement here): 060, 061, 062, 063 all depend on this extractor.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Entropy bin count kept at the pinned default (32 bins, base-2, spanning
+  `[min, max]`).** No deviation needed — AC7/AC8 both hold with the spec's
+  default, so the builder made no adjustment.
+- **Alignment guard reads `scan_img.shape`/`.affine` directly** (NiBabel's
+  image-level accessors) rather than `.header.get_zooms()`-style derivation,
+  since both shape and affine are needed as-is for the exact-shape /
+  tolerance-affine comparison; this mirrors `io.load_case`'s checks on the
+  already-loaded `Volume` objects, adapted to work directly on
+  `Nifti1Image` inputs per the item's pinned `Nifti1Image`-based signature.
+- **`compute_intensity_features` re-validates alignment via
+  `_check_alignment` up front, then again implicitly inside each
+  `compute_label_intensity` call.** The per-call check is intentionally kept
+  (not bypassed) so `compute_intensity_features` output is provably identical
+  to calling `compute_label_intensity` per label (AC15), at the cost of a
+  cheap redundant shape/affine comparison per label.
+- **No new dependency on SciPy was needed** — all statistics (percentiles,
+  histogram-based entropy) are available directly via NumPy, so the module's
+  imports are `numpy`, `nibabel`, `dataclasses`, `typing`, `__future__` only
+  (SciPy remains an allowed-but-unused import per AC1's import-allowlist
+  test).
