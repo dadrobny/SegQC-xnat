@@ -502,7 +502,7 @@ def test_ac21_gitattributes_pins_the_new_intensity_fixtures():
     """AC21: .gitattributes contains a rule pinning
     tests/corpus/intensity/manifest.json to text eol=lf and a rule marking
     tests/corpus/intensity/fixtures/*.nii.gz as binary."""
-    repo_root = INTENSITY_CORPUS_DIR.resolve().parents[1]
+    repo_root = INTENSITY_CORPUS_DIR.resolve().parents[2]
     gitattributes = (repo_root / ".gitattributes").read_text()
 
     assert re.search(
