@@ -351,7 +351,16 @@ def _features_block():
                 "geometry": {
                     "voxel_count": 100, "physical_volume_mm3": 500.0,
                     "extent_x_mm": 1, "extent_y_mm": 1, "extent_z_mm": 1,
-                    "bbox_voxel": {}, "bbox_physical": {},
+                    "bbox_voxel": {
+                        "x_min": 0, "x_max": 4,
+                        "y_min": 0, "y_max": 4,
+                        "z_min": 0, "z_max": 4,
+                    },
+                    "bbox_physical": {
+                        "x_min": 0.0, "x_max": 4.0,
+                        "y_min": 0.0, "y_max": 4.0,
+                        "z_min": 0.0, "z_max": 4.0,
+                    },
                     "touches_inferior": False, "touches_superior": False,
                     "touches_left": False, "touches_right": False,
                     "touches_anterior": False, "touches_posterior": False,
