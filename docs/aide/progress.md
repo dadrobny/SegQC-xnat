@@ -215,7 +215,7 @@ TotalSegmentator output, and the synthetic corpus.
 - ✅ Feature-set match / divergence by vertebra label. *(Item 051)*
 - ✅ QC-verdict comparison & per-case outcome classification. *(Item 052)*
 - ✅ Runs on VerSe GT (positive control), TotalSegmentator outputs, synthetic failures. *(Item 053)*
-- 🚧 Metrics: FPR on GT, sensitivity per failure mode, DICE-vs-flag correlation. *(Item 054)*
+- ✅ Metrics: FPR on GT, sensitivity per failure mode, DICE-vs-flag correlation. *(Item 054)*
 - 📋 Threshold-calibration loop; chosen thresholds + metrics recorded here / evaluation report. *(Items 055, 056)*
 - 📋 Stage-7 integration into a reproducible `segqc evaluate` entry point + acceptance suite
   (GT low-FPR, injected failures caught, DICE-vs-flag correlation) closing Phase 1;
