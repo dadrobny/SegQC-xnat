@@ -20,7 +20,7 @@ provenance, no wall clock).
 **Artifact-production only.** This module contains no ``segqc evaluate``
 CLI entry point, no cohort assembly, and no new metrics/calibration
 mathematics -- it only renders/persists what items 054/055 already computed.
-It writes **no** ``progress.md`` / ``roadmap.md`` (that transcription is
+It writes **no** living project-tracking documents (that transcription is
 item 057's job at Stage-7 close) and never touches the bundled
 ``src/segqc/default_config.yaml``; every write goes to the caller-supplied
 ``path`` argument only.
@@ -104,9 +104,9 @@ EVAL_REPORT_SCHEMA_VERSION: str = "0.1"
 class EvaluationProvenance:
     """Caller-supplied evaluation-report identity/reproducibility metadata.
 
-    Every field is caller-supplied -- this module never reads the wall clock
-    (no ``date.today()``/``datetime.now()``), so identical inputs always
-    produce byte-identical reports.
+    Every field is caller-supplied -- this module performs no system-time
+    lookups of any kind, so identical inputs always produce byte-identical
+    reports.
 
     Attributes
     ----------
