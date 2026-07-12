@@ -476,4 +476,27 @@ part of item 057's direct-merge work.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`load_cohort_manifest` validation order.** Per-case structural checks
+  (`case_id` → `gt` → `expected`/`expected_verdict` present) run before the
+  duplicate-`case_id` check, which itself runs before path-existence
+  resolution. This lets the AC2 "duplicate `case_id`" case reuse an
+  otherwise-valid case dict without needing distinct fixture paths, and keeps
+  each malformation isolated to one clear error message rather than a
+  cascade.
+- **Unknown top-level manifest keys / non-`Mapping` case entries** are
+  defensively rejected with `SegQCInputError` (not exercised by the committed
+  tests, which only cover the shapes pinned in Assumptions) rather than
+  silently ignored, consistent with "clear `SegQCInputError` messages" in the
+  Assumptions.
+- **`segqc evaluate`'s `--calibrate` uses `default_calibration_axes()`
+  unconditionally** (no CLI flag to pass a custom axis grid) — matches
+  Implementation Step 3.4 exactly; a caller wanting a different grid drives
+  `calibrate_thresholds` directly from Python (as the acceptance suite's
+  AC13 tests do) rather than through the CLI. Not adding an axis-grid CLI
+  flag keeps `evaluate`'s argument surface minimal, per the item's "not in
+  scope" list (no new public API beyond `cohort.py` + the CLI wiring).
+- **CLI summary line** prints `n_cases`, `false_positive_rate`, and
+  calibration `status` (`"n/a"` when `--calibrate` was not passed) plus the
+  written JSON report path — enough to sanity-check a run from the terminal
+  without duplicating the full human-readable report already written to
+  `eval_report.txt`.

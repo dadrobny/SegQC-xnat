@@ -28,6 +28,10 @@ stdlib-only plain-text rendering, and a byte-reproducible calibrated
 
 from __future__ import annotations
 
+from .cohort import (
+    EVAL_COHORT_MANIFEST_VERSION,
+    load_cohort_manifest,
+)
 from .calibrate import (
     CalibrationObjective,
     CalibrationResult,
@@ -71,6 +75,8 @@ from .report import (
 )
 
 __all__ = [
+    "EVAL_COHORT_MANIFEST_VERSION",
+    "load_cohort_manifest",
     "compute_overlap",
     "LabelOverlap",
     "OverlapResult",

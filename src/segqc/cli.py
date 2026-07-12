@@ -179,6 +179,90 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     build_reference_parser.set_defaults(handler=_handle_build_reference)
 
+    evaluate_parser = subparsers.add_parser(
+        "evaluate",
+        help="Run a Stage-7 evaluation over a cohort and write a metrics report.",
+        description=(
+            "Run a reproducible Stage-7 evaluation: load an evaluation-cohort "
+            "manifest (a JSON document naming a set of GT / optional-candidate "
+            "/ expected-verdict cases -- e.g. a mounted VerSe GT or "
+            "TotalSegmentator-vs-GT cohort -- see segqc.eval.cohort for the "
+            "exact shape), drive it through evaluate_cohort -> "
+            "compute_cohort_metrics (items 053/054), optionally calibrate "
+            "rule thresholds against it (--calibrate, items 055/056), and "
+            "write <out>/eval_report.json + <out>/eval_report.txt (and, when "
+            "calibrating, <out>/calibrated_config.yaml). Example manifest "
+            "shape:\n"
+            '  {"manifest_version": 1, "cases": [{"case_id": "sub-001", '
+            '"gt": "gt/sub-001.nii.gz", "candidate": "cand/sub-001.nii.gz", '
+            '"expected": {"expected_verdict": "pass"}}]}\n'
+            "gt/candidate paths are resolved relative to the manifest file's "
+            "own directory."
+        ),
+    )
+    evaluate_parser.add_argument(
+        "--cohort",
+        required=True,
+        metavar="<json>",
+        help="Path to an evaluation-cohort manifest JSON (segqc.eval.cohort).",
+    )
+    evaluate_parser.add_argument(
+        "--out",
+        required=True,
+        metavar="<dir>",
+        help="Output directory for the evaluation report(s).",
+    )
+    evaluate_parser.add_argument(
+        "--config",
+        default=None,
+        metavar="<yaml>",
+        help=(
+            "Path to a custom heuristic-config YAML file. When omitted, the "
+            "bundled default_config.yaml (item 035) is used."
+        ),
+    )
+    evaluate_parser.add_argument(
+        "--calibrate",
+        action="store_true",
+        default=False,
+        help=(
+            "Also run the threshold-calibration loop (item 055) over the "
+            "cohort using the default calibration axes, and -- when a "
+            "feasible setting is found -- write <out>/calibrated_config.yaml "
+            "and embed a 'calibration' block in the JSON report."
+        ),
+    )
+    evaluate_parser.add_argument(
+        "--cohort-id",
+        default=None,
+        metavar="<label>",
+        help=(
+            "Free-text identifier for the evaluated cohort, stamped into the "
+            "report's provenance block (default: the --cohort filename stem)."
+        ),
+    )
+    evaluate_parser.add_argument(
+        "--build-date",
+        default="2026-07-12",
+        metavar="<YYYY-MM-DD>",
+        help=(
+            "Fixed ISO build-date stamped into the report's provenance "
+            "(default: %(default)s -- a fixed value, not 'today', to keep "
+            "repeated evaluations byte-reproducible)."
+        ),
+    )
+    evaluate_parser.add_argument(
+        "--log-level",
+        default="WARNING",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        metavar="<level>",
+        help=(
+            "Log level for the segqc logger hierarchy "
+            "(DEBUG/INFO/WARNING/ERROR/CRITICAL; default: WARNING)."
+        ),
+    )
+    evaluate_parser.set_defaults(handler=_handle_evaluate)
+
     return parser
 
 
@@ -429,6 +513,110 @@ def _handle_build_reference(args: argparse.Namespace) -> int:
 
     out_path = write_artifact(dist, args.out)
     print(f"Wrote reference artifact to {out_path}")
+    return 0
+
+
+def _handle_evaluate(args: argparse.Namespace) -> int:
+    """Handler for ``segqc evaluate`` (item 057) -- the Stage-7 integration
+    entry point.
+
+    Loads the config (bundled default or ``--config``), loads the cohort via
+    :func:`segqc.eval.cohort.load_cohort_manifest`, drives
+    ``evaluate_cohort -> compute_cohort_metrics`` (items 053/054),
+    optionally runs the threshold-calibration loop (``--calibrate``, item
+    055), builds + writes the JSON and human-readable evaluation reports
+    (item 056), and -- when calibrating and a feasible setting was found --
+    records the calibrated config. Returns 1 (writing no report) on a bad
+    ``--config`` or a cohort-loading error (e.g. a nonexistent ``--cohort``
+    path) -- a caller error is reported, not a traceback.
+    """
+    from segqc._logging import setup_logging  # noqa: PLC0415
+
+    setup_logging(args.log_level)
+
+    from segqc.config import (  # noqa: PLC0415
+        SegQCConfigError,
+        bundled_default_config,
+        load_config,
+    )
+    from segqc.eval.calibrate import calibrate_thresholds, default_calibration_axes  # noqa: PLC0415
+    from segqc.eval.cohort import load_cohort_manifest  # noqa: PLC0415
+    from segqc.eval.harness import evaluate_cohort  # noqa: PLC0415
+    from segqc.eval.metrics import compute_cohort_metrics  # noqa: PLC0415
+    from segqc.eval.report import (  # noqa: PLC0415
+        EvaluationProvenance,
+        build_evaluation_report,
+        record_calibrated_config,
+        render_evaluation_report,
+        write_evaluation_report,
+    )
+    from segqc.io import SegQCInputError  # noqa: PLC0415
+
+    logger.debug(
+        "segqc evaluate: cohort=%r  out=%r  config=%r  calibrate=%r",
+        args.cohort, args.out, args.config, args.calibrate,
+    )
+
+    # --- 0. Load config (bundled default, or --config override) -------------- #
+    if args.config:
+        try:
+            cfg = load_config(args.config)
+        except SegQCConfigError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+    else:
+        cfg = bundled_default_config()
+
+    # --- 1. Load the cohort manifest ------------------------------------------ #
+    try:
+        cases = load_cohort_manifest(args.cohort)
+    except (SegQCInputError, OSError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    # --- 2. Drive the harness + metrics --------------------------------------- #
+    cohort = evaluate_cohort(cases, cfg)
+    metrics = compute_cohort_metrics(cohort)
+
+    # --- 3. Optional calibration ----------------------------------------------- #
+    if args.calibrate:
+        axes = default_calibration_axes()
+        calibration = calibrate_thresholds(cases, cfg, axes)
+    else:
+        axes = None
+        calibration = None
+
+    # --- 4. Build + write reports ---------------------------------------------- #
+    cohort_id = args.cohort_id or pathlib.Path(args.cohort).stem
+    provenance = EvaluationProvenance(
+        cohort_id=cohort_id,
+        cohort_size=metrics.n_cases,
+        config_version=cfg.schema_version,
+        build_date=args.build_date,
+    )
+
+    report = build_evaluation_report(metrics, provenance, calibration=calibration)
+
+    out_path = pathlib.Path(args.out)
+    json_path = write_evaluation_report(report, out_path / "eval_report.json")
+
+    txt_str = render_evaluation_report(metrics, provenance, calibration=calibration)
+    txt_path = out_path / "eval_report.txt"
+    txt_path.write_text(txt_str, encoding="utf-8")
+
+    # --- 5. Optionally record the calibrated config ----------------------------- #
+    if calibration is not None and calibration.best is not None:
+        record_calibrated_config(
+            cfg, calibration, axes, out_path / "calibrated_config.yaml"
+        )
+
+    # --- 6. Summary + exit code -------------------------------------------------- #
+    calibration_status = "n/a" if calibration is None else calibration.status
+    print(
+        f"segqc evaluate: n_cases={metrics.n_cases} "
+        f"fpr={metrics.false_positive_rate} calibration={calibration_status} "
+        f"-> {json_path}"
+    )
     return 0
 
 
