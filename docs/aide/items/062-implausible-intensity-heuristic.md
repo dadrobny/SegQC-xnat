@@ -569,4 +569,27 @@ Intended code path (all under `source_dir = src/segqc`): a new
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implemented exactly per the spec's public interface and Implementation Steps —
+no deviations from the pinned contract. Notes from the build:
+
+- **Reason strings.** Each reason embeds the tag constant, the integer label,
+  the measured statistic formatted to two decimals, and the crossed
+  threshold(s) (low/high additionally restate the full band for context, as
+  the spec's "for context, the plausibility band" wording asks). This matches
+  AC17's substring checks (label, measured value, threshold all present as
+  plain-text substrings) without over-constraining exact wording.
+- **Label/first_order extraction mirrors `reference_delta`'s defensive
+  pattern**: derive the integer label from `entry.get("label", key)` (falling
+  back to the `per_label` dict key), skip non-dict entries, skip entries whose
+  `first_order` isn't a dict — all silently tolerated per AC16 and the
+  malformed-entry adversarial cases, with no `try/except` around the per-label
+  loop body beyond the label-coercion `try/except (TypeError, ValueError)`.
+- **`default_config.yaml` left untouched** as directed (deferred to item 065),
+  confirmed the rule is silent when `image_features` is absent (golden-safety
+  adversarial test path), and registration was smoke-checked interactively:
+  `iter_rules()` now yields all nine ids including `intensity`, with no
+  duplicate-registration `ValueError`.
+- **Module docstring's env note.** Left the `heuristics/__init__.py` top-level
+  package docstring's "items 027–035" and rule-family enumeration as-is
+  (unchanged by item 047 either) — only the one-line registering import was
+  added, consistent with the item's Implementation Steps §3.
