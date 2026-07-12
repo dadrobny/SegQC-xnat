@@ -31,7 +31,7 @@
 | 4 | Heuristic Rule Engine over Failure Modes | G2 | ✅ |
 | 5 | Synthetic Failure Corpus & Regression Suite | G7, G2 | ✅ |
 | 6 | VerSe Reference Distributions & Delta Rules | G3 | ✅ |
-| 7 | Evaluation, Calibration & Metrics *(Phase 1 complete)* | G3, G7 | 🚧 |
+| 7 | Evaluation, Calibration & Metrics *(Phase 1 complete)* | G3, G7 | ✅ |
 | 8 | Image-Based / Radiomics Features | (Phase 2) | 📋 |
 | 9 | Containerisation & XNAT Command | G5 | 📋 |
 | 10 | Portable Compute: GPU Acceleration Path | G6 | 📋 |
@@ -43,11 +43,11 @@
 |-----------|--------------|--------|
 | G1 Detect empty / trivially-failed | Stage 1 | ✅ |
 | G2 Detect catalogued failure modes (§6) | Stages 4, 5 | ✅ |
-| G3 Distinguish failure from variation | Stages 6, 7 | 🚧 |
+| G3 Distinguish failure from variation | Stages 6, 7 | ✅ |
 | G4 Per-case QC report (JSON + human) | Stage 1 (ext. 2–4) | ✅ |
 | G5 Deploy on XNAT *(deferred)* | Stage 9 | 📋 |
 | G6 Portable / GPU *(deferred)* | Stage 10 | 📋 |
-| G7 Evaluable & regression-testable | Stages 5, 7 | 🚧 |
+| G7 Evaluable & regression-testable | Stages 5, 7 | ✅ |
 | G8 Extensible / classification *(deferred)* | Stage 11 | 📋 |
 
 ---
@@ -205,7 +205,7 @@ mislabelling heuristics.
 
 ---
 
-## Stage 7 — Evaluation, Calibration & Metrics (G3, G7) — 🚧 *(Phase 1 complete)*
+## Stage 7 — Evaluation, Calibration & Metrics (G3, G7) — ✅ *(Phase 1 complete)*
 
 **Goal.** Quantify performance and calibrate thresholds against VerSe GT,
 TotalSegmentator output, and the synthetic corpus.
@@ -217,14 +217,14 @@ TotalSegmentator output, and the synthetic corpus.
 - ✅ Runs on VerSe GT (positive control), TotalSegmentator outputs, synthetic failures. *(Item 053)*
 - ✅ Metrics: FPR on GT, sensitivity per failure mode, DICE-vs-flag correlation. *(Item 054)*
 - ✅ Threshold-calibration loop; chosen thresholds + metrics recorded here / evaluation report. *(Items 055, 056)*
-- 🚧 Stage-7 integration into a reproducible `segqc evaluate` entry point + acceptance suite
+- ✅ Stage-7 integration into a reproducible `segqc evaluate` entry point + acceptance suite
   (GT low-FPR, injected failures caught, DICE-vs-flag correlation) closing Phase 1;
   calibrated thresholds + metrics recorded. *(Item 057)*
 
 **Acceptance.**
-- [ ] GT passes at a high rate (low FPR) (**G3**).
-- [ ] Injected failures caught; flag rate / feature divergence correlates with DICE (**G7**).
-- [ ] Calibrated thresholds + metrics recorded; evaluation reproducible.
+- [x] GT passes at a high rate (low FPR) (**G3**).
+- [x] Injected failures caught; flag rate / feature divergence correlates with DICE (**G7**).
+- [x] Calibrated thresholds + metrics recorded; evaluation reproducible.
 
 **Calibrated metrics (to be filled at completion).**
 - FPR on VerSe GT: _TBD_
