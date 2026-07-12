@@ -1,6 +1,6 @@
 # Seg-QC-xnat — Work Queue 006
 
-> **Status:** Live · **Created:** 2026-07-11
+> **Status:** ✅ Completed — superseded by queue-007 (2026-07-12).
 > Step 4 of the AIDE loop. Derived from [`../vision.md`](../vision.md),
 > [`../roadmap.md`](../roadmap.md), and [`../progress.md`](../progress.md).
 > Follows [`queue-005.md`](queue-005.md) (items 043–049).
@@ -244,18 +244,18 @@ in the config/`progress.md` output; deterministic / golden-stable.
 
 ---
 
-## Current state (2026-07-11)
+## Current state (2026-07-12)
 
-Freshly generated; supersedes [`queue-005.md`](queue-005.md) (Stage 6, items
-043–049, all ✅). No Stage 7 items claimed yet. The three comparison primitives
-**050 (DICE / overlap), 051 (feature-set match), 052 (verdict-outcome
-classification)** are independent and may be picked up in parallel; **053** (cohort
-model + harness driver) must merge before the rest — it assembles those primitives
-into per-case evaluation records that **054** (metrics), **055** (calibration), and
-**056** (report + recorded results) consume, and **057** (integration + acceptance)
-wires it all into `segqc evaluate` and closes Stage 7 / Phase 1. This is the last
-Phase-1 queue; the following queue opens **Phase 2 (Stage 8)** behind a
-human-reviewed queue PR.
+**Completed — all items ✅ done** (verified against `progress.md` Stage 7, which
+is ✅ *Phase 1 complete*): **050** (DICE / overlap), **051** (feature-set match),
+**052** (verdict-outcome classification), **053** (cohort model + harness driver),
+**054** (metrics), **055** (calibration loop), **056** (evaluation report +
+recorded results), and **057** (integration + acceptance) — the latter wiring the
+harness into `segqc evaluate` and closing Stage 7 / **Phase 1**. The calibrated
+headline metrics (FPR 0.0 on GT, per-mode sensitivities, DICE-vs-flag correlation
+-0.943) are recorded in `progress.md`'s Stage-7 "Calibrated metrics" block.
+Superseded by [`queue-007.md`](queue-007.md), which opens **Phase 2 (Stage 8 —
+Image-Based / Radiomics Features)** behind a human-reviewed queue PR.
 
 ## Next Step
 
