@@ -11,9 +11,12 @@ Currently exposes the level-2 **DICE-vs-GT** segmentation-overlap primitive
 match / divergence-by-label** primitive (item 051; see
 :mod:`segqc.eval.feature_match`), the level-1 **QC-verdict comparison /
 per-case outcome classification** primitive (item 052; see
-:mod:`segqc.eval.outcome`), and the **evaluation cohort model & harness
-driver** (item 053; see :mod:`segqc.eval.harness`) that assembles the three
-per case against the real pipeline.
+:mod:`segqc.eval.outcome`), the **evaluation cohort model & harness driver**
+(item 053; see :mod:`segqc.eval.harness`) that assembles the three per case
+against the real pipeline, and the **cohort-level metrics aggregation** (item
+054; see :mod:`segqc.eval.metrics`) that reduces a harness cohort to
+FPR-on-GT, per-§6-mode sensitivity, and DICE-vs-flag / feature-divergence-vs-
+flag correlations.
 """
 
 from __future__ import annotations
@@ -31,6 +34,13 @@ from .harness import (
     EvaluationCase,
     evaluate_case,
     evaluate_cohort,
+)
+from .metrics import (
+    CohortMetrics,
+    ConfusionCounts,
+    CorrelationResult,
+    PerModeSensitivity,
+    compute_cohort_metrics,
 )
 from .outcome import CaseOutcome, Outcome, classify_outcome
 from .overlap import LabelOverlap, OverlapResult, compute_overlap
@@ -52,4 +62,9 @@ __all__ = [
     "CohortEvaluation",
     "evaluate_case",
     "evaluate_cohort",
+    "compute_cohort_metrics",
+    "ConfusionCounts",
+    "PerModeSensitivity",
+    "CorrelationResult",
+    "CohortMetrics",
 ]

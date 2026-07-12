@@ -479,4 +479,51 @@ correlation may still be defined; negative/`>1` sentinel DICE never occurs
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Implementation followed the spec's Implementation Steps essentially
+  verbatim** (module docstring, four frozen dataclasses in steps 2-5,
+  `_count_confusion`, FPR/overall-rate helpers, per-mode grouping,
+  `_correlate`, `compute_cohort_metrics` orchestration, `__init__.py`
+  re-export). No divergence from the pinned interfaces of items 050-053 was
+  found; all Assumption pins matched the merged code as read.
+
+- **`CohortMetrics.to_dict()` mirrors `harness._tuples_to_lists` exactly** —
+  a single `dataclasses.asdict(self)` followed by the same recursive
+  tuple-to-list coercion used in `segqc/eval/harness.py`. No `Outcome`
+  members appear anywhere in `CohortMetrics`'s field tree (the `Outcome`
+  enum lives only on `CaseOutcome`, which this module never embeds), so the
+  enum-safe `dict_factory` used by `harness._asdict_enum_safe` was not
+  needed here — a plain `dataclasses.asdict` already yields only
+  str/int/float/bool/None/tuple/dict, and the tuple pass takes care of the
+  rest.
+
+- **Pearson/Spearman computed as population covariance/std ratios via
+  `numpy`** (`np.std` at the default `ddof=0`, `np.mean` for centering),
+  per the spec's explicit decision not to use `scipy.stats.pearsonr`/
+  `spearmanr` (keeps sentinel/`NaN`-avoidance fully under this module's
+  control). Because the Pearson coefficient is scale-invariant in the
+  ddof convention (numerator and denominator both scale by the same factor
+  whether counts are normalised by `n` or `n-1`), this matches the tests'
+  independent pure-Python `_pearson`/`_spearman` helpers (which use raw
+  sums, not normalised variances) to well within the `1e-9` AC8/AC9/AC11/
+  AC12 tolerance.
+
+- **Average-rank ties (Spearman) computed with a single `np.argsort`
+  (`kind="mergesort"` for stability) plus a linear tie-run scan**, assigning
+  each tied run the mean of its 1-based rank positions — the same algorithm
+  as the tests' independent `_avg_ranks` helper, implemented directly on
+  `numpy` arrays rather than reusing `scipy.stats.rankdata` (again, no scipy
+  dependency introduced by this item).
+
+- **Per-mode `failure_mode_name` resolution order**: a name supplied via a
+  `{int: name}` `failure_modes` mapping wins; otherwise the name is read off
+  the first grouped record of that mode (all records sharing a mode are
+  assumed to carry a consistent name, per the harness's pass-through
+  semantics); otherwise `None` (e.g. a requested mode with zero records, or
+  `failure_modes=None` with a bare sequence — not a mapping — supplied,
+  which carries no name at all).
+
+- **`ConfusionCounts` convenience properties (`n_total`, `n_expected_pass`,
+  `n_expected_fail`)** were added as the spec's step 2 suggested ("optional
+  convenience properties"); they are cheap derived reads with no effect on
+  the dataclass's field set (still exactly `tp, fp, tn, fn` per AC1) or its
+  frozen/equality semantics.
