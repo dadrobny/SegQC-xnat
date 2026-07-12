@@ -184,8 +184,17 @@ def test_overall_corpus_sensitivity_is_five_of_eight_not_over_claimed():
 
 #: Increasing crop_depth -> monotonically shrinking retained candidate
 #: volume -> monotonically decreasing DICE-vs-GT, while BorderRule fires
-#: (flags) every degraded candidate regardless of depth.
-_GRADED_CROP_DEPTHS = (1, 4, 8, 12, 16)
+#: (flags) every degraded candidate regardless of depth. Empirically probed
+#: against the single-level (L3-only) ``build_clean_spine`` fixture used
+#: below (target label extent ~24 voxels along the crop axis): depths past
+#: ~10 all crop the level away entirely and plateau at DICE 0.0, so these
+#: five depths are chosen from the pre-saturation range (crop_depth 1..9)
+#: where DICE strictly decreases at every step while BorderRule still fires
+#: for all of them --
+#: dice(1)=0.3673469387755102, dice(3)=0.2978723404255319,
+#: dice(5)=0.2222222222222222, dice(7)=0.13953488372093023,
+#: dice(9)=0.04878048780487805.
+_GRADED_CROP_DEPTHS = (1, 3, 5, 7, 9)
 
 
 def _build_graded_quality_cohort():
