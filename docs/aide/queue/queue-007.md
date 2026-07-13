@@ -1,6 +1,6 @@
 # Seg-QC-xnat — Work Queue 007
 
-> **Status:** Live · **Created:** 2026-07-12
+> **Status:** ✅ Completed — superseded by queue-008 (2026-07-13).
 > Step 4 of the AIDE loop. Derived from [`../vision.md`](../vision.md),
 > [`../roadmap.md`](../roadmap.md), and [`../progress.md`](../progress.md).
 > Follows [`queue-006.md`](queue-006.md) (items 050–057, Stage 7 / Phase 1 — all ✅).
@@ -258,19 +258,23 @@ the intensity path; output is schema-valid and byte-stable across repeated runs.
 
 ---
 
-## Current state (2026-07-12)
+## Current state (2026-07-13)
 
-Freshly generated; supersedes [`queue-006.md`](queue-006.md) (Stage 7 / Phase 1,
-items 050–057, all ✅). This is the **first Phase-2 queue** and opens **Stage 8 —
-Image-Based / Radiomics Features** on top of the complete Phase-1 pipeline. No
-Stage 8 items claimed yet. **058** (intensity-bearing synthetic fixtures) is the
-shared foundation and should merge first; **059** (first-order intensity extractor)
-is the core deliverable; then **060 (PyRadiomics adapter), 061 (report fusion),
-062 (implausible-intensity heuristic), 063 (reference extended with intensity)** are
-parallelisable; **064** (delta-to-reference intensity rule) follows **063**; and
-**065** (integration + acceptance) wires it all into `segqc run` and closes
-Stage 8. This queue landed via a human-reviewed queue PR (the Phase-2 batch
-checkpoint).
+✅ Completed. All items 058–065 merged; **Stage 8 — Image-Based / Radiomics
+Features** is done, closing the first stage of Phase 2. Superseded by
+[`queue-008.md`](queue-008.md) (Stage 9 — Containerisation & XNAT Container
+Service Command).
+
+| Item | Status |
+|---|---|
+| 058 Intensity-bearing synthetic scan fixtures | ✅ done |
+| 059 Per-label first-order intensity feature extractor | ✅ done |
+| 060 Optional PyRadiomics integration | ✅ done |
+| 061 Fuse intensity features into the JSON report | ✅ done |
+| 062 Implausible-intensity heuristic | ✅ done |
+| 063 Extend reference distributions with intensity | ✅ done |
+| 064 Level-aware delta-to-reference intensity rule | ✅ done |
+| 065 Stage 8 integration & acceptance suite | ✅ done |
 
 ## Next Step
 
