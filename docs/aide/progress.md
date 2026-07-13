@@ -274,7 +274,7 @@ uncalibrated.)*
 
 **Deliverables.**
 - ✅ Dockerfile (CPU-only base), pinned deps, bundled/mounted reference data. *(Item 066)*
-- 🚧 XNAT Container Service `command.json` (inputs: session/scan + segmentation; outputs: report resources). *(Item 067)*
+- ✅ XNAT Container Service `command.json` (inputs: session/scan + segmentation; outputs: report resources). *(Item 067)*
 - 📋 Entry script mapping XNAT inputs → CLI → output resources. *(Item 068)*
 - 📋 Local container smoke test + deployment docs. *(Items 069, 070)*
 
