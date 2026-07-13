@@ -56,7 +56,12 @@ if TYPE_CHECKING:
     from segqc.reference.schema import ReferenceDistribution
     from segqc.verdict import Reason
 
-__all__ = ["extract_feature_record", "run_qc", "run_qc_with_reference"]
+__all__ = [
+    "extract_feature_record",
+    "run_qc",
+    "run_qc_with_reference",
+    "run_qc_with_intensity",
+]
 
 
 def extract_feature_record(seg_img: "nib.Nifti1Image", config: "HeuristicConfig") -> dict:
@@ -287,3 +292,156 @@ def run_qc_with_reference(
         findings, config, base_reasons=base_reasons, base_per_label=base_per_label
     )
     return case_result, features_block, reference_delta
+
+
+def run_qc_with_intensity(
+    seg_img: "nib.Nifti1Image",
+    scan_img: "nib.Nifti1Image",
+    config: "HeuristicConfig",
+    *,
+    reference: "Optional[ReferenceDistribution]" = None,
+    base_reasons: Sequence["Reason"] = (),
+    base_per_label: Optional[Mapping[int, Sequence["Reason"]]] = None,
+    enable_pyradiomics: bool = True,
+    stratum: str = "all",
+    lower_pct: float = 1,
+    upper_pct: float = 99,
+) -> Tuple["CaseResult", dict, dict, Optional[dict], Optional[dict]]:
+    """Extract geometric + intensity features, run the Stage 4 rules over the
+    composed record, and aggregate a verdict (item 065).
+
+    An intensity-aware sibling of :func:`run_qc` / :func:`run_qc_with_reference`:
+    composes :func:`extract_feature_record` with item 059/060's per-label
+    intensity/radiomics extraction and item 061's ``image_features`` block
+    assembly, attaching ``image_features`` to the record fed to the rule
+    engine (under ``"image_features"``) so item 062's ``IntensityRule`` can
+    act on it. When a *reference* is supplied, also computes the geometric
+    reference delta (item 046) and the intensity reference delta (item 064),
+    attaching ``"reference"``, ``"reference_delta"``, and
+    ``"intensity_reference_delta"`` to the record so item 047's
+    ``ReferenceDeltaRule`` and item 064's ``IntensityReferenceDeltaRule`` can
+    act on them too.
+
+    ``run_qc``/``run_qc_with_reference`` are not edited: this is a new,
+    additive code path, so their existing call sites and the item-042 golden
+    snapshots stay byte-identical.
+
+    Parameters
+    ----------
+    seg_img:
+        A NiBabel ``Nifti1Image`` carrying an integer instance label map.
+    scan_img:
+        A NiBabel ``Nifti1Image`` carrying scan intensity data, grid-aligned
+        with ``seg_img`` (same shape, compatible affine; item 059's
+        ``_check_alignment`` raises ``ValueError`` otherwise).
+    config:
+        A :class:`~segqc.config.HeuristicConfig`.
+    reference:
+        Optional :class:`~segqc.reference.schema.ReferenceDistribution`. When
+        given, both the geometric and intensity reference deltas are
+        computed and attached; when ``None`` (default), both delta return
+        values are ``None`` and no delta-related key is added to the record.
+    base_reasons:
+        Optional pre-existing case-level reasons, threaded through to
+        ``aggregate.build_case_result``. Not mutated.
+    base_per_label:
+        Optional pre-existing per-vertebra reasons, keyed by integer label.
+        Threaded through to ``aggregate.build_case_result``. Not mutated.
+    enable_pyradiomics:
+        Forwarded to item 060's ``compute_radiomics_features``; when
+        ``False``, forces the builtin (first-order-only) backend even if
+        PyRadiomics happens to be installed.
+    stratum:
+        The reference stratum to compare against (default ``"all"``).
+    lower_pct, upper_pct:
+        The percentile pair defining the reference's in-range band.
+
+    Returns
+    -------
+    tuple[CaseResult, dict, dict, dict | None, dict | None]
+        ``(case_result, features_block, image_features_block, reference_delta,
+        intensity_reference_delta)``. ``features_block`` carries no
+        ``image_features``/``reference``/``reference_delta``/
+        ``intensity_reference_delta`` keys -- those live only on the
+        transient rule-evaluation record. ``image_features_block`` is
+        always populated (``available == True``) when this function
+        succeeds. ``reference_delta``/``intensity_reference_delta`` are
+        ``None`` unless *reference* is given. Deterministic and
+        non-mutating: repeated calls on the same inputs return equal
+        results, and none of ``seg_img``, ``scan_img``, ``config``, nor
+        ``reference`` is modified.
+
+    Raises
+    ------
+    ValueError
+        If ``scan_img`` and ``seg_img`` have mismatched shapes or
+        incompatible affines (beyond tolerance) -- item 059's
+        ``_check_alignment`` guard.
+    """
+    from segqc.aggregate import build_case_result
+    from segqc.feature_report import build_image_features_block
+    from segqc.features.radiomics import compute_radiomics_features
+    from segqc.heuristics import run_rules
+    from segqc.reference import (
+        compute_intensity_reference_delta,
+        compute_reference_delta,
+        reference_delta_to_dict,
+    )
+
+    features_block = extract_feature_record(seg_img, config)
+
+    radiomics = compute_radiomics_features(
+        scan_img, seg_img, enable_pyradiomics=enable_pyradiomics
+    )
+    image_features_block = build_image_features_block(
+        intensity={label: r.first_order for label, r in radiomics.items()},
+        extended={label: r.extended for label, r in radiomics.items()},
+        backend=(
+            "pyradiomics"
+            if any(r.radiomics_available for r in radiomics.values())
+            else "builtin"
+        ),
+        radiomics_available=any(
+            r.radiomics_available for r in radiomics.values()
+        ),
+    )
+
+    rule_record = {**features_block, "image_features": image_features_block}
+
+    reference_delta: Optional[dict] = None
+    intensity_reference_delta: Optional[dict] = None
+    if reference is not None:
+        delta = compute_reference_delta(
+            features_block,
+            reference,
+            stratum=stratum,
+            lower_pct=lower_pct,
+            upper_pct=upper_pct,
+        )
+        reference_delta = reference_delta_to_dict(delta)
+
+        intensity_delta = compute_intensity_reference_delta(
+            features_block,
+            image_features_block,
+            reference,
+            stratum=stratum,
+            lower_pct=lower_pct,
+            upper_pct=upper_pct,
+        )
+        intensity_reference_delta = reference_delta_to_dict(intensity_delta)
+
+        rule_record["reference"] = reference
+        rule_record["reference_delta"] = reference_delta
+        rule_record["intensity_reference_delta"] = intensity_reference_delta
+
+    findings = run_rules(rule_record, config)
+    case_result = build_case_result(
+        findings, config, base_reasons=base_reasons, base_per_label=base_per_label
+    )
+    return (
+        case_result,
+        features_block,
+        image_features_block,
+        reference_delta,
+        intensity_reference_delta,
+    )

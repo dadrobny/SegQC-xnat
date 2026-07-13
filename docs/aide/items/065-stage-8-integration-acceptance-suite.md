@@ -369,4 +369,64 @@ All ✅ in `progress.md`. Direct structural precedent: items 049 and 057
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`run_qc_with_intensity` composes exactly per the spec's pseudocode**:
+  `extract_feature_record` + `compute_radiomics_features` (item 060) +
+  `build_image_features_block` (item 061) always populate `image_features`
+  (`available=True`); when `reference` is passed, both
+  `compute_reference_delta` (item 046) and `compute_intensity_reference_delta`
+  (item 064) are computed and attached to the transient rule record under
+  `"reference"`/`"reference_delta"`/`"intensity_reference_delta"`. The
+  imports for `compute_intensity_reference_delta` were sourced from
+  `segqc.reference` (already re-exported there) rather than
+  `segqc.reference.delta` directly, for consistency with the existing
+  `compute_reference_delta`/`reference_delta_to_dict` imports in
+  `run_qc_with_reference`.
+- **CLI wiring**: `--intensity` (store-true, off by default) combines with
+  the existing `--scan`/`--reference` flags exactly as the Assumptions
+  describe. When intensity mode is enabled, `cfg.intensity_param("radiomics",
+  True)` gates `enable_pyradiomics` (a config-only knob, no new CLI flag —
+  matching the spec's "A config knob... can force-disable it"). A
+  scan/seg grid-alignment `ValueError` (item 059's `_check_alignment`) is
+  caught around the `run_qc_with_intensity` call and reported as a clean
+  `Error: ...` + exit 1, mirroring the existing caller-error handling
+  pattern used for `--config`/`--reference-artifact` failures.
+- **`config.py`**: added `intensity: Dict[str, Any] = field(default_factory=dict)`
+  to `HeuristicConfig`, `"intensity": {}` to `_DEFAULTS`, and an
+  `intensity_param(key, default)` accessor — byte-for-byte mirroring the
+  `reference`/`reference_param` precedent. Left out of
+  `reference/artifact.py::config_hash`'s canonical field list, unchanged.
+- **`default_config.yaml`**: added a comment-only `intensity:` mode block
+  (mirroring the `reference:` block) plus comment-only example
+  `rules.intensity` / `rules.intensity_reference_delta` threshold blocks
+  documenting the item-062/064 code defaults. The parsed `rules`/`verdict`
+  dicts are unchanged; `config_hash(bundled_default_config())` still equals
+  the committed `reference_default.json` provenance hash
+  (`87c73ab35da9707054b300e15664c391ce50851c5d11490c89125381c1c96ac8`),
+  verified directly against the bundled config after these edits.
+- **`human_report.py`**: added an optional `image_features: dict | None = None`
+  parameter to `render_human_report`, delegating to the existing item-061
+  `_render_image_features_section` helper (already used by
+  `render_feature_table`). Default `None` keeps prior output byte-identical.
+- **Known pre-existing test discrepancy (not introduced by this item)**:
+  `tests/test_065_config_intensity.py::test_ac12_load_config_default_path_equals_default_config`
+  asserts `load_config(default_config_path()) == default_config()`. This
+  equality does not hold on `main` independently of item 065's changes:
+  `default_config()` (`HeuristicConfig(**_DEFAULTS)`) has `rules == {}` /
+  `verdict == {}` by design (item 026/034's documented "absent/empty
+  section means built-in defaults via `rule_param`/`policy_param`"
+  contract), whereas `load_config(default_config_path())` parses
+  `default_config.yaml`'s fully-materialised `rules`/`verdict` sections
+  (item 035's "materialises the existing hand-set defaults" design). These
+  two configs are behaviourally equivalent (same effective thresholds via
+  the accessor methods) but not `==`-equal as dataclasses, and this was
+  already true before item 065 touched anything (verified: the `rules`/
+  `verdict` diff between the two configs is identical with or without the
+  `intensity` field addition). This item's own substantive AC12 checks —
+  `set(cfg.rules.keys()) == {seven ids}` and
+  `config_hash(bundled_default_config())` equals the committed
+  `reference_default.json` hash — both pass; only this one orthogonal
+  equality assertion, which predates and is unrelated to the intensity
+  feature, is expected to fail. Flagged for the validator/reviewer rather
+  than silently reconciled, since "fixing" it would require changing
+  `default_config()`'s long-standing empty-`rules`-by-design contract —
+  well outside this item's scope and a explicit non-goal at item 026/034/035.

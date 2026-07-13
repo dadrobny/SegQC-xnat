@@ -86,6 +86,7 @@ def render_human_report(
     case_id: str,
     config: "HeuristicConfig",
     findings: "list | None" = None,
+    image_features: "dict | None" = None,
 ) -> str:
     """Render a human-readable QC report string.
 
@@ -105,6 +106,13 @@ def render_human_report(
         ``to_dict()`` dicts. When ``None`` (default) no "Findings" section is
         rendered, preserving the item-010 report shape exactly. When an empty
         list, a "Findings" section is rendered with a "(none)" body.
+    image_features:
+        Optional Stage 8 ``image_features`` block (item 061/065), as
+        produced by :func:`~segqc.feature_report.build_image_features_block`.
+        When non-``None``, delegates to the existing item-061
+        ``_render_image_features_section`` so an "Intensity features:"
+        section is appended. When ``None`` (default), no section is
+        appended, preserving byte-identical output.
 
     Returns
     -------
@@ -154,6 +162,14 @@ def render_human_report(
     # ------------------------------------------------------------------ #
     if findings is not None:
         lines.extend(_render_findings_section(findings))
+
+    # ------------------------------------------------------------------ #
+    # Intensity features section (item 065) — only rendered when explicitly
+    # supplied, so the omitted-image_features case is byte-for-byte the
+    # pre-item report.
+    # ------------------------------------------------------------------ #
+    if image_features is not None:
+        lines.extend(_render_image_features_section(image_features))
 
     return "\n".join(lines)
 

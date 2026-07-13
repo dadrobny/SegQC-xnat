@@ -157,6 +157,45 @@ rules:
       flag_order_inconsistency: true
       severity: flagged-for-review
 
+  # ------------------------------------------------------------------ #
+  # intensity (item 062) -- implausible-intensity (absolute-band) rule.
+  # Registered enabled-by-default with NO active section here (mirroring
+  # reference_delta's own precedent, item 065's pivotal design decision):
+  # adding an active `rules.intensity` section would change this file's
+  # parsed `rules` dict and hence `config_hash` (item 045 provenance),
+  # staling the committed reference_default.json and breaking item 035's
+  # exact-seven-rule-id test. Values below are DOCUMENTATION ONLY, copied
+  # verbatim from heuristics/intensity.py's code defaults -- uncomment and
+  # adjust to opt a deployment into custom intensity thresholds.
+  #
+  # intensity:
+  #   enabled: true
+  #   params:
+  #     flag_low: true
+  #     flag_high: true
+  #     flag_degenerate: true
+  #     min_plausible_hu: 100.0
+  #     max_plausible_hu: 2000.0
+  #     max_degenerate_std: 1.0
+  #     severity: flagged-for-review
+
+  # ------------------------------------------------------------------ #
+  # intensity_reference_delta (item 064) -- level-aware intensity
+  # delta-to-reference rule. Same section-less-by-design rationale as
+  # `intensity` above (and `reference_delta`) -- documentation only.
+  # Values copied verbatim from heuristics/intensity_reference_delta.py's
+  # code defaults.
+  #
+  # intensity_reference_delta:
+  #   enabled: true
+  #   params:
+  #     flag_out_of_range: true
+  #     flag_robust_z: true
+  #     flag_distribution_distance: true
+  #     max_robust_z: 3.5
+  #     max_distribution_distance: 3.0
+  #     severity: flagged-for-review
+
 # Case-level verdict-aggregation policy (item 034).
 verdict:
   # 0 = escalation disabled -- pure severity dominance, matching the
@@ -177,3 +216,16 @@ verdict:
 #   lower_pct: 1
 #   upper_pct: 99
 #   stratum: all
+
+# Intensity-mode switch (item 065) -- documented here as COMMENTS ONLY, for
+# the same reason as `reference:` above: an active `intensity:` section
+# would change this file's parsed dict and hence
+# `load_config(default_config_path()) == default_config()` (AC12) plus
+# `config_hash`-adjacent expectations, so the code-side defaults are supplied
+# instead via HeuristicConfig.intensity_param(key, default). Uncomment and
+# adjust to opt a deployment into intensity mode without the `--intensity`
+# CLI flag.
+#
+# intensity:
+#   enabled: false   # off by default -- see item 065's Assumptions.
+#   radiomics: true  # PyRadiomics auto-degrades to first-order-only if absent.

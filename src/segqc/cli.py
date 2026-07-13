@@ -109,6 +109,19 @@ def _build_parser() -> argparse.ArgumentParser:
             "artifact (bundled_default_reference()) is used."
         ),
     )
+    run_parser.add_argument(
+        "--intensity",
+        action="store_true",
+        default=False,
+        help=(
+            "Enable intensity mode (item 065): compute per-label first-order "
+            "intensity/radiomics features from --scan and embed an "
+            "image_features block in the report, letting the intensity / "
+            "intensity_reference_delta rules fire. OFF by default -- falls "
+            "back to config intensity.enabled when the flag itself is not "
+            "given."
+        ),
+    )
     run_parser.set_defaults(handler=_handle_run)
 
     build_reference_parser = subparsers.add_parser(
@@ -299,16 +312,22 @@ def _handle_run(args: argparse.Namespace) -> int:
     extracts the Stage 2/3 feature block and runs the Stage 4 rule engine over
     it (:func:`segqc.pipeline.run_qc`), threading the empty-check's reasons in
     as case-level ``base_reasons`` so the aggregated verdict reflects both.
-    Writes a JSON report (:func:`segqc.report.serialize_report_json`,
-    carrying ``features`` + ``findings``) and a human-readable plain-text
-    report (:func:`segqc.human_report.render_human_report`, carrying a
-    Findings section) to ``<out>/segqc_report.json`` and
-    ``<out>/segqc_report.txt`` respectively.
+    When ``--intensity`` (or config ``intensity.enabled``) is set, dispatches
+    to :func:`segqc.pipeline.run_qc_with_intensity` instead (item 065),
+    additionally computing per-label intensity/radiomics features and
+    embedding an ``image_features`` block in both reports. Writes a JSON
+    report (:func:`segqc.report.serialize_report_json`, carrying ``features``
+    + ``findings`` and, in intensity mode, ``image_features``) and a
+    human-readable plain-text report
+    (:func:`segqc.human_report.render_human_report`, carrying a Findings
+    section and, in intensity mode, an Intensity features section) to
+    ``<out>/segqc_report.json`` and ``<out>/segqc_report.txt`` respectively.
 
-    Returns 0 on pass or flagged-for-review; returns 1 on fail or input/config
-    error. Both report files are always written before the process exits on a
-    successful run (even on an aggregated fail); no report is written when the
-    config or input fails to load.
+    Returns 0 on pass or flagged-for-review; returns 1 on fail, input/config
+    error, or (in intensity mode) a scan<->seg grid-alignment error. Both
+    report files are always written before the process exits on a successful
+    run (even on an aggregated fail); no report is written when the config,
+    input, or grid alignment fails.
     """
     # Set up logging first so any subsequent log messages respect the level.
     from segqc._logging import setup_logging  # noqa: PLC0415
@@ -326,7 +345,11 @@ def _handle_run(args: argparse.Namespace) -> int:
     from segqc.verdict import Reason, Severity  # noqa: PLC0415
     from segqc.report import serialize_report_json  # noqa: PLC0415
     from segqc.human_report import render_human_report  # noqa: PLC0415
-    from segqc.pipeline import run_qc, run_qc_with_reference  # noqa: PLC0415
+    from segqc.pipeline import (  # noqa: PLC0415
+        run_qc,
+        run_qc_with_intensity,
+        run_qc_with_reference,
+    )
 
     logger.debug(
         "segqc run: scan=%r  seg=%r  out=%r  config=%r",
@@ -391,6 +414,13 @@ def _handle_run(args: argparse.Namespace) -> int:
     reference_enabled = bool(args.reference) or bool(
         cfg.reference_param("enabled", False)
     )
+    # Intensity mode (item 065) -- OFF by default; enabled via --intensity or
+    # config intensity.enabled.
+    intensity_enabled = bool(args.intensity) or bool(
+        cfg.intensity_param("enabled", False)
+    )
+
+    reference = None
     reference_delta = None
     if reference_enabled:
         from segqc.reference import (  # noqa: PLC0415
@@ -411,10 +441,36 @@ def _handle_run(args: argparse.Namespace) -> int:
             print(f"Error: {exc}", file=sys.stderr)
             return 1
 
-        stratum = cfg.reference_param("stratum", "all")
-        lower_pct = cfg.reference_param("lower_pct", 1)
-        upper_pct = cfg.reference_param("upper_pct", 99)
+    stratum = cfg.reference_param("stratum", "all")
+    lower_pct = cfg.reference_param("lower_pct", 1)
+    upper_pct = cfg.reference_param("upper_pct", 99)
 
+    image_features = None
+    if intensity_enabled:
+        scan_img = nib.Nifti1Image(case.scan.data, case.scan.affine)
+        radiomics_enabled = bool(cfg.intensity_param("radiomics", True))
+        try:
+            (
+                case_result,
+                features_block,
+                image_features,
+                reference_delta,
+                _intensity_reference_delta,
+            ) = run_qc_with_intensity(
+                seg_img,
+                scan_img,
+                cfg,
+                reference=reference,
+                base_reasons=base_reasons,
+                enable_pyradiomics=radiomics_enabled,
+                stratum=stratum,
+                lower_pct=lower_pct,
+                upper_pct=upper_pct,
+            )
+        except ValueError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+    elif reference_enabled:
         case_result, features_block, reference_delta = run_qc_with_reference(
             seg_img,
             cfg,
@@ -450,12 +506,17 @@ def _handle_run(args: argparse.Namespace) -> int:
         features=features_block,
         findings=findings_dicts,
         reference_delta=reference_delta,
+        image_features=image_features,
     )
     json_path = out_path / "segqc_report.json"
     json_path.write_text(json_str, encoding="utf-8")
 
     txt_str = render_human_report(
-        verdict, case_id, cfg, findings=case_result.findings
+        verdict,
+        case_id,
+        cfg,
+        findings=case_result.findings,
+        image_features=image_features,
     )
     txt_path = out_path / "segqc_report.txt"
     txt_path.write_text(txt_str, encoding="utf-8")

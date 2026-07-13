@@ -97,6 +97,13 @@ _DEFAULTS: Dict[str, Any] = {
     # list (see ``reference/artifact.py::config_hash``), so adding this
     # section never changes an artifact's provenance hash.
     "reference": {},
+    # Intensity-mode switch (item 065). Keys are read via ``intensity_param``.
+    # An absent or empty "intensity" section leaves intensity mode disabled
+    # (``enabled`` == False) -- every intensity-less caller and the item-042
+    # goldens are unaffected. Not part of ``config_hash``'s canonical field
+    # list (see ``reference/artifact.py::config_hash``), so adding this
+    # section never changes an artifact's provenance hash.
+    "intensity": {},
 }
 
 
@@ -153,6 +160,11 @@ class HeuristicConfig:
     # Access via reference_param rather than directly. Deliberately excluded
     # from config_hash's canonical field list (reference/artifact.py).
     reference: Dict[str, Any] = field(default_factory=dict)
+    # Intensity-mode config section (item 065). Shape:
+    #   { <key>: <value> }, e.g. {"enabled": True, "radiomics": False}.
+    # Access via intensity_param rather than directly. Deliberately excluded
+    # from config_hash's canonical field list (reference/artifact.py).
+    intensity: Dict[str, Any] = field(default_factory=dict)
 
     # ------------------------------------------------------------------ #
     # Per-rule accessors (item 026)
@@ -262,6 +274,30 @@ class HeuristicConfig:
         Any
         """
         return self.reference.get(key, default)
+
+    # ------------------------------------------------------------------ #
+    # Intensity-mode accessor (item 065)
+    # ------------------------------------------------------------------ #
+
+    def intensity_param(self, key: str, default: Any) -> Any:
+        """Return a single intensity-mode config value, or *default*.
+
+        Convenience accessor: reads ``intensity[key]``; returns *default*
+        when the ``intensity`` section or *key* is absent.
+
+        Parameters
+        ----------
+        key:
+            The intensity-mode parameter name (e.g. ``"enabled"``,
+            ``"radiomics"``).
+        default:
+            Value returned when the key is absent.
+
+        Returns
+        -------
+        Any
+        """
+        return self.intensity.get(key, default)
 
 
 # ---- Public API ------------------------------------------------------------- #
