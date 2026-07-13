@@ -1,0 +1,146 @@
+{
+  "name": "segqc",
+  "label": "SegQC",
+  "description": "Automated quality control for vertebra instance segmentations of spine CT: extracts geometric/topological features from a label map, applies an explainable heuristic rule set, and emits JSON + human-readable QC reports.",
+  "version": "0.0.1",
+  "schema-version": "1.0",
+  "type": "docker",
+  "image": "segqc:latest",
+  "working-directory": "/app",
+  "command-line": "python /app/docker/entrypoint.py --scan-dir /input/scan --seg-dir /input/seg --out-dir /output --config-dir /input/config --reference-dir /input/reference #REFERENCE_FLAG# #INTENSITY_FLAG#",
+  "mounts": [
+    {
+      "name": "scan-in",
+      "writable": false,
+      "path": "/input/scan"
+    },
+    {
+      "name": "seg-in",
+      "writable": false,
+      "path": "/input/seg"
+    },
+    {
+      "name": "config-in",
+      "writable": false,
+      "path": "/input/config",
+      "description": "Optional QC-config YAML override, resolved by the entry script and forwarded to `segqc run --config <file>` when present; the bundled default config is used otherwise."
+    },
+    {
+      "name": "reference-in",
+      "writable": false,
+      "path": "/input/reference",
+      "description": "Optional reference-artifact JSON override, resolved by the entry script and forwarded to `segqc run --reference --reference-artifact <file>` when present."
+    },
+    {
+      "name": "reports-out",
+      "writable": true,
+      "path": "/output"
+    }
+  ],
+  "inputs": [
+    {
+      "name": "reference-mode",
+      "description": "Enable reference-grounded QC checks (segqc run --reference).",
+      "type": "boolean",
+      "required": false,
+      "default-value": "false",
+      "true-value": "--reference",
+      "false-value": "",
+      "replacement-key": "#REFERENCE_FLAG#"
+    },
+    {
+      "name": "intensity-mode",
+      "description": "Enable Stage-8 intensity/radiomics QC checks (segqc run --intensity).",
+      "type": "boolean",
+      "required": false,
+      "default-value": "false",
+      "true-value": "--intensity",
+      "false-value": "",
+      "replacement-key": "#INTENSITY_FLAG#"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "qc-report-json",
+      "description": "Machine-readable QC report (segqc_report.json).",
+      "mount": "reports-out",
+      "path": "segqc_report.json",
+      "glob": "segqc_report.json",
+      "required": true
+    },
+    {
+      "name": "qc-report-human",
+      "description": "Human-readable QC report (segqc_report.txt).",
+      "mount": "reports-out",
+      "path": "segqc_report.txt",
+      "glob": "segqc_report.txt",
+      "required": true
+    }
+  ],
+  "xnat": [
+    {
+      "name": "segqc-session",
+      "label": "SegQC vertebra segmentation QC",
+      "description": "Runs SegQC against a session's scan and segmentation resources and writes back QC report resources.",
+      "contexts": ["xnat:imageSessionData"],
+      "external-inputs": [
+        {
+          "name": "session",
+          "description": "Imaging session providing the scan and segmentation resources to QC.",
+          "type": "Session",
+          "required": true
+        }
+      ],
+      "derived-inputs": [
+        {
+          "name": "scan-resource",
+          "description": "Scan (image) resource on the session, mounted read-only at /input/scan.",
+          "type": "Resource",
+          "derived-from-wrapper-input": "session",
+          "required": true,
+          "provides-files-for-command-mount": "scan-in"
+        },
+        {
+          "name": "seg-resource",
+          "description": "Segmentation label-map resource on the session, mounted read-only at /input/seg.",
+          "type": "Resource",
+          "derived-from-wrapper-input": "session",
+          "required": true,
+          "provides-files-for-command-mount": "seg-in"
+        },
+        {
+          "name": "config-resource",
+          "description": "Optional QC-config YAML resource on the session, mounted read-only at /input/config; maps to segqc run --config.",
+          "type": "Resource",
+          "derived-from-wrapper-input": "session",
+          "required": false,
+          "provides-files-for-command-mount": "config-in"
+        },
+        {
+          "name": "reference-resource",
+          "description": "Optional reference-artifact JSON resource on the session, mounted read-only at /input/reference; maps to segqc run --reference-artifact.",
+          "type": "Resource",
+          "derived-from-wrapper-input": "session",
+          "required": false,
+          "provides-files-for-command-mount": "reference-in"
+        }
+      ],
+      "output-handlers": [
+        {
+          "name": "qc-report-json-handler",
+          "accepts-command-output": "qc-report-json",
+          "as-a-child-of": "session",
+          "type": "Resource",
+          "label": "SEGQC"
+        },
+        {
+          "name": "qc-report-human-handler",
+          "accepts-command-output": "qc-report-human",
+          "as-a-child-of": "session",
+          "type": "Resource",
+          "label": "SEGQC"
+        }
+      ]
+    }
+  ]
+}

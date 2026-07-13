@@ -351,4 +351,52 @@ Stage-9 acceptance closure) all build on this command.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Schema shape used.** `command.json` at repo root with the pinned top-level
+  keys (`name`, `label`, `description`, `version` mirroring
+  `segqc.__version__` = `"0.0.1"`, `schema-version` `"1.0"`, `type` `"docker"`,
+  `image` `"segqc:latest"`, `working-directory` `"/app"`, `command-line`,
+  `mounts`, `inputs`, `outputs`, `xnat`) — exactly the shape sketched in
+  Implementation Steps, no deviation.
+
+- **Mounts.** Five mounts: `scan-in` (`/input/scan`, ro), `seg-in`
+  (`/input/seg`, ro), `config-in` (`/input/config`, ro, `description`
+  documents the `--config` mapping for AC18), `reference-in`
+  (`/input/reference`, ro, `description` documents `--reference-artifact`),
+  `reports-out` (`/output`, `writable: true`).
+
+- **`command-line`.** Exactly the pinned form from Assumptions:
+  `python /app/docker/entrypoint.py --scan-dir /input/scan --seg-dir /input/seg
+  --out-dir /output --config-dir /input/config --reference-dir /input/reference
+  #REFERENCE_FLAG# #INTENSITY_FLAG#`.
+
+- **Inputs.** `reference-mode` and `intensity-mode`, both `type: "boolean"`,
+  `required: false`, `default-value: "false"`, `true-value` `--reference` /
+  `--intensity`, `false-value: ""`, `replacement-key` `#REFERENCE_FLAG#` /
+  `#INTENSITY_FLAG#` — matching AC16/AC17 exactly.
+
+- **Outputs.** `qc-report-json` and `qc-report-human`, both `mount:
+  "reports-out"`, with both `path` and `glob` set to the literal filename
+  (`segqc_report.json` / `segqc_report.txt`) so either lookup convention
+  resolves.
+
+- **`xnat` wrapper.** One wrapper (`segqc-session`) with `contexts:
+  ["xnat:imageSessionData"]`; a `Session`-typed `external-input` (AC19); four
+  `derived-inputs` of `type: "Resource"` derived from the session input, each
+  setting `provides-files-for-command-mount` to `scan-in` / `seg-in` /
+  `config-in` / `reference-in` respectively (AC20 covers scan+seg; config/
+  reference derived-inputs are `required: false` and additionally keep those
+  two mounts non-orphan even though they're already referenced via
+  `command-line` path tokens). Two `output-handlers`
+  (`qc-report-json-handler`, `qc-report-human-handler`), each
+  `accepts-command-output` naming the matching output, `as-a-child-of:
+  "session"`, `type: "Resource"`, `label: "SEGQC"` (both reports land in one
+  XNAT resource named `SEGQC` on the session) — satisfies AC21.
+
+- **No deviations from the pinned mount/argument contract.** The
+  `command-line`, mount paths, and replacement keys match the Assumptions
+  section verbatim, so item 068's entry script can implement against this
+  file without any renegotiation.
+
+- **Not implemented here (by design).** No `docker/entrypoint.py`, no
+  Dockerfile change, no deployment docs — those remain items 068/070 per
+  scope.
