@@ -33,7 +33,7 @@
 | 6 | VerSe Reference Distributions & Delta Rules | G3 | ✅ |
 | 7 | Evaluation, Calibration & Metrics *(Phase 1 complete)* | G3, G7 | ✅ |
 | 8 | Image-Based / Radiomics Features | (Phase 2) | ✅ |
-| 9 | Containerisation & XNAT Command | G5 | 📋 |
+| 9 | Containerisation & XNAT Command | G5 | 🚧 |
 | 10 | Portable Compute: GPU Acceleration Path | G6 | 📋 |
 | 11 | Extensibility & Abnormality Classification Arm | G8 | 📋 |
 
@@ -45,7 +45,7 @@
 | G2 Detect catalogued failure modes (§6) | Stages 4, 5 | ✅ |
 | G3 Distinguish failure from variation | Stages 6, 7 | ✅ |
 | G4 Per-case QC report (JSON + human) | Stage 1 (ext. 2–4) | ✅ |
-| G5 Deploy on XNAT *(deferred)* | Stage 9 | 📋 |
+| G5 Deploy on XNAT *(deferred)* | Stage 9 | 🚧 |
 | G6 Portable / GPU *(deferred)* | Stage 10 | 📋 |
 | G7 Evaluable & regression-testable | Stages 5, 7 | ✅ |
 | G8 Extensible / classification *(deferred)* | Stage 11 | 📋 |
@@ -268,12 +268,12 @@ uncalibrated.)*
 
 ---
 
-## Stage 9 — Containerisation & XNAT Container Service Command (G5) — 📋
+## Stage 9 — Containerisation & XNAT Container Service Command (G5) — 🚧
 
 **Goal.** Package the completed pipeline as a Docker image with an XNAT command.
 
 **Deliverables.**
-- 📋 Dockerfile (CPU-only base), pinned deps, bundled/mounted reference data. *(Item 066)*
+- 🚧 Dockerfile (CPU-only base), pinned deps, bundled/mounted reference data. *(Item 066)*
 - 📋 XNAT Container Service `command.json` (inputs: session/scan + segmentation; outputs: report resources). *(Item 067)*
 - 📋 Entry script mapping XNAT inputs → CLI → output resources. *(Item 068)*
 - 📋 Local container smoke test + deployment docs. *(Items 069, 070)*
