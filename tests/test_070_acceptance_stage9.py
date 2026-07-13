@@ -57,10 +57,7 @@ MOUNT_PATH_TOKEN_RE = re.compile(r"/input/[A-Za-z0-9_-]+|/output(?![A-Za-z0-9_-]
 # The roadmap's literal Stage-9 acceptance sentence (roadmap.md, Stage 9 ->
 # "Validation / acceptance", verbatim minus the trailing "(G5)" objective
 # tag). AC11 requires this exact sentence be traceable in this closer module.
-STAGE9_ACCEPTANCE_SENTENCE = (
-    "Container runs the pipeline on a mounted case, producing JSON + human report; "
-    "`command.json` validates; install steps documented"
-)
+STAGE9_ACCEPTANCE_SENTENCE = "Container runs the pipeline on a mounted case, producing JSON + human report; `command.json` validates; install steps documented"
 
 
 # =========================================================================== #
