@@ -289,13 +289,15 @@ uncalibrated.)*
 **Goal.** Optional GPU acceleration equivalent to the CPU path; GPU never required.
 
 **Deliverables.**
-- 📋 Runtime backend selection (CuPy/cuCIM when present, NumPy/SciPy fallback).
-- 📋 Equivalence tests: CPU vs GPU produce identical verdicts.
-- 📋 Performance benchmark.
+- 📋 Runtime backend selection (CuPy/cuCIM when present, NumPy/SciPy fallback). *(Item 071)*
+- 📋 Backend-aware feature extraction (Stage 2/3 geometric/topological compute routed through the abstraction). *(Item 072)*
+- 📋 Equivalence tests: CPU vs GPU produce identical verdicts. *(Item 073)*
+- 📋 Performance benchmark. *(Item 074)*
+- 📋 CLI/pipeline integration + Stage-10 acceptance closure. *(Item 075)*
 
 **Acceptance.**
-- [ ] GPU path optional + auto-detected; CPU/GPU verdict-equivalence tests pass.
-- [ ] The tool runs fully CPU-only (**G6**).
+- [ ] GPU path optional + auto-detected; CPU/GPU verdict-equivalence tests pass. *(Item 075)*
+- [ ] The tool runs fully CPU-only (**G6**). *(Item 075)*
 
 ---
 
