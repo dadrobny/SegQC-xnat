@@ -10,11 +10,13 @@ from .aggregate import aggregate_reference
 from .delta import (
     DEFAULT_LOWER_PCT,
     DEFAULT_UPPER_PCT,
+    INTENSITY_FEATURE_PREFIX,
     IQR_TO_SIGMA,
     REFERENCE_DELTA_VERSION,
     FeatureDelta,
     LabelDelta,
     ReferenceDelta,
+    compute_intensity_reference_delta,
     compute_reference_delta,
     reference_delta_to_dict,
 )
@@ -95,9 +97,11 @@ __all__ = [
     "DEFAULT_LOWER_PCT",
     "DEFAULT_UPPER_PCT",
     "IQR_TO_SIGMA",
+    "INTENSITY_FEATURE_PREFIX",
     "FeatureDelta",
     "LabelDelta",
     "ReferenceDelta",
     "compute_reference_delta",
+    "compute_intensity_reference_delta",
     "reference_delta_to_dict",
 ]

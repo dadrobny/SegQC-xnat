@@ -37,6 +37,7 @@ import -- only ``math``/builtins are used for the statistics.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping as MappingABC
 from dataclasses import dataclass
 from typing import Mapping, Optional, Tuple
 
@@ -48,10 +49,12 @@ __all__ = [
     "DEFAULT_LOWER_PCT",
     "DEFAULT_UPPER_PCT",
     "IQR_TO_SIGMA",
+    "INTENSITY_FEATURE_PREFIX",
     "FeatureDelta",
     "LabelDelta",
     "ReferenceDelta",
     "compute_reference_delta",
+    "compute_intensity_reference_delta",
     "reference_delta_to_dict",
 ]
 
@@ -73,6 +76,12 @@ _GEOMETRY_FEATURES: Tuple[str, ...] = tuple(
     name for name in INGESTED_FEATURES if name != "spline_offset_mm"
 )
 _SPLINE_OFFSET_FEATURE = "spline_offset_mm"
+
+# Prefix marking the tracked-intensity feature vocabulary in a reference's
+# ``features`` tuple (item 063's ``INGESTED_INTENSITY_FEATURES`` convention),
+# e.g. ``"intensity_median"`` -> case value at ``first_order["median"]``
+# (item 064).
+INTENSITY_FEATURE_PREFIX = "intensity_"
 
 
 @dataclass(frozen=True)
@@ -208,6 +217,31 @@ def _distribution_distance(feature_deltas: Tuple[FeatureDelta, ...]) -> Optional
     return math.sqrt(sum(rz * rz for rz in robust_zs) / len(robust_zs))
 
 
+def _intensity_case_values(image_entry: Mapping, tracked_intensity: Tuple[str, ...]) -> dict:
+    """Extract the tracked ``intensity_*`` values present for one label's
+    ``image_features`` per-label entry (item 064).
+
+    Reads ``image_entry["first_order"]`` and, for each ``tracked_intensity``
+    name (``"intensity_<stat>"``), looks up ``first_order["<stat>"]`` (the
+    ``intensity_`` prefix stripped). A missing or ``None`` value is skipped —
+    never inserted as ``None``. Never mutates ``image_entry``.
+    """
+
+    if not isinstance(image_entry, MappingABC):
+        return {}
+    first_order = image_entry.get("first_order")
+    if not isinstance(first_order, MappingABC):
+        return {}
+
+    values = {}
+    for feature_name in tracked_intensity:
+        stat = feature_name[len(INTENSITY_FEATURE_PREFIX):]
+        value = first_order.get(stat)
+        if value is not None:
+            values[feature_name] = value
+    return values
+
+
 # --------------------------------------------------------------------------- #
 # Public API
 # --------------------------------------------------------------------------- #
@@ -281,6 +315,144 @@ def compute_reference_delta(
 
         feature_deltas = []
         for feature_name in tracked_features:
+            if feature_name not in case_values:
+                continue
+            stats = level_dist.feature_stats.get(feature_name)
+            if stats is None:
+                continue
+            feature_deltas.append(
+                _feature_delta(
+                    feature_name,
+                    case_values[feature_name],
+                    stats,
+                    lower_pct=lower_pct,
+                    upper_pct=upper_pct,
+                    percentile_order=percentile_order,
+                )
+            )
+        feature_deltas = tuple(feature_deltas)
+
+        out_of_range_features = tuple(
+            sorted(fd.feature for fd in feature_deltas if fd.out_of_range)
+        )
+
+        per_label[label] = LabelDelta(
+            label=label,
+            level_name=level_name,
+            stratum=stratum,
+            available=True,
+            features=feature_deltas,
+            distribution_distance=_distribution_distance(feature_deltas),
+            out_of_range_features=out_of_range_features,
+        )
+
+    return ReferenceDelta(
+        reference_delta_version=REFERENCE_DELTA_VERSION,
+        reference_schema_version=reference.schema_version,
+        reference_source=reference.provenance.source,
+        stratum=stratum,
+        lower_pct=lower_pct,
+        upper_pct=upper_pct,
+        per_label=per_label,
+    )
+
+
+def compute_intensity_reference_delta(
+    features_block: Mapping,
+    image_features: Mapping,
+    reference: ReferenceDistribution,
+    *,
+    stratum: str = ALL_STRATUM,
+    lower_pct: int = DEFAULT_LOWER_PCT,
+    upper_pct: int = DEFAULT_UPPER_PCT,
+) -> ReferenceDelta:
+    """Compute per-label delta-to-reference metrics for the intensity feature
+    family (item 064) -- a sibling of :func:`compute_reference_delta`.
+
+    For each label in ``features_block["per_label"]`` (the geometric block,
+    used purely as the authoritative label -> ``level_name`` join surface),
+    looks up its level's ``FeatureStats`` in ``reference`` (for ``stratum``)
+    and scores the case's intensity values -- drawn from
+    ``image_features["per_label"][str(label)]["first_order"]`` (item 061's
+    shape) -- against the ``intensity_``-prefixed subset of
+    ``reference.features``. Reuses :func:`_feature_delta` (and hence the
+    same z / robust-z / percentile-rank / out-of-range / distribution-distance
+    mechanics item 046 uses for geometry).
+
+    A label whose level (or requested stratum) is absent from ``reference``
+    yields an ``available=False`` :class:`LabelDelta` rather than raising. A
+    reference carrying no ``intensity_*`` distributions yields zero
+    ``FeatureDelta``s for every available label (backward compatibility with
+    pre-063 references). An absent, non-mapping, or ``available: false``
+    ``image_features`` block yields zero intensity scores for every label,
+    without raising. A missing/``None`` first-order value simply omits that
+    feature (never scored as ``None``).
+
+    This function does not modify :func:`compute_reference_delta`, which
+    stays intensity-inert and byte-identical.
+
+    Pure: no file I/O, no wall-clock reads; none of ``features_block``,
+    ``image_features``, or ``reference`` is mutated.
+
+    Raises
+    ------
+    ValueError
+        If ``lower_pct`` or ``upper_pct`` is not a percentile stored in
+        ``reference.percentiles``.
+    """
+
+    if lower_pct not in reference.percentiles:
+        raise ValueError(
+            f"lower_pct={lower_pct!r} is not in reference.percentiles={reference.percentiles!r}"
+        )
+    if upper_pct not in reference.percentiles:
+        raise ValueError(
+            f"upper_pct={upper_pct!r} is not in reference.percentiles={reference.percentiles!r}"
+        )
+
+    percentile_order = tuple(sorted(reference.percentiles))
+    tracked_intensity = tuple(
+        sorted(name for name in reference.features if name.startswith(INTENSITY_FEATURE_PREFIX))
+    )
+
+    image_by_label: dict = {}
+    if (
+        isinstance(image_features, MappingABC)
+        and image_features.get("available")
+        and isinstance(image_features.get("per_label"), MappingABC)
+    ):
+        for label_key, image_entry in image_features["per_label"].items():
+            if not isinstance(image_entry, MappingABC):
+                continue
+            try:
+                image_label = int(image_entry.get("label", label_key))
+            except (TypeError, ValueError):
+                continue
+            image_by_label[image_label] = image_entry
+
+    per_label = {}
+    for _label_str, entry in features_block.get("per_label", {}).items():
+        label = int(entry["label"])
+        level_name = entry["level_name"]
+
+        level_strata = reference.levels.get(level_name)
+        if level_strata is None or stratum not in level_strata:
+            per_label[label] = LabelDelta(
+                label=label,
+                level_name=level_name,
+                stratum=stratum,
+                available=False,
+                features=(),
+                distribution_distance=None,
+                out_of_range_features=(),
+            )
+            continue
+
+        level_dist = level_strata[stratum]
+        case_values = _intensity_case_values(image_by_label.get(label, {}), tracked_intensity)
+
+        feature_deltas = []
+        for feature_name in tracked_intensity:
             if feature_name not in case_values:
                 continue
             stats = level_dist.feature_stats.get(feature_name)

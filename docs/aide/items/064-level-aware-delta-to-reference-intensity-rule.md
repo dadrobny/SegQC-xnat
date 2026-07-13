@@ -624,4 +624,37 @@ Intended code path (all under `source_dir = src/segqc`): edit
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implementation followed the spec's Public Interface and Implementation Steps
+without deviation. Notes:
+
+- `compute_intensity_reference_delta` was inserted directly after
+  `compute_reference_delta` in `src/segqc/reference/delta.py` (before the
+  `_feature_delta_to_dict`/`reference_delta_to_dict` serialisers), and its
+  private helper `_intensity_case_values` was inserted directly after
+  `_distribution_distance`, keeping every existing line of
+  `compute_reference_delta` and its neighbouring helpers byte-identical
+  (AC1). Used `collections.abc.Mapping` (aliased `MappingABC`) for the
+  `isinstance` mapping checks needed to validate `image_features` (the
+  module already imports `typing.Mapping` only for annotations).
+- `INTENSITY_FEATURE_PREFIX` and `compute_intensity_reference_delta` are
+  exported from both `segqc.reference.delta.__all__` and
+  `segqc.reference.__all__` (re-exported at the package level), mirroring
+  how `compute_reference_delta` is already re-exported; the tests import
+  `compute_intensity_reference_delta`/`INTENSITY_FEATURE_PREFIX` from
+  `segqc.reference.delta` directly, so the package-level re-export is an
+  additive convenience, not load-bearing for the committed tests.
+- `image_by_label` is built by reading each `image_features["per_label"]`
+  entry's own `"label"` field (falling back to the dict key) exactly as
+  `compute_reference_delta` does for the geometric `features_block`,
+  keeping the two compute functions' label-parsing defensiveness
+  consistent.
+- `heuristics/intensity_reference_delta.py` is a structural copy of
+  `heuristics/reference_delta.py` (item 047) with the `rule_id`, the three
+  reason tags, the record key (`intensity_reference_delta`), and the
+  severity-error message renamed; no other behavioural change. Registered
+  via one import line in `src/segqc/heuristics/__init__.py` immediately
+  after item 062's `intensity` import.
+- `src/segqc/default_config.yaml` was left untouched, as scoped; verified
+  via `bundled_default_config()`/rule-registry smoke import that the rule
+  registers as the tenth rule id and is enabled by the absent-section
+  `rule_enabled` fallback.

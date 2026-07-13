@@ -79,6 +79,7 @@ from segqc.heuristics import overlap  # noqa: F401 — registers OverlapRule (it
 from segqc.heuristics import mislabel  # noqa: F401 — registers MislabelRule (item 033)
 from segqc.heuristics import reference_delta  # noqa: F401 — registers ReferenceDeltaRule (item 047)
 from segqc.heuristics import intensity  # noqa: F401 — registers IntensityRule (item 062)
+from segqc.heuristics import intensity_reference_delta  # noqa: F401 — registers IntensityReferenceDeltaRule (item 064)
 
 __all__ = [
     "Finding",
