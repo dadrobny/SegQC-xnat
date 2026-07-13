@@ -283,4 +283,66 @@ realised and kept robust._
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **No production/Dockerfile/command.json/entrypoint code change needed.**
+  Verified by static/manual trace (Docker CLI/daemon is unavailable in this
+  execution environment, so `docker build`/`docker run` could not be exercised
+  directly) that `Dockerfile`, `command.json`, and `docker/entrypoint.py`
+  already satisfy every AC the committed `tests/test_069_container_smoke.py`
+  exercises:
+  - **Mount paths.** `command.json`'s `mounts` (`/input/scan`, `/input/seg`,
+    `/input/config`, `/input/reference`, `/output`) match the test's
+    `-v <dir>:/input/scan:ro` / `:/input/seg:ro` / `:/input/reference:ro` /
+    `:/output` bind-mount targets exactly (AC4, AC9).
+  - **CLI args.** `command.json`'s `command-line` template
+    (`--scan-dir --seg-dir --out-dir --config-dir --reference-dir
+    #REFERENCE_FLAG# #INTENSITY_FLAG#`) matches `docker/entrypoint.py`'s
+    `argparse` surface 1:1 (`--scan-dir`/`--seg-dir`/`--out-dir` required;
+    `--config-dir`/`--reference-dir` optional; `--reference`/`--intensity`
+    boolean toggles); the smoke test's `entry_args` lists
+    (`--scan-dir --seg-dir --out-dir` for the happy/failure paths, plus
+    `--reference-dir --reference` for AC9) are a valid subset since the
+    optional flags default to `None`/`False`. `entrypoint.py`'s
+    `build_run_argv` in turn emits `segqc run` argv
+    (`--scan --seg --out [--config] [--reference] [--reference-artifact]
+    [--intensity]`) that matches `segqc.cli`'s actual `run` subparser flags
+    (`--config`, `--reference`, `--reference-artifact`, `--intensity` all
+    confirmed present in `src/segqc/cli.py`).
+  - **Output filenames.** `segqc.cli` writes `<out>/segqc_report.json` and
+    `<out>/segqc_report.txt` (confirmed at `src/segqc/cli.py:511,521`),
+    matching AC5/AC6/AC9's exact filename assertions and `command.json`'s
+    `outputs[].path`/`glob` (`segqc_report.json`, `segqc_report.txt`).
+  - **Schema fields.** `src/segqc/report_schema_v0.json` requires
+    `schema_version` (`const: "0.1"`), `case_id` (non-empty string), and
+    `verdict` (`enum: ["pass","flagged-for-review","fail"]`) — matching AC8's
+    assertions verbatim — and defines an optional top-level `reference_delta`
+    block, matching AC9's `"reference_delta" in report` check.
+  - **Failure path.** `docker/entrypoint.py`'s `resolve_required_nifti` raises
+    `EntryScriptError` for an empty/non-NIfTI scan dir *before*
+    `segqc.cli.main` is ever invoked; `main()` catches it, prints a single
+    `Error: ...` line to stderr, and returns 1 — never a traceback, never a
+    partial `segqc_report.*` write — matching AC10-AC12 exactly.
+  - **Shared conftest fixtures (AC1-AC3).** The `_docker_available()` helper,
+    `requires_docker` marker, and session-scoped `docker_image_tag` build
+    fixture were already promoted into `tests/conftest.py` (item 069's own
+    conftest refactor, done by the test-writer per the spec's Implementation
+    Step 1) and `tests/test_066_dockerfile.py` already consumes them via
+    `from conftest import requires_docker` with no local duplicate
+    definitions remaining — one `segqc:test-066` build shared by both
+    modules.
+  - **Fixtures.** All three referenced fixtures exist and are the sizes the
+    spec's Assumptions describe:
+    `tests/corpus/fixtures/base_scan.nii.gz`,
+    `tests/corpus/fixtures/clean_control_seg.nii.gz`,
+    `src/segqc/reference/reference_default.json`.
+  - **Output-dir writability.** The image's non-root `segqc` user (Dockerfile
+    `USER segqc`) can write into the bind-mounted `/output` because the test's
+    `_stage_output_dir` chmods the host dir `0o777` before mounting, matching
+    the spec's Assumption.
+  No fix was made to `Dockerfile`, `command.json`, or `docker/entrypoint.py`
+  — this item confirms items 066/067/068's contract holds end-to-end rather
+  than changing it. Docker itself was unavailable in this execution
+  environment (no `docker` CLI on PATH), so AC4-AC12 could not be exercised
+  against a live daemon here; the trace above is a manual/static
+  cross-check of mount paths, filenames, CLI args, and schema fields across
+  all four files plus `segqc.cli.py`. A CI/host with Docker available should
+  still run the module to get the live `docker run` confirmation.
