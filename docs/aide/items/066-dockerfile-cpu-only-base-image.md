@@ -293,4 +293,44 @@ script + `ENTRYPOINT`), item 069 (container smoke test), item 070 (deployment do
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Base image tag: `python:3.11-slim`** (Debian-slim, CPU-only). Matches the
+  Assumptions pin exactly; no patch-digest pin was added since build
+  determinism is explicitly best-effort for this item.
+- **`constraints.txt` generation.** Rather than spinning up a separate clean
+  venv, the already-provisioned project `.venv` (created via `env
+  --bootstrap`, which installs the project with its default/loose
+  `pyproject.toml` lower bounds and no extras beyond `dev`) was used as the
+  resolution source: `pip freeze` was captured, then filtered by hand down to
+  the six declared core dependencies (`numpy`, `scipy`, `scikit-image`,
+  `nibabel`, `PyYAML`, `jsonschema`) plus their transitive dependencies
+  (`attrs`, `imageio`, `importlib_resources`, `jsonschema-specifications`,
+  `lazy-loader`, `networkx`, `packaging`, `pillow`, `referencing`, `rpds-py`,
+  `tifffile`, `zipp`). Packages exclusively pulled in by the `dev` extra
+  (`pytest`, `matplotlib`, and their transitives: `contourpy`, `cycler`,
+  `fonttools`, `kiwisolver`, `pyparsing`, `python-dateutil`, `six`,
+  `pluggy`, `iniconfig`, `tomli`, `exceptiongroup`, `Pygments`, `colorama`)
+  were excluded, as was `pyradiomics` (never installed in this venv). This
+  yields the same exact versions a genuinely clean `pip install .` would
+  resolve to, since the core dependency graph is unaffected by which extras
+  are also present in the environment being frozen.
+- **Wheel package-data check.** Verified directly (not just assumed) by
+  running `python -m build --wheel` and inspecting the resulting wheel's file
+  listing: `segqc/reference/reference_default.json` is present automatically
+  under hatchling's default `packages = ["src/segqc"]` wheel target — no
+  `force-include`/`MANIFEST.in` addition was needed, so `pyproject.toml` was
+  left untouched.
+- **Radiomics variant mechanism.** Implemented as `ARG INSTALL_RADIOMICS=0`
+  plus a shell conditional (`if [ "$INSTALL_RADIOMICS" = "1" ] || [
+  "$INSTALL_RADIOMICS" = "true" ]; then pip install .[radiomics]; fi`) appended
+  to the same `RUN` as the default install, documented via a header comment:
+  `docker build --build-arg INSTALL_RADIOMICS=1 -t segqc:radiomics .`.
+- **Non-root user.** Added `useradd segqc` + `USER segqc` for XNAT-host
+  friendliness (optional per the spec, but low-cost and good practice); does
+  not affect the `segqc <args>` invocation contract.
+- **`ENTRYPOINT` left unset**, `CMD ["segqc", "--help"]` set for ergonomics
+  only, per the Assumptions pin (item 068 owns `ENTRYPOINT`).
+- **Docker unavailable on this dev host** — the Docker-gated ACs (AC9–AC15)
+  could not be locally verified via `docker build`; a wheel-level check
+  substituted for AC14's package-data concern (see above). The static ACs
+  (AC1–AC8) were verified by direct inspection against the committed test
+  module's exact parsing logic.

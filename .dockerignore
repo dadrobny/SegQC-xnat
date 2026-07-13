@@ -1,0 +1,25 @@
+# .dockerignore — keep the Docker build context lean (item 066, AC8).
+
+.git
+.gitattributes
+.gitignore
+
+.venv
+.venv-*
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+
+docs/aide/status
+docs/aide/permissions
+
+.claude/settings.local.json
+
+*.log
+.DS_Store
