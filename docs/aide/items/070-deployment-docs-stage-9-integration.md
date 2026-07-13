@@ -316,4 +316,37 @@ progress-reconciliation-without-`roadmap.md` pattern: items 049, 057, 065.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Doc location confirmed at `docs/deployment.md`** per the Assumptions
+  (top-level, siblings the future human docs, discoverable from the repo
+  root). No `docker/README.md` variant was written.
+- **Structure follows the Implementation Steps verbatim**: Overview/
+  prerequisites, then five numbered sections — (1) Build the image, (2)
+  Install `command.json` on an XNAT server, (3) Configure inputs on a
+  session, (4) Local verification, (5) Troubleshooting — plus a closing
+  pointer back to §4 for troubleshooting-by-reproduction.
+- **All concrete values (build command, `INSTALL_RADIOMICS` ARG, mount
+  paths `/input/{scan,seg,config,reference}`/`/output`, report filenames
+  `segqc_report.json`/`segqc_report.txt`, entry-script invocation
+  `python /app/docker/entrypoint.py --scan-dir ... --seg-dir ... --out-dir
+  ...`, boolean inputs `reference-mode`/`intensity-mode` and their
+  `--reference`/`--intensity` flags, output resource label `SEGQC`) were
+  copied verbatim from the merged `Dockerfile`, `command.json`, and
+  `docker/entrypoint.py` — none invented.
+- **§2 (install on XNAT) links the official XNAT Container Service docs**
+  at `https://wiki.xnat.org/container-service/building-docker-images-for-container-service`,
+  satisfying AC3's `wiki.xnat.org` requirement; the exact admin-UI
+  click-path is described at the level of the panel names (Administer →
+  Plugin Settings → Images and Commands) since the precise UI varies by
+  XNAT version — the linked official doc is the authoritative source.
+- **Troubleshooting table (§5)** enumerates all four item-068 failure modes
+  named in the Implementation Steps — missing/empty mount, ambiguous
+  (multiple-NIfTI) mount, non-NIfTI input, and scan/seg grid mismatch —
+  each with symptom and fix, and states the `Error: ...` / non-zero-exit /
+  no-traceback / no-partial-report convention both in prose and per row.
+- **No `README.md` cross-link was added.** The existing root `README.md`'s
+  "Development setup"/"Testing" sections are narrowly scoped to the local
+  dev workflow and don't yet have a deployment/usage section to hang a
+  one-line link off of without either inventing a new heading or touching
+  unrelated content; per the Implementation Steps this cross-link is
+  explicitly optional and skippable "if it risks touching unrelated README
+  content," so it was skipped rather than force-fit.
