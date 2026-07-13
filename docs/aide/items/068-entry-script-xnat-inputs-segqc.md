@@ -366,4 +366,52 @@ this script.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Structure matches the Implementation Steps exactly.** `docker/entrypoint.py`
+  defines `EntryScriptError`, `_build_parser`, `resolve_required_nifti`,
+  `resolve_optional_file`, `build_run_argv`, and `main`, in that order, plus a
+  small private helper `_matches_any_pattern(name, patterns)` (case-insensitive
+  suffix match shared by both resolvers) and a module constant
+  `_NIFTI_PATTERNS = ("*.nii", "*.nii.gz")` used by `resolve_required_nifti`.
+  `resolve_optional_file` takes the caller-supplied `patterns` argument
+  directly (`("*.yaml", "*.yml")` for config, `("*.json",)` for reference), so
+  the pattern set lives at the call site in `main`, matching the spec's
+  signature `resolve_optional_file(dir_path, patterns, role)`.
+
+- **`segqc.cli.main` resolved at call time.** `main()` does a local
+  `import segqc.cli` followed by `segqc.cli.main(run_argv)` *inside* the
+  function body (not a module-level `from segqc.cli import main as ...`
+  binding), so `monkeypatch.setattr("segqc.cli.main", spy)` in the test suite
+  is observed correctly (AC13, the invocation-mechanism tests).
+
+- **Resolution happens strictly before any `segqc.cli.main` call.** `main`
+  first resolves scan/seg (required) and config/reference (optional) inside a
+  single `try/except EntryScriptError` block; only once all four resolutions
+  succeed does it build the argv and invoke `segqc.cli.main`. This guarantees
+  AC21 (no report written on an entry-script input error) unconditionally —
+  there is no code path where `segqc.cli.main` is reached after a resolution
+  failure.
+
+- **Outer `try/except Exception` around the `segqc.cli.main` call is a safety
+  net, not the primary error path.** `segqc.cli._handle_run` already converts
+  its own realistic failure modes (bad input, bad config, alignment errors)
+  into `Error:` + return `1` without raising, so this outer handler only
+  fires for a genuinely unexpected exception (exercised by the adversarial
+  "unexpected exception from `segqc.cli.main`" test), converting it to
+  `Error: <message>` + return `1` rather than a raw traceback, per the item's
+  pinned error-channel convention.
+
+- **`build_run_argv` is a pure function with no filesystem access** — it only
+  assembles a list from already-resolved values, matching the pin that it
+  must be deterministic and side-effect-free so tests can assert on the
+  returned list directly (verified by the adversarial determinism test).
+
+- **Dockerfile edit is a single added `COPY docker/ /app/docker/` line**,
+  placed directly after the existing `COPY src/ ./src/` line, before the
+  `RUN pip install ...` step (order doesn't matter for correctness here since
+  the entry script isn't touched by the install step, but keeping the two
+  `COPY` lines adjacent keeps the layer-caching comment accurate). No
+  `ENTRYPOINT`/`CMD` change — item 067's `command-line` still invokes
+  `python /app/docker/entrypoint.py ...` explicitly.
+
+- **No changes needed to `.dockerignore`** — it does not exclude `docker/`,
+  so no edit was required there (verified before implementing).

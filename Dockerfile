@@ -37,6 +37,9 @@ ARG INSTALL_RADIOMICS=0
 # caching), respecting .dockerignore for the rest of the build context.
 COPY pyproject.toml constraints.txt README.md ./
 COPY src/ ./src/
+# item 068: the XNAT Container Service entry script -- lands at the pinned
+# in-image path /app/docker/entrypoint.py that item 067's command.json invokes.
+COPY docker/ /app/docker/
 
 RUN python -m pip install --upgrade pip \
     && pip install -c constraints.txt . \
