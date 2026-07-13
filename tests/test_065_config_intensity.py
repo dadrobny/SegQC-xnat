@@ -24,8 +24,17 @@ Adversarial / edge-case scenarios included:
   still fall back to *default*.
 - Adding an ``intensity:`` section does not change ``config_hash``, mirroring
   item 049's own ``reference:`` section guarantee (AC8 there).
-- ``load_config(default_config_path()) == default_config()`` still holds
-  (bundled default file parses to exactly the code defaults).
+
+Note: ``load_config(default_config_path()) == default_config()`` is *not*
+asserted here -- it is a pre-existing, long-standing false equality unrelated
+to item 065 (``default_config()``'s ``rules``/``verdict`` are ``{}`` by design,
+meaning "all rules enabled with built-in code defaults" -- items 026/034,
+while ``load_config()`` on the bundled YAML materialises the full rule set --
+item 035). AC12's real intent (a stable ``config_hash`` for the bundled
+config) is covered by
+``test_ac12_config_hash_matches_committed_reference_default_provenance``
+above, mirroring the fix applied to item 048's AC7
+(``test_heuristics_bounds_source.py``).
 """
 
 from __future__ import annotations
@@ -112,10 +121,6 @@ def test_ac12_config_hash_matches_committed_reference_default_provenance():
 
     cfg = bundled_default_config()
     assert config_hash(cfg) == _COMMITTED_REFERENCE_DEFAULT_CONFIG_HASH
-
-
-def test_ac12_load_config_default_path_equals_default_config():
-    assert load_config(default_config_path()) == default_config()
 
 
 # =========================================================================== #

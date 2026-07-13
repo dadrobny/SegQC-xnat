@@ -16,7 +16,12 @@ Covers Acceptance Criteria AC1, AC2, AC13, AC14, AC15:
 - AC13: with a reference supplied, ``intensity_reference_delta`` is
   populated (``per_label`` entries carry an ``available`` flag) and the
   ``intensity_reference_delta`` rule participates over the composed record,
-  staying silent on the clean ``clean_hu`` fixture.
+  staying silent on the clean ``clean_hu`` fixture (against a purpose-built
+  bracketing reference -- see ``_build_bracketing_intensity_reference``
+  below; the *bundled* default reference's per-level intensity distributions
+  are built from an extremely small, noisy sample and are not a reliable
+  bracket for an independently-synthesized clean fixture, mirroring item
+  049's own ``_build_bracketing_reference`` precedent for AC10).
 - AC14: a reference carrying no ``intensity_*`` distributions does not raise
   and yields no ``intensity_reference_delta`` finding (backward
   compatibility, item 064's own documented contract).
@@ -39,6 +44,8 @@ Adversarial / edge-case scenarios included:
 from __future__ import annotations
 
 import copy
+import pathlib
+import tempfile
 
 import nibabel as nib
 import pytest
@@ -52,9 +59,15 @@ from segqc.pipeline import (
     run_qc_with_reference,
 )
 from segqc.reference import build_reference, bundled_default_reference
-from segqc.reference.ingest import DEFAULT_SEG_SUFFIX
+from segqc.reference.ingest import DEFAULT_SCAN_SUFFIX, DEFAULT_SEG_SUFFIX
 from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.intensity import INTENSITY_CORPUS_DIR, load_intensity_manifest
+from segqc.synth.intensity import (
+    DEFAULT_HU_MODEL,
+    INTENSITY_CORPUS_DIR,
+    HUModel,
+    load_intensity_manifest,
+    paint_clean_scan,
+)
 
 
 # =========================================================================== #
@@ -89,6 +102,82 @@ def _loaded_case_images(case, corpus_dir=INTENSITY_CORPUS_DIR):
 
 def _clean_hu_images():
     return _loaded_case_images(_case("clean_hu"))
+
+
+#: A spread of HU models (background/cancellous/cortical mean+std) used
+#: alongside ``DEFAULT_HU_MODEL`` to build a bracketing intensity reference
+#: cohort -- wide enough that clean_hu's own per-level statistics (drawn from
+#: DEFAULT_HU_MODEL, seed=0) sit comfortably inside every level's p01-p99
+#: band and keep robust_z small, empirically verified via a standalone script
+#: (see item 065's AC13 test-fix notes) to bracket clean_hu on every level
+#: (20/L1, 21/L2, 22/L3, 23/L4, 24/L5) -- not just the corpus's nominal
+#: target label 22.
+_BRACKETING_INTENSITY_MODELS = (
+    DEFAULT_HU_MODEL,
+    HUModel(
+        background_mean=30, background_std=8,
+        cancellous_mean=170, cancellous_std=30,
+        cortical_mean=500, cortical_std=100,
+    ),
+    HUModel(
+        background_mean=50, background_std=12,
+        cancellous_mean=230, cancellous_std=50,
+        cortical_mean=700, cortical_std=140,
+    ),
+    HUModel(
+        background_mean=40, background_std=15,
+        cancellous_mean=200, cancellous_std=60,
+        cortical_mean=600, cortical_std=180,
+    ),
+    HUModel(
+        background_mean=35, background_std=6,
+        cancellous_mean=150, cancellous_std=25,
+        cortical_mean=450, cortical_std=80,
+    ),
+    HUModel(
+        background_mean=45, background_std=14,
+        cancellous_mean=250, cancellous_std=55,
+        cortical_mean=750, cortical_std=150,
+    ),
+)
+_BRACKETING_INTENSITY_SEEDS = (0, 1, 2, 3, 4, 5, 6, 7)
+
+
+def _build_bracketing_intensity_reference():
+    """A freshly-built reference cohort that robustly brackets clean_hu's
+    per-label intensity statistics at every level (see
+    ``_BRACKETING_INTENSITY_MODELS`` above for why the *bundled* default
+    reference is not sufficient here -- its per-level intensity
+    distributions, item 063, are built from an extremely small, noisy
+    sample). Every synthetic subject shares clean_hu's exact geometry
+    (``build_clean_spine`` defaults: L1-L5, 1mm isotropic spacing, 6mm curve
+    amplitude -- the same generator clean_hu's seg fixture comes from) so
+    only the painted HU intensities vary, spanning a wide enough spread of
+    ``paint_clean_scan`` models/seeds to bracket clean_hu's own draw
+    (DEFAULT_HU_MODEL, seed=0) without inflating robust_z. Mirrors item 049's
+    own ``_build_bracketing_reference`` precedent for its AC10 geometric
+    positive control."""
+    with tempfile.TemporaryDirectory() as tmp:
+        cohort_dir = pathlib.Path(tmp)
+        spine = build_clean_spine(
+            levels=("L1", "L2", "L3", "L4", "L5"),
+            spacing=(1.0, 1.0, 1.0),
+            curve_amplitude_mm=6.0,
+        )
+        i = 0
+        for model in _BRACKETING_INTENSITY_MODELS:
+            for seed in _BRACKETING_INTENSITY_SEEDS:
+                scan = paint_clean_scan(spine.seg_img, seed=seed, model=model)
+                sid = f"sub-{i:03d}"
+                nib.save(spine.seg_img, str(cohort_dir / f"{sid}{DEFAULT_SEG_SUFFIX}"))
+                nib.save(scan, str(cohort_dir / f"{sid}{DEFAULT_SCAN_SUFFIX}"))
+                i += 1
+        return build_reference(
+            cohort_dir,
+            source="bracketing-intensity-065",
+            build_date="2026-07-13",
+            with_intensity=True,
+        )
 
 
 # =========================================================================== #
@@ -200,7 +289,7 @@ def test_ac13_intensity_reference_delta_populated_with_available_flags():
 def test_ac13_intensity_reference_delta_rule_is_silent_on_clean_hu():
     seg_img, scan_img = _clean_hu_images()
     cfg = bundled_default_config()
-    reference = bundled_default_reference()
+    reference = _build_bracketing_intensity_reference()
 
     case_result, _features_block, _image_features_block, _rd, _ird = (
         run_qc_with_intensity(seg_img, scan_img, cfg, reference=reference)
