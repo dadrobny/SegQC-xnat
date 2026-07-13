@@ -114,14 +114,19 @@ every other Stage-10 item builds on.
   CUDA device (`cupy.cuda.runtime.getDeviceCount`). A genuine device/execution
   check is deferred to items 073/075's GPU-gated tests. This keeps 071 fully
   unit-testable on a GPU-less host by mocking the import alone.
-- **A3 — cuCIM deferred to 072; `Backend` extension point pinned.** The `gpu`
-  extra ships `cupy` now; `cucim` (Linux/CUDA-only, heavier install friction) is
-  added to the same extra by item **072**, when the scikit-image-equivalent ops
-  are actually ported. The `Backend` handle exposes only `.xp` (array module),
-  `.name`, and `.is_gpu` in this item. **Pinned extension point:** item 072 may
-  add scipy.ndimage / scikit-image-equivalent handles (e.g.
-  `cupyx.scipy.ndimage`, `cucim.skimage`) to `Backend` when it needs them;
-  nothing in 071 forecloses that.
+- **A3 — No cuCIM dependency; `Backend` extension point pinned.** *(Corrected
+  2026-07-13 by the item-072 spec author — this originally claimed item 072 would
+  add `cucim` to the `gpu` extra; that is wrong.)* The `gpu` extra ships **`cupy`
+  only**, and item **072** adds **no** `cucim` requirement. The three Stage-2/3
+  ndimage ops item 072 ports (`label`, `distance_transform_edt`,
+  `gaussian_filter`) live in **`cupyx.scipy.ndimage`** — a subpackage that ships
+  **inside the `cupy` package itself**, so no separate `cucim` install is needed.
+  (Item 072's spline steps — `splprep`/`splev`/`minimize_scalar` — deliberately
+  fall back to SciPy/CPU rather than seeking a GPU equivalent, adding no
+  dependency either.) The `Backend` handle exposes only `.xp` (array module),
+  `.name`, and `.is_gpu` in this item. **Pinned extension point:** item 072 will
+  add an `.ndimage` accessor to `Backend` (CPU → `scipy.ndimage`, GPU →
+  `cupyx.scipy.ndimage`); nothing in 071 forecloses that.
 - **A4 — Dynamic probe, by design.** `cupy_available()` performs a guarded
   `import cupy` **inside the function** on each call (honouring `sys.modules`),
   rather than caching a boolean at module import time (contrast the item-060
