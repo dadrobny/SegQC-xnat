@@ -19,11 +19,12 @@ daemon running, no network to pull the base layer).
 from __future__ import annotations
 
 import re
-import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
+
+from conftest import requires_docker
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCKERFILE_PATH = REPO_ROOT / "Dockerfile"
@@ -334,59 +335,13 @@ def test_adv_every_core_package_missing_from_constraints_would_fail(monkeypatch)
 # =========================================================================== #
 # Docker-gated fixtures & tests (AC9-AC15)
 # =========================================================================== #
-
-
-def _docker_available() -> bool:
-    if shutil.which("docker") is None:
-        return False
-    try:
-        result = subprocess.run(
-            ["docker", "version"],
-            capture_output=True,
-            timeout=15,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    return result.returncode == 0
-
-
-requires_docker = pytest.mark.skipif(
-    not _docker_available(),
-    reason="docker CLI/daemon not available on this host",
-)
-
-
-@pytest.fixture(scope="session")
-def docker_image_tag():
-    """Build the item-066 image once per test session and yield its tag.
-
-    Skips (does not fail) when Docker is unavailable, or when the build
-    itself fails for environmental reasons (e.g. no network to pull the
-    base image) -- the goal is to keep the default suite Docker-optional
-    and green, while still failing loudly on a genuine Dockerfile defect
-    when Docker *is* available and functioning.
-    """
-    if not _docker_available():
-        pytest.skip("docker CLI/daemon not available on this host")
-
-    tag = "segqc:test-066"
-    try:
-        result = subprocess.run(
-            ["docker", "build", "-t", tag, "."],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            timeout=1800,
-            text=True,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        pytest.skip(f"docker build could not run in this environment: {exc}")
-
-    if result.returncode != 0:
-        pytest.fail(
-            "docker build failed (AC9):\n"
-            f"--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}"
-        )
-    return tag
+#
+# The Docker-availability helper (``_docker_available``), the ``requires_docker``
+# skip marker, and the session-scoped ``docker_image_tag`` build fixture live in
+# ``tests/conftest.py`` (promoted there by item 069) so this module and
+# ``test_069_container_smoke.py`` share a single image build per test session.
+# ``requires_docker`` is imported explicitly above; ``docker_image_tag`` is a
+# conftest fixture and is injected automatically by name.
 
 
 def _docker_run(tag, *args, timeout=120):

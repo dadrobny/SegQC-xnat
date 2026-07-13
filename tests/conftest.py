@@ -9,9 +9,19 @@ In-memory fixtures yield a :class:`synthetic.SyntheticCase` bundle. The
 ``*_files`` fixtures additionally materialise the case under pytest's
 ``tmp_path`` and yield ``(scan_path, seg_path)`` so on-disk consumers (e.g. the
 CLI in item 006) get real ``.nii.gz`` files to load.
+
+Also hosts the shared Docker-gating helpers and the session-scoped item-066
+image-build fixture (promoted here from ``tests/test_066_dockerfile.py`` by
+item 069) so every Docker-gated test module in the suite -- item 066's own
+image-contract checks and item 069's container smoke test -- builds the
+``segqc:test-066`` image **at most once** per test session.
 """
 
 from __future__ import annotations
+
+import shutil
+import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -21,6 +31,8 @@ from synthetic import (
     empty_case,
     labelled_blocks_case,
 )
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 # --- In-memory case bundles -------------------------------------------------
@@ -63,3 +75,63 @@ def empty_labelmap_files(empty_labelmap, tmp_path):
 def anisotropic_files(anisotropic, tmp_path):
     """Write the anisotropic case and yield ``(scan_path, seg_path)``."""
     return anisotropic.write(tmp_path, suffix=".nii.gz")
+
+
+# --- Docker-gating helpers & shared image-build fixture (items 066/069) ----
+
+
+def _docker_available() -> bool:
+    if shutil.which("docker") is None:
+        return False
+    try:
+        result = subprocess.run(
+            ["docker", "version"],
+            capture_output=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+requires_docker = pytest.mark.skipif(
+    not _docker_available(),
+    reason="docker CLI/daemon not available on this host",
+)
+
+
+@pytest.fixture(scope="session")
+def docker_image_tag():
+    """Build the item-066 image once per test session and yield its tag.
+
+    Shared by ``test_066_dockerfile.py`` and ``test_069_container_smoke.py``
+    (item 069) so the two modules trigger a single ``docker build`` per
+    session rather than one each.
+
+    Skips (does not fail) when Docker is unavailable, or when the build
+    itself fails for environmental reasons (e.g. no network to pull the
+    base image) -- the goal is to keep the default suite Docker-optional
+    and green, while still failing loudly on a genuine Dockerfile defect
+    when Docker *is* available and functioning.
+    """
+    if not _docker_available():
+        pytest.skip("docker CLI/daemon not available on this host")
+
+    tag = "segqc:test-066"
+    try:
+        result = subprocess.run(
+            ["docker", "build", "-t", tag, "."],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            timeout=1800,
+            text=True,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        pytest.skip(f"docker build could not run in this environment: {exc}")
+
+    if result.returncode != 0:
+        pytest.fail(
+            "docker build failed (AC9):\n"
+            f"--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}"
+        )
+    return tag
