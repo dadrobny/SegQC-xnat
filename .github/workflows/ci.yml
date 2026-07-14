@@ -40,14 +40,17 @@ jobs:
           python-version: "3.11"
       - name: Install base project (numpy etc. first)
         run: pip install -e .[dev]
+      - name: Install pyradiomics's undeclared build-time dependencies
+        # pyradiomics's legacy setup.py imports numpy AND versioneer at
+        # build time, but its build-system.requires declares neither, so
+        # pip's isolated per-package build env fails with
+        # ModuleNotFoundError for each in turn (numpy first, then
+        # versioneer once numpy was fixed). This is exactly the install
+        # friction pyproject.toml's `radiomics` extra comment (item 060)
+        # predicted -- pre-installing both here, then building with
+        # --no-build-isolation, works around it.
+        run: pip install versioneer
       - name: Install pyradiomics without build isolation
-        # pyradiomics's legacy setup.py does `import numpy` at build time but
-        # never declares numpy as a build-system requirement, so pip's
-        # isolated per-package build env doesn't have it and the build fails
-        # with ModuleNotFoundError. --no-build-isolation makes pip build it
-        # against the already-installed numpy from the previous step instead
-        # of a fresh isolated env. This is exactly the install friction
-        # pyproject.toml's `radiomics` extra comment (item 060) predicted.
         run: pip install --no-build-isolation "pyradiomics>=3.0"
       - name: Confirm docker is available
         run: docker version
