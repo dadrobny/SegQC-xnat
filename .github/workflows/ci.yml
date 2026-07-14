@@ -38,8 +38,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install with radiomics extra
-        run: pip install -e .[dev,radiomics]
+      - name: Install base project (numpy etc. first)
+        run: pip install -e .[dev]
+      - name: Install pyradiomics without build isolation
+        # pyradiomics's legacy setup.py does `import numpy` at build time but
+        # never declares numpy as a build-system requirement, so pip's
+        # isolated per-package build env doesn't have it and the build fails
+        # with ModuleNotFoundError. --no-build-isolation makes pip build it
+        # against the already-installed numpy from the previous step instead
+        # of a fresh isolated env. This is exactly the install friction
+        # pyproject.toml's `radiomics` extra comment (item 060) predicted.
+        run: pip install --no-build-isolation "pyradiomics>=3.0"
       - name: Confirm docker is available
         run: docker version
       - name: Run environment-gated test modules
