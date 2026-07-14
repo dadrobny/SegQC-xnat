@@ -12,7 +12,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # ubuntu + windows are both x86_64. macos-latest (Apple Silicon /
+        # arm64) is deliberately NOT in the matrix: several golden-file /
+        # reference-artifact tests (test_022, test_042, test_045, test_063)
+        # assert byte-identity or tight-tolerance equality against committed
+        # fixtures that were generated on x86, and floating-point aggregates
+        # (spline/curvature/EDT/percentile stats) are not reproducible across
+        # CPU architectures -- different BLAS/SIMD/libm -- even at identical
+        # numpy/scipy versions. Item 078 relaxed test_042 to numeric tolerance
+        # (enough for x86 cross-platform), but arm64 divergence exceeds even
+        # that for some values and the other three tests compare exactly.
+        # Supporting arm64 needs its own effort (arch-portable goldens or
+        # wide-tolerance conversion of all golden tests) -- tracked as item
+        # 079, deferred. See docs/aide/items/079-arm64-golden-reproducibility.md.
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
