@@ -50,6 +50,23 @@
 | G7 Evaluable & regression-testable | Stages 5, 7 | ✅ |
 | G8 Extensible / classification *(deferred)* | Stage 11 | 📋 |
 
+## Environment-Gated Capability Verification
+
+_One row per capability gated behind an optional package or external tool.
+Status is `❓ Unverified` until a human or CI runner with the dependency
+present actually exercises the gated path (a skip-clean pytest run does not
+count as verification — see `.aide/conventions.md`'s "Environment-gated
+capabilities" rule), then `✅ Verified (date, host/CI)`. This table is
+separate from stage completion above: a stage reaches ✅ on its graceful
+fallback path alone; this tracks whether the real dependency has ever been
+exercised._
+
+| Capability | Package / Tool | Introduced by | Status | Notes |
+|------------|-----------------|----------------|--------|-------|
+| Radiomics feature extraction | `pyradiomics` (extra: `segqc[radiomics]`) | Stage 8 *(Item 060)* | ❓ Unverified | `tests/test_060_*` (and related Stage-8 radiomics tests) skip via `pytest.importorskip("radiomics")`; `pyradiomics` has never been installed in any environment this project has run tests in, so the radiomics feature-extraction path itself has never executed. |
+| Containerised pipeline (Docker build + run) | Docker (external tool, no pip dependency) | Stage 9 *(Items 066, 069, 070)* | ❓ Unverified | `tests/test_066_dockerfile.py`, `tests/test_069_container_smoke.py`, `tests/test_070_acceptance_stage9.py`'s Docker-gated cases skip via the shared `requires_docker` marker/`docker_image_tag` fixture; no `docker` CLI/daemon has been available in any environment this project has run tests in, so the image has never actually been built or run. |
+| GPU-accelerated feature extraction | `cupy` (planned extra: `segqc[gpu]`) | Stage 10 *(Items 071–075)* | ❓ Unverified | Stage 10 not yet built (queue-009, specs authored). Once built, the GPU path will be CuPy-gated identically to the two rows above; this row is pre-registered now so the stage-closing item (075) updates it rather than introducing it from scratch. |
+
 ---
 
 # Phase 1 — Complete MVP Pipeline
