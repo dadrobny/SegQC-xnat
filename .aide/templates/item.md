@@ -14,6 +14,14 @@
   No Docker/services "Testing Prerequisites" boilerplate in the core — enable a
   project-specific block via aide.toml only if the project actually needs it.
 
+  Optional "Environment / Hardware Dependencies" section: include it ONLY when
+  this item introduces a capability gated behind an optional package or
+  external tool (GPU library, Docker, a large/optional pip extra, ...). Its
+  point is to make the eventual real-dependency verification trackable in
+  progress.md rather than silently inferred from a green (skip-clean) test
+  run — see conventions.md's Environment-Gated Capability Verification rule.
+  Omit the section entirely for items with no such capability.
+
   Fill-in conventions: `{{slot}}` = literal value; _italic line_ = guidance to
   read then replace. Delete this comment in the generated file.
 -->
@@ -62,6 +70,23 @@ module._
 
 _Other item numbers this relies on (must be ✅/🚧), and what each provides.
 Write "None." if there are none._
+
+## Environment / Hardware Dependencies  <!-- OPTIONAL: delete if not applicable -->
+
+_Only for an item that introduces a capability gated behind an optional
+package or external tool (GPU library, Docker, a large/optional pip extra,
+...). One row per capability:_
+
+- **{{package/tool name}}** — declared via {{pyproject optional-dependencies
+  extra name, or "external tool (not a pip dependency)"}}. Required fallback:
+  {{what happens when absent — must degrade gracefully, e.g. skip cleanly,
+  never fail, never silently no-op as if the path were exercised}}.
+  **Full-capability verification:** not yet exercised with the dependency
+  present. Tracked in `progress.md`'s Environment-Gated Capability
+  Verification table as `❓ Unverified` until a human or a CI runner with the
+  dependency actually runs the gated path — a green skip-clean suite does
+  **not** count as verification, and a stage-closing item must add/update
+  this table's row for any capability it introduces (see conventions.md).
 
 ## Decisions & Trade-offs
 
