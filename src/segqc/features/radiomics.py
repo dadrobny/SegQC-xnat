@@ -72,7 +72,12 @@ any PyRadiomics work is attempted, so both the builtin and present paths
 raise identically and before touching PyRadiomics (AC9). Likewise, when
 ``first_order.voxel_count == 0`` (absent/empty label, or an all-non-finite
 mask), the PyRadiomics wrapper is **not** invoked at all — PyRadiomics would
-error on an empty mask — and ``extended`` is simply ``{}`` (AC10).
+error on an empty mask — and ``extended`` is simply ``{}`` (AC10). A
+**non-empty but too-small/degenerate** mask (e.g. a single-voxel label, or a
+paper-thin sliver) that PyRadiomics' own geometry validation rejects with a
+``ValueError`` is likewise degraded to the builtin result rather than
+propagating that exception (item 076) — so the "degrade cleanly" philosophy
+now covers both the empty and the degenerate-but-nonempty case.
 
 Public API
 ----------
@@ -276,7 +281,15 @@ def compute_label_radiomics(
         # an empty mask (it would error). Degrade to the builtin markers.
         return _builtin_result(first_order)
 
-    extended = _extract_with_pyradiomics(scan_img, seg_img, label)
+    try:
+        extended = _extract_with_pyradiomics(scan_img, seg_img, label)
+    except ValueError:
+        # Non-empty but too-small/degenerate mask: PyRadiomics' own geometry
+        # validation may reject it (ValueError), e.g. a single-voxel label or
+        # a paper-thin sliver. Degrade to the builtin markers, exactly like
+        # the empty-mask case above -- never let PyRadiomics' rejection
+        # propagate.
+        return _builtin_result(first_order)
 
     return LabelRadiomics(
         first_order=first_order,

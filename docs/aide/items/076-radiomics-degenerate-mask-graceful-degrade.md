@@ -298,4 +298,30 @@ Linux/CI present-path run (sibling branch `ci/verify-environment-gated-capabilit
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+**Implemented exactly per the pinned plan.** In `compute_label_radiomics`
+(`src/segqc/features/radiomics.py`), the previously-unconditional
+`extended = _extract_with_pyradiomics(scan_img, seg_img, label)` line is now
+wrapped in a tight `try/except ValueError` that, on catch, `return
+_builtin_result(first_order)` — the identical degrade the empty-mask branch
+above it already uses. The `try` scopes only the extraction call itself; the
+subsequent `LabelRadiomics(..., backend=RADIOMICS_BACKEND_PYRADIOMICS,
+radiomics_available=True)` success-path construction/return sits outside the
+`try` block entirely, so it cannot accidentally swallow an error from
+somewhere else. A comment at the guard explains the rationale (mirrors the
+existing empty-mask comment's style). No other branch, function, or the
+`_extract_with_pyradiomics` body was touched.
+
+The module docstring's "Empty/absent label & alignment guards" section
+(lines ~66–75) gained one added sentence noting that a non-empty but
+too-small/degenerate mask rejected by PyRadiomics' own geometry validation is
+likewise degraded to the builtin result (citing item 076), so the documented
+"degrade cleanly" philosophy now explicitly covers both the empty-mask and
+degenerate-but-nonempty cases.
+
+No test files were modified by this agent (test-writer already committed the
+one additive assertion). Could not exercise the present path locally
+(PyRadiomics fails to import on this Windows dev machine per the spec's pinned
+Windows-local limitation); correctness was verified by careful reading against
+the spec's AC1–AC8 and by confirming the diff matches the Implementation Steps
+verbatim. Final present-path verification happens via the sibling CI job (PR
+#33) per the spec.
