@@ -19,7 +19,18 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install
-        run: pip install -e .[dev]
+        # Installed via constraints.txt (the Stage-9 Docker lockfile, item
+        # 066), not pyproject.toml's loose lower bounds -- per item 001's own
+        # design intent ("exact reproducibility pins belong in the deployable
+        # container's lockfile/constraints, not in library metadata"). The
+        # golden-file/reference-artifact byte-identity tests (items 042, 045,
+        # 063) assert exact reproducibility, which only holds within this
+        # pinned numpy/scipy environment: a fresh loose-bound install resolves
+        # much newer numpy/scipy on Python 3.11 and their tiny last-digit
+        # floating-point differences break byte-identity (found via CI; see
+        # item 077). Contributors regenerating golden files locally should
+        # likewise install via `-c constraints.txt`.
+        run: pip install -e .[dev] -c constraints.txt
       - name: Test
         run: python -m pytest
 
