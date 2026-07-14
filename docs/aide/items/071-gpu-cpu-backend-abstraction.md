@@ -249,6 +249,22 @@ None`) genuinely makes the guarded import raise so the test isn't vacuous.
   suite), 074 (benchmark), and 075 (CLI integration) all consume this module's
   API — see the pinned interfaces in Assumptions A1/A3.
 
+## Environment / Hardware Dependencies
+
+- **CuPy** (`cupy`) — declared via the new `pyproject.toml` optional-dependencies
+  extra `segqc[gpu]` (this item; see AC15/A7). Required fallback: `import
+  segqc.backend` and every selection-logic path must work with zero required
+  GPU dependencies (AC1, AC14) — the module never imports `cupy` at module
+  scope, and auto-detect silently falls back to CPU when `cupy` is absent
+  (AC4). **Full-capability verification:** not yet exercised with a real CuPy
+  install / GPU device — every AC in this item is proven via `sys.modules`
+  mocking (A2, A4), never a genuine `import cupy` against real hardware.
+  Tracked in `progress.md`'s Environment-Gated Capability Verification table
+  (row: "GPU-accelerated feature extraction") as `❓ Unverified`; item 075
+  (Stage-10 closer) is responsible for updating that row at stage closure, and
+  it stays `❓ Unverified` from this item alone regardless of how many of its
+  ACs pass, since none of them touch real hardware.
+
 ## Decisions & Trade-offs
 
 To be updated during implementation.

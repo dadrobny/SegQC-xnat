@@ -267,6 +267,17 @@ is present)._
   encoded as an acceptance criterion (a spec cannot pytest-assert its own
   progress-doc bookkeeping). `roadmap.md` (PR-gated framework file) is **not**
   edited by this item.
+  **Same action also covers the pre-registered "GPU-accelerated feature
+  extraction" row in `progress.md`'s Environment-Gated Capability Verification
+  table** (`.aide/conventions.md`'s "Environment-gated capabilities" rule): the
+  validator updates that row's item reference to "Items 071–075" but flips its
+  Status to `✅ Verified` **only if** this item's AC10/AC12 GPU-gated acceptance
+  clause actually ran (not skipped) on the merging host — i.e. CuPy/a real GPU
+  was genuinely present and the equivalence assertion executed. On any host
+  where AC10 skips (expected on this CuPy-absent dev/CI environment), the row
+  stays `❓ Unverified` even though Stage 10 itself reaches ✅ on its fallback
+  path — the two statuses are intentionally decoupled (see A8 and the table's
+  own header note in `progress.md`).
 
 - **A10 — Fixture reuse, no new binaries.** The end-to-end CPU run (AC8) and the
   acceptance CPU/GPU clauses reuse existing committed fixtures: the CLI scan+seg
@@ -346,7 +357,10 @@ production edits are to **`src/segqc/cli.py`**; the compute modules are untouche
 7. **`pyproject.toml` unchanged.** Verify `[project].dependencies` gains nothing
    (AC13); the `gpu` extra from item 071 is the only GPU surface.
 8. **No `progress.md` / `roadmap.md` edits here** (A9) — the validator reconciles
-   `progress.md` Stage 10 at merge via the `aide` CLI.
+   `progress.md` Stage 10 at merge via the `aide` CLI, including the
+   Environment-Gated Capability Verification table's "GPU-accelerated feature
+   extraction" row (flipped to `✅ Verified` only if AC10 actually ran GPU-side
+   on the merging host, else left `❓ Unverified`).
 
 ## Testing Strategy
 
