@@ -81,17 +81,32 @@ def anisotropic_files(anisotropic, tmp_path):
 
 
 def _docker_available() -> bool:
+    """True iff a Docker daemon is reachable **and** can run Linux containers.
+
+    The image under test (item 066) is a Linux image (``FROM python:3.11-slim``),
+    so a daemon in *Windows-containers* mode -- which the Windows GitHub
+    runners default to -- cannot build it (``docker build`` fails with "no
+    matching manifest for windows/amd64"). That is an environmental
+    limitation, not a Dockerfile defect, so it must gate these tests to a
+    clean skip rather than letting the build fail. We therefore require the
+    server OS to be ``linux``; the dedicated Linux CI job (and Linux/macOS dev
+    hosts with Docker Desktop in Linux-container mode) satisfies this, while a
+    Windows-container daemon reports ``windows`` and is treated as unavailable.
+    """
     if shutil.which("docker") is None:
         return False
     try:
         result = subprocess.run(
-            ["docker", "version"],
+            ["docker", "version", "--format", "{{.Server.Os}}"],
             capture_output=True,
             timeout=15,
+            text=True,
         )
     except (OSError, subprocess.TimeoutExpired):
         return False
-    return result.returncode == 0
+    if result.returncode != 0:
+        return False
+    return result.stdout.strip() == "linux"
 
 
 requires_docker = pytest.mark.skipif(
