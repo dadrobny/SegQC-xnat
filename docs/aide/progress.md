@@ -195,6 +195,7 @@ mislabelling heuristics.
 - ✅ Small committed fixture set spanning all 8 failure modes. *(Item 040)*
 - ✅ Regression suite asserting expected verdict + which heuristic fired per case. *(Item 041)*
 - ✅ Golden-file JSON snapshots for stability/determinism. *(Item 042)*
+- ✅ Cross-platform golden comparison: fresh-vs-committed via numeric tolerance (item 042's byte-identity of asymmetric-geometry floats was only reproducible on the goldens' origin platform; found via CI). *(Item 078)*
 
 **Acceptance.**
 - [x] Every §6 failure mode has ≥1 synthetic case and is detected (**G7**, **G2**).
