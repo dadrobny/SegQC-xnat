@@ -78,6 +78,31 @@ completion (per-item AC ticking is not deterministic).
   mandatory **Assumptions** block (see the item template). *(spec-author,
   validator)*
 
+### Environment-gated capabilities (optional, additive)
+
+A capability gated behind an optional package or external tool (a GPU
+library, Docker, a large/optional pip extra, ...) must degrade gracefully —
+its tests skip cleanly (never fail, never silently pass as if exercised) when
+the dependency is absent, mirroring the project's existing optional-extra
+pattern. That graceful-fallback bar is enough for a stage to reach ✅ under the
+rollup rule above — **but** a skip-clean pytest run is not evidence the
+optional path was ever run for real, and nothing else records that gap by
+default. Two additive, non-blocking mechanisms close it:
+
+- The item template's optional **Environment / Hardware Dependencies**
+  section — filled in by any item introducing such a capability, naming the
+  package/tool, its `pyproject`/equivalent declaration, and the required
+  fallback behaviour.
+- `progress.md`'s optional **Environment-Gated Capability Verification**
+  table — one row per capability, starting `❓ Unverified`. A stage-closing
+  item's Implementation Steps must add/update the row(s) for any capability
+  its stage introduced. The row flips to `✅ Verified (date, host/CI)` only
+  when a human or a CI runner that actually has the dependency present has
+  run the gated path — never inferred from the stage's own ✅ status.
+
+Both mechanisms are opt-in: a project with no environment-gated capability
+omits them entirely.
+
 ---
 
 ## 2. Claim protocol — how "in progress" is signalled

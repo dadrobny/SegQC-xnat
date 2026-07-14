@@ -12,6 +12,16 @@
   row / header / delivered objectives read ✅. Mixed -> 🚧. None started -> 📋.
   Update INCREMENTALLY; never reset a non-planned status back to 📋.
 
+  Optional "Environment-Gated Capability Verification" section: include it
+  ONLY if the project has ANY stage introducing a capability gated behind an
+  optional package or external tool (GPU library, Docker, an optional pip
+  extra, ...). It is deliberately OUTSIDE the stage-summary rollup above — a
+  stage's ✅ still only requires its fallback/skip-clean path to pass; this
+  table is a separate, additive visibility mechanism so a green suite is never
+  mistaken for "the optional dependency was actually exercised." See
+  conventions.md's Environment-Gated Capability Verification rule; omit this
+  whole section if the project has no such capability.
+
   Fill-in conventions: `{{slot}}` = literal value; _italic line_ = guidance to
   read then replace. Delete this comment in the generated file.
 -->
@@ -46,6 +56,17 @@ _One row per vision objective._
 | Objective | Delivered by | Status |
 |-----------|--------------|--------|
 | G1 {{short}} | Stage 1 | 📋 |
+
+## Environment-Gated Capability Verification  <!-- OPTIONAL: delete if not applicable -->
+
+_One row per capability gated behind an optional package or external tool.
+Status is `❓ Unverified` until a human or CI runner with the dependency
+present actually exercises the gated path (not inferred from a skip-clean
+pytest run), then `✅ Verified ({{yyyy-mm-dd}}, {{host/CI description}})`._
+
+| Capability | Package / Tool | Introduced by | Status | Notes |
+|------------|-----------------|----------------|--------|-------|
+| {{capability}} | {{package or tool name}} | Stage {{n}} *(Item {{nnn}})* | ❓ Unverified | {{notes}} |
 
 ---
 
