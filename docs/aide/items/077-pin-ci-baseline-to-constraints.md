@@ -85,13 +85,37 @@ words), not to an arbitrary future numpy/scipy release.
 with a comment explaining the rationale and pointing at item 001's original
 design intent and this item's number for future readers.
 
-## Verification
+## Verification (actual outcome — partial)
 
-Re-running CI after this change must show the baseline `test` job green on
-all three OSes (confirming golden-file byte-identity holds again once the
-pinned versions are actually installed), with the `verify-environment-gated`
-job (Docker + radiomics, items 066–070/076) unaffected (it already installs
-separately and was already green).
+Re-running CI after this change (run `29366329323`) confirmed:
+
+- **Fixed**, all three OSes: `tests/test_045_reference_artifact.py` and
+  `tests/test_063_reference_intensity.py`'s byte-identity assertions now pass
+  — the numpy/scipy version-drift hypothesis was correct for these two.
+- **Still failing**, all three OSes, unchanged by this fix:
+  `tests/test_042_golden_determinism.py`'s 4 cases
+  (`test_ac9_fresh_canonical_json_equals_committed_golden_bytes` for
+  `mode3_inject_islands`/`mode6_crop_at_border`/`mode8_force_overlap`, plus
+  `test_ac13_regeneration_reproduces_committed_goldens_byte_for_byte`).
+  Pinning `constraints.txt` did **not** fix these, so the numpy/scipy
+  version-drift explanation does not fully account for them — a **separate,
+  not-yet-diagnosed root cause** remains. Working hypothesis (untested):
+  something order/platform-dependent in the synthetic-perturbation pipeline
+  (items 037–039) specific to multi-component perturbation modes — the three
+  failing modes all involve multiple connected components/islands, while
+  passing/`"reconstructed_record"` modes (which skip the real pipeline, per
+  item 057's Assumptions) are unaffected. Not yet confirmed.
+- `verify-environment-gated` (Docker + radiomics) job: green, unaffected, as
+  expected.
+
+**This item is therefore only partially complete.** The numpy/scipy pin was
+the right fix for 2 of the 3 originally-failing files; `test_042`'s residual
+failures need their own investigation (separate root-cause diagnosis, likely
+its own follow-up item) before PR #33 (`ci/verify-environment-gated-capabilities`)
+can show a fully green CI run. Deliberately paused here (human decision,
+2026-07-14) rather than continuing the investigation in the same session —
+resume by re-reading this section and `src/segqc/synth/` (items 036–039) plus
+`src/segqc/synth/golden.py`'s `check_case_golden`/`canonical_json`.
 
 ## Dependencies
 
