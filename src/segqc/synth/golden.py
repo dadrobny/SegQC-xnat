@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import math
 from pathlib import Path
 from typing import Optional, Sequence, Tuple
 
@@ -45,6 +46,9 @@ __all__ = [
     "VOLATILE_SENTINEL",
     "build_report_for_case",
     "canonical_json",
+    "reports_close",
+    "GOLDEN_REL_TOL",
+    "GOLDEN_ABS_TOL",
     "golden_path",
     "read_golden_text",
     "load_golden",
@@ -145,6 +149,75 @@ def canonical_json(report: dict, *, volatile_pointers=VOLATILE_POINTERS) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Cross-platform numeric comparison (item 078)
+# --------------------------------------------------------------------------- #
+#
+# Byte-exact comparison of two report canonicalisations is the right guarantee
+# *within a single process on a single platform* (see canonical_json's
+# same-platform determinism tests) -- but it is NOT achievable *across*
+# platforms for the asymmetric-geometry cases (mode3_inject_islands,
+# mode6_crop_at_border, mode8_force_overlap). Those produce irrational-decimal
+# floats (off-grid centroids, spline/curvature/EDT values) whose last ~1 ULP
+# differs between the platform the committed goldens were generated on and
+# another platform, even at identical numpy/scipy versions, because of
+# platform BLAS/SIMD/libm rounding. So the *fresh-vs-committed* comparison
+# (check_case_golden, item 042 AC9/AC13) uses numeric tolerance rather than
+# raw bytes; the same-platform determinism checks (AC4/AC5/AC12) stay byte
+# exact. See item 078.
+
+#: Relative tolerance for numeric-leaf comparison in :func:`reports_close`.
+GOLDEN_REL_TOL: float = 1e-9
+
+#: Absolute tolerance for numeric-leaf comparison in :func:`reports_close`
+#: (governs values near zero, e.g. ``total_curvature_deg`` ~ 1e-14).
+GOLDEN_ABS_TOL: float = 1e-12
+
+
+def reports_close(
+    a,
+    b,
+    *,
+    rel_tol: float = GOLDEN_REL_TOL,
+    abs_tol: float = GOLDEN_ABS_TOL,
+) -> bool:
+    """Recursively compare two parsed report structures for equality, with
+    numeric leaves compared within tolerance and everything else exactly.
+
+    Rules:
+
+    - ``dict`` -- equal iff the key sets are identical and every value is
+      ``reports_close``.
+    - ``list`` -- equal iff the lengths match and each pair is
+      ``reports_close`` (order-sensitive).
+    - ``bool`` -- compared by exact identity, and is **never** treated as a
+      number (``True`` is not close to ``1.0``). Checked before the numeric
+      branch because ``bool`` is a subclass of ``int``.
+    - ``int`` / ``float`` -- compared via
+      :func:`math.isclose` with the given tolerances.
+    - anything else (``str``, ``None``, ...) -- compared with ``==``.
+
+    Used by :func:`check_case_golden` for the cross-platform fresh-vs-committed
+    comparison (item 078). It intentionally does **not** canonicalise or sort
+    -- it walks the parsed structures directly.
+    """
+    if isinstance(a, bool) or isinstance(b, bool):
+        return a is b
+    if isinstance(a, dict) and isinstance(b, dict):
+        if a.keys() != b.keys():
+            return False
+        return all(reports_close(a[k], b[k], rel_tol=rel_tol, abs_tol=abs_tol) for k in a)
+    if isinstance(a, list) and isinstance(b, list):
+        if len(a) != len(b):
+            return False
+        return all(
+            reports_close(x, y, rel_tol=rel_tol, abs_tol=abs_tol) for x, y in zip(a, b)
+        )
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return math.isclose(a, b, rel_tol=rel_tol, abs_tol=abs_tol)
+    return a == b
+
+
+# --------------------------------------------------------------------------- #
 # Golden storage
 # --------------------------------------------------------------------------- #
 
@@ -174,12 +247,22 @@ def check_case_golden(
     golden_dir: Path = GOLDEN_DIR,
     corpus_dir: Path = CORPUS_DIR,
 ) -> bool:
-    """``True`` iff ``canonical_json(build_report_for_case(case))`` equals
-    the committed golden text. Propagates ``FileNotFoundError`` when the
-    golden is missing (does not swallow it)."""
-    fresh = canonical_json(build_report_for_case(case, config, corpus_dir))
-    committed = read_golden_text(case["case_id"], golden_dir)
-    return fresh == committed
+    """``True`` iff the freshly-built report for *case* matches the committed
+    golden **within numeric tolerance** (:func:`reports_close`).
+
+    The comparison is deliberately *not* raw byte-identity: the committed
+    goldens encode full-precision floats whose last ~1 ULP differs across
+    platforms for the asymmetric-geometry cases, so a fresh build on a
+    different platform than the one the goldens were generated on would fail a
+    byte comparison despite being numerically identical (item 078). Numeric
+    leaves are compared with tolerance; structure, keys, strings, bools, and
+    ordering are compared exactly, so a genuine difference (a changed verdict,
+    a new/removed finding, a meaningfully different feature value) is still
+    caught. Propagates ``FileNotFoundError`` when the golden is missing (does
+    not swallow it)."""
+    fresh = build_report_for_case(case, config, corpus_dir)
+    committed = json.loads(read_golden_text(case["case_id"], golden_dir))
+    return reports_close(fresh, committed)
 
 
 def write_goldens(
