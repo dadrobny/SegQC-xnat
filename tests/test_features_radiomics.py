@@ -436,6 +436,11 @@ class TestPresentPath:
         result = compute_label_radiomics(scan_img, seg_img, label=1, enable_pyradiomics=True)
         assert result.first_order == compute_label_intensity(scan_img, seg_img, label=1)
         assert result.first_order.voxel_count == 1
+        # AC3: the degenerate-mask degrade must mirror the empty-mask degrade
+        # exactly -- same builtin markers, not a partial/hybrid result.
+        assert result.extended == {}
+        assert result.backend == "builtin"
+        assert result.radiomics_available is False
 
 
 # =========================================================================== #
