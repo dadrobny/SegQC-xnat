@@ -62,4 +62,12 @@ jobs:
             tests/test_069_container_smoke.py \
             tests/test_070_acceptance_stage9.py
       - name: Fail if any environment-gated test was skipped
-        run: python .github/scripts/assert_no_skips.py gated-results.xml
+        # --allow: a couple of tests intentionally verify the *absent*-path
+        # behaviour and correctly self-skip once they detect PyRadiomics is
+        # actually installed (the inverse condition of every other gated
+        # test here) -- see tests/test_features_radiomics.py's
+        # test_ac5_absent_path_yields_builtin_markers_and_no_exception and
+        # test_adv_enable_true_with_pyradiomics_absent_still_degrades_cleanly.
+        run: |
+          python .github/scripts/assert_no_skips.py gated-results.xml \
+            --allow "PyRadiomics happens to be installed"
