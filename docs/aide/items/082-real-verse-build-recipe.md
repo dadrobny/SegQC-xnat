@@ -355,4 +355,30 @@ real artifact.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Doc authored at `docs/reference-build.md`** as anticipated in Assumptions,
+  covering Overview, Storage & versioning policy, Acquisition, Staging, Build
+  invocation, Deployment selection, and Reproducibility & automation — one
+  section per Implementation Step, each carrying the exact substrings the
+  AC9-AC12 tests assert on (verified against the test file before writing).
+- **`artifact.py`'s "Two rebuild commands" docstring section extended**
+  (doc-only) to name the `reference_verse_vN.json` / `--source verse-vN`
+  convention and cross-link `docs/reference-build.md`. One deviation from a
+  literal reading of the Implementation Steps: the example command in the
+  docstring intentionally does **not** spell out the literal real VerSe mask
+  suffix (`_seg-vert_msk.nii.gz`) — AC3's scope guard (mirrored in
+  `test_ac3_scope_guard_no_new_suffix_mapping_symbol_in_ingest_or_artifact`)
+  asserts the substring `"seg-vert_msk"` is **absent** from `artifact.py`
+  (guarding against a code adapter creeping in), and that string check does
+  not distinguish "adapter code" from "docstring prose". The docstring
+  instead points readers to `docs/reference-build.md` for the concrete
+  `--seg-suffix` value and full staging steps, which is where the AC12 tests
+  assert that literal string. No behavioural/logic change either way.
+- **No code changes** to `ingest.py` or `build_reference`/CLI handler —
+  confirmed by reading both; the existing `--seg-suffix` flag and
+  `(OSError, ReferenceArtifactError)` graceful-absence handling already
+  satisfy AC1-AC8 with zero new production code.
+- **`.gitattributes` hygiene line added**: `src/segqc/reference/reference_verse_*.json
+  text eol=lf`, a no-op today (no matching file committed), per the optional
+  Implementation Step 4.
+- **No real `reference_verse_vN.json` committed**, per the fenced scope —
+  confirmed no such file exists under `src/segqc/reference/`.

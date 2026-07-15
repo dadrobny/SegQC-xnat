@@ -42,14 +42,27 @@ bakes the fixed constant :data:`DEFAULT_BUILD_DATE`.
 
 Two rebuild commands
 ---------------------
-Rebuild the artifact from a mounted real VerSe directory::
+Rebuild the artifact from a mounted real VerSe directory, writing a
+**separately versioned** file (``reference_verse_vN.json``,
+``provenance.source == "verse-vN"``) that never overwrites the bundled
+default::
 
-    segqc build-reference --cohort /mnt/verse --out reference.json \\
-        --source verse-vN --build-date YYYY-MM-DD
+    segqc build-reference --cohort /mnt/verse \\
+        --out src/segqc/reference/reference_verse_v1.json \\
+        --source verse-v1 --build-date YYYY-MM-DD \\
+        --seg-suffix <the real VerSe vertebra-mask suffix>
+
+(see :doc:`/reference-build` for the exact staged-cohort ``--seg-suffix``
+value and the operator staging steps it depends on)
 
 Regenerate the committed bundled default from the fixed synthetic cohort::
 
     python -m segqc.reference.artifact
+
+See :doc:`/reference-build` (``docs/reference-build.md``, item 082) for the
+full storage/versioning policy, real-VerSe acquisition + cohort-staging
+notes, and the deployment-selection mechanism (``segqc run
+--reference-artifact`` / ``reference.artifact_path``).
 
 Scope boundary: this module does not compute delta metrics, add rules, touch
 the bounds config, or wire the artifact into ``segqc run`` (items 046-049);
