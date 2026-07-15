@@ -36,7 +36,7 @@
 | 9 | Containerisation & XNAT Command | G5 | ✅ |
 | 10 | Portable Compute: GPU Acceleration Path | G6 | 📋 |
 | 11 | Extensibility & Abnormality Classification Arm | G8 | 📋 |
-| 12 | Real-VerSe Grounding & Reference Feature Expansion | G3, G7 | 📋 |
+| 12 | Real-VerSe Grounding & Reference Feature Expansion | G3, G7 | 🚧 |
 
 ## Objective coverage
 
@@ -339,7 +339,7 @@ abnormalities are accounted for rather than naively flagged.
 
 ---
 
-## Stage 12 — Real-VerSe Grounding & Reference Feature Expansion (G3, G7) — 📋
+## Stage 12 — Real-VerSe Grounding & Reference Feature Expansion (G3, G7) — 🚧
 
 **Goal.** Finish Stages 6/7 against reality: widen the reference distributions
 to the full discriminative per-level feature set the engine already computes,
@@ -348,7 +348,7 @@ Stages 6/7 shipped on a synthetic VerSe stand-in (see the "Real VerSe GT" row in
 the Environment-Gated Capability Verification table).
 
 **Deliverables.**
-- 📋 Expanded reference feature vocabulary — add fragmentation index, largest-component
+- 🚧 Expanded reference feature vocabulary — add fragmentation index, largest-component
   fraction, component count, centroid depth, orientation, and spacing/neighbour-consistency
   deviations through ingest → aggregation → delta rules → config; regenerate the synthetic default. *(Item 081)*
 - 📋 Real-VerSe acquisition & versioned artifact build recipe (derived artifact committed, raw scans never). *(Item 082)*
