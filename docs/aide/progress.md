@@ -36,6 +36,7 @@
 | 9 | Containerisation & XNAT Command | G5 | ✅ |
 | 10 | Portable Compute: GPU Acceleration Path | G6 | 📋 |
 | 11 | Extensibility & Abnormality Classification Arm | G8 | 📋 |
+| 12 | Real-VerSe Grounding & Reference Feature Expansion | G3, G7 | 📋 |
 
 ## Objective coverage
 
@@ -63,7 +64,7 @@ alone; this tracks whether the real dependency/data has ever been exercised._
 
 | Capability | Package / Tool / Data | Introduced by | Status | Notes |
 |------------|-----------------|----------------|--------|-------|
-| Real VerSe GT reference distributions | VerSe ground-truth cohort (external dataset) | Stage 6 *(Items 044, 045)* | ❓ Unverified | The ingestion → aggregation → versioned-artifact pipeline (items 043–045) is complete and tested, but the **bundled `reference_default.json` was built from a synthetic VerSe-shaped cohort** (`provenance.source == "synthetic-verse-cohort"`, `subject_count == 5`), **not** real VerSe scans. Stage 6's machinery is ✅ against that stand-in; grounding the distributions in real VerSe GT (the stage's stated goal) has not been done. To verify: run `segqc build-reference` over a real VerSe cohort directory and re-bundle. |
+| Real VerSe GT reference distributions | VerSe ground-truth cohort (external dataset) | Stage 6 *(Items 044, 045)*; closed by Stage 12 *(Item 084)* | ❓ Unverified | The ingestion → aggregation → versioned-artifact pipeline (items 043–045) is complete and tested, but the **bundled `reference_default.json` was built from a synthetic VerSe-shaped cohort** (`provenance.source == "synthetic-verse-cohort"`, `subject_count == 5`), **not** real VerSe scans. Stage 6's machinery is ✅ against that stand-in; grounding the distributions in real VerSe GT (the stage's stated goal) is scheduled as **Stage 12** (queue-010). To verify: run `segqc build-reference` over a real VerSe cohort directory, re-bundle, and evaluate (item 084). |
 | Radiomics feature extraction | `pyradiomics` (extra: `segqc[radiomics]`) | Stage 8 *(Item 060)* | ✅ Verified (2026-07-14, GitHub Actions CI) | `.github/workflows/ci.yml`'s `verify-environment-gated` job installs `segqc[radiomics]` on `ubuntu-latest` and runs the radiomics tests for real, failing if any report as skipped (`assert_no_skips.py`). First real run exposed — and item 076 fixed — a genuine bug (`compute_label_radiomics` raised on PyRadiomics-rejected degenerate masks instead of degrading). Green since PR #33 (item 076 fix + the two intentional inverse-condition skips allow-listed). |
 | Containerised pipeline (Docker build + run) | Docker (external tool, no pip dependency) | Stage 9 *(Items 066, 069, 070)* | ✅ Verified (2026-07-14, GitHub Actions CI) | The same `verify-environment-gated` job performs a real `docker build` of the item-066 image and `docker run` container smoke tests (`test_066_dockerfile.py`, `test_069_container_smoke.py`, `test_070_acceptance_stage9.py`) on `ubuntu-latest`, all passing. Item 080 additionally hardened `_docker_available()` to require a Linux daemon so these tests skip (not error) on Windows-container-mode hosts. |
 | GPU-accelerated feature extraction | `cupy` (planned extra: `segqc[gpu]`) | Stage 10 *(Items 071–075)* | ❓ Unverified | Stage 10 not yet built (queue-009, specs authored). Once built, the GPU path will be CuPy-gated identically to the two rows above; this row is pre-registered now so the stage-closing item (075) updates it rather than introducing it from scratch. No CI coverage possible (standard GitHub-hosted runners have no GPU) — see [`docs/gpu-verification.md`](../gpu-verification.md) for the manual verification checklist once GPU hardware is available. |
@@ -335,6 +336,29 @@ abnormalities are accounted for rather than naively flagged.
 **Acceptance.**
 - [ ] A new heuristic + abnormality class can be added via the documented path in a test.
 - [ ] Explicitly-handled abnormalities are not naively flagged (Vision Success Criterion 4) (**G8**).
+
+---
+
+## Stage 12 — Real-VerSe Grounding & Reference Feature Expansion (G3, G7) — 📋
+
+**Goal.** Finish Stages 6/7 against reality: widen the reference distributions
+to the full discriminative per-level feature set the engine already computes,
+ground them in real VerSe GT, and quantify the false-positive rate on real GT.
+Stages 6/7 shipped on a synthetic VerSe stand-in (see the "Real VerSe GT" row in
+the Environment-Gated Capability Verification table).
+
+**Deliverables.**
+- 📋 Expanded reference feature vocabulary — add fragmentation index, largest-component
+  fraction, component count, centroid depth, orientation, and spacing/neighbour-consistency
+  deviations through ingest → aggregation → delta rules → config; regenerate the synthetic default. *(Item 081)*
+- 📋 Real-VerSe acquisition & versioned artifact build recipe (derived artifact committed, raw scans never). *(Item 082)*
+- 📋 One-command reference-refresh wrapper (rebuild + re-evaluate) that degrades gracefully when the uncommitted VerSe cohort is absent. *(Item 083)*
+- 📋 Real-VerSe evaluation quantifying the G3 false-positive rate; verification-table closure. *(Item 084)*
+
+**Acceptance.**
+- [ ] Expanded features appear in the rebuilt reference artifact and are consumed by the delta-to-reference rules; existing synthetic tests stay green.
+- [ ] The real-VerSe artifact builds reproducibly from a mounted cohort; the refresh wrapper skips the real-VerSe steps cleanly when the cohort is absent.
+- [ ] The pipeline's false-positive rate on real VerSe GT is quantified and recorded (**G3**, **G7**); the "Real VerSe GT" verification-table row reads Verified. *(Item 084)*
 
 ---
 
