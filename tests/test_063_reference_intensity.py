@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import copy
 import inspect
+import json
 import os
 
 import nibabel as nib
@@ -80,6 +81,7 @@ from segqc.reference.ingest import (
     ingest_subject,
 )
 from segqc.synth.clean_gt import build_clean_spine
+from segqc.synth.golden import reports_close
 from segqc.synth.intensity import paint_clean_scan
 
 # INGESTED_INTENSITY_FEATURES is item 063's new companion constant -- not yet
@@ -566,8 +568,15 @@ def test_ac15_bundled_artifact_regenerates_byte_identically(tmp_path):
     build_and_write_default(dest1)
     build_and_write_default(dest2)
 
+    # Item 081: the bundled artifact now carries a platform-sensitive PCA
+    # float (eigenvalue_ratio), so the regenerated-vs-committed comparison
+    # switches to numeric tolerance (item 078's reports_close). Intra-platform
+    # determinism across two independent regenerations stays byte-exact
+    # (asserted separately above).
     assert dest1.read_bytes() == dest2.read_bytes()
-    assert dest1.read_bytes() == default_artifact_path().read_bytes()
+    regenerated = json.loads(dest1.read_text(encoding="utf-8"))
+    committed = json.loads(default_artifact_path().read_text(encoding="utf-8"))
+    assert reports_close(regenerated, committed)
 
 
 def test_ac15_gitattributes_still_pins_bundled_artifact_lf():
