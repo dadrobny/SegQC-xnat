@@ -36,8 +36,8 @@ Usage::
         --verse-seg-suffix _seg-vert_msk.nii.gz --build-date 2026-07-15
 
 Self-contained: imports only ``segqc.*`` production modules; never imports
-the ``tests`` package nor reads ``tests/corpus/**``, so it runs unmodified in
-a deployed checkout with no test fixtures present.
+the ``tests`` package nor reads the test corpus fixtures, so it runs unmodified
+in a deployed checkout with no test fixtures present.
 """
 from __future__ import annotations
 
