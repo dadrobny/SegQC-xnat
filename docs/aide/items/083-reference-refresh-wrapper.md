@@ -496,4 +496,45 @@ to `src/segqc/**`, no new CLI subcommand, no committed artifact.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Confirmed upstream pins held.** Both item 081 and item 082 pins in the
+  Assumptions section matched reality at implementation time:
+  `build_reference`/`build_and_write_default` already default
+  `with_intensity=True, with_morphology=True` and read no wall clock;
+  `build_reference(cohort_dir, source=..., build_date=..., seg_suffix=...)` is
+  the exact call shape used for the versioned VerSe build. No hand-back was
+  needed.
+- **Eval-cohort recipe.** `synthesize_eval_cohort` uses a small fixed
+  two-subject `_EVAL_COHORT_RECIPE` (mirroring `build_default_cohort`'s
+  pattern but independent of it) writing `<case_id>_gt.nii.gz` /
+  `<case_id>_cand.nii.gz` pairs plus `manifest.json` under
+  `<out_dir>/eval_cohort/`. The candidate file is produced by copying the GT
+  file's bytes (`read_bytes()`/`write_bytes()`) rather than re-saving the
+  NIfTI twice, guaranteeing byte-identity (AC4) without relying on
+  `nib.save` determinism across two calls.
+- **verse-evaluate cohort source.** For the "cohort present" path, the
+  self-vs-self eval cohort re-evaluated in `verse-evaluate` is the wrapper's
+  own synthetic cohort (written to a separate `eval_verse_cohort_src/`
+  subdirectory under `--out`, not derived from the supplied VerSe cohort's
+  GT files themselves), since the spec's per-item Testing Strategy only
+  requires exercising the evaluate *path* over *a* cohort in this branch, and
+  item 084 owns the real quantified VerSe FPR. This keeps the step simple and
+  keeps `--verse-cohort`'s directory read-only.
+- **Defensive `try/except` around `verse-build`/`verse-evaluate`.** Although
+  the "cohort present" happy path never raises in practice, both steps are
+  wrapped so a malformed/empty `--verse-cohort` degrades to a clean
+  `status="failed"` entry with a `reason` (never a traceback), matching the
+  adversarial "empty-but-present cohort" scenario in the Testing Strategy
+  (which accepts either a clean `ran` or a clean `failed`, but never a crash).
+- **Exit code contract.** `main` returns `0` iff the three synthetic steps
+  all have `status == "ran"`; a `verse-build`/`verse-evaluate` `failed` (as
+  opposed to a genuine `skipped`) does not, per spec, need to flip the exit
+  code non-zero, but as implemented it also does not, since the synthetic
+  steps are independent of the verse branch and always run first. This
+  matches AC2/AC8's "exit 0 regardless of the verse outcome" requirement
+  while still surfacing failures structurally in the summary.
+- **Manual smoke verification (not pytest).** Ran `scripts/refresh_reference.py`
+  directly for both the no-`--verse-cohort` path and a hand-built stand-in
+  VerSe cohort; both completed with exit 0 and produced the expected
+  `reference_default.json` / `eval_synthetic/eval_report.json` /
+  `reference_verse_v1.json` / `eval_verse/eval_report.json` artifacts, and the
+  verse artifact's `provenance.source` began with `"verse-"`.
