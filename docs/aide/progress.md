@@ -348,7 +348,7 @@ Stages 6/7 shipped on a synthetic VerSe stand-in (see the "Real VerSe GT" row in
 the Environment-Gated Capability Verification table).
 
 **Deliverables.**
-- 🚧 Expanded reference feature vocabulary — add fragmentation index, largest-component
+- ✅ Expanded reference feature vocabulary — add fragmentation index, largest-component
   fraction, component count, centroid depth, orientation, and spacing/neighbour-consistency
   deviations through ingest → aggregation → delta rules → config; regenerate the synthetic default. *(Item 081)*
 - 📋 Real-VerSe acquisition & versioned artifact build recipe (derived artifact committed, raw scans never). *(Item 082)*
