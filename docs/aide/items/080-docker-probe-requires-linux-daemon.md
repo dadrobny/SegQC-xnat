@@ -30,7 +30,8 @@ running daemon at all (clean skip) versus a running Windows-container daemon
 (build error) varied between runs.
 
 **Fix.** `_docker_available()` now requires the daemon's **server OS to be
-`linux`** (`docker version --format '{{.Server.Os}}'` → `"linux"`), since the
+`linux`** (via `docker version`'s `--format` server-OS query, which prints
+`linux` or `windows`), since the
 image under test is a Linux image. A Windows-container daemon reports
 `windows` and is treated as unavailable → the Docker-gated tests skip cleanly,
 which is the intended behaviour (they run for real only in the dedicated Linux
