@@ -91,6 +91,7 @@ def _write_verse_shaped_cohort(dest_dir, n=3, levels=("L1", "L2", "L3", "L4", "L
     ``eigenvalue_ratio`` is present) paired with a seeded, deterministic
     ``paint_clean_scan``. Mirrors ``build_default_cohort``'s style but with the
     real VerSe vertebra-mask suffix. Returns ``(dest_dir, subject_ids)``."""
+    pathlib.Path(dest_dir).mkdir(parents=True, exist_ok=True)
     subject_ids = []
     for i in range(n):
         subject_id = f"sub-verse{i:03d}"
