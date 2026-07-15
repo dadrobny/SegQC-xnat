@@ -26,6 +26,7 @@ Segmentation heuristics can support downstream classification tasks:
 - pathologies (e.g. compression fracture),
 - implant presence (pedicle screws, rods, intervertebral cages),
 - spinal shape (scoliosis)
+
 Additional tools can be plugged in:
 - registration-based template matching,
 - radiomics or similar features,
