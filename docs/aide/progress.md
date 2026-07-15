@@ -63,9 +63,9 @@ exercised._
 
 | Capability | Package / Tool | Introduced by | Status | Notes |
 |------------|-----------------|----------------|--------|-------|
-| Radiomics feature extraction | `pyradiomics` (extra: `segqc[radiomics]`) | Stage 8 *(Item 060)* | ❓ Unverified | `tests/test_060_*` (and related Stage-8 radiomics tests) skip via `pytest.importorskip("radiomics")`; `pyradiomics` has never been installed in any environment this project has run tests in, so the radiomics feature-extraction path itself has never executed. |
-| Containerised pipeline (Docker build + run) | Docker (external tool, no pip dependency) | Stage 9 *(Items 066, 069, 070)* | ❓ Unverified | `tests/test_066_dockerfile.py`, `tests/test_069_container_smoke.py`, `tests/test_070_acceptance_stage9.py`'s Docker-gated cases skip via the shared `requires_docker` marker/`docker_image_tag` fixture; no `docker` CLI/daemon has been available in any environment this project has run tests in, so the image has never actually been built or run. |
-| GPU-accelerated feature extraction | `cupy` (planned extra: `segqc[gpu]`) | Stage 10 *(Items 071–075)* | ❓ Unverified | Stage 10 not yet built (queue-009, specs authored). Once built, the GPU path will be CuPy-gated identically to the two rows above; this row is pre-registered now so the stage-closing item (075) updates it rather than introducing it from scratch. |
+| Radiomics feature extraction | `pyradiomics` (extra: `segqc[radiomics]`) | Stage 8 *(Item 060)* | ❓ Unverified | `tests/test_060_*` (and related Stage-8 radiomics tests) skip via `pytest.importorskip("radiomics")`; `pyradiomics` has never been installed in any environment this project has run tests in, so the radiomics feature-extraction path itself has never executed. **Pending:** `.github/workflows/ci.yml`'s `verify-environment-gated` job installs `segqc[radiomics]` and fails if any of these tests report as skipped — flip this row once that job has actually run green. |
+| Containerised pipeline (Docker build + run) | Docker (external tool, no pip dependency) | Stage 9 *(Items 066, 069, 070)* | ❓ Unverified | `tests/test_066_dockerfile.py`, `tests/test_069_container_smoke.py`, `tests/test_070_acceptance_stage9.py`'s Docker-gated cases skip via the shared `requires_docker` marker/`docker_image_tag` fixture; no `docker` CLI/daemon has been available in any environment this project has run tests in, so the image has never actually been built or run. **Pending:** the same `verify-environment-gated` CI job (Docker ships pre-installed on `ubuntu-latest`) — flip this row once that job has actually run green. |
+| GPU-accelerated feature extraction | `cupy` (planned extra: `segqc[gpu]`) | Stage 10 *(Items 071–075)* | ❓ Unverified | Stage 10 not yet built (queue-009, specs authored). Once built, the GPU path will be CuPy-gated identically to the two rows above; this row is pre-registered now so the stage-closing item (075) updates it rather than introducing it from scratch. No CI coverage possible (standard GitHub-hosted runners have no GPU) — see [`docs/gpu-verification.md`](../gpu-verification.md) for the manual verification checklist once GPU hardware is available. |
 
 ---
 
@@ -195,6 +195,7 @@ mislabelling heuristics.
 - ✅ Small committed fixture set spanning all 8 failure modes. *(Item 040)*
 - ✅ Regression suite asserting expected verdict + which heuristic fired per case. *(Item 041)*
 - ✅ Golden-file JSON snapshots for stability/determinism. *(Item 042)*
+- ✅ Cross-platform golden comparison: fresh-vs-committed via numeric tolerance (item 042's byte-identity of asymmetric-geometry floats was only reproducible on the goldens' origin platform; found via CI). *(Item 078)*
 
 **Acceptance.**
 - [x] Every §6 failure mode has ≥1 synthetic case and is detected (**G7**, **G2**).

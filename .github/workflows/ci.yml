@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu + windows are both x86_64. macos-latest (Apple Silicon /
+        # arm64) is deliberately NOT in the matrix: several golden-file /
+        # reference-artifact tests (test_022, test_042, test_045, test_063)
+        # assert byte-identity or tight-tolerance equality against committed
+        # fixtures that were generated on x86, and floating-point aggregates
+        # (spline/curvature/EDT/percentile stats) are not reproducible across
+        # CPU architectures -- different BLAS/SIMD/libm -- even at identical
+        # numpy/scipy versions. Item 078 relaxed test_042 to numeric tolerance
+        # (enough for x86 cross-platform), but arm64 divergence exceeds even
+        # that for some values and the other three tests compare exactly.
+        # Supporting arm64 needs its own effort (arch-portable goldens or
+        # wide-tolerance conversion of all golden tests) -- tracked as item
+        # 079, deferred. See docs/aide/items/079-arm64-golden-reproducibility.md.
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        # Installed via constraints.txt (the Stage-9 Docker lockfile, item
+        # 066), not pyproject.toml's loose lower bounds -- per item 001's own
+        # design intent ("exact reproducibility pins belong in the deployable
+        # container's lockfile/constraints, not in library metadata"). The
+        # golden-file/reference-artifact byte-identity tests (items 042, 045,
+        # 063) assert exact reproducibility, which only holds within this
+        # pinned numpy/scipy environment: a fresh loose-bound install resolves
+        # much newer numpy/scipy on Python 3.11 and their tiny last-digit
+        # floating-point differences break byte-identity (found via CI; see
+        # item 077). Contributors regenerating golden files locally should
+        # likewise install via `-c constraints.txt`.
+        run: pip install -e .[dev] -c constraints.txt
+      - name: Test
+        run: python -m pytest
+
+  # This project has two optional capabilities -- pyradiomics (Stage 8) and
+  # the Docker container path (Stage 9) -- whose tests skip cleanly when the
+  # dependency is absent (see .aide/conventions.md "Environment-gated
+  # capabilities"). The `test` job above only ever exercises the skip path.
+  # This job installs the real dependencies and proves the gated tests
+  # actually run (not just pass-by-skipping) -- see assert_no_skips.py, which
+  # fails the job outright if any of them report as skipped here.
+  verify-environment-gated:
+    name: verify environment-gated capabilities (radiomics + docker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install base project (numpy etc. first)
+        run: pip install -e .[dev]
+      - name: Install pyradiomics's undeclared build-time dependencies
+        # pyradiomics's legacy setup.py imports numpy AND versioneer at
+        # build time, but its build-system.requires declares neither, so
+        # pip's isolated per-package build env fails with
+        # ModuleNotFoundError for each in turn (numpy first, then
+        # versioneer once numpy was fixed). This is exactly the install
+        # friction pyproject.toml's `radiomics` extra comment (item 060)
+        # predicted -- pre-installing both here, then building with
+        # --no-build-isolation, works around it.
+        run: pip install versioneer
+      - name: Install pyradiomics without build isolation
+        run: pip install --no-build-isolation "pyradiomics>=3.0"
+      - name: Confirm docker is available
+        run: docker version
+      - name: Run environment-gated test modules
+        run: |
+          python -m pytest -v --junitxml=gated-results.xml \
+            tests/test_features_radiomics.py \
+            tests/test_066_dockerfile.py \
+            tests/test_069_container_smoke.py \
+            tests/test_070_acceptance_stage9.py
+      - name: Fail if any environment-gated test was skipped
+        # --allow: a couple of tests intentionally verify the *absent*-path
+        # behaviour and correctly self-skip once they detect PyRadiomics is
+        # actually installed (the inverse condition of every other gated
+        # test here) -- see tests/test_features_radiomics.py's
+        # test_ac5_absent_path_yields_builtin_markers_and_no_exception and
+        # test_adv_enable_true_with_pyradiomics_absent_still_degrades_cleanly.
+        run: |
+          python .github/scripts/assert_no_skips.py gated-results.xml \
+            --allow "PyRadiomics happens to be installed"

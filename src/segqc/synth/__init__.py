@@ -92,8 +92,10 @@ from segqc.synth.intensity import (
     write_intensity_corpus,
 )
 from segqc.synth.golden import (
+    GOLDEN_ABS_TOL,
     GOLDEN_DIR,
     GOLDEN_DIRNAME,
+    GOLDEN_REL_TOL,
     VOLATILE_POINTERS,
     VOLATILE_SENTINEL,
     build_report_for_case,
@@ -102,6 +104,7 @@ from segqc.synth.golden import (
     golden_path,
     load_golden,
     read_golden_text,
+    reports_close,
     write_goldens,
 )
 
@@ -146,8 +149,10 @@ __all__ = [
     "offending_labels_match",
     "pipeline_hides_designated_rule",
     "verify_case",
+    "GOLDEN_ABS_TOL",
     "GOLDEN_DIR",
     "GOLDEN_DIRNAME",
+    "GOLDEN_REL_TOL",
     "VOLATILE_POINTERS",
     "VOLATILE_SENTINEL",
     "build_report_for_case",
@@ -156,6 +161,7 @@ __all__ = [
     "golden_path",
     "load_golden",
     "read_golden_text",
+    "reports_close",
     "write_goldens",
     "HUModel",
     "DEFAULT_HU_MODEL",

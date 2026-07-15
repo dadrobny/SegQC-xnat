@@ -48,6 +48,14 @@ dev = [
 # platforms/Python versions (it transitively pulls SimpleITK); the default
 # feature set and test suite run fine without it. Install with
 # `pip install segqc[radiomics]`.
+# Confirmed friction (2026-07-14, CI): pyradiomics's legacy setup.py does
+# `import numpy` at build time without declaring numpy as a build-system
+# requirement, so a plain `pip install segqc[radiomics]` fails in pip's
+# isolated build env with `ModuleNotFoundError: No module named 'numpy'`.
+# Install core deps first, then pyradiomics with `--no-build-isolation`:
+#   pip install -e .[dev]
+#   pip install --no-build-isolation "pyradiomics>=3.0"
+# See .github/workflows/ci.yml's verify-environment-gated job.
 radiomics = [
     "pyradiomics>=3.0",
 ]

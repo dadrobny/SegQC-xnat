@@ -14,15 +14,22 @@ Covers Acceptance Criteria AC1-AC16:
 - AC6-AC8 (Group C, golden corpus completeness/storage/validity): exactly one
   golden per manifest case_id; every committed golden parses and validates;
   every golden's embedded ``case_id`` matches its filename stem.
-- AC9 (Group D): fresh canonical JSON equals the committed golden bytes for
-  every case (``check_case_golden`` is True).
+- AC9 (Group D): the freshly-built report matches the committed golden within
+  numeric tolerance for every case (``check_case_golden`` is True) -- relaxed
+  from raw byte-identity to a numeric-tolerance comparison so it holds across
+  platforms (item 078); the same-platform byte determinism stays strict in
+  AC4/AC5/AC12.
 - AC10-AC11 (Group E, volatile-field seam): an explicit ``volatile_pointers``
   normalises a synthetic differing field; the real v0 report is already free
   of the documented volatile-key denylist and ``VOLATILE_POINTERS == ()``.
 - AC12-AC15 (Group F, one-command update path & the harness bites): ``main``
   regenerates matching goldens into a fresh directory; ``write_goldens``
-  reproduces the committed goldens byte-for-byte; a missing golden raises
-  ``FileNotFoundError``; a mutated golden fails the comparison.
+  reproduces the committed goldens within numeric tolerance (item 078); a
+  missing golden raises ``FileNotFoundError``; a mutated golden fails the
+  comparison.
+- Item 078 (Group H): ``reports_close`` compares two parsed reports with
+  numeric tolerance on numeric leaves and exact equality on
+  structure/strings/bools/ordering.
 - AC16 (Group G): every ``reconstructed_record`` case's committed golden is a
   known pipeline-blind snapshot (``verdict == "pass"``, no golden finding's
   ``rule_id`` is in ``expected_rule_ids``).
@@ -71,6 +78,7 @@ from segqc.synth.golden import (
     load_golden,
     main,
     read_golden_text,
+    reports_close,
     write_goldens,
 )
 from segqc.synth.regression import loaded_seg_image
@@ -231,9 +239,13 @@ def test_ac8_committed_golden_case_id_matches_filename(case):
 
 
 @pytest.mark.parametrize("case", _CASES, ids=_case_id)
-def test_ac9_fresh_canonical_json_equals_committed_golden_bytes(case):
+def test_ac9_fresh_report_matches_committed_golden_within_tolerance(case):
     """AC9: check_case_golden(case) is True against the real GOLDEN_DIR for
-    every case (fresh output equals the committed golden bytes)."""
+    every case (fresh output matches the committed golden within numeric
+    tolerance -- see item 078; cross-platform byte-identity of the
+    asymmetric-geometry cases' floats is not achievable, so numeric leaves are
+    compared with tolerance while structure/strings/bools/ordering stay
+    exact)."""
     assert check_case_golden(case) is True
 
 
@@ -287,16 +299,23 @@ def test_ac12_main_regenerates_matching_goldens(tmp_path):
         assert written.read_bytes() == expected, case["case_id"]
 
 
-def test_ac13_regeneration_reproduces_committed_goldens_byte_for_byte(tmp_path):
-    """AC13: for every case, the file write_goldens(tmp) produces is
-    byte-identical to the committed GOLDEN_DIR/<case_id>.json."""
+def test_ac13_regeneration_reproduces_committed_goldens_within_tolerance(tmp_path):
+    """AC13: for every case, the file write_goldens(tmp) produces matches the
+    committed GOLDEN_DIR/<case_id>.json within numeric tolerance (item 078 --
+    a fresh regeneration on a different platform than the goldens' origin is
+    numerically identical but not necessarily byte-identical for the
+    asymmetric-geometry cases)."""
     dest = tmp_path / "regen_write"
     write_goldens(dest)
 
     for case in _CASES:
-        regenerated = (dest / f"{case['case_id']}.json").read_bytes()
-        committed = golden_path(case["case_id"]).read_bytes()
-        assert regenerated == committed, case["case_id"]
+        regenerated = json.loads(
+            (dest / f"{case['case_id']}.json").read_text(encoding="utf-8")
+        )
+        committed = json.loads(
+            golden_path(case["case_id"]).read_text(encoding="utf-8")
+        )
+        assert reports_close(regenerated, committed), case["case_id"]
 
 
 def test_ac14_missing_golden_fails_loudly(tmp_path):
@@ -449,3 +468,77 @@ def test_adv_reconstructed_golden_blindness_is_checked_via_rule_ids_not_empty_fi
         # being empty -- assert the discriminator explicitly rather than
         # via golden["findings"] == [].
         assert not (all_rule_ids & expected_rule_ids)
+
+
+# =========================================================================== #
+# H. reports_close numeric-tolerance comparator (item 078, AC1-AC4)
+# =========================================================================== #
+
+
+def test_ac1_reports_close_deep_structural_equal_is_true():
+    """Item 078 AC1: reports_close returns True for two structurally-equal
+    nested reports (dicts, lists, mixed leaf types)."""
+    a = {"x": [1, 2.0, "s", True, None], "y": {"z": 3.5}}
+    b = {"x": [1, 2.0, "s", True, None], "y": {"z": 3.5}}
+    assert reports_close(a, b) is True
+
+
+def test_ac2_reports_close_float_within_tolerance_is_true():
+    """Item 078 AC2: two reports whose only difference is a sub-tolerance
+    float delta (a last-ULP-style difference) compare equal."""
+    a = {"centroid_mm": [106.9841827768014, 35.47483623582042, 27.0]}
+    b = {"centroid_mm": [106.98418277680141, 35.474836235820421, 27.0]}
+    assert reports_close(a, b) is True
+
+
+def test_ac2_reports_close_near_zero_uses_abs_tol():
+    """Item 078 AC2: values near zero (e.g. total_curvature_deg ~ 1e-14)
+    compare equal via the absolute tolerance, where relative tolerance alone
+    would not."""
+    a = {"total_curvature_deg": 7.105427357601002e-14}
+    b = {"total_curvature_deg": 0.0}
+    assert reports_close(a, b) is True
+
+
+def test_ac3_reports_close_float_beyond_tolerance_is_false():
+    """Item 078 AC3: a genuine numeric difference (a centroid off by 0.5)
+    returns False -- the tolerance does not blunt real feature changes."""
+    a = {"centroid_mm": [107.0]}
+    b = {"centroid_mm": [107.5]}
+    assert reports_close(a, b) is False
+
+
+def test_ac4_reports_close_string_difference_is_false():
+    """Item 078 AC4: a differing string leaf (verdict) is caught exactly."""
+    assert reports_close({"verdict": "pass"}, {"verdict": "fail"}) is False
+
+
+def test_ac4_reports_close_bool_is_not_a_number():
+    """Item 078 AC4: booleans are compared by identity, never as numbers --
+    True must not be treated as close to 1.0 (bool is an int subclass)."""
+    assert reports_close({"flag": True}, {"flag": 1}) is False
+    assert reports_close({"flag": True}, {"flag": 1.0}) is False
+    assert reports_close({"flag": False}, {"flag": 0}) is False
+    assert reports_close({"flag": True}, {"flag": True}) is True
+
+
+def test_ac4_reports_close_missing_or_extra_key_is_false():
+    """Item 078 AC4: differing dict key sets (a missing or extra key) return
+    False."""
+    assert reports_close({"a": 1, "b": 2}, {"a": 1}) is False
+    assert reports_close({"a": 1}, {"a": 1, "b": 2}) is False
+
+
+def test_ac4_reports_close_list_length_and_order_are_exact():
+    """Item 078 AC4: list comparison is length- and order-sensitive (a
+    reordered or shorter list is not close)."""
+    assert reports_close([1, 2, 3], [1, 2]) is False
+    assert reports_close([1, 2, 3], [3, 2, 1]) is False
+    assert reports_close([1, 2, 3], [1, 2, 3]) is True
+
+
+def test_ac4_reports_close_int_float_equal_value_is_true():
+    """Item 078 AC4 (edge): an int and a float of equal value compare close
+    (e.g. a voxel_count serialised as 5 vs 5.0) -- both are numbers, neither
+    is a bool."""
+    assert reports_close({"n": 5}, {"n": 5.0}) is True
