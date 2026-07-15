@@ -71,11 +71,19 @@ _ITEM_REF_RE = re.compile(r"[Ii]tem\s+0*(\d+)")
 # Data model
 # --------------------------------------------------------------------------- #
 @dataclass
+class Phase:
+    """A roadmap phase (``# Phase N — Title`` in progress.md) grouping stages."""
+    number: str
+    title: str
+
+
+@dataclass
 class Stage:
     number: str
     title: str
     objectives: str
     status: str  # one of STATUS_ICONS values
+    phase: Optional[str] = None  # roadmap phase number this stage belongs to
 
 
 @dataclass
@@ -107,6 +115,38 @@ class CorpusCase:
 
 
 @dataclass
+class ReferenceArtifact:
+    """The versioned reference-distribution artifact (Stage 6, item 045):
+    per-level, per-feature summary statistics the delta-to-reference rules
+    consume. Parsed from ``src/segqc/reference/reference_default.json``."""
+    source: str
+    subject_count: int
+    build_date: str
+    schema_version: str
+    size_proxy_name: Optional[str]
+    features: List[str] = field(default_factory=list)
+    levels: List[str] = field(default_factory=list)
+    strata: List[str] = field(default_factory=list)
+    percentiles: List[int] = field(default_factory=list)
+    # level -> feature -> {"mean","std","min","max","count", "percentiles": {...}}
+    level_stats: Dict[str, Dict[str, dict]] = field(default_factory=dict)
+
+    @property
+    def is_synthetic(self) -> bool:
+        """True when the cohort is a synthetic VerSe stand-in rather than a
+        real VerSe ground-truth ingestion (source names it explicitly)."""
+        return "synthetic" in (self.source or "").lower()
+
+    @property
+    def intensity_feature_count(self) -> int:
+        return sum(1 for f in self.features if f.startswith("intensity_"))
+
+    @property
+    def geometric_feature_count(self) -> int:
+        return len(self.features) - self.intensity_feature_count
+
+
+@dataclass
 class TestSummary:
     file_count: int = 0
     test_count: int = 0
@@ -124,6 +164,7 @@ class TestSummary:
 class ReportModel:
     generated_at: str
     project: str = "Seg-QC-xnat"
+    phases: List[Phase] = field(default_factory=list)
     stages: List[Stage] = field(default_factory=list)
     objectives: List[Objective] = field(default_factory=list)
     items: List[WorkItem] = field(default_factory=list)
@@ -131,6 +172,7 @@ class ReportModel:
     qc_images: List[Tuple[str, str]] = field(default_factory=list)  # (label, data-uri or path)
     distributions: List[Tuple[str, str]] = field(default_factory=list)
     corpus: List[CorpusCase] = field(default_factory=list)
+    reference: Optional[ReferenceArtifact] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -201,6 +243,72 @@ def parse_progress(text: str) -> Tuple[List[Stage], List[Objective], Dict[int, T
             elif prev[1] is None and current_stage is not None:
                 item_status[num] = (prev[0], current_stage)
     return stages, objectives, item_status
+
+
+def parse_phases(text: str) -> Tuple[List[Phase], Dict[str, str]]:
+    """Parse ``# Phase N — Title`` headers and the ``## Stage M`` sections that
+    follow each, from ``progress.md``'s body.
+
+    Returns ``(phases, stage_to_phase)`` where ``stage_to_phase`` maps a stage
+    number to the number of the phase whose header most recently preceded that
+    stage's section. Stages appearing before any phase header (none, in
+    practice) map to no phase.
+    """
+    phases: List[Phase] = []
+    stage_to_phase: Dict[str, str] = {}
+    phase_re = re.compile(r"^#\s+Phase\s+(\d+)\s*[—:-]?\s*(.*)$")
+    stage_re = re.compile(r"^##\s+Stage\s+(\d+)\b")
+    current_phase: Optional[str] = None
+    seen_phase_numbers: set = set()
+    for line in text.splitlines():
+        pm = phase_re.match(line)
+        if pm:
+            current_phase = pm.group(1)
+            if current_phase not in seen_phase_numbers:
+                phases.append(Phase(current_phase, pm.group(2).strip()))
+                seen_phase_numbers.add(current_phase)
+            continue
+        sm = stage_re.match(line)
+        if sm and current_phase is not None:
+            stage_to_phase.setdefault(sm.group(1), current_phase)
+    return phases, stage_to_phase
+
+
+def parse_reference_artifact(path: Path) -> Optional[ReferenceArtifact]:
+    """Parse the reference-distribution artifact (Stage 6, item 045) into a
+    :class:`ReferenceArtifact`. Returns ``None`` if the file is absent or
+    malformed — the reference panel then renders its placeholder."""
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    prov = data.get("provenance", {}) if isinstance(data.get("provenance"), dict) else {}
+    levels_block = data.get("levels", {}) if isinstance(data.get("levels"), dict) else {}
+    level_stats: Dict[str, Dict[str, dict]] = {}
+    for level_name, strata in levels_block.items():
+        if not isinstance(strata, dict):
+            continue
+        # Prefer the "all" stratum; fall back to the first available.
+        chosen = strata.get("all") or next(iter(strata.values()), None)
+        if isinstance(chosen, dict) and isinstance(chosen.get("feature_stats"), dict):
+            level_stats[str(level_name)] = chosen["feature_stats"]
+    try:
+        return ReferenceArtifact(
+            source=str(prov.get("source", "")),
+            subject_count=int(data.get("subject_count", 0) or 0),
+            build_date=str(prov.get("build_date", "")),
+            schema_version=str(data.get("schema_version", "")),
+            size_proxy_name=prov.get("size_proxy_name"),
+            features=[str(f) for f in data.get("features", [])],
+            levels=[str(l) for l in levels_block.keys()],
+            strata=[str(s) for s in data.get("strata", [])],
+            percentiles=[int(p) for p in data.get("percentiles", []) if isinstance(p, (int, float))],
+            level_stats=level_stats,
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def parse_items(items_dir: Path) -> Dict[int, str]:
@@ -359,6 +467,7 @@ def build_report_model(
     distributions_dir: Optional[Path] = None,
     embed_images: bool = True,
     now: Optional[_dt.datetime] = None,
+    reference_path: Optional[Path] = None,
 ) -> ReportModel:
     tests_dir = tests_dir or (REPO_ROOT / "tests")
     now = now or _dt.datetime.now(_dt.timezone.utc)
@@ -366,11 +475,14 @@ def build_report_model(
     progress_path = aide_dir / "progress.md"
     stages: List[Stage] = []
     objectives: List[Objective] = []
+    phases: List[Phase] = []
     item_status: Dict[int, Tuple[str, Optional[str]]] = {}
     if progress_path.is_file():
-        stages, objectives, item_status = parse_progress(
-            progress_path.read_text(encoding="utf-8")
-        )
+        progress_text = progress_path.read_text(encoding="utf-8")
+        stages, objectives, item_status = parse_progress(progress_text)
+        phases, stage_to_phase = parse_phases(progress_text)
+        for stage in stages:
+            stage.phase = stage_to_phase.get(stage.number)
 
     titles = parse_items(aide_dir / "items")
     queued = parse_queues(aide_dir / "queue")
@@ -389,8 +501,11 @@ def build_report_model(
             )
         )
 
+    if reference_path is None:
+        reference_path = REPO_ROOT / "src" / "segqc" / "reference" / "reference_default.json"
     model = ReportModel(
         generated_at=now.strftime("%Y-%m-%d %H:%M UTC"),
+        phases=phases,
         stages=stages,
         objectives=objectives,
         items=items,
@@ -398,6 +513,7 @@ def build_report_model(
         qc_images=_collect_images(qc_images_dir, embed_images),
         distributions=_collect_images(distributions_dir, embed_images),
         corpus=parse_corpus_manifest(tests_dir / "corpus" / "manifest.json"),
+        reference=parse_reference_artifact(reference_path),
     )
     return model
 
@@ -452,6 +568,19 @@ details.fold > table th, details.fold > table td { padding-left: 12px; }
 .b-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px;
          font-weight: 600; background: #eaeef2; color: #24292f; white-space: nowrap; }
 .b-pill.recon { background: #fff1e5; color: #9a5b00; }
+.phase-block { margin: 18px 0; }
+.phase-block h3 { color: #1f2328; text-transform: none; letter-spacing: 0; font-size: 15px;
+         margin-bottom: 6px; }
+.bar-caption { font-size: 12px; color: #57606a; margin: 4px 0 0; }
+.note { font-size: 13px; color: #424a53; background: var(--bg); border-left: 3px solid var(--line);
+        padding: 8px 12px; border-radius: 0 6px 6px 0; margin: 10px 0; }
+.note strong { color: #1f2328; }
+.legend { margin: 8px 0; padding: 8px 12px 8px 28px; font-size: 13px; color: #424a53; }
+.legend li { margin: 2px 0; }
+.scroll-x { overflow-x: auto; }
+table.matrix { font-size: 12px; white-space: nowrap; }
+table.matrix th { position: sticky; top: 0; background: #fff; }
+.muted { color: #8c959f; font-weight: 400; }
 footer { text-align: center; color: #57606a; font-size: 12px; padding: 24px; }
 """
 
@@ -473,25 +602,69 @@ def _esc(text: str) -> str:
     return html.escape(str(text))
 
 
+def _stage_rows(stages: Sequence[Stage]) -> str:
+    return "\n".join(
+        f"<tr><td>{_esc(s.number)}</td><td>{_esc(s.title)}</td>"
+        f"<td>{_esc(s.objectives)}</td><td>{_badge(s.status)}</td></tr>"
+        for s in stages
+    )
+
+
+def _stage_table(stages: Sequence[Stage]) -> str:
+    return (
+        "<table><tr><th>Stage</th><th>Title</th><th>Objectives</th>"
+        f"<th>Status</th></tr>{_stage_rows(stages)}</table>"
+    )
+
+
+def _progress_bar(done: int, total: int) -> str:
+    pct = round(100 * done / total) if total else 0
+    return (
+        f'<div class="progress-bar"><span style="width:{pct}%"></span></div>'
+        f'<p class="bar-caption">{done} of {total} complete ({pct}%)</p>'
+    )
+
+
 def _render_stage_section(model: ReportModel) -> str:
     if not model.stages:
         return ""
     done = sum(1 for s in model.stages if s.status == "complete")
-    pct = round(100 * done / len(model.stages)) if model.stages else 0
-    rows = "\n".join(
-        f"<tr><td>{_esc(s.number)}</td><td>{_esc(s.title)}</td>"
-        f"<td>{_esc(s.objectives)}</td><td>{_badge(s.status)}</td></tr>"
-        for s in model.stages
-    )
+    total = len(model.stages)
+
+    # Group stages under their roadmap phase when phase data is available;
+    # otherwise fall back to a single flat table.
+    phase_titles = {p.number: p.title for p in model.phases}
+    grouped: "Dict[Optional[str], List[Stage]]" = {}
+    for s in model.stages:
+        grouped.setdefault(s.phase, []).append(s)
+
+    if model.phases and any(k is not None for k in grouped):
+        blocks = []
+        for phase in model.phases:
+            stages = grouped.get(phase.number, [])
+            if not stages:
+                continue
+            p_done = sum(1 for s in stages if s.status == "complete")
+            blocks.append(
+                f'<div class="phase-block">'
+                f"<h3>Phase {_esc(phase.number)} — {_esc(phase.title)}</h3>"
+                f"{_progress_bar(p_done, len(stages))}"
+                f"{_stage_table(stages)}</div>"
+            )
+        # Any stages with no detected phase (shouldn't happen) go last.
+        orphans = grouped.get(None, [])
+        if orphans:
+            blocks.append(f"<div class=\"phase-block\">{_stage_table(orphans)}</div>")
+        body = "\n".join(blocks)
+    else:
+        body = _stage_table(model.stages)
+
     return f"""
 <section id="phase">
-  <h2>Project Phase Alignment</h2>
-  <p>{done} of {len(model.stages)} roadmap stages complete ({pct}%).</p>
-  <div class="progress-bar"><span style="width:{pct}%"></span></div>
-  <table>
-    <tr><th>Stage</th><th>Title</th><th>Objectives</th><th>Status</th></tr>
-    {rows}
-  </table>
+  <h2>Roadmap Phases &amp; Stages</h2>
+  <p>Overall: {done} of {total} roadmap stages complete.</p>
+  {_progress_bar(done, total)}
+  {body}
 </section>"""
 
 
@@ -560,16 +733,37 @@ def _render_queue_section(model: ReportModel) -> str:
 </section>"""
 
 
+# The eight catalogued segmentation failure modes from the project vision
+# (vision.md §6). Surfaced in the status report so "failure mode N" is
+# self-explanatory without cross-referencing the vision document.
+FAILURE_MODES_LEGEND = {
+    1: "Label not aligned with the vertebra it names",
+    2: "Over-/under-segmentation (fused or fragmented segments)",
+    3: "Disconnected components / islands (tiny rogue segments)",
+    4: "Semantic mislabelling (wrong vertebra identity)",
+    5: "Not all vertebrae segmented (missing level)",
+    6: "Partial vertebra at the image border",
+    7: "Non-continuous label sequence (e.g. L1→T12→L2→L5)",
+    8: "Overlapping segments",
+}
+
+
 def _render_corpus_section(model: ReportModel) -> str:
-    """Stage-5 synthetic failure corpus coverage (tests/corpus/manifest.json)."""
+    """Stage-5 synthetic failure corpus coverage (tests/corpus/manifest.json).
+
+    "Failure mode N" refers to the N-th catalogued segmentation failure mode
+    in the project vision (vision.md §6); the modes are spelled out in the
+    legend so the report is self-contained.
+    """
     if not model.corpus:
         return """
 <section id="corpus">
   <h2>Synthetic Failure Corpus</h2>
   <p class="placeholder"><strong>Extension point.</strong> The committed synthetic-failure
   corpus (roadmap Stage 5, item 040) populates here once
-  <code>tests/corpus/manifest.json</code> exists — one row per §6 failure mode plus the
-  clean-GT positive control, with its detection path and expected verdict.</p>
+  <code>tests/corpus/manifest.json</code> exists — one row per catalogued
+  segmentation failure mode (project vision §6) plus the clean-GT positive
+  control, with its detection path and expected verdict.</p>
 </section>"""
 
     modes = {c.failure_mode for c in model.corpus}
@@ -585,22 +779,128 @@ def _render_corpus_section(model: ReportModel) -> str:
         for c in model.corpus
     )
     table = (
-        "<table><tr><th>Mode</th><th>§6 failure mode</th><th>Case</th><th>Perturbation</th>"
+        "<table><tr><th>Mode</th><th>Failure mode</th><th>Case</th><th>Perturbation</th>"
         "<th>Detection</th><th>Expected verdict</th><th>Rule(s)</th></tr>"
         f"{rows}</table>"
+    )
+    legend_items = "".join(
+        f"<li><strong>{n}</strong> — {_esc(desc)}</li>"
+        for n, desc in sorted(FAILURE_MODES_LEGEND.items())
+    )
+    legend = (
+        '<details class="fold"><summary>What the failure modes are '
+        "(project vision §6) — click to expand</summary>"
+        f'<ul class="legend">{legend_items}</ul></details>'
     )
     return f"""
 <section id="corpus">
   <h2>Synthetic Failure Corpus</h2>
+  <p class="note">Each of the eight <strong>catalogued segmentation failure modes</strong>
+  from the project vision (vision.md §6, spelled out in the legend below) has ≥1
+  committed synthetic case, plus a clean-GT positive control (mode 0).</p>
   <div class="cards">
     <div class="card"><div class="n">{len(model.corpus)}</div><div class="l">Committed cases</div></div>
-    <div class="card"><div class="n">{len(non_clean_modes)}/8</div><div class="l">§6 modes covered</div></div>
+    <div class="card"><div class="n">{len(non_clean_modes)}/8</div><div class="l">Failure modes covered</div></div>
     <div class="card"><div class="n">{recon}</div><div class="l">Reconstructed-record</div></div>
   </div>
-  <p>Each §6 failure mode has ≥1 committed case; <em>reconstructed-record</em> cases
-  (modes 1/4/8) are pipeline-blind by design and asserted via a reconstructed feature
-  record (see items 038–041).</p>
+  {legend}
+  <p><em>Reconstructed-record</em> cases (modes 1/4/8) are pipeline-blind by
+  design and asserted via a reconstructed feature record (see items 038–041).</p>
   {table}
+</section>"""
+
+
+def _fmt_num(value) -> str:
+    """Format a numeric stat compactly (≤4 significant figures)."""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return _esc(value)
+    if f == 0:
+        return "0"
+    return f"{f:.4g}"
+
+
+def _render_reference_section(model: ReportModel) -> str:
+    """Stage-6 VerSe reference-distribution artifact (per-level feature stats)."""
+    ref = model.reference
+    if ref is None:
+        return """
+<section id="reference">
+  <h2>Reference Feature Distributions (VerSe)</h2>
+  <p class="placeholder"><strong>Extension point.</strong> The versioned reference
+  artifact (roadmap Stage 6, item 045) populates here once
+  <code>src/segqc/reference/reference_default.json</code> exists — per-level,
+  per-feature expected distributions the delta-to-reference rules compare against.</p>
+</section>"""
+
+    origin = (
+        '<span class="b-pill recon">synthetic VerSe stand-in</span>'
+        if ref.is_synthetic
+        else '<span class="b-pill">real VerSe GT</span>'
+    )
+    synthetic_note = (
+        "<p class=\"note\"><strong>Note — this is a synthetic cohort.</strong> "
+        f"The bundled artifact was built from a synthetic VerSe-shaped cohort "
+        f"(<code>source: {_esc(ref.source)}</code>), <em>not</em> from real VerSe "
+        "ground-truth scans. The ingestion pipeline (item 044) accepts a real "
+        "VerSe cohort directory unchanged; no real VerSe GT has been ingested "
+        "yet, so the distributions below are illustrative of the schema and "
+        "shape, not clinically representative.</p>"
+        if ref.is_synthetic
+        else ""
+    )
+
+    size_proxy = ref.size_proxy_name or "none (unstratified)"
+    cards = (
+        f'<div class="card"><div class="n">{ref.subject_count}</div>'
+        '<div class="l">Cohort subjects</div></div>'
+        f'<div class="card"><div class="n">{len(ref.levels)}</div>'
+        '<div class="l">Vertebra levels</div></div>'
+        f'<div class="card"><div class="n">{len(ref.features)}</div>'
+        f'<div class="l">Features ({ref.geometric_feature_count} geom. + '
+        f'{ref.intensity_feature_count} intensity)</div></div>'
+        f'<div class="card"><div class="n">{len(ref.percentiles)}</div>'
+        '<div class="l">Percentiles/feature</div></div>'
+    )
+
+    # Compact per-level × feature "mean (±std)" matrix, folded (it is wide).
+    features = ref.features
+    header_cells = "".join(f"<th>{_esc(f)}</th>" for f in features)
+    body_rows = []
+    for level in ref.levels:
+        stats = ref.level_stats.get(level, {})
+        cells = [f"<td><strong>{_esc(level)}</strong></td>"]
+        for feat in features:
+            fs = stats.get(feat)
+            if isinstance(fs, dict) and "mean" in fs:
+                mean = _fmt_num(fs.get("mean"))
+                std = _fmt_num(fs.get("std"))
+                cells.append(f"<td>{mean} <span class=\"muted\">±{std}</span></td>")
+            else:
+                cells.append("<td>—</td>")
+        body_rows.append(f"<tr>{''.join(cells)}</tr>")
+    matrix = (
+        '<div class="scroll-x"><table class="matrix">'
+        f"<tr><th>Level</th>{header_cells}</tr>{''.join(body_rows)}</table></div>"
+    )
+
+    provenance = (
+        f"<p class=\"note\">Built <strong>{_esc(ref.build_date or '—')}</strong> · "
+        f"schema v{_esc(ref.schema_version or '—')} · "
+        f"size-proxy stratification: {_esc(size_proxy)} · "
+        f"strata: {_esc(', '.join(ref.strata) or '—')}.</p>"
+    )
+
+    return f"""
+<section id="reference">
+  <h2>Reference Feature Distributions (VerSe) &nbsp;{origin}</h2>
+  {synthetic_note}
+  <div class="cards">{cards}</div>
+  {provenance}
+  <details class="fold"><summary>Per-level feature means (±std) — click to expand</summary>
+  {matrix}
+  </details>
 </section>"""
 
 
@@ -678,6 +978,7 @@ def render_html(model: ReportModel) -> str:
             _render_stage_section(model),
             _render_objectives_section(model),
             _render_corpus_section(model),
+            _render_reference_section(model),
             _render_tests_section(model),
             _render_highlights_section(model),
         ]

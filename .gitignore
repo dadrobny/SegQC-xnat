@@ -236,6 +236,8 @@ docs/aide/status/*.png
 docs/aide/status/*.svg
 docs/aide/status/*.jpg
 docs/aide/status/*.jpeg
+docs/aide/status/*.xml
+docs/aide/status/results.xml
 
 # Local datasets (large, not versioned)
 dataset-verse19training/

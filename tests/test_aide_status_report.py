@@ -183,9 +183,9 @@ def test_render_html_is_self_contained_and_escaped():
     assert "<style>" in doc  # inline CSS, no external assets
     assert "http://" not in doc and "https://" not in doc  # no external fetches
     # Core sections present.
-    for anchor in ("Work-Queue Overview", "Project Phase Alignment",
-                   "Vision Objective Coverage", "Testing Overview",
-                   "Project Feature Highlights"):
+    for anchor in ("Work-Queue Overview", "Roadmap Phases",
+                   "Vision Objective Coverage", "Reference Feature Distributions",
+                   "Testing Overview", "Project Feature Highlights"):
         assert anchor in doc
     # Extension-point placeholders render when no images are supplied.
     assert "Extension point" in doc
@@ -302,3 +302,168 @@ def test_main_writes_output(tmp_path: Path):
     assert rc == 0
     assert out.is_file()
     assert out.read_text(encoding="utf-8").startswith("<!DOCTYPE html>")
+
+
+# --------------------------------------------------------------------------- #
+# Phase grouping
+# --------------------------------------------------------------------------- #
+
+_PROGRESS_WITH_PHASES = """# Progress
+
+| Stage | Title | Objectives | Status |
+|-------|-------|-----------|--------|
+| 0 | Scaffolding | (foundation) | ✅ |
+| 7 | Evaluation | G3 | ✅ |
+| 8 | Radiomics | (Phase 2) | ✅ |
+| 10 | GPU | G6 | 📋 |
+
+# Phase 1 — Complete MVP Pipeline
+
+## Stage 0 — Scaffolding — ✅
+## Stage 7 — Evaluation — ✅
+
+# Phase 2 — Extensions
+
+## Stage 8 — Radiomics — ✅
+## Stage 10 — GPU — 📋
+"""
+
+
+def test_parse_phases_maps_stages_to_phases():
+    phases, stage_to_phase = asr.parse_phases(_PROGRESS_WITH_PHASES)
+    assert [(p.number, p.title) for p in phases] == [
+        ("1", "Complete MVP Pipeline"),
+        ("2", "Extensions"),
+    ]
+    assert stage_to_phase == {"0": "1", "7": "1", "8": "2", "10": "2"}
+
+
+def test_stage_section_groups_by_phase_when_available():
+    stages = [
+        asr.Stage("0", "Scaffolding", "(foundation)", "complete", phase="1"),
+        asr.Stage("8", "Radiomics", "(Phase 2)", "complete", phase="2"),
+        asr.Stage("10", "GPU", "G6", "planned", phase="2"),
+    ]
+    model = asr.ReportModel(
+        generated_at="now",
+        phases=[asr.Phase("1", "Complete MVP Pipeline"), asr.Phase("2", "Extensions")],
+        stages=stages,
+    )
+    html_out = asr._render_stage_section(model)
+    assert "Phase 1 — Complete MVP Pipeline" in html_out
+    assert "Phase 2 — Extensions" in html_out
+    # Overall progress reflects all stages (1 of 3 not counted as complete).
+    assert "2 of 3 roadmap stages complete" in html_out
+
+
+def test_stage_section_falls_back_to_flat_table_without_phases():
+    stages = [asr.Stage("0", "Scaffolding", "(foundation)", "complete")]
+    model = asr.ReportModel(generated_at="now", phases=[], stages=stages)
+    html_out = asr._render_stage_section(model)
+    assert "Scaffolding" in html_out
+    assert "Phase 1" not in html_out
+
+
+# --------------------------------------------------------------------------- #
+# Reference-distribution artifact (VerSe)
+# --------------------------------------------------------------------------- #
+
+_REFERENCE_SAMPLE = {
+    "schema_version": "1.1",
+    "subject_count": 5,
+    "features": ["physical_volume_mm3", "extent_x_mm", "intensity_mean"],
+    "percentiles": [1, 5, 25, 50, 75, 95, 99],
+    "strata": ["all"],
+    "provenance": {
+        "source": "synthetic-verse-cohort",
+        "build_date": "2026-07-11",
+        "size_proxy_name": None,
+    },
+    "levels": {
+        "L1": {
+            "all": {
+                "level_name": "L1",
+                "stratum": "all",
+                "record_count": 4,
+                "feature_stats": {
+                    "physical_volume_mm3": {
+                        "count": 4, "mean": 19141.19, "std": 425.7,
+                        "min": 18750.0, "max": 19714.7,
+                        "percentiles": {"p50": 19050.0},
+                    },
+                    "extent_x_mm": {
+                        "count": 4, "mean": 25.0, "std": 0.1,
+                        "min": 25.0, "max": 25.3, "percentiles": {"p50": 25.0},
+                    },
+                    "intensity_mean": {
+                        "count": 4, "mean": 210.0, "std": 5.0,
+                        "min": 205.0, "max": 215.0, "percentiles": {"p50": 210.0},
+                    },
+                },
+            }
+        }
+    },
+}
+
+
+def _write_reference(tmp_path: Path) -> Path:
+    import json
+    path = tmp_path / "reference_default.json"
+    path.write_text(json.dumps(_REFERENCE_SAMPLE), encoding="utf-8")
+    return path
+
+
+def test_parse_reference_artifact_reads_provenance_and_stats(tmp_path: Path):
+    ref = asr.parse_reference_artifact(_write_reference(tmp_path))
+    assert ref is not None
+    assert ref.source == "synthetic-verse-cohort"
+    assert ref.subject_count == 5
+    assert ref.is_synthetic is True
+    assert ref.levels == ["L1"]
+    assert ref.geometric_feature_count == 2  # physical_volume_mm3, extent_x_mm
+    assert ref.intensity_feature_count == 1  # intensity_mean
+    assert ref.level_stats["L1"]["physical_volume_mm3"]["mean"] == 19141.19
+
+
+def test_parse_reference_artifact_missing_returns_none(tmp_path: Path):
+    assert asr.parse_reference_artifact(tmp_path / "nope.json") is None
+
+
+def test_parse_reference_artifact_malformed_returns_none(tmp_path: Path):
+    bad = tmp_path / "reference_default.json"
+    bad.write_text("{ not json", encoding="utf-8")
+    assert asr.parse_reference_artifact(bad) is None
+
+
+def test_reference_section_flags_synthetic_cohort_and_shows_matrix(tmp_path: Path):
+    ref = asr.parse_reference_artifact(_write_reference(tmp_path))
+    model = asr.ReportModel(generated_at="now", reference=ref)
+    html_out = asr._render_reference_section(model)
+    assert "synthetic VerSe stand-in" in html_out
+    assert "not</em> from real VerSe" in html_out  # honesty note
+    assert "L1" in html_out
+    assert "19140" in html_out or "1.914e+04" in html_out  # mean rendered (4 sig figs)
+
+
+def test_reference_section_placeholder_when_absent():
+    model = asr.ReportModel(generated_at="now", reference=None)
+    html_out = asr._render_reference_section(model)
+    assert "Extension point" in html_out
+
+
+def test_real_docs_reference_is_synthetic_verse_cohort():
+    """The bundled reference artifact is currently a synthetic VerSe stand-in;
+    the report must surface that honestly rather than implying real VerSe GT."""
+    model = _model()
+    assert model.reference is not None
+    assert model.reference.is_synthetic is True
+    assert model.reference.subject_count > 0
+
+
+def test_corpus_legend_spells_out_failure_modes():
+    """§6 references must be self-explanatory: the eight failure modes are
+    spelled out in the rendered report."""
+    model = _model()
+    doc = asr.render_html(model)
+    assert "Overlapping segments" in doc  # mode 8 description from the legend
+    assert "vision.md §6" in doc  # the reference is explained, not bare
