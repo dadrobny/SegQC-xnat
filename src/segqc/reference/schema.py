@@ -16,7 +16,7 @@ import json
 from dataclasses import dataclass
 from typing import Mapping, Optional, Tuple
 
-SCHEMA_VERSION = "1.1"
+SCHEMA_VERSION = "1.2"
 DEFAULT_PERCENTILES: Tuple[int, ...] = (1, 5, 25, 50, 75, 95, 99)
 ALL_STRATUM = "all"
 

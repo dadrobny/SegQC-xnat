@@ -41,7 +41,7 @@ from collections.abc import Mapping as MappingABC
 from dataclasses import dataclass
 from typing import Mapping, Optional, Tuple
 
-from .ingest import INGESTED_FEATURES
+from .ingest import INGESTED_FEATURES, INGESTED_MORPHOLOGY_FEATURES
 from .schema import ALL_STRATUM, FeatureStats, ReferenceDistribution
 
 __all__ = [
@@ -50,11 +50,13 @@ __all__ = [
     "DEFAULT_UPPER_PCT",
     "IQR_TO_SIGMA",
     "INTENSITY_FEATURE_PREFIX",
+    "MORPHOLOGY_FEATURES",
     "FeatureDelta",
     "LabelDelta",
     "ReferenceDelta",
     "compute_reference_delta",
     "compute_intensity_reference_delta",
+    "compute_morphology_reference_delta",
     "reference_delta_to_dict",
 ]
 
@@ -82,6 +84,13 @@ _SPLINE_OFFSET_FEATURE = "spline_offset_mm"
 # e.g. ``"intensity_median"`` -> case value at ``first_order["median"]``
 # (item 064).
 INTENSITY_FEATURE_PREFIX = "intensity_"
+
+# The tracked geometric-morphology feature vocabulary (item 081) -- an alias
+# of ``INGESTED_MORPHOLOGY_FEATURES``, scored via its own read path
+# (``components`` / Stage 3 orientation blocks), never through
+# ``_GEOMETRY_FEATURES`` / ``entry["geometry"]`` nor the ``intensity_``
+# prefix.
+MORPHOLOGY_FEATURES: Tuple[str, ...] = INGESTED_MORPHOLOGY_FEATURES
 
 
 @dataclass(frozen=True)
@@ -239,6 +248,32 @@ def _intensity_case_values(image_entry: Mapping, tracked_intensity: Tuple[str, .
         value = first_order.get(stat)
         if value is not None:
             values[feature_name] = value
+    return values
+
+
+def _morphology_case_values(
+    entry: Mapping, orientations_by_label: Mapping[int, float], label: int
+) -> dict:
+    """Extract the tracked morphology values present for one case label
+    entry (item 081).
+
+    Reads ``largest_component_fraction`` / ``component_count`` from
+    ``entry["components"]`` (cast ``component_count`` to ``float``) and, when
+    available, the matching Stage 3 ``eigenvalue_ratio``. Never reads
+    ``entry["geometry"]``. Never mutates ``entry``.
+    """
+
+    components = entry.get("components")
+    values = {}
+    if isinstance(components, MappingABC):
+        if "largest_component_fraction" in components:
+            values["largest_component_fraction"] = float(
+                components["largest_component_fraction"]
+            )
+        if "component_count" in components:
+            values["component_count"] = float(components["component_count"])
+    if label in orientations_by_label:
+        values["eigenvalue_ratio"] = float(orientations_by_label[label])
     return values
 
 
@@ -453,6 +488,137 @@ def compute_intensity_reference_delta(
 
         feature_deltas = []
         for feature_name in tracked_intensity:
+            if feature_name not in case_values:
+                continue
+            stats = level_dist.feature_stats.get(feature_name)
+            if stats is None:
+                continue
+            feature_deltas.append(
+                _feature_delta(
+                    feature_name,
+                    case_values[feature_name],
+                    stats,
+                    lower_pct=lower_pct,
+                    upper_pct=upper_pct,
+                    percentile_order=percentile_order,
+                )
+            )
+        feature_deltas = tuple(feature_deltas)
+
+        out_of_range_features = tuple(
+            sorted(fd.feature for fd in feature_deltas if fd.out_of_range)
+        )
+
+        per_label[label] = LabelDelta(
+            label=label,
+            level_name=level_name,
+            stratum=stratum,
+            available=True,
+            features=feature_deltas,
+            distribution_distance=_distribution_distance(feature_deltas),
+            out_of_range_features=out_of_range_features,
+        )
+
+    return ReferenceDelta(
+        reference_delta_version=REFERENCE_DELTA_VERSION,
+        reference_schema_version=reference.schema_version,
+        reference_source=reference.provenance.source,
+        stratum=stratum,
+        lower_pct=lower_pct,
+        upper_pct=upper_pct,
+        per_label=per_label,
+    )
+
+
+def compute_morphology_reference_delta(
+    features_block: Mapping,
+    reference: ReferenceDistribution,
+    *,
+    stratum: str = ALL_STRATUM,
+    lower_pct: int = DEFAULT_LOWER_PCT,
+    upper_pct: int = DEFAULT_UPPER_PCT,
+) -> ReferenceDelta:
+    """Compute per-label delta-to-reference metrics for the geometric-
+    morphology feature family (item 081) -- a sibling of
+    :func:`compute_reference_delta` and :func:`compute_intensity_reference_delta`.
+
+    For each label in ``features_block["per_label"]`` (used purely as the
+    authoritative label -> ``level_name`` join surface), looks up its level's
+    ``FeatureStats`` in ``reference`` (for ``stratum``) and scores the case's
+    morphology values -- ``largest_component_fraction`` / ``component_count``
+    from that label's ``components`` block, and ``eigenvalue_ratio`` from
+    ``features_block["stage3"]["per_label_orientations"]`` matched by label --
+    against the :data:`MORPHOLOGY_FEATURES` subset of ``reference.features``.
+    Reuses :func:`_feature_delta` (the same z / robust-z / percentile-rank /
+    out-of-range / distribution-distance mechanics the other two deltas use).
+    Never reads ``entry["geometry"]``.
+
+    A label whose level (or requested stratum) is absent from ``reference``
+    yields an ``available=False`` :class:`LabelDelta` rather than raising. A
+    reference carrying no morphology distributions yields zero
+    ``FeatureDelta``s for every available label (backward compatibility with
+    pre-081 references). A missing/``None`` value simply omits that feature
+    (never scored as ``None``).
+
+    This function does not modify :func:`compute_reference_delta` or
+    :func:`compute_intensity_reference_delta`, which stay morphology-inert
+    and byte-identical.
+
+    Pure: no file I/O, no wall-clock reads; neither ``features_block`` nor
+    ``reference`` is mutated.
+
+    Raises
+    ------
+    ValueError
+        If ``lower_pct`` or ``upper_pct`` is not a percentile stored in
+        ``reference.percentiles``.
+    """
+
+    if lower_pct not in reference.percentiles:
+        raise ValueError(
+            f"lower_pct={lower_pct!r} is not in reference.percentiles={reference.percentiles!r}"
+        )
+    if upper_pct not in reference.percentiles:
+        raise ValueError(
+            f"upper_pct={upper_pct!r} is not in reference.percentiles={reference.percentiles!r}"
+        )
+
+    percentile_order = tuple(sorted(reference.percentiles))
+    tracked_morphology = tuple(
+        sorted(name for name in reference.features if name in MORPHOLOGY_FEATURES)
+    )
+
+    orientations_by_label = {}
+    stage3 = features_block.get("stage3")
+    if stage3 is not None:
+        for orientation_entry in stage3.get("per_label_orientations", []):
+            orientations_by_label[int(orientation_entry["label"])] = orientation_entry[
+                "eigenvalue_ratio"
+            ]
+
+    per_label = {}
+    for _label_str, entry in features_block.get("per_label", {}).items():
+        label = int(entry["label"])
+        level_name = entry["level_name"]
+
+        level_strata = reference.levels.get(level_name)
+        if level_strata is None or stratum not in level_strata:
+            per_label[label] = LabelDelta(
+                label=label,
+                level_name=level_name,
+                stratum=stratum,
+                available=False,
+                features=(),
+                distribution_distance=None,
+                out_of_range_features=(),
+            )
+            continue
+
+        level_dist = level_strata[stratum]
+        case_values = _morphology_case_values(entry, orientations_by_label, label)
+
+        feature_deltas = []
+        for feature_name in tracked_morphology:
             if feature_name not in case_values:
                 continue
             stats = level_dist.feature_stats.get(feature_name)

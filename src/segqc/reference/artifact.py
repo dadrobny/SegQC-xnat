@@ -148,6 +148,7 @@ def build_reference(
     size_strata_edges: "Optional[Sequence[float]]" = None,
     stratum_labels: "Optional[Sequence[str]]" = None,
     with_intensity: bool = True,
+    with_morphology: bool = True,
 ) -> ReferenceDistribution:
     """Chain ``ingest_cohort`` -> ``aggregate_reference`` into a
     :class:`~segqc.reference.schema.ReferenceDistribution`, stamping a
@@ -182,6 +183,13 @@ def build_reference(
         sibling scan; subjects with no scan degrade to geometry-only.
         Purely additive -- the geometric ``feature_stats`` produced are
         identical regardless of this flag.
+    with_morphology:
+        Forwarded to ``ingest_cohort`` (default ``True``, opt-in-by-default
+        at this layer, item 081). When ``True``, per-level geometric-
+        morphology values (``largest_component_fraction``, ``component_count``,
+        ``eigenvalue_ratio``) are folded into the ingested records. Purely
+        additive -- the geometric and intensity ``feature_stats`` produced
+        are identical regardless of this flag.
 
     Returns
     -------
@@ -206,6 +214,7 @@ def build_reference(
         seg_suffix=seg_suffix,
         with_size_proxy=stratifying,
         with_intensity=with_intensity,
+        with_morphology=with_morphology,
     )
 
     provenance = Provenance(

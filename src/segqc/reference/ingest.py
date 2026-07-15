@@ -79,6 +79,7 @@ __all__ = [
     "SIZE_PROXY_NAME",
     "INGESTED_FEATURES",
     "INGESTED_INTENSITY_FEATURES",
+    "INGESTED_MORPHOLOGY_FEATURES",
     "SubjectIngest",
     "CohortIngest",
     "ingest_subject",
@@ -130,6 +131,21 @@ INGESTED_INTENSITY_FEATURES: Tuple[str, ...] = (
     "intensity_range",
     "intensity_iqr",
     "intensity_entropy",
+)
+
+# The per-level *geometric-morphology* feature-name vocabulary (item 081) --
+# a deliberately SEPARATE, companion constant, never routed through the
+# geometry path (``INGESTED_FEATURES`` / ``entry["geometry"]``) nor the
+# intensity path (the ``intensity_`` prefix). Drawn straight from the
+# per-label ``components`` block (item 012) and the Stage 3
+# ``per_label_orientations`` block (item 019). Deliberately excludes
+# ``fragmentation_index`` (an exact alias of ``largest_component_fraction``
+# that would double-weight the same signal) and ``principal_axis`` (a
+# unit-vector, not a per-level scalar).
+INGESTED_MORPHOLOGY_FEATURES: Tuple[str, ...] = (
+    "largest_component_fraction",
+    "component_count",
+    "eigenvalue_ratio",
 )
 
 # The ``LabelIntensity`` statistical field names, in the same order as
@@ -213,6 +229,7 @@ def ingest_subject(
     subject_id: Optional[str] = None,
     with_size_proxy: bool = True,
     with_intensity: bool = False,
+    with_morphology: bool = False,
 ) -> SubjectIngest:
     """Load one GT label map, run the feature engine, and emit one
     ``FeatureRecord`` per recognised, present level.
@@ -253,6 +270,17 @@ def ingest_subject(
         ``scan_path`` is ``None``, degrades silently to geometry-only. A
         grid-misaligned scan raises ``ValueError`` (propagated from the
         extractor).
+    with_morphology:
+        When ``True`` (default ``False``, preserving existing callers), fold
+        each recognised level's geometric-morphology values --
+        ``largest_component_fraction`` / ``component_count`` from that
+        level's ``components`` block, and (when the subject has >= 2
+        recognised levels, so Stage 3 ran) ``eigenvalue_ratio`` from its
+        Stage 3 orientation entry -- into that level's ``features`` under
+        their own (unprefixed) keys. Read from the ``components`` /
+        orientation blocks, never from ``entry["geometry"]``. A single-label
+        subject (no Stage 3) omits ``eigenvalue_ratio`` entirely -- ``None``
+        is never inserted into a ``features`` mapping.
 
     Returns
     -------
@@ -278,10 +306,13 @@ def ingest_subject(
     block = extract_feature_record(seg_img, config)
 
     offsets_by_label = {}
+    orientations_by_label = {}
     stage3 = block.get("stage3")
     if stage3 is not None:
         for entry in stage3.get("per_label_offsets", []):
             offsets_by_label[int(entry["label"])] = entry["offset_mm"]
+        for entry in stage3.get("per_label_orientations", []):
+            orientations_by_label[int(entry["label"])] = entry["eigenvalue_ratio"]
 
     intensity_by_label = {}
     if with_intensity and scan_path is not None:
@@ -314,6 +345,17 @@ def ingest_subject(
 
         if label_value in intensity_by_label:
             features.update(_intensity_features_dict(intensity_by_label[label_value]))
+
+        if with_morphology:
+            components = entry["components"]
+            features["largest_component_fraction"] = float(
+                components["largest_component_fraction"]
+            )
+            features["component_count"] = float(components["component_count"])
+            if label_value in orientations_by_label:
+                features["eigenvalue_ratio"] = float(
+                    orientations_by_label[label_value]
+                )
 
         collected.append((level_name, features))
 
@@ -351,6 +393,7 @@ def ingest_cohort(
     seg_suffix: str = DEFAULT_SEG_SUFFIX,
     with_size_proxy: bool = True,
     with_intensity: bool = False,
+    with_morphology: bool = False,
 ) -> CohortIngest:
     """Walk ``cohort_dir`` for label maps matching ``seg_suffix``, ingest
     each subject in ascending ``subject_id`` order, and return the
@@ -375,6 +418,9 @@ def ingest_cohort(
     with_size_proxy:
         Forwarded to :func:`ingest_subject` for every discovered subject.
     with_intensity:
+        Forwarded to :func:`ingest_subject` for every discovered subject
+        (default ``False``, preserving existing callers).
+    with_morphology:
         Forwarded to :func:`ingest_subject` for every discovered subject
         (default ``False``, preserving existing callers).
 
@@ -414,6 +460,7 @@ def ingest_cohort(
             subject_id=subject_id,
             with_size_proxy=with_size_proxy,
             with_intensity=with_intensity,
+            with_morphology=with_morphology,
         )
         for subject_id, seg_path, scan_path in discovered
     )

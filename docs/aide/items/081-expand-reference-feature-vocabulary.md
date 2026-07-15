@@ -587,4 +587,57 @@ any `features/*` module; **do not** add a `.gitattributes` line.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implementation followed the spec's Implementation Steps and Assumptions
+exactly; no divergence from the pinned upstream interfaces was found. Notes:
+
+- `schema.SCHEMA_VERSION` bumped `"1.1"` -> `"1.2"`; `artifact.ARTIFACT_SCHEMA_VERSION`
+  re-exports it automatically (no separate edit needed there beyond the
+  existing `= SCHEMA_VERSION` assignment).
+- `ingest.py`: added `INGESTED_MORPHOLOGY_FEATURES` (added to `__all__`),
+  `with_morphology: bool = False` on both `ingest_subject` and
+  `ingest_cohort` (forwarded), and an `orientations_by_label` map built
+  alongside the existing `offsets_by_label` map from `stage3.per_label_orientations`.
+  In the per-label collection loop, when `with_morphology=True`,
+  `largest_component_fraction` / `component_count` are read from
+  `entry["components"]` unconditionally (that block is always present per
+  label in `extract_feature_record`'s output) and `eigenvalue_ratio` is
+  added only `if label_value in orientations_by_label` (single-level
+  subjects have no Stage 3, hence no orientations, hence the key is simply
+  omitted -- never `None`).
+- `artifact.py`: `build_reference` gained `with_morphology: bool = True`
+  (opt-in by default at this layer, mirroring item 063's `with_intensity`),
+  forwarded to `ingest_cohort`. `build_default_cohort` needed no change
+  (morphology derives from the seg alone, already written by
+  `build_clean_spine`).
+- `delta.py`: added `MORPHOLOGY_FEATURES` (alias of
+  `INGESTED_MORPHOLOGY_FEATURES`), a private `_morphology_case_values`
+  helper mirroring `_intensity_case_values`'s shape (reads
+  `entry["components"]` and an `orientations_by_label` map built from
+  `features_block["stage3"]["per_label_orientations"]`; never reads
+  `entry["geometry"]`), and `compute_morphology_reference_delta` mirroring
+  `compute_intensity_reference_delta`'s structure exactly (same
+  available/unavailable label handling, same `_feature_delta`/
+  `_distribution_distance` reuse, same `lower_pct`/`upper_pct` percentile
+  validation). `compute_reference_delta` and `compute_intensity_reference_delta`
+  were left byte-for-byte unmodified. `aggregate.py` was not touched (the
+  generic aggregation core needed no change, per AC8/AC20).
+- Re-exported `INGESTED_MORPHOLOGY_FEATURES`, `INGESTED_INTENSITY_FEATURES`
+  (previously not re-exported at the package level; added while touching
+  this block for consistency with the sibling geometry/morphology
+  constants), `MORPHOLOGY_FEATURES`, and `compute_morphology_reference_delta`
+  from `segqc/reference/__init__.py`, matching the pattern already used for
+  the geometry/intensity siblings.
+- Regenerated `src/segqc/reference/reference_default.json` via
+  `python -m segqc.reference.artifact`. The diff is purely additive: a new
+  `schema_version: "1.2"`, three new `features` entries, and new
+  `component_count` / `eigenvalue_ratio` / `largest_component_fraction`
+  `feature_stats` blocks under every level/stratum -- every existing
+  geometric/intensity `feature_stats` value is byte-unchanged (confirmed by
+  inspecting the diff: the only removed line is the old `schema_version`
+  literal). No `.gitattributes` edit was needed -- the existing
+  `src/segqc/reference/reference_default.json text eol=lf` pin already
+  covers the regenerated file (same filename).
+- No CLI (`segqc build-reference`) change was made; it calls `build_reference`
+  without an explicit `with_morphology` argument, so it now opts into
+  morphology by the new default, consistent with `with_intensity`'s existing
+  default-`True` behaviour at that layer.
