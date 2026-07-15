@@ -369,7 +369,7 @@ def test_stage_section_falls_back_to_flat_table_without_phases():
 # --------------------------------------------------------------------------- #
 
 _REFERENCE_SAMPLE = {
-    "schema_version": "1.1",
+    "schema_version": "1.2",
     "subject_count": 5,
     "features": ["physical_volume_mm3", "extent_x_mm", "intensity_mean"],
     "percentiles": [1, 5, 25, 50, 75, 95, 99],

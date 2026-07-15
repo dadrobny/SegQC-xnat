@@ -19,7 +19,9 @@ Covers Acceptance Criteria AC1-AC17:
   non-empty levels mapping and the correct schema_version.
 - AC9: the bundled default's provenance carries the expected deterministic
   fields.
-- AC10: build_and_write_default reproduces the committed bytes exactly.
+- AC10: build_and_write_default reproduces the committed artifact (compared
+  via item-078/081 numeric-tolerance ``reports_close``, since item 081 makes
+  the bundled artifact carry a platform-sensitive PCA float).
 - AC11: build_default_cohort is deterministic across two temp directories.
 - AC12: config_hash is stable for equal configs and sensitive to a changed
   extraction-affecting field.
@@ -72,6 +74,7 @@ from segqc.reference import (
 from segqc.reference.artifact import DEFAULT_BUILD_DATE, DEFAULT_SOURCE
 from segqc.reference.ingest import DEFAULT_SEG_SUFFIX, SIZE_PROXY_NAME
 from segqc.synth.clean_gt import build_clean_spine
+from segqc.synth.golden import reports_close
 
 
 # =========================================================================== #
@@ -277,7 +280,23 @@ def test_ac10_regenerating_reproduces_committed_bytes(tmp_path):
     dest_json = tmp_path / "regenerated.json"
     build_and_write_default(dest_json)
 
-    assert dest_json.read_bytes() == default_artifact_path().read_bytes()
+    # Item 081: the bundled artifact now carries a platform-sensitive PCA
+    # float (eigenvalue_ratio), so the regenerated-vs-committed comparison
+    # switches to numeric tolerance (item 078's reports_close). Intra-platform
+    # determinism across two independent regenerations stays byte-exact
+    # (asserted separately below).
+    regenerated = json.loads(dest_json.read_text(encoding="utf-8"))
+    committed = json.loads(default_artifact_path().read_text(encoding="utf-8"))
+    assert reports_close(regenerated, committed)
+
+
+def test_ac10_two_regenerations_stay_byte_identical(tmp_path):
+    dest1 = tmp_path / "regenerated1.json"
+    dest2 = tmp_path / "regenerated2.json"
+    build_and_write_default(dest1)
+    build_and_write_default(dest2)
+
+    assert dest1.read_bytes() == dest2.read_bytes()
 
 
 # =========================================================================== #

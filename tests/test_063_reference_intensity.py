@@ -19,12 +19,12 @@ Covers Acceptance Criteria AC1-AC16:
 - AC8: ``aggregate_reference`` tracks intensity features with no core change
   (guarded by a source-text marker on ``aggregate.py``, plus
   hand-verifiable stats).
-- AC9: schema version bumped to "1.1" and enforced by the loader.
+- AC9: schema version bumped to "1.2" (item 081) and enforced by the loader.
 - AC10: ``build_reference`` threads ``with_intensity`` (default on).
 - AC11: ``build_default_cohort`` writes a painted, aligned, reproducible
   scan per subject.
 - AC12: the bundled artifact carries per-level intensity distributions for
-  L1-L5 under schema "1.1".
+  L1-L5 under schema "1.2".
 - AC13: enabling intensity does not alter geometric stats.
 - AC14: the existing delta computation stays inert on intensity reference
   features.
@@ -36,7 +36,7 @@ Adversarial / edge-case scenarios included:
   ``with_intensity=True``: intensity for the former only, no crash.
 - A NaN-filled label alongside a normal label in the same subject: only the
   NaN label's record omits intensity keys.
-- ``with_intensity=True`` over a scan-less cohort still loads under "1.1"
+- ``with_intensity=True`` over a scan-less cohort still loads under "1.2"
   (backward tolerance).
 - Idempotent regeneration: two ``build_and_write_default`` calls to two
   different temp destinations reproduce identical bytes.
@@ -380,8 +380,11 @@ def test_ac8_aggregate_reference_tracks_intensity_with_no_core_change(tmp_path):
 
 
 def test_ac9_schema_version_bumped_and_enforced(tmp_path):
-    assert SCHEMA_VERSION == "1.1"
-    assert ARTIFACT_SCHEMA_VERSION == "1.1"
+    # Item 081 bumped the schema to "1.2" (additive morphology vocabulary);
+    # this test's own version-bump/enforcement behaviour is otherwise
+    # unaffected -- only the literal is updated.
+    assert SCHEMA_VERSION == "1.2"
+    assert ARTIFACT_SCHEMA_VERSION == "1.2"
 
     _painted_case(tmp_path, "sub-000", levels=("L1",))
     dist = build_reference(tmp_path, source="s", build_date="2026-07-11")
@@ -389,7 +392,7 @@ def test_ac9_schema_version_bumped_and_enforced(tmp_path):
     write_artifact(dist, out_path)
 
     loaded = load_artifact(out_path)  # must not raise
-    assert loaded.schema_version == "1.1"
+    assert loaded.schema_version == "1.2"
 
     import json
 
@@ -471,7 +474,7 @@ def test_ac11_build_default_cohort_writes_aligned_reproducible_scans(tmp_path):
 def test_ac12_bundled_artifact_carries_intensity_distributions_for_lumbar_levels():
     dist = bundled_default_reference()
 
-    assert dist.schema_version == "1.1"
+    assert dist.schema_version == "1.2"
     assert any(name.startswith("intensity_") for name in dist.features)
 
     for level_name in ("L1", "L2", "L3", "L4", "L5"):
@@ -605,14 +608,14 @@ def test_ac16_geometry_only_reference_under_new_schema_round_trips(tmp_path):
     dist = build_reference(
         tmp_path, source="s", build_date="2026-07-11", with_intensity=False
     )
-    assert dist.schema_version == "1.1"
+    assert dist.schema_version == "1.2"
     assert not any(name.startswith("intensity_") for name in dist.features)
 
     assert from_dict(to_dict(dist)) == dist
 
     out_path = tmp_path / "artifact.json"
     write_artifact(dist, out_path)
-    loaded = load_artifact(out_path)  # must not raise under "1.1"
+    loaded = load_artifact(out_path)  # must not raise under "1.2"
     assert loaded == dist
 
 
@@ -666,7 +669,7 @@ def test_adv_with_intensity_true_over_scan_less_cohort_loads_under_new_schema(tm
     dist = build_reference(
         tmp_path, source="s", build_date="2026-07-11", with_intensity=True
     )
-    assert dist.schema_version == "1.1"
+    assert dist.schema_version == "1.2"
     assert not any(name.startswith("intensity_") for name in dist.features)
 
     out_path = tmp_path / "artifact.json"
