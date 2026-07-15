@@ -351,7 +351,7 @@ the Environment-Gated Capability Verification table).
 - ✅ Expanded reference feature vocabulary — add fragmentation index, largest-component
   fraction, component count, centroid depth, orientation, and spacing/neighbour-consistency
   deviations through ingest → aggregation → delta rules → config; regenerate the synthetic default. *(Item 081)*
-- 📋 Real-VerSe acquisition & versioned artifact build recipe (derived artifact committed, raw scans never). *(Item 082)*
+- 🚧 Real-VerSe acquisition & versioned artifact build recipe (derived artifact committed, raw scans never). *(Item 082)*
 - 📋 One-command reference-refresh wrapper (rebuild + re-evaluate) that degrades gracefully when the uncommitted VerSe cohort is absent. *(Item 083)*
 - 📋 Real-VerSe evaluation quantifying the G3 false-positive rate; verification-table closure. *(Item 084)*
 
