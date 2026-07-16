@@ -34,7 +34,7 @@
 | 7 | Evaluation, Calibration & Metrics *(Phase 1 complete)* | G3, G7 | ✅ |
 | 8 | Image-Based / Radiomics Features | (Phase 2) | ✅ |
 | 9 | Containerisation & XNAT Command | G5 | ✅ |
-| 10 | Portable Compute: GPU Acceleration Path | G6 | 🚧 |
+| 10 | Portable Compute: GPU Acceleration Path | G6 | ✅ |
 | 11 | Extensibility & Abnormality Classification Arm | G8 | 📋 |
 | 12 | Real-VerSe Grounding & Reference Feature Expansion | G3, G7 | ✅ |
 
@@ -47,7 +47,7 @@
 | G3 Distinguish failure from variation | Stages 6, 7 | ✅ |
 | G4 Per-case QC report (JSON + human) | Stage 1 (ext. 2–4) | ✅ |
 | G5 Deploy on XNAT *(deferred)* | Stage 9 | ✅ |
-| G6 Portable / GPU *(deferred)* | Stage 10 | 🚧 |
+| G6 Portable / GPU *(deferred)* | Stage 10 | ✅ |
 | G7 Evaluable & regression-testable | Stages 5, 7 | ✅ |
 | G8 Extensible / classification *(deferred)* | Stage 11 | 📋 |
 
@@ -67,7 +67,7 @@ alone; this tracks whether the real dependency/data has ever been exercised._
 | Real VerSe GT reference distributions | VerSe ground-truth cohort (external dataset) | Stage 6 *(Items 044, 045)*; closed by Stage 12 *(Item 084)* | ❓ Unverified | The ingestion → aggregation → versioned-artifact pipeline (items 043–045) is complete and tested, but the **bundled `reference_default.json` was built from a synthetic VerSe-shaped cohort** (`provenance.source == "synthetic-verse-cohort"`, `subject_count == 5`), **not** real VerSe scans. Stage 6's machinery passes against that stand-in; grounding the distributions in real VerSe GT (the stage's stated goal) is scheduled as **Stage 12** (queue-010). To verify: run `segqc build-reference` over a real VerSe cohort directory, re-bundle, and evaluate (item 084). |
 | Radiomics feature extraction | `pyradiomics` (extra: `segqc[radiomics]`) | Stage 8 *(Item 060)* | ✅ Verified (2026-07-14, GitHub Actions CI) | `.github/workflows/ci.yml`'s `verify-environment-gated` job installs `segqc[radiomics]` on `ubuntu-latest` and runs the radiomics tests for real, failing if any report as skipped (`assert_no_skips.py`). First real run exposed — and item 076 fixed — a genuine bug (`compute_label_radiomics` raised on PyRadiomics-rejected degenerate masks instead of degrading). Green since PR #33 (item 076 fix + the two intentional inverse-condition skips allow-listed). |
 | Containerised pipeline (Docker build + run) | Docker (external tool, no pip dependency) | Stage 9 *(Items 066, 069, 070)* | ✅ Verified (2026-07-14, GitHub Actions CI) | The same `verify-environment-gated` job performs a real `docker build` of the item-066 image and `docker run` container smoke tests (`test_066_dockerfile.py`, `test_069_container_smoke.py`, `test_070_acceptance_stage9.py`) on `ubuntu-latest`, all passing. Item 080 additionally hardened `_docker_available()` to require a Linux daemon so these tests skip (not error) on Windows-container-mode hosts. |
-| GPU-accelerated feature extraction | `cupy` (planned extra: `segqc[gpu]`) | Stage 10 *(Items 071–075)* | ❓ Unverified | Stage 10 not yet built (queue-009, specs authored). Once built, the GPU path will be CuPy-gated identically to the two rows above; this row is pre-registered now so the stage-closing item (075) updates it rather than introducing it from scratch. No CI coverage possible (standard GitHub-hosted runners have no GPU) — see [`docs/gpu-verification.md`](../gpu-verification.md) for the manual verification checklist once GPU hardware is available. |
+| GPU-accelerated feature extraction | `cupy` (planned extra: `segqc[gpu]`) | Stage 10 *(Items 071–075)* | ❓ Unverified | Stage 10 is complete (071–075 ✅) and reaches ✅ on its CPU-fallback path, but the GPU-gated clause itself remains unverified: item 075's `test_075_stage10_acceptance.py::test_ac10_gpu_vs_cpu_verdict_identical` is `skipif`-gated on `cupy_available()` and **skipped** (not run) on every host merged so far, since none has CuPy/a real GPU. This row and Stage 10's stage-summary status are intentionally decoupled (see item 075 A8/A9) — flip this row to ✅ Verified only once AC10 actually executes (CuPy present) on a merging host. No CI coverage possible (standard GitHub-hosted runners have no GPU) — see [`docs/gpu-verification.md`](../gpu-verification.md) for the manual verification checklist once GPU hardware is available. |
 
 ---
 
@@ -305,7 +305,7 @@ uncalibrated.)*
 
 ---
 
-## Stage 10 — Portable Compute: GPU Acceleration Path (G6) — 🚧
+## Stage 10 — Portable Compute: GPU Acceleration Path (G6) — ✅
 
 **Goal.** Optional GPU acceleration equivalent to the CPU path; GPU never required.
 
@@ -314,11 +314,11 @@ uncalibrated.)*
 - ✅ Backend-aware feature extraction (Stage 2/3 geometric/topological compute routed through the abstraction). *(Item 072)*
 - ✅ Equivalence tests: CPU vs GPU produce identical verdicts. *(Item 073)*
 - ✅ Performance benchmark. *(Item 074)*
-- 🚧 CLI/pipeline integration + Stage-10 acceptance closure. *(Item 075)*
+- ✅ CLI/pipeline integration + Stage-10 acceptance closure. *(Item 075)*
 
 **Acceptance.**
-- [ ] GPU path optional + auto-detected; CPU/GPU verdict-equivalence tests pass. *(Item 075)*
-- [ ] The tool runs fully CPU-only (**G6**). *(Item 075)*
+- [x] GPU path optional + auto-detected; CPU/GPU verdict-equivalence tests pass. *(Item 075)*
+- [x] The tool runs fully CPU-only (**G6**). *(Item 075)*
 
 ---
 
