@@ -50,6 +50,108 @@ Invoke Python/pytest via the venv in the relative form —
 (macOS/Linux). The `aide` CLI itself is stdlib-only and runs on **any** Python
 3.11+ via `python .aide/scripts/aide.py …` (it must work before the venv exists).
 
+## Common commands
+
+```bash
+# Full suite (from repo root, venv already bootstrapped)
+.venv/bin/python -m pytest                                   # macOS/Linux
+.venv\Scripts\python -m pytest                                # Windows
+
+# One file / one test
+.venv/bin/python -m pytest tests/test_035_cli_e2e.py
+.venv/bin/python -m pytest tests/test_035_cli_e2e.py::test_name -v
+
+# CLI, once installed editable (`pip install -e .[dev]`)
+segqc run --scan scan.nii.gz --seg seg.nii.gz --out out/       # QC one case
+segqc build-reference --cohort cohort/ --out reference.json    # Stage 6 artifact
+segqc evaluate --cohort manifest.json --out out/ [--calibrate] # Stage 7 harness
+```
+
+CI (`.github/workflows/ci.yml`) installs with `pip install -e .[dev] -c
+constraints.txt` (the Stage-9 Docker lockfile) rather than `pyproject.toml`'s
+loose bounds — several tests assert byte-identical output against committed
+golden files (items 042/045/063), which only holds within that pinned
+numpy/scipy environment. Regenerate goldens locally against the same
+constraints. Two **environment-gated** capabilities (PyRadiomics, Docker) skip
+cleanly when their dependency is absent; a second CI job
+(`verify-environment-gated`) installs both and fails if any gated test merely
+skipped instead of running — see `.aide/conventions.md` "Environment-gated
+capabilities" before adding a new one. There is no configured linter/formatter
+(no ruff/black/mypy) — `pytest` is the only gate.
+
+## Architecture
+
+`segqc` extracts label-map features, runs an explainable rule engine over
+them, and aggregates the findings into a verdict. The stage numbers below
+match `docs/aide/roadmap.md`/`progress.md` and the `NNN-*` work-item/test
+prefixes (`tests/test_0NN_*.py`) — when in doubt which stage a module belongs
+to, its docstring names the item number.
+
+- **Entry points** (`cli.py`): three subcommands — `run` (single-case QC),
+  `build-reference` (Stage 6, builds a versioned reference-distribution
+  artifact from a cohort), `evaluate` (Stage 7, runs a cohort through the
+  pipeline and reports aggregate metrics, optionally calibrating rule
+  thresholds). All handlers defer heavy imports (NumPy/SciPy/NiBabel) into the
+  function body so `segqc --help` stays fast.
+- **`pipeline.py`** is the orchestration seam: `extract_feature_record` calls
+  the Stage 2/3 extractors under `features/` and assembles them (via
+  `feature_report.build_features_block`) into one per-case `features` dict —
+  the single record shape every rule is written against. `run_qc` /
+  `run_qc_with_reference` / `run_qc_with_intensity` layer on top, attaching
+  optional `reference` / `reference_delta` / `image_features` keys to a
+  *transient* rule-evaluation record (never persisted back onto
+  `features_block`) before calling `heuristics.run_rules`.
+- **`features/`** — pure, stateless extractors over a NiBabel label map (and,
+  for intensity/radiomics, the paired scan): per-label geometry, connected
+  components, centroids, case-level relationships/overlaps (Stage 2), then
+  centroid-spline fit, per-label spline offset, orientation/curvature,
+  spacing/monotonic consistency (Stage 3, only computed when ≥2 labels are
+  present), plus intensity/radiomics (Stage 8, `radiomics.py` degrades to a
+  builtin first-order-only backend when PyRadiomics isn't installed).
+- **`heuristics/`** — the rule engine (Stage 4). `rule.py` defines the `Rule`
+  ABC and a module-level registry (`register_rule`/`iter_rules`, sorted by
+  `rule_id`); each concrete file (`bounds.py`, `overlap.py`, `mislabel.py`,
+  `fragmentation.py`, `coverage.py`, `sequence.py`, `border.py`,
+  `intensity.py`, `reference_delta.py`, `intensity_reference_delta.py`)
+  registers one rule that reads the `features` record plus `HeuristicConfig`
+  thresholds and returns zero or more `Finding`s. `runner.run_rules` executes
+  all enabled rules (`config.rule_enabled(rule_id)`) in deterministic order
+  and never mutates the record — adding a new rule means adding a new file
+  that self-registers, not touching the runner.
+- **`aggregate.py` / `verdict.py`** fold `Finding`s (plus Stage-1
+  `check_empty` base reasons) into a `CaseResult`/`Verdict` with an overall
+  `Severity` (pass / flagged-for-review / fail); `report.py` /
+  `human_report.py` serialize that into the JSON and plain-text reports the
+  CLI writes.
+- **`reference/`** (Stage 6) — ingests a cohort (`ingest.py`), aggregates
+  per-label geometric (and, Stage 8, intensity) distributions into a
+  `ReferenceDistribution` (`aggregate.py`, `schema.py`), versions it as a JSON
+  artifact (`artifact.py`), and computes a case's delta-to-reference
+  (`delta.py`) that the `reference_delta`/`intensity_reference_delta` rules
+  consume.
+- **`eval/`** (Stage 7) — a separate cohort-level harness, not the per-case
+  rule engine: `harness.py` runs `pipeline.run_qc*` over every case in a
+  manifest (`cohort.py`), `outcome.py`/`overlap.py`/`feature_match.py` compare
+  against expected verdicts/ground truth, `metrics.py` aggregates
+  FPR/FNR/etc., and `calibrate.py` grid-searches rule thresholds against those
+  metrics; `report.py` renders the `segqc evaluate` output.
+- **`backend.py`** (Stage 10) — resolves `"cpu"`/`"gpu"`/`"auto"` (precedence:
+  explicit override → `SEGQC_BACKEND` env var → `"auto"`) to a NumPy- or
+  CuPy-backed array-module handle. CuPy is probed with a guarded `import`
+  inside the function body on every call (never cached at import time) so
+  tests can inject/remove a fake `cupy` module in `sys.modules`. The default
+  install and full test suite need **zero** GPU dependencies.
+- **`synth/`** (Stage 5) — synthetic failure-corpus generators (deliberately
+  broken label maps: fragmentation, coverage/border/overlap defects, identity
+  /ordering/alignment issues) used by the regression suite; distinct from
+  `tests/synthetic.py`, which builds well-formed happy-path fixtures for unit
+  tests (see the README's "Testing & synthetic fixtures" section).
+
+Nearly every stage's module docstring documents its item number, design
+decisions, and explicit non-goals ("Scope fence") — read the module docstring
+before extending it; the reasoning for *why* it's shaped that way is usually
+already written down there rather than in `docs/aide/`.
+
 ## The framework, in one line each
 
 - **Loop & agents** — see [`.aide/README.md`](.aide/README.md).
