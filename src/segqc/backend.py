@@ -54,9 +54,10 @@ handle. It does not:
 
 from __future__ import annotations
 
+import functools
 import os
-from dataclasses import dataclass
-from typing import Any, Optional
+from dataclasses import dataclass, field
+from typing import Any, Callable, Optional
 
 import numpy
 
@@ -136,15 +137,34 @@ class Backend:
             common NumPy/CuPy-interchangeable-array-module convention.
         ndimage: The ndimage module to route ``label`` /
             ``distance_transform_edt`` / ``gaussian_filter`` calls through --
-            ``scipy.ndimage`` for CPU, ``cupyx.scipy.ndimage`` (imported
-            lazily, only on the GPU path -- it ships inside the ``cupy``
-            package, no ``cucim`` needed) for GPU. Added by item 072.
+            ``scipy.ndimage`` for CPU, ``cupyx.scipy.ndimage`` for GPU. Added
+            by item 072. Exposed as a cached property backed by
+            ``_ndimage_loader`` so that ``import cupyx.scipy.ndimage`` (which
+            genuinely requires a CuPy install, unlike the bare ``import
+            cupy`` used for capability probing) happens lazily -- only the
+            first time ``.ndimage`` is actually accessed on a GPU backend --
+            rather than eagerly inside :func:`get_backend` just to construct
+            the handle. This keeps ``get_backend(override="gpu")`` itself
+            working under a host/test double that stubs ``cupy`` but not
+            ``cupyx`` (see ``tests/test_071_backend.py``'s ``fake_cupy``
+            fixture, which never touches ``.ndimage``).
     """
 
     name: str
     is_gpu: bool
     xp: Any
-    ndimage: Any
+    _ndimage_loader: Callable[[], Any] = field(repr=False, compare=False)
+
+    @functools.cached_property
+    def ndimage(self) -> Any:
+        """The ndimage module for this backend, imported on first access.
+
+        Direct instance-``__dict__`` caching via ``functools.cached_property``
+        works even though :class:`Backend` is a frozen dataclass: the cache
+        write bypasses ``__setattr__`` (and thus ``FrozenInstanceError``) by
+        writing straight into ``instance.__dict__``.
+        """
+        return self._ndimage_loader()
 
 
 # ---- Resolution ------------------------------------------------------------ #
@@ -217,9 +237,22 @@ def get_backend(override: Optional[str] = None) -> Backend:
     if resolved == BACKEND_CPU:
         import scipy.ndimage
 
-        return Backend(name=BACKEND_CPU, is_gpu=False, xp=numpy, ndimage=scipy.ndimage)
+        return Backend(
+            name=BACKEND_CPU,
+            is_gpu=False,
+            xp=numpy,
+            _ndimage_loader=lambda: scipy.ndimage,
+        )
 
     import cupy
-    import cupyx.scipy.ndimage
 
-    return Backend(name=BACKEND_GPU, is_gpu=True, xp=cupy, ndimage=cupyx.scipy.ndimage)
+    def _load_gpu_ndimage() -> Any:
+        # Deferred: only imported the first time `.ndimage` is actually
+        # accessed on a GPU backend, not eagerly here -- `cupyx` genuinely
+        # requires a real CuPy install (unlike the bare `import cupy` above,
+        # which a sys.modules stub can satisfy for capability probing/tests).
+        import cupyx.scipy.ndimage
+
+        return cupyx.scipy.ndimage
+
+    return Backend(name=BACKEND_GPU, is_gpu=True, xp=cupy, _ndimage_loader=_load_gpu_ndimage)
