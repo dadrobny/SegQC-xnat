@@ -59,6 +59,18 @@ dev = [
 radiomics = [
     "pyradiomics>=3.0",
 ]
+# Optional Stage-10 extra (item 071): CuPy, the CUDA-accelerated NumPy-alike
+# consumed by segqc.backend's GPU path (segqc.backend.get_backend). Kept out
+# of core `dependencies` -- the default backend is CPU/NumPy and the full
+# test suite runs with zero required GPU dependencies; auto-detect silently
+# falls back to CPU when cupy is absent. The requirement below is a loose
+# lower bound only: CuPy ships CUDA-version-specific wheels
+# (`cupy-cuda11x` / `cupy-cuda12x`) or a source build, so the user must pick
+# the wheel matching their installed CUDA toolkit -- `pip install segqc[gpu]`
+# documents the dependency but does not, by itself, choose a working wheel.
+gpu = [
+    "cupy>=12",
+]
 
 [project.urls]
 Homepage = "https://github.com/dadrobny/SegQC-xnat"

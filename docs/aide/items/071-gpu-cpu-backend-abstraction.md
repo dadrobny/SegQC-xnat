@@ -267,4 +267,26 @@ None`) genuinely makes the guarded import raise so the test isn't vacuous.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- Implemented exactly per the Implementation Steps: `src/segqc/backend.py` is
+  new and self-contained (constants, `SegQCBackendError`, `cupy_available`,
+  frozen `Backend` dataclass, `resolve_backend_choice`, `backend_name`,
+  `get_backend`, `__all__`). No other source file was touched (`cli.py`,
+  `pipeline.py`, `features/*.py` are untouched, per A1/scope fence).
+- `resolve_backend_choice` normalises the raw token once
+  (`override` if non-`None`/non-empty after `.strip()`, else the `SEGQC_BACKEND`
+  env var, else `None`) and only then applies `.strip().lower()` with an
+  empty result treated as `auto` -- this keeps AC12's whitespace/case and
+  empty-env-var handling in one place shared by both the token-validity check
+  and the `auto` resolution.
+- The GPU-unavailable-when-forced error message names both the `gpu` extra
+  and mentions `cupy` explicitly, satisfying AC7's "mentions CuPy / the gpu
+  extra" assertion and the test's stricter `"gpu" in message and ("extra" in
+  message or "install" in message or "cupy" in message)` check.
+- `pyproject.toml`: added a `gpu` extra under `[project.optional-dependencies]`
+  listing only `cupy>=12` (loose lower bound, commented per A7/A3 -- no
+  `cucim`), mirroring the `radiomics` extra's comment style. `[project].dependencies`
+  is untouched; confirmed neither `cupy` nor `cucim` appears there.
+- No deviations from the spec's pinned interfaces (A1-A7) were needed; the
+  test file's expectations (39 tests) were read in full before implementation
+  and matched directly against the module's public API without needing any
+  adjustment.
