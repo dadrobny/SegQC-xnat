@@ -262,10 +262,15 @@ def test_ac5_comparison_helpers_are_non_vacuous():
     result_fail_other = CaseResult(verdict=fail_verdict, findings=(other_finding,))
     assert verdict_signature(result_fail) != verdict_signature(result_fail_other)
 
-    # -- feature_leaves_close: a float leaf perturbed by 10*atol --
-    cpu_block = {"per_label": {"1": {"volume_mm3": 10.0, "level_name": "L1"}}}
+    # -- feature_leaves_close: a float leaf perturbed well beyond tolerance --
+    # np.isclose's effective tolerance at value=10.0 is atol + rtol*|value| =
+    # 1e-6 + 1e-5*10 ~= 1.01e-4, so the offset must clear that margin (not just
+    # 10*atol, which is dwarfed by the rtol*|value| term at this magnitude).
+    base_value = 10.0
+    offset = 2 * (ATOL + RTOL * abs(base_value))
+    cpu_block = {"per_label": {"1": {"volume_mm3": base_value, "level_name": "L1"}}}
     gpu_block = {
-        "per_label": {"1": {"volume_mm3": 10.0 + 10 * ATOL, "level_name": "L1"}}
+        "per_label": {"1": {"volume_mm3": base_value + offset, "level_name": "L1"}}
     }
     assert feature_leaves_close(cpu_block, gpu_block, rtol=RTOL, atol=ATOL) is False
 
