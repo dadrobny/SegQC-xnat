@@ -478,53 +478,19 @@ def test_ac10_record_fpr_matches_report_fpr(tmp_path):
 # =========================================================================== #
 
 
-def test_ac11_no_src_or_scripts_change_and_no_new_dependency():
-    """Diff this branch against its merge-base with main: only test-side
-    files may change, and no src/segqc/** or scripts/** file may appear.
-    Falls back to a plain working-tree status check if main/merge-base is
-    unavailable (e.g. a shallow clone) so the guard degrades cleanly rather
-    than raising."""
+def test_ac11_no_new_dependency():
+    """No new core dependency was introduced by item 084.
+
+    The original AC11 also diffed this branch against ``main`` to prove item
+    084 added no ``src/segqc/**``/``scripts/**`` file -- a one-time proof that
+    was true at merge time and reviewed then. Left as a permanent check it is
+    unsound: any *later* item that legitimately adds source under
+    ``src/segqc/`` (e.g. item 071's ``backend.py``) makes this branch's diff
+    against a moving ``main`` include that path, failing a guard about item
+    084's own historical scope rather than the current branch's. Narrowed to
+    the timeless part -- the dependency set -- which item 084 also never
+    changed and which remains meaningful to re-check on any branch."""
     repo_root = pathlib.Path(__file__).resolve().parent.parent
-    import subprocess
-
-    changed_paths = set()
-    merge_base = subprocess.run(
-        ["git", "merge-base", "HEAD", "main"],
-        cwd=str(repo_root),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if merge_base.returncode == 0 and merge_base.stdout.strip():
-        base = merge_base.stdout.strip()
-        diff = subprocess.run(
-            ["git", "diff", "--name-only", base, "HEAD"],
-            cwd=str(repo_root),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        for line in diff.stdout.splitlines():
-            if line.strip():
-                changed_paths.add(line.strip())
-
-    status = subprocess.run(
-        ["git", "status", "--porcelain"],
-        cwd=str(repo_root),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    for line in status.stdout.splitlines():
-        # porcelain format: "XY path" (or "XY orig -> new" for renames)
-        parts = line.strip().split(" ", 1)
-        if len(parts) == 2:
-            changed_paths.add(parts[1].split(" -> ")[-1])
-
-    for path in changed_paths:
-        assert not path.startswith("src/segqc/"), f"unexpected src/segqc change: {path}"
-        assert not path.startswith("scripts/"), f"unexpected scripts change: {path}"
-
     pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
     import re
 
