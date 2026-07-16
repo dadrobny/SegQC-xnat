@@ -312,7 +312,7 @@ uncalibrated.)*
 **Deliverables.**
 - ✅ Runtime backend selection (CuPy/cuCIM when present, NumPy/SciPy fallback). *(Item 071)*
 - ✅ Backend-aware feature extraction (Stage 2/3 geometric/topological compute routed through the abstraction). *(Item 072)*
-- 📋 Equivalence tests: CPU vs GPU produce identical verdicts. *(Item 073)*
+- 🚧 Equivalence tests: CPU vs GPU produce identical verdicts. *(Item 073)*
 - 📋 Performance benchmark. *(Item 074)*
 - 📋 CLI/pipeline integration + Stage-10 acceptance closure. *(Item 075)*
 
