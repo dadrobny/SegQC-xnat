@@ -134,6 +134,27 @@ def _geom_intensity_stats(dist, level_name, stratum="all"):
     }
 
 
+def _assert_stats_close(actual, expected, *, level_name, feature_name):
+    """Assert two ``FeatureStats`` are equal up to float tolerance.
+
+    Used for the AC12 additivity check, which compares the *committed* bundled
+    artifact against a *regenerated* build: their geometric/intensity floats can
+    differ in the last ULPs across NumPy/BLAS versions (e.g. ``std`` at the 15th
+    digit on NumPy 2.5), so an exact ``==`` is too brittle -- this mirrors the
+    module's ``reports_close`` policy for regenerated-vs-committed comparisons.
+    ``count`` is an integer and must still match exactly.
+    """
+    ctx = f"{level_name}/{feature_name}"
+    assert actual.count == expected.count, ctx
+    assert actual.mean == pytest.approx(expected.mean), ctx
+    assert actual.std == pytest.approx(expected.std), ctx
+    assert actual.min == pytest.approx(expected.min), ctx
+    assert actual.max == pytest.approx(expected.max), ctx
+    assert set(actual.percentiles) == set(expected.percentiles), ctx
+    for key in actual.percentiles:
+        assert actual.percentiles[key] == pytest.approx(expected.percentiles[key]), f"{ctx} p{key}"
+
+
 def _fragment_first_level(spine, convention):
     """Return a new seg image where the first recognised level gains a
     disconnected single-voxel island at the FOV corner (background, given
@@ -493,7 +514,14 @@ def test_ac12_bundled_default_geometric_and_intensity_stats_identical_on_off_mor
         stats_off = _geom_intensity_stats(dist_off, level_name)
         assert set(stats_on.keys()) == set(stats_off.keys())
         for feature_name, stats in stats_on.items():
-            assert stats == stats_off[feature_name]
+            # dist_on is the *committed* bundled artifact, dist_off a fresh
+            # rebuild -- compare with float tolerance (see _assert_stats_close),
+            # not exact ==, so last-ULP drift across NumPy/BLAS versions doesn't
+            # break the additivity check.
+            _assert_stats_close(
+                stats, stats_off[feature_name],
+                level_name=level_name, feature_name=feature_name,
+            )
 
 
 # =========================================================================== #
