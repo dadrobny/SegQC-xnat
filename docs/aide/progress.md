@@ -34,7 +34,7 @@
 | 7 | Evaluation, Calibration & Metrics *(Phase 1 complete)* | G3, G7 | ✅ |
 | 8 | Image-Based / Radiomics Features | (Phase 2) | ✅ |
 | 9 | Containerisation & XNAT Command | G5 | ✅ |
-| 10 | Portable Compute: GPU Acceleration Path | G6 | 📋 |
+| 10 | Portable Compute: GPU Acceleration Path | G6 | 🚧 |
 | 11 | Extensibility & Abnormality Classification Arm | G8 | 📋 |
 | 12 | Real-VerSe Grounding & Reference Feature Expansion | G3, G7 | ✅ |
 
@@ -47,7 +47,7 @@
 | G3 Distinguish failure from variation | Stages 6, 7 | ✅ |
 | G4 Per-case QC report (JSON + human) | Stage 1 (ext. 2–4) | ✅ |
 | G5 Deploy on XNAT *(deferred)* | Stage 9 | ✅ |
-| G6 Portable / GPU *(deferred)* | Stage 10 | 📋 |
+| G6 Portable / GPU *(deferred)* | Stage 10 | 🚧 |
 | G7 Evaluable & regression-testable | Stages 5, 7 | ✅ |
 | G8 Extensible / classification *(deferred)* | Stage 11 | 📋 |
 
@@ -305,12 +305,12 @@ uncalibrated.)*
 
 ---
 
-## Stage 10 — Portable Compute: GPU Acceleration Path (G6) — 📋
+## Stage 10 — Portable Compute: GPU Acceleration Path (G6) — 🚧
 
 **Goal.** Optional GPU acceleration equivalent to the CPU path; GPU never required.
 
 **Deliverables.**
-- 📋 Runtime backend selection (CuPy/cuCIM when present, NumPy/SciPy fallback). *(Item 071)*
+- 🚧 Runtime backend selection (CuPy/cuCIM when present, NumPy/SciPy fallback). *(Item 071)*
 - 📋 Backend-aware feature extraction (Stage 2/3 geometric/topological compute routed through the abstraction). *(Item 072)*
 - 📋 Equivalence tests: CPU vs GPU produce identical verdicts. *(Item 073)*
 - 📋 Performance benchmark. *(Item 074)*
