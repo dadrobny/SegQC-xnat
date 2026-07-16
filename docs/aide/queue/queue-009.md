@@ -1,7 +1,7 @@
 # Seg-QC-xnat — Work Queue 009
 
-> **Status:** Planned (deferred — specced but not started; re-activate by
-> flipping this line back to `Live`) · **Created:** 2026-07-13
+> **Status:** Live · **Created:** 2026-07-13 · **Re-activated:** 2026-07-16
+> (queue-010/Stage 12 completed; resuming Stage 10 GPU work)
 > Step 4 of the AIDE loop. Derived from [`../vision.md`](../vision.md),
 > [`../roadmap.md`](../roadmap.md), and [`../progress.md`](../progress.md).
 > Follows [`queue-008.md`](queue-008.md) (items 066–070, Stage 9 — all ✅).

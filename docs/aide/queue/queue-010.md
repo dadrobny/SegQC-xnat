@@ -1,6 +1,7 @@
 # Seg-QC-xnat — Work Queue 010
 
-> **Status:** Live · **Created:** 2026-07-15
+> **Status:** Completed (all 4 items 081–084 merged 2026-07-16; Stage 12
+> closed) · **Created:** 2026-07-15
 > Step 4 of the AIDE loop. Derived from [`../vision.md`](../vision.md),
 > [`../roadmap.md`](../roadmap.md), and [`../progress.md`](../progress.md).
 > Prioritised ahead of [`queue-009.md`](queue-009.md) (Stage 10 GPU, now
