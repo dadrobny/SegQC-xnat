@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import pathlib
 import sys
 from typing import Optional, Sequence
@@ -24,6 +25,47 @@ from typing import Optional, Sequence
 from . import __version__
 
 logger = logging.getLogger(__name__)
+
+_BACKEND_HELP = (
+    "Compute backend for feature extraction: 'cpu' (NumPy/SciPy), "
+    "'gpu' (CuPy; requires the optional gpu extra + a CUDA device), or "
+    "'auto' (GPU when available, else CPU). Omitted = auto (today's "
+    "default); forcing gpu without CuPy exits 1 with a clear error."
+)
+
+
+def _apply_backend_selection(args: argparse.Namespace) -> Optional[int]:
+    """Eagerly validate/resolve ``--backend`` and wire it into ``SEGQC_BACKEND``.
+
+    Called near the top of each ``_handle_*`` handler, before any input is
+    loaded, so a forced-but-unavailable GPU (or an invalid ambient
+    ``SEGQC_BACKEND``) fails fast with a clean ``Error:`` message rather than
+    a mid-pipeline traceback (item 075, AC3/AC5).
+
+    When ``--backend`` was explicitly given, resolves it via
+    :func:`segqc.backend.get_backend` and, on success, sets
+    ``os.environ["SEGQC_BACKEND"]`` to the given token so the unmodified
+    compute entry points (which auto-resolve ``backend=None -> get_backend()``
+    per item 072) pick it up (AC4). When the flag was omitted, the ambient
+    environment (or the ``auto`` default) governs untouched (AC6/AC7).
+
+    Returns:
+        An exit code (``1``) if backend resolution failed, else ``None`` to
+        signal the caller should continue.
+    """
+    from segqc.backend import SegQCBackendError, get_backend  # noqa: PLC0415
+
+    tok = getattr(args, "backend", None)
+    try:
+        get_backend(override=tok)
+    except SegQCBackendError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    if tok is not None:
+        os.environ["SEGQC_BACKEND"] = tok
+
+    return None
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -122,6 +164,13 @@ def _build_parser() -> argparse.ArgumentParser:
             "given."
         ),
     )
+    run_parser.add_argument(
+        "--backend",
+        default=None,
+        choices=["cpu", "gpu", "auto"],
+        metavar="<cpu|gpu|auto>",
+        help=_BACKEND_HELP,
+    )
     run_parser.set_defaults(handler=_handle_run)
 
     build_reference_parser = subparsers.add_parser(
@@ -189,6 +238,13 @@ def _build_parser() -> argparse.ArgumentParser:
             "Optional size-proxy stratum edges (one or more floats); when "
             "given, the artifact is size-stratified."
         ),
+    )
+    build_reference_parser.add_argument(
+        "--backend",
+        default=None,
+        choices=["cpu", "gpu", "auto"],
+        metavar="<cpu|gpu|auto>",
+        help=_BACKEND_HELP,
     )
     build_reference_parser.set_defaults(handler=_handle_build_reference)
 
@@ -274,6 +330,13 @@ def _build_parser() -> argparse.ArgumentParser:
             "(DEBUG/INFO/WARNING/ERROR/CRITICAL; default: WARNING)."
         ),
     )
+    evaluate_parser.add_argument(
+        "--backend",
+        default=None,
+        choices=["cpu", "gpu", "auto"],
+        metavar="<cpu|gpu|auto>",
+        help=_BACKEND_HELP,
+    )
     evaluate_parser.set_defaults(handler=_handle_evaluate)
 
     return parser
@@ -333,6 +396,10 @@ def _handle_run(args: argparse.Namespace) -> int:
     from segqc._logging import setup_logging  # noqa: PLC0415
 
     setup_logging(args.log_level)
+
+    code = _apply_backend_selection(args)
+    if code is not None:
+        return code
 
     from segqc.io import SegQCInputError, load_case  # noqa: PLC0415
     from segqc.labels import LabelConvention, summarise_inventory  # noqa: PLC0415
@@ -548,6 +615,10 @@ def _handle_build_reference(args: argparse.Namespace) -> int:
     from segqc.reference.artifact import build_reference, write_artifact
     from segqc.reference.ingest import DEFAULT_SEG_SUFFIX
 
+    code = _apply_backend_selection(args)
+    if code is not None:
+        return code
+
     if args.config:
         try:
             cfg = load_config(args.config)
@@ -594,6 +665,10 @@ def _handle_evaluate(args: argparse.Namespace) -> int:
     from segqc._logging import setup_logging  # noqa: PLC0415
 
     setup_logging(args.log_level)
+
+    code = _apply_backend_selection(args)
+    if code is not None:
+        return code
 
     from segqc.config import (  # noqa: PLC0415
         SegQCConfigError,

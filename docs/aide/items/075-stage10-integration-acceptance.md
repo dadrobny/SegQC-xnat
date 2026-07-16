@@ -478,4 +478,31 @@ spy handling.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- Implemented exactly per the Implementation Steps: a single shared
+  `_BACKEND_HELP` string is reused for all three `--backend` argument
+  definitions (`run_parser`, `build_reference_parser`, `evaluate_parser`) to
+  keep the help text byte-identical across subcommands without duplicating
+  the string three times — no spec deviation, just a small DRY choice within
+  `cli.py`.
+- `_apply_backend_selection` is a module-level function placed directly above
+  `_build_parser`, matching the file's existing top-to-bottom convention (parser
+  builder, then handlers). `import os` was added to the existing top-level
+  import block (alongside `argparse`/`logging`/`pathlib`/`sys`); the
+  `segqc.backend` import stays deferred *inside* the helper, mirroring the
+  file's existing deferred-import convention for optional/heavy dependencies
+  (e.g. `nibabel` inside `_handle_run`).
+- Call-site placement: in `_handle_run` and `_handle_evaluate`, the helper runs
+  immediately after `setup_logging(args.log_level)` and before any config/input
+  loading, per AC5's "no output written" guarantee. `_handle_build_reference`
+  has no `setup_logging` call (unchanged from its pre-existing shape), so the
+  helper runs immediately after that handler's own imports, still before
+  `--config`/`--cohort` are read.
+- Verified no dependency drift: `pyproject.toml`'s `[project].dependencies` was
+  not touched (AC13) — confirmed by `git diff --stat` showing only
+  `src/segqc/cli.py` changed.
+- Manually smoke-tested (not part of the pytest suite, which the validator
+  runs): `segqc run --help` lists `--backend <cpu|gpu|auto>` with the
+  documented help text, and `segqc run --scan a --seg b --out <dir> --backend
+  gpu` on this CuPy-absent host prints `Error: GPU backend requested but the
+  'cupy' package is not importable...` to stderr and exits 1 before touching
+  `--scan`/`--seg`, confirming AC3/AC5's eager-validation ordering.
