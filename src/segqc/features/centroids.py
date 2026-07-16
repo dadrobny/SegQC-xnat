@@ -336,7 +336,11 @@ def compute_edt_centroids(
 
     # --- Strict centre: argmax of the Gaussian-smoothed EDT ---------------- #
     smoothed = backend.ndimage.gaussian_filter(edt, sigma=strict_sigma)
-    peak = xp.unravel_index(int(xp.argmax(smoothed)), smoothed.shape)
+    # Pass the argmax result straight through as a device scalar -- do NOT wrap
+    # it in a Python ``int``. Under NEP 50 (NumPy >= 2), ``cupy.unravel_index``
+    # rejects a Python int with ``can_cast() does not support Python ints`` on
+    # the GPU path; the array-scalar form works identically on NumPy and CuPy.
+    peak = xp.unravel_index(xp.argmax(smoothed), smoothed.shape)
     strict_centre_voxel = (float(peak[0]), float(peak[1]), float(peak[2]))
 
     smooth_centre_mm = tuple(v * s for v, s in zip(smooth_centre_voxel, spacing))

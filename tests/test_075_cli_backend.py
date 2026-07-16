@@ -39,6 +39,7 @@ from pathlib import Path
 import nibabel as nib
 import pytest
 
+from segqc.backend import cupy_available
 from segqc.cli import _build_parser, main
 from segqc.reference.ingest import DEFAULT_SEG_SUFFIX
 from segqc.synth.clean_gt import build_clean_spine
@@ -264,9 +265,8 @@ def test_ac4_backend_flag_sets_env_seen_by_compute_entry(sub, tmp_path, monkeypa
 
 @pytest.mark.parametrize("sub", SUBCOMMANDS)
 def test_ac5_forcing_gpu_without_cupy_fails_cleanly(sub, tmp_path, capsys):
-    from segqc.backend import cupy_available
-
-    assert not cupy_available(), "this test targets a CuPy-absent host"
+    if cupy_available():
+        pytest.skip("This test targets a CuPy-absent host only.")
 
     argv, out_target = _build_argv(sub, tmp_path, extra=["--backend", "gpu"])
     code = main(argv)
@@ -323,6 +323,12 @@ def test_ac7_backend_omitted_ambient_env_governs(tmp_path, monkeypatch):
 
 
 def test_ac8_end_to_end_cpu_run_needs_zero_gpu_dependency(tmp_path):
+    if cupy_available():
+        # On a CuPy-present host cupy is imported by sibling GPU tests in the same
+        # process, so the "CPU run imports no cupy" invariant can't be observed
+        # here; it is verified on the CuPy-absent baseline/CI host.
+        pytest.skip("This test targets a CuPy-absent host only.")
+
     argv, out_target = _build_argv("run", tmp_path, extra=["--backend", "cpu"])
     main(argv)
 
@@ -426,6 +432,9 @@ def test_adv_gpu_force_fails_before_any_input_loaded(tmp_path):
     """AC5's guard-before-GPU-selection: --backend gpu on this CuPy-absent
     host must fail at the eager get_backend step before --scan/--seg are
     ever loaded -- the --out directory itself must never even be created."""
+    if cupy_available():
+        pytest.skip("This test targets a CuPy-absent host only.")
+
     scan_path, seg_path = _run_files(tmp_path)
     out_dir = tmp_path / "out"
 
@@ -445,6 +454,9 @@ def test_adv_bad_ambient_env_flag_omitted_fails_cleanly(sub, tmp_path, monkeypat
     """A4: a bad *ambient* SEGQC_BACKEND (gpu, CuPy absent) with --backend
     omitted must surface as a clean Error: + exit 1 (eager validation), not a
     mid-pipeline traceback, and must write no output."""
+    if cupy_available():
+        pytest.skip("This test targets a CuPy-absent host only.")
+
     monkeypatch.setenv("SEGQC_BACKEND", "gpu")
     argv, out_target = _build_argv(sub, tmp_path)
 
