@@ -315,10 +315,12 @@ uncalibrated.)*
 - ✅ Equivalence tests: CPU vs GPU produce identical verdicts. *(Item 073)*
 - ✅ Performance benchmark. *(Item 074)*
 - ✅ CLI/pipeline integration + Stage-10 acceptance closure. *(Item 075)*
+- 🚧 GPU-present-host verification hardening: fix the CuPy/NumPy-2.5 (NEP-50) regression in `compute_edt_centroids` (the GPU path passes a Python `int` to `cupy.unravel_index`, which `numpy.can_cast` now rejects), and guard the inverse-condition GPU tests to self-skip cleanly on a CuPy-**present** host (mirroring the four siblings already using `if cupy_available(): pytest.skip(...)`), so the Stage-10 GPU-gated suite runs green on a GPU-enabled host with the CPU/GPU equivalence tests actually **executing**. Closes the "GPU-accelerated feature extraction" verification row and corrects `docs/gpu-verification.md`. *(Item 085)*
 
 **Acceptance.**
 - [x] GPU path optional + auto-detected; CPU/GPU verdict-equivalence tests pass. *(Item 075)*
 - [x] The tool runs fully CPU-only (**G6**). *(Item 075)*
+- [ ] On a CuPy-present GPU host the GPU-gated suite is green: the CPU/GPU equivalence tests execute (not skip) and pass; the inverse-condition tests skip cleanly and are allow-listed by `assert_no_skips.py`. *(Item 085)*
 
 ---
 
