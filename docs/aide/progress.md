@@ -353,7 +353,7 @@ the Environment-Gated Capability Verification table).
   deviations through ingest → aggregation → delta rules → config; regenerate the synthetic default. *(Item 081)*
 - ✅ Real-VerSe acquisition & versioned artifact build recipe (derived artifact committed, raw scans never). *(Item 082)*
 - ✅ One-command reference-refresh wrapper (rebuild + re-evaluate) that degrades gracefully when the uncommitted VerSe cohort is absent. *(Item 083)*
-- 📋 Real-VerSe evaluation quantifying the G3 false-positive rate; verification-table closure. *(Item 084)*
+- 🚧 Real-VerSe evaluation quantifying the G3 false-positive rate; verification-table closure. *(Item 084)*
 
 **Acceptance.**
 - [ ] Expanded features appear in the rebuilt reference artifact and are consumed by the delta-to-reference rules; existing synthetic tests stay green.
