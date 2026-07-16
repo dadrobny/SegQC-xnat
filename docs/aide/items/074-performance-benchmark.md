@@ -411,4 +411,30 @@ as spec-author._ New module **`tests/test_074_benchmark.py`** (mirrors the
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- Implemented exactly per the Implementation Steps: `_load_fixture`,
+  `_time_backend`, `run_benchmark`, `write_report`, `main` all match the pinned
+  signatures/shapes. Confirmed items 071/072's realised interfaces match A1/A9
+  exactly (`segqc.backend.ENV_VAR == "SEGQC_BACKEND"`, `cupy_available()`,
+  `get_backend`/`Backend` all present as pinned) — no divergence, so no hand-back
+  was needed.
+- `n_labels` (both in `_load_fixture`'s selection scan and its `fixture_meta`)
+  is computed via `len(set(data[data != 0].tolist()))` rather than
+  `numpy.unique(...).size`, to avoid a module-scope `numpy` import (the spec's
+  import list for this module is stdlib + existing `segqc` modules only, not
+  `numpy` directly) while still counting distinct non-zero label values
+  identically to the test suite's `numpy.unique` computation.
+- `segqc.backend` is imported as `import segqc.backend` (module import, not
+  `from segqc.backend import ...`) so `ENV_VAR`, `cupy_available`, and any
+  future backend-module additions stay reachable via one qualified name without
+  growing the module-scope import list further; `cupy` itself is only ever
+  referenced inside `_time_backend`'s GPU branch (never at module scope, AC1).
+- `_time_backend` saves/restores `SEGQC_BACKEND` via presence-or-absence
+  (`os.environ.pop(..., None)` when it was previously unset) rather than a
+  sentinel default, so a host with no ambient `SEGQC_BACKEND` sees the env var
+  fully absent again after `run_benchmark` returns (satisfies the "no leak"
+  edge-case test).
+- Verified manually (no `pytest` run, per this agent's constraints): imported
+  `segqc.benchmark` and called `run_benchmark(iterations=1, warmup=1)` in the
+  project venv — returns a schema-shaped dict with a positive `cpu` timing and
+  no `gpu` entry on this CuPy-absent host; confirmed `"cupy" not in
+  vars(segqc.benchmark)`; confirmed `pyproject.toml` has no diff.
