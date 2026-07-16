@@ -20,16 +20,28 @@ Public API
 ``evaluate_spline(fit, u_values) -> np.ndarray``
     Evaluate the spline at the supplied parameter values; returns ``(N, 3)``
     float64 array of (x, y, z) mm-coordinates.
+
+Deliberate CPU fallback (item 072)
+-----------------------------------
+Both ``fit_centroid_spline`` and ``evaluate_spline`` accept a ``backend``
+keyword for signature uniformity with the other Stage-2/3 feature functions,
+but their numeric work always runs on CPU: ``splprep``/``splev`` operate on
+tiny centroid arrays (at most a few dozen points) with no reliable CuPy
+equivalent, so this is a documented, known partial-GPU-coverage limitation --
+even under an explicit GPU backend, inputs are marshalled to host NumPy, the
+fit/evaluate runs on SciPy/CPU, and host NumPy results are returned.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence, Tuple
+from typing import Optional, Sequence, Tuple
 
 import numpy as np
 from scipy.interpolate import splev, splprep
 
+import segqc.backend as _backend_mod
+from segqc.backend import Backend
 from segqc.features.centroids import LabelCentroid
 
 __all__ = [
@@ -78,6 +90,8 @@ class SplineFit:
 def fit_centroid_spline(
     centroids: Sequence[LabelCentroid],
     degree: int = 3,
+    *,
+    backend: Optional[Backend] = None,
 ) -> SplineFit:
     """Fit a parametric B-spline through the ordered centroid mm-coordinates.
 
@@ -94,6 +108,11 @@ def fit_centroid_spline(
         ``splprep`` always receives a valid ``k`` argument (requires
         ``k < n_points``).  The effective degree is recorded in
         :attr:`SplineFit.degree`.
+    backend:
+        Optional :class:`~segqc.backend.Backend` handle. Accepted for
+        signature uniformity and to resolve the auto-detect default (see
+        AC3), but the fit itself always runs on host NumPy/SciPy -- see the
+        module docstring's "Deliberate CPU fallback" section.
 
     Returns
     -------
@@ -107,6 +126,8 @@ def fit_centroid_spline(
         cannot define a curve.  The message states the received count and the
         minimum requirement.
     """
+    backend = backend or _backend_mod.get_backend()
+
     n_points = len(centroids)
 
     if n_points < 2:
@@ -141,7 +162,12 @@ def fit_centroid_spline(
 # --------------------------------------------------------------------------- #
 
 
-def evaluate_spline(fit: SplineFit, u_values: Sequence[float]) -> np.ndarray:
+def evaluate_spline(
+    fit: SplineFit,
+    u_values: Sequence[float],
+    *,
+    backend: Optional[Backend] = None,
+) -> np.ndarray:
     """Evaluate the spline at the supplied parameter values.
 
     Parameters
@@ -149,7 +175,15 @@ def evaluate_spline(fit: SplineFit, u_values: Sequence[float]) -> np.ndarray:
     fit:
         A :class:`SplineFit` as returned by :func:`fit_centroid_spline`.
     u_values:
-        Sequence of parameter values in [0, 1].  Any length N >= 1.
+        Sequence of parameter values in [0, 1].  Any length N >= 1.  May be a
+        host sequence/array, or a device-array-like object (exposing
+        ``.get()`` and/or ``__array__``) -- either is marshalled to host
+        NumPy before evaluation.
+    backend:
+        Optional :class:`~segqc.backend.Backend` handle. Accepted for
+        signature uniformity and to resolve the auto-detect default (see
+        AC3), but evaluation always runs on host NumPy/SciPy -- see the
+        module docstring's "Deliberate CPU fallback" section.
 
     Returns
     -------
@@ -158,6 +192,17 @@ def evaluate_spline(fit: SplineFit, u_values: Sequence[float]) -> np.ndarray:
         For well-conditioned inputs (parameter values inside [0, 1]) the output
         contains no NaN or Inf values.
     """
-    coords = splev(u_values, fit.tck)
+    backend = backend or _backend_mod.get_backend()
+
+    # Marshal a possibly-device u_values to host NumPy: prefer a CuPy-style
+    # .get() transfer, then fall back to np.asarray (which honours
+    # __array__ for any array-like, including plain sequences).
+    getter = getattr(u_values, "get", None)
+    if callable(getter):
+        host_u_values = getter()
+    else:
+        host_u_values = np.asarray(u_values)
+
+    coords = splev(host_u_values, fit.tck)
     # splev returns a list of three arrays [x_arr, y_arr, z_arr]; stack to (N, 3)
     return np.column_stack([np.asarray(c, dtype=np.float64) for c in coords])

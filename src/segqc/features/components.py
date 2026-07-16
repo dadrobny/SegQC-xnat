@@ -35,10 +35,13 @@ Public API
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import nibabel as nib
+
+import segqc.backend as _backend_mod
+from segqc.backend import Backend
 
 __all__ = [
     "ComponentsInfo",
@@ -104,6 +107,8 @@ def compute_components(
     seg_img: nib.Nifti1Image,
     label: int,
     config,
+    *,
+    backend: Optional[Backend] = None,
 ) -> ComponentsInfo:
     """Compute connected-components analysis for a single integer label.
 
@@ -123,6 +128,11 @@ def compute_components(
     config:
         A :class:`~segqc.config.HeuristicConfig` instance. The
         ``min_fragment_voxels`` field controls the small-fragment threshold.
+    backend:
+        Optional :class:`~segqc.backend.Backend` handle routing the array/
+        ndimage operations through ``numpy``/``scipy.ndimage`` (CPU) or
+        ``cupy``/``cupyx.scipy.ndimage`` (GPU). When ``None`` (the default),
+        resolved via :func:`segqc.backend.get_backend`.
 
     Returns
     -------
@@ -134,34 +144,38 @@ def compute_components(
     ValueError
         If ``label`` is not present in ``seg_img`` (no voxels carry that value).
     """
+    backend = backend or _backend_mod.get_backend()
+    xp = backend.xp
+
     # Read data without copying — we never write to it.
-    data = np.asanyarray(seg_img.dataobj)
+    data = xp.asarray(np.asanyarray(seg_img.dataobj))
 
     # Build boolean mask for the requested label (does not mutate data).
     mask = data == label  # new boolean array, not a view of data
 
     if not mask.any():
-        available = sorted(int(v) for v in np.unique(data) if v != 0)
+        available = sorted(
+            int(v) for v in np.unique(np.asanyarray(seg_img.dataobj)) if v != 0
+        )
         raise ValueError(
             f"Label {label!r} is not present in the segmentation image "
             f"(no voxels found). Available non-zero labels: {available}"
         )
 
-    # Run 6-connectivity labelling via scipy.ndimage.label.
-    # The default structuring element for scipy.ndimage.label is the
-    # 3-D cross (face-neighbours only), which implements 6-connectivity.
-    from scipy.ndimage import label as ndimage_label  # lazy import
-
-    labelled, n_components = ndimage_label(mask)
+    # Run 6-connectivity labelling via backend.ndimage.label (scipy.ndimage
+    # for CPU, cupyx.scipy.ndimage for GPU).
+    # The default structuring element for ndimage.label is the 3-D cross
+    # (face-neighbours only), which implements 6-connectivity.
+    labelled, n_components = backend.ndimage.label(mask)
     # labelled: integer array (0=background, 1..n_components=component ids)
 
     # Count voxels per component and sort descending.
-    # np.bincount is fast and deterministic; index 0 is the background count.
-    counts = np.bincount(labelled.ravel())
+    # xp.bincount is fast and deterministic; index 0 is the background count.
+    counts = xp.bincount(labelled.ravel())
     # Slice off index 0 (background), get component counts for ids 1..n.
     component_counts = counts[1:n_components + 1]
     # Sort descending.
-    component_sizes_arr = np.sort(component_counts)[::-1]
+    component_sizes_arr = xp.sort(component_counts)[::-1]
     component_sizes: List[int] = [int(s) for s in component_sizes_arr]
 
     # Voxel volume from the image header.

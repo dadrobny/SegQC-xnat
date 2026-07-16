@@ -43,10 +43,13 @@ Public API
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 import nibabel as nib
+
+import segqc.backend as _backend_mod
+from segqc.backend import Backend
 
 __all__ = [
     "BBox",
@@ -146,6 +149,8 @@ def _get_spacing(seg_img: nib.Nifti1Image) -> Tuple[float, float, float]:
 def compute_label_geometry(
     seg_img: nib.Nifti1Image,
     label: int,
+    *,
+    backend: Optional[Backend] = None,
 ) -> LabelGeometry:
     """Compute geometric features for a single integer label in a NIfTI label map.
 
@@ -162,6 +167,13 @@ def compute_label_geometry(
         spacings correctly.
     label:
         The integer label value to extract geometry for.
+    backend:
+        Optional :class:`~segqc.backend.Backend` handle routing the array
+        operations through ``numpy`` (CPU) or ``cupy`` (GPU).  When ``None``
+        (the default), resolved via :func:`segqc.backend.get_backend`
+        (auto-detect, honouring ``SEGQC_BACKEND``).  The CPU path is
+        numerically byte-identical regardless of whether ``backend`` is
+        explicit or auto-resolved.
 
     Returns
     -------
@@ -173,18 +185,21 @@ def compute_label_geometry(
     ValueError
         If ``label`` is not present in ``seg_img`` (no voxels carry that value).
     """
+    backend = backend or _backend_mod.get_backend()
+    xp = backend.xp
+
     # Read the array without copying — np.asanyarray returns a view where
     # possible; we never write to it, so the input is not mutated.
-    data = np.asanyarray(seg_img.dataobj)
+    data = xp.asarray(np.asanyarray(seg_img.dataobj))
 
     # Locate voxels for the requested label.
-    coords = np.argwhere(data == label)  # shape (N, 3) or (0, 3)
+    coords = xp.argwhere(data == label)  # shape (N, 3) or (0, 3)
 
     if coords.shape[0] == 0:
         raise ValueError(
             f"Label {label!r} is not present in the segmentation image "
             f"(no voxels found). Available labels: "
-            f"{sorted(int(v) for v in np.unique(data) if v != 0)}"
+            f"{sorted(int(v) for v in np.unique(np.asanyarray(seg_img.dataobj)) if v != 0)}"
         )
 
     voxel_count = int(coords.shape[0])

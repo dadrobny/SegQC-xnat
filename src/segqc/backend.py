@@ -134,11 +134,17 @@ class Backend:
         xp: The array module to route operations through -- the ``numpy``
             module for CPU, the ``cupy`` module for GPU. Named ``xp`` per the
             common NumPy/CuPy-interchangeable-array-module convention.
+        ndimage: The ndimage module to route ``label`` /
+            ``distance_transform_edt`` / ``gaussian_filter`` calls through --
+            ``scipy.ndimage`` for CPU, ``cupyx.scipy.ndimage`` (imported
+            lazily, only on the GPU path -- it ships inside the ``cupy``
+            package, no ``cucim`` needed) for GPU. Added by item 072.
     """
 
     name: str
     is_gpu: bool
     xp: Any
+    ndimage: Any
 
 
 # ---- Resolution ------------------------------------------------------------ #
@@ -209,8 +215,11 @@ def get_backend(override: Optional[str] = None) -> Backend:
     """
     resolved = resolve_backend_choice(override=override)
     if resolved == BACKEND_CPU:
-        return Backend(name=BACKEND_CPU, is_gpu=False, xp=numpy)
+        import scipy.ndimage
+
+        return Backend(name=BACKEND_CPU, is_gpu=False, xp=numpy, ndimage=scipy.ndimage)
 
     import cupy
+    import cupyx.scipy.ndimage
 
-    return Backend(name=BACKEND_GPU, is_gpu=True, xp=cupy)
+    return Backend(name=BACKEND_GPU, is_gpu=True, xp=cupy, ndimage=cupyx.scipy.ndimage)

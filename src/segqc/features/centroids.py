@@ -26,8 +26,9 @@ from typing import Optional, Tuple
 
 import numpy as np
 import nibabel as nib
-from scipy.ndimage import distance_transform_edt, gaussian_filter
 
+import segqc.backend as _backend_mod
+from segqc.backend import Backend
 from segqc.labels import UNKNOWN, LabelConvention
 
 __all__ = [
@@ -97,6 +98,8 @@ def compute_centroid(
     seg_img: nib.Nifti1Image,
     label: int,
     convention: Optional[LabelConvention] = None,
+    *,
+    backend: Optional[Backend] = None,
 ) -> LabelCentroid:
     """Compute the centre-of-mass centroid for a single integer label.
 
@@ -118,6 +121,10 @@ def compute_centroid(
         anatomical level name.  When ``None`` (default), the shipped
         TotalSegmentator / VerSe convention (:meth:`LabelConvention.default`)
         is used.
+    backend:
+        Optional :class:`~segqc.backend.Backend` handle routing the array
+        operations through ``numpy`` (CPU) or ``cupy`` (GPU). When ``None``
+        (the default), resolved via :func:`segqc.backend.get_backend`.
 
     Returns
     -------
@@ -129,25 +136,28 @@ def compute_centroid(
     ValueError
         If ``label`` is not present in ``seg_img`` (no voxels carry that value).
     """
+    backend = backend or _backend_mod.get_backend()
+    xp = backend.xp
+
     # Read the array without copying — np.asanyarray returns a view where
     # possible; we never write to it, so the input is not mutated.
-    data = np.asanyarray(seg_img.dataobj)
+    data = xp.asarray(np.asanyarray(seg_img.dataobj))
 
     # Locate all voxels for the requested label.  Shape is (N, 3) when N > 0.
-    coords = np.argwhere(data == label)
+    coords = xp.argwhere(data == label)
 
     if coords.shape[0] == 0:
         raise ValueError(
             f"Label {label!r} is not present in the segmentation image "
             f"(no voxels found). "
             f"Available non-zero labels: "
-            f"{sorted(int(v) for v in np.unique(data) if v != 0)}"
+            f"{sorted(int(v) for v in np.unique(np.asanyarray(seg_img.dataobj)) if v != 0)}"
         )
 
     # Centre of mass: mean of voxel coordinates along each axis.
-    cx = float(np.mean(coords[:, 0]))
-    cy = float(np.mean(coords[:, 1]))
-    cz = float(np.mean(coords[:, 2]))
+    cx = float(xp.mean(coords[:, 0]))
+    cy = float(xp.mean(coords[:, 1]))
+    cz = float(xp.mean(coords[:, 2]))
     centroid_voxel: Tuple[float, float, float] = (cx, cy, cz)
 
     # Physical centroid: element-wise multiplication with voxel spacings.
@@ -222,13 +232,14 @@ class CentroidFeatures:
     strict_sigma: float
 
 
-def _compute_edt(mask: np.ndarray) -> np.ndarray:
+def _compute_edt(mask: np.ndarray, backend: Backend) -> np.ndarray:
     """Euclidean distance transform of a binary ``mask`` (float64, same shape).
 
     Each foreground voxel holds its distance (in voxel units) to the nearest
-    background voxel; background voxels are 0.
+    background voxel; background voxels are 0. Routed through
+    ``backend.ndimage.distance_transform_edt``.
     """
-    return distance_transform_edt(mask)
+    return backend.ndimage.distance_transform_edt(mask)
 
 
 def _depth_from_edt(edt: np.ndarray, voxel: Tuple[float, ...]) -> float:
@@ -252,6 +263,7 @@ def compute_edt_centroids(
     smooth_threshold: float = 0.50,
     strict_sigma: float = 1.0,
     convention: Optional[LabelConvention] = None,
+    backend: Optional[Backend] = None,
 ) -> CentroidFeatures:
     """Compute EDT-based centroid variants and centroid depth for one label.
 
@@ -273,6 +285,11 @@ def compute_edt_centroids(
     convention:
         Optional :class:`~segqc.labels.LabelConvention`; defaults to
         :meth:`LabelConvention.default`.
+    backend:
+        Optional :class:`~segqc.backend.Backend` handle routing the array/
+        ndimage operations through ``numpy``/``scipy.ndimage`` (CPU) or
+        ``cupy``/``cupyx.scipy.ndimage`` (GPU). When ``None`` (the default),
+        resolved via :func:`segqc.backend.get_backend`.
 
     Returns
     -------
@@ -284,8 +301,11 @@ def compute_edt_centroids(
     ValueError
         If ``label`` is not present in ``seg_img`` (no voxels carry that value).
     """
+    backend = backend or _backend_mod.get_backend()
+    xp = backend.xp
+
     # Read-only view; we never write to it.
-    data = np.asanyarray(seg_img.dataobj)
+    data = xp.asarray(np.asanyarray(seg_img.dataobj))
 
     mask = data == label
     if not mask.any():
@@ -293,20 +313,20 @@ def compute_edt_centroids(
             f"Label {label!r} is not present in the segmentation image "
             f"(no voxels found). "
             f"Available non-zero labels: "
-            f"{sorted(int(v) for v in np.unique(data) if v != 0)}"
+            f"{sorted(int(v) for v in np.unique(np.asanyarray(seg_img.dataobj)) if v != 0)}"
         )
 
     sx, sy, sz = _get_spacing(seg_img)
     spacing = (sx, sy, sz)
 
-    edt = _compute_edt(mask)
+    edt = _compute_edt(mask, backend)
     edt_max = float(edt.max())
 
     # --- Smooth centre: CoM of the EDT-thresholded interior core ----------- #
     thresh_mask = (edt >= smooth_threshold * edt_max) & mask
     if not thresh_mask.any():  # pragma: no cover - peak is always in the mask
         thresh_mask = mask
-    smooth_coords = np.argwhere(thresh_mask)
+    smooth_coords = xp.argwhere(thresh_mask)
     smooth_mean = smooth_coords.mean(axis=0)
     smooth_centre_voxel = (
         float(smooth_mean[0]),
@@ -315,8 +335,8 @@ def compute_edt_centroids(
     )
 
     # --- Strict centre: argmax of the Gaussian-smoothed EDT ---------------- #
-    smoothed = gaussian_filter(edt, sigma=strict_sigma)
-    peak = np.unravel_index(int(np.argmax(smoothed)), smoothed.shape)
+    smoothed = backend.ndimage.gaussian_filter(edt, sigma=strict_sigma)
+    peak = xp.unravel_index(int(xp.argmax(smoothed)), smoothed.shape)
     strict_centre_voxel = (float(peak[0]), float(peak[1]), float(peak[2]))
 
     smooth_centre_mm = tuple(v * s for v, s in zip(smooth_centre_voxel, spacing))

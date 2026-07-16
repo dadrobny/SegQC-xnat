@@ -23,7 +23,11 @@ Public API
 
 from __future__ import annotations
 
+from typing import Optional
+
 import nibabel as nib
+
+from segqc.backend import Backend
 
 __all__ = ["compute_fragmentation_index"]
 
@@ -32,6 +36,8 @@ def compute_fragmentation_index(
     seg_img: "nib.Nifti1Image",
     label: int,
     config,
+    *,
+    backend: Optional[Backend] = None,
 ) -> float:
     """Compute the fragmentation index for a single integer label.
 
@@ -53,6 +59,11 @@ def compute_fragmentation_index(
     config:
         A :class:`~segqc.config.HeuristicConfig` instance (forwarded to
         :func:`~segqc.features.components.compute_components`).
+    backend:
+        Optional :class:`~segqc.backend.Backend` handle, forwarded unchanged
+        to :func:`~segqc.features.components.compute_components`. When
+        ``None`` (the default), ``compute_components`` auto-resolves it via
+        :func:`segqc.backend.get_backend`.
 
     Returns
     -------
@@ -66,5 +77,5 @@ def compute_fragmentation_index(
     """
     from segqc.features.components import compute_components  # lazy import
 
-    result = compute_components(seg_img, label, config)
+    result = compute_components(seg_img, label, config, backend=backend)
     return result.largest_component_fraction

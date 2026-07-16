@@ -20,6 +20,16 @@ Public API
     Frozen dataclass with per-centroid offset data.
 ``compute_spline_offsets(centroids, fit, spacing_mm=None) -> List[VertebralSplineOffset]``
     Compute one offset record per centroid.
+
+Deliberate CPU fallback (item 072)
+-----------------------------------
+``compute_spline_offsets`` accepts a ``backend`` keyword for signature
+uniformity with the other Stage-2/3 feature functions, but its numeric work
+always runs on CPU: the coarse ``u`` scan and ``scipy.optimize.minimize_scalar``
+refinement operate on tiny centroid arrays with no reliable CuPy equivalent, so
+this is a documented, known partial-GPU-coverage limitation -- even under an
+explicit GPU backend, the optimisation runs on SciPy/CPU with host arrays and
+returns host results.
 """
 
 from __future__ import annotations
@@ -31,6 +41,8 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 from scipy.optimize import minimize_scalar
 
+import segqc.backend as _backend_mod
+from segqc.backend import Backend
 from segqc.features.centroids import LabelCentroid
 from segqc.features.spline import SplineFit, evaluate_spline
 
@@ -91,14 +103,16 @@ class VertebralSplineOffset:
 # --------------------------------------------------------------------------- #
 
 
-def _sq_distance(u_scalar: float, pt: np.ndarray, fit: SplineFit) -> float:
+def _sq_distance(
+    u_scalar: float, pt: np.ndarray, fit: SplineFit, backend: Optional[Backend]
+) -> float:
     """Squared Euclidean distance from pt to the spline point at parameter u."""
-    spline_pt = evaluate_spline(fit, [float(u_scalar)])  # shape (1, 3)
+    spline_pt = evaluate_spline(fit, [float(u_scalar)], backend=backend)  # shape (1, 3)
     diff = pt - spline_pt[0]
     return float(np.dot(diff, diff))
 
 
-def _find_closest_u(pt: np.ndarray, fit: SplineFit) -> float:
+def _find_closest_u(pt: np.ndarray, fit: SplineFit, backend: Optional[Backend]) -> float:
     """Return the spline parameter u* in [0, 1] closest to point pt (mm coords).
 
     Strategy:
@@ -106,7 +120,7 @@ def _find_closest_u(pt: np.ndarray, fit: SplineFit) -> float:
     2. Refine with ``minimize_scalar`` in a bracket centred on the coarse best.
     """
     u_scan = np.linspace(0.0, 1.0, _N_SCAN)
-    spline_pts = evaluate_spline(fit, u_scan)  # (N_SCAN, 3)
+    spline_pts = evaluate_spline(fit, u_scan, backend=backend)  # (N_SCAN, 3)
     diffs = spline_pts - pt  # (N_SCAN, 3)
     sq_dists = np.einsum("ij,ij->i", diffs, diffs)  # (N_SCAN,)
     best_idx = int(np.argmin(sq_dists))
@@ -124,7 +138,7 @@ def _find_closest_u(pt: np.ndarray, fit: SplineFit) -> float:
     result = minimize_scalar(
         _sq_distance,
         bounds=(lo, hi),
-        args=(pt, fit),
+        args=(pt, fit, backend),
         method="bounded",
         options={"xatol": 1e-6},
     )
@@ -141,6 +155,8 @@ def compute_spline_offsets(
     centroids: Sequence[LabelCentroid],
     fit: SplineFit,
     spacing_mm: Optional[Tuple[float, float, float]] = None,
+    *,
+    backend: Optional[Backend] = None,
 ) -> List[VertebralSplineOffset]:
     """Compute the perpendicular offset of each centroid from the fitted spline.
 
@@ -155,6 +171,12 @@ def compute_spline_offsets(
         Voxel spacings (sx, sy, sz) in mm used to convert offset_mm to
         offset_voxel.  When None, isotropic 1 mm spacing is assumed (so
         offset_voxel == offset_mm).
+    backend:
+        Optional :class:`~segqc.backend.Backend` handle, forwarded to
+        :func:`~segqc.features.spline.evaluate_spline`. When ``None`` (the
+        default), resolved via :func:`segqc.backend.get_backend`; the
+        optimisation itself always runs on host NumPy/SciPy regardless (see
+        the module docstring's "Deliberate CPU fallback" section).
 
     Returns
     -------
@@ -167,6 +189,8 @@ def compute_spline_offsets(
     ValueError
         When centroids is empty or fit has fewer than 2 points.
     """
+    backend = backend or _backend_mod.get_backend()
+
     if len(centroids) == 0:
         raise ValueError(
             "compute_spline_offsets requires at least one centroid, "
@@ -187,10 +211,10 @@ def compute_spline_offsets(
             dtype=np.float64,
         )
 
-        u_star = _find_closest_u(pt, fit)
+        u_star = _find_closest_u(pt, fit, backend)
 
         # Displacement vector: centroid - closest spline point.
-        spline_pt = evaluate_spline(fit, [u_star])[0]  # shape (3,)
+        spline_pt = evaluate_spline(fit, [u_star], backend=backend)[0]  # shape (3,)
         diff = pt - spline_pt  # (dx_mm, dy_mm, dz_mm)
 
         dx_mm = float(diff[0])

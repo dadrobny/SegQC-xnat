@@ -315,4 +315,53 @@ not vacuous.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`Backend.ndimage` implemented as a plain dataclass field, not a
+  property/cached-property.** `Backend` is a frozen dataclass with only
+  simple attributes (`name`, `is_gpu`, `xp`); adding `ndimage: Any` as a
+  fourth field, populated once in `get_backend()` (`scipy.ndimage` for CPU,
+  lazily-imported `cupyx.scipy.ndimage` for GPU) is the simplest option
+  consistent with the existing shape, keeps `Backend` fully duck-typeable
+  (the test suite's fake `Backend`s are `types.SimpleNamespace(name=...,
+  is_gpu=..., xp=..., ndimage=...)`), and needs no extra caching logic since
+  `get_backend()` already resolves once per call.
+- **`get_backend` is always called through the module object
+  (`_backend_mod.get_backend()`), never via a `from segqc.backend import
+  get_backend` bound name.** The test suite's AC3 spy monkeypatches
+  `segqc.backend.get_backend` (the module attribute) rather than patching
+  each feature module's local name. A `from ... import get_backend`
+  statement binds a private reference in the importing module's namespace at
+  import time, which a later `monkeypatch.setattr(backend_mod,
+  "get_backend", spy)` would not reach. Every ported function therefore does
+  `import segqc.backend as _backend_mod` and calls
+  `_backend_mod.get_backend()` at the call site, so the attribute lookup
+  happens fresh each call and honours the patched spy. `evaluate_spline`
+  (imported directly by name into `spline_offset.py`, per the pre-existing
+  style) is the one exception, and deliberately so: AC10's spy patches
+  `spline_offset_mod.evaluate_spline` itself, which works precisely because
+  it *is* a plain "import the name into this module's globals" binding —
+  consistent with, not contradicting, the ``_backend_mod`` rule above (two
+  different attributes are being spied on, in two different modules, so two
+  different import styles are each correct for their own case).
+- **Spline steps (`spline.py`, `spline_offset.py`) still resolve
+  `backend = backend or _backend_mod.get_backend()` even though the
+  resolved value's `xp`/`ndimage` are never used for computation.** This
+  keeps AC3 (backend=None auto-resolves; explicit backend does not consult
+  `get_backend()`) uniform across all eight ported functions, at the cost of
+  one now-otherwise-unused local variable in `fit_centroid_spline` — an
+  intentional, documented trade-off favouring interface uniformity over a
+  minor unused-value dead-store.
+- **`evaluate_spline`'s `u_values` marshalling favours a duck-typed
+  `.get()` transfer, falling back to `np.asarray`.** This mirrors the
+  CuPy-array `.get()` convention documented in item 071 without adding a
+  CuPy import, and satisfies the adversarial "device-array input" test
+  (`_FakeDeviceArray`, which exposes both `.get()` and `__array__`) without
+  requiring CuPy to be installed.
+- **Result-boundary marshalling in `geometry.py`/`components.py`/
+  `centroids.py` re-reads `np.asanyarray(seg_img.dataobj)` (host NumPy) for
+  the `ValueError`'s "available labels" listing**, rather than routing that
+  diagnostic-only path through `backend.xp`. It is off the hot path (raised
+  only when the requested label is absent) and keeps that error message
+  byte-identical to the pre-port behaviour regardless of backend.
+- No deviations from the spec's Implementation Steps; `pipeline.py`,
+  `cli.py`, and `pyproject.toml` are unchanged, confirming AC14 and the
+  scope fence (items 075 / 073 stay out of scope here).
