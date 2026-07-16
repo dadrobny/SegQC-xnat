@@ -36,7 +36,7 @@
 | 9 | Containerisation & XNAT Command | G5 | ✅ |
 | 10 | Portable Compute: GPU Acceleration Path | G6 | 📋 |
 | 11 | Extensibility & Abnormality Classification Arm | G8 | 📋 |
-| 12 | Real-VerSe Grounding & Reference Feature Expansion | G3, G7 | 🚧 |
+| 12 | Real-VerSe Grounding & Reference Feature Expansion | G3, G7 | ✅ |
 
 ## Objective coverage
 
@@ -339,7 +339,7 @@ abnormalities are accounted for rather than naively flagged.
 
 ---
 
-## Stage 12 — Real-VerSe Grounding & Reference Feature Expansion (G3, G7) — 🚧
+## Stage 12 — Real-VerSe Grounding & Reference Feature Expansion (G3, G7) — ✅
 
 **Goal.** Finish Stages 6/7 against reality: widen the reference distributions
 to the full discriminative per-level feature set the engine already computes,
@@ -353,12 +353,12 @@ the Environment-Gated Capability Verification table).
   deviations through ingest → aggregation → delta rules → config; regenerate the synthetic default. *(Item 081)*
 - ✅ Real-VerSe acquisition & versioned artifact build recipe (derived artifact committed, raw scans never). *(Item 082)*
 - ✅ One-command reference-refresh wrapper (rebuild + re-evaluate) that degrades gracefully when the uncommitted VerSe cohort is absent. *(Item 083)*
-- 🚧 Real-VerSe evaluation quantifying the G3 false-positive rate; verification-table closure. *(Item 084)*
+- ✅ Real-VerSe evaluation quantifying the G3 false-positive rate; verification-table closure. *(Item 084)*
 
 **Acceptance.**
-- [ ] Expanded features appear in the rebuilt reference artifact and are consumed by the delta-to-reference rules; existing synthetic tests stay green.
-- [ ] The real-VerSe artifact builds reproducibly from a mounted cohort; the refresh wrapper skips the real-VerSe steps cleanly when the cohort is absent.
-- [ ] The pipeline's false-positive rate on real VerSe GT is quantified and recorded (**G3**, **G7**); the "Real VerSe GT" verification-table row reads Verified. *(Item 084)*
+- [x] Expanded features appear in the rebuilt reference artifact and are consumed by the delta-to-reference rules; existing synthetic tests stay green.
+- [x] The real-VerSe artifact builds reproducibly from a mounted cohort; the refresh wrapper skips the real-VerSe steps cleanly when the cohort is absent.
+- [x] The pipeline's false-positive rate on real VerSe GT is quantified and recorded (**G3**, **G7**); the "Real VerSe GT" verification-table row reads Verified. *(Item 084)*
 
 ---
 
