@@ -126,15 +126,17 @@ confirms no raw scans are committed (only the descriptor).
 
 ## Current state (2026-07-16)
 
-Freshly generated after Stage 10 GPU verification (item 085) and the real-VerSe
-data mount. This is the **Live** queue; it opens **Stage 13 — Dataset Ingestion
-Adapters & Harmonization Schema** and supersedes the completed
-[`queue-010.md`](queue-010.md). No Stage 13 items claimed yet. **086** (interface
-+ resolver) is pure and data-independent — land it first; **087** (integration +
-CLI) then routes ingestion through it; **088** (VerSe19 descriptor + acceptance)
-closes the stage with its real-cohort check environment-gated. This queue lands
-together with the Stage-13 roadmap/vision addition via a single human-reviewed PR
-(roadmap is PR-gated).
+Generated after Stage 10 GPU verification (item 085) and the real-VerSe data
+mount. Opens **Stage 13 — Dataset Ingestion Adapters & Harmonization Schema** and
+supersedes the completed [`queue-010.md`](queue-010.md). **All three items
+(086–088) are implemented on `aide/stage-13-dataset-adapters`** (per the user's
+exception to build the whole queue on one branch) — the interface + resolver
+(086), the Cohort-driven ingestion/manifest path + CLI flags (087), and the
+committed VerSe19 descriptor + Stage-13 acceptance (088), whose real-cohort check
+is `SEGQC_VERSE_COHORT`-gated but was **exercised for real** (resolved VerSe19
+train 80 / val 40 / test 40, split-subjects handled, no manual staging). Lands
+together with the Stage-13 roadmap/vision addition as a **single human-reviewed
+PR** (roadmap is PR-gated).
 
 ## Next Step
 

@@ -84,6 +84,7 @@ __all__ = [
     "CohortIngest",
     "ingest_subject",
     "ingest_cohort",
+    "ingest_dataset_cohort",
 ]
 
 # Label-map filename suffix used to discover subjects (Stage 5 corpus
@@ -463,6 +464,60 @@ def ingest_cohort(
             with_morphology=with_morphology,
         )
         for subject_id, seg_path, scan_path in discovered
+    )
+
+    records = tuple(
+        record
+        for subject in subjects
+        for record in subject.records
+    )
+
+    return CohortIngest(
+        subjects=subjects,
+        records=records,
+        size_proxy_name=SIZE_PROXY_NAME if with_size_proxy else None,
+    )
+
+
+def ingest_dataset_cohort(
+    cohort,
+    *,
+    config: "Optional[HeuristicConfig]" = None,
+    with_size_proxy: bool = True,
+    with_intensity: bool = False,
+    with_morphology: bool = False,
+) -> CohortIngest:
+    """Ingest a resolved :class:`segqc.datasets.Cohort` (Stage 13, item 087).
+
+    The dataset-agnostic analogue of :func:`ingest_cohort`: instead of the flat,
+    non-recursive, `<id>_scan.nii.gz`-hardcoded directory walk, it consumes the
+    ``(case_id, seg_path, scan_path, label_convention)`` tuples a dataset adapter
+    already resolved (`segqc.datasets.resolve`), so nested / varied real datasets
+    are ingested with no manual staging. The cohort is already ordered
+    deterministically by ``case_id``; each case's own ``label_convention`` is
+    used. Read-only and deterministic — same semantics as :func:`ingest_cohort`,
+    only the discovery source differs.
+
+    Parameters mirror :func:`ingest_cohort` (minus the directory/suffix), forwarded
+    to :func:`ingest_subject` per case.
+    """
+    from segqc.config import bundled_default_config
+
+    if config is None:
+        config = bundled_default_config()
+
+    subjects = tuple(
+        ingest_subject(
+            case.seg_path,
+            config=config,
+            convention=case.label_convention,
+            scan_path=case.scan_path,
+            subject_id=case.case_id,
+            with_size_proxy=with_size_proxy,
+            with_intensity=with_intensity,
+            with_morphology=with_morphology,
+        )
+        for case in cohort
     )
 
     records = tuple(

@@ -68,6 +68,49 @@ def _apply_backend_selection(args: argparse.Namespace) -> Optional[int]:
     return None
 
 
+_DATASET_SCHEMA_HELP = (
+    "Path to a declarative dataset descriptor (YAML/JSON, segqc.datasets) "
+    "mapping a nested/varied dataset (e.g. VerSe's derivatives/rawdata layout) "
+    "onto the internal cohort interface -- ingested directly, no manual staging. "
+    "Mutually exclusive with the flat --cohort discovery."
+)
+
+
+def _add_dataset_schema_args(parser: argparse.ArgumentParser) -> None:
+    """Add the shared Stage-13 dataset-adapter flags to a subcommand parser."""
+    parser.add_argument(
+        "--dataset-schema", default=None, metavar="<descriptor>", help=_DATASET_SCHEMA_HELP,
+    )
+    parser.add_argument(
+        "--data-root", default=None, metavar="<dir>",
+        help="Override the descriptor's data_root (so one committed descriptor "
+             "works across machines). Only used with --dataset-schema.",
+    )
+    parser.add_argument(
+        "--subset", default=None, metavar="<name>",
+        help="Name of a subset in the descriptor (a folder split / CSV / id-list "
+             "/ glob) to restrict to. Only used with --dataset-schema.",
+    )
+
+
+def _resolve_cohort_from_args(args: argparse.Namespace, *, role: "Optional[str]" = None):
+    """Resolve a :class:`segqc.datasets.Cohort` from ``--dataset-schema`` /
+    ``--data-root`` / ``--subset``, or ``None`` when ``--dataset-schema`` was not
+    given. Raises ``DatasetSchemaError`` (caught by handlers) on any descriptor
+    or resolution problem."""
+    if not getattr(args, "dataset_schema", None):
+        return None
+    from segqc.datasets import load_descriptor, resolve  # noqa: PLC0415
+
+    descriptor = load_descriptor(args.dataset_schema)
+    return resolve(
+        descriptor,
+        data_root=getattr(args, "data_root", None),
+        subset=getattr(args, "subset", None),
+        role=role,
+    )
+
+
 def _build_parser() -> argparse.ArgumentParser:
     """Construct the top-level argument parser and its subcommands."""
     parser = argparse.ArgumentParser(
@@ -95,21 +138,24 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     run_parser.add_argument(
         "--scan",
-        required=True,
+        default=None,
         metavar="<nii>",
-        help="Path to the input scan (NIfTI).",
+        help="Path to the input scan (NIfTI). Required for a single-case run; "
+             "omit when using --dataset-schema (batch mode).",
     )
     run_parser.add_argument(
         "--seg",
-        required=True,
+        default=None,
         metavar="<nii>",
-        help="Path to the instance segmentation label map (NIfTI).",
+        help="Path to the instance segmentation label map (NIfTI). Required for "
+             "a single-case run; omit when using --dataset-schema (batch mode).",
     )
     run_parser.add_argument(
         "--out",
         required=True,
         metavar="<dir>",
-        help="Output directory for the QC report.",
+        help="Output directory for the QC report (single case), or the parent "
+             "directory for per-case <out>/<case_id>/ reports (--dataset-schema).",
     )
     run_parser.add_argument(
         "--config",
@@ -171,6 +217,7 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="<cpu|gpu|auto>",
         help=_BACKEND_HELP,
     )
+    _add_dataset_schema_args(run_parser)
     run_parser.set_defaults(handler=_handle_run)
 
     build_reference_parser = subparsers.add_parser(
@@ -184,9 +231,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     build_reference_parser.add_argument(
         "--cohort",
-        required=True,
+        default=None,
         metavar="<dir>",
-        help="Path to the cohort directory to ingest.",
+        help="Path to a flat cohort directory to ingest (item 044 convention). "
+             "Provide this OR --dataset-schema.",
     )
     build_reference_parser.add_argument(
         "--out",
@@ -246,6 +294,7 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="<cpu|gpu|auto>",
         help=_BACKEND_HELP,
     )
+    _add_dataset_schema_args(build_reference_parser)
     build_reference_parser.set_defaults(handler=_handle_build_reference)
 
     evaluate_parser = subparsers.add_parser(
@@ -271,9 +320,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     evaluate_parser.add_argument(
         "--cohort",
-        required=True,
+        default=None,
         metavar="<json>",
-        help="Path to an evaluation-cohort manifest JSON (segqc.eval.cohort).",
+        help="Path to an evaluation-cohort manifest JSON (segqc.eval.cohort). "
+             "Provide this OR --dataset-schema (which evaluates the resolved "
+             "cohort as GT-as-expected-pass, quantifying the GT false-positive "
+             "rate).",
     )
     evaluate_parser.add_argument(
         "--out",
@@ -337,6 +389,7 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="<cpu|gpu|auto>",
         help=_BACKEND_HELP,
     )
+    _add_dataset_schema_args(evaluate_parser)
     evaluate_parser.set_defaults(handler=_handle_evaluate)
 
     return parser
@@ -368,6 +421,47 @@ def _print_inventory(summary) -> None:
                 print(f"  {value!s:>4}  (unknown)     (malformed count: {count!r})")
 
 
+def _run_batch(args: argparse.Namespace) -> int:
+    """Batch ``segqc run`` over a dataset adapter (Stage 13, item 087).
+
+    Resolves the ``--dataset-schema`` cohort and runs the single-case handler on
+    each case (reusing all of :func:`_handle_run`'s logic) into
+    ``<out>/<case_id>/``. Returns the worst per-case exit code (0 only if every
+    case passed / was flagged); a single bad case does not abort the batch.
+    """
+    import copy  # noqa: PLC0415
+
+    from segqc.datasets import DatasetSchemaError  # noqa: PLC0415
+
+    try:
+        cohort = _resolve_cohort_from_args(args, role=None)
+    except DatasetSchemaError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    if cohort is None or len(cohort) == 0:
+        print("Error: --dataset-schema resolved an empty cohort.", file=sys.stderr)
+        return 1
+
+    out_root = pathlib.Path(args.out)
+    worst = 0
+    n_nonpass = 0
+    for case in cohort:
+        case_args = copy.copy(args)
+        case_args.dataset_schema = None
+        case_args.scan = case.scan_path
+        case_args.seg = case.seg_path
+        case_args.out = str(out_root / case.case_id)
+        rc = _handle_run(case_args)
+        if rc != 0:
+            n_nonpass += 1
+            worst = rc
+    print(
+        f"segqc run (batch): {len(cohort)} case(s), {n_nonpass} non-pass/error "
+        f"-> {out_root}"
+    )
+    return worst
+
+
 def _handle_run(args: argparse.Namespace) -> int:
     """Handler for ``segqc run`` — full Stage 1 + Stage 4 pipeline (item 035).
 
@@ -396,6 +490,18 @@ def _handle_run(args: argparse.Namespace) -> int:
     from segqc._logging import setup_logging  # noqa: PLC0415
 
     setup_logging(args.log_level)
+
+    # Batch mode: --dataset-schema runs QC on every case in the resolved cohort,
+    # writing per-case reports under <out>/<case_id>/ (Stage 13, item 087).
+    if getattr(args, "dataset_schema", None):
+        return _run_batch(args)
+    if not args.scan or not args.seg:
+        print(
+            "Error: provide --scan and --seg (single case) or --dataset-schema "
+            "(batch mode).",
+            file=sys.stderr,
+        )
+        return 1
 
     code = _apply_backend_selection(args)
     if code is not None:
@@ -611,13 +717,26 @@ def _handle_build_reference(args: argparse.Namespace) -> int:
     a caller error is reported, not a traceback.
     """
     from segqc.config import SegQCConfigError, bundled_default_config, load_config
+    from segqc.datasets import DatasetSchemaError
     from segqc.reference import ReferenceArtifactError
-    from segqc.reference.artifact import build_reference, write_artifact
+    from segqc.reference.artifact import (
+        build_reference,
+        build_reference_from_cohort,
+        write_artifact,
+    )
     from segqc.reference.ingest import DEFAULT_SEG_SUFFIX
 
     code = _apply_backend_selection(args)
     if code is not None:
         return code
+
+    if bool(args.cohort) == bool(args.dataset_schema):
+        print(
+            "Error: provide exactly one of --cohort (flat directory) or "
+            "--dataset-schema (dataset adapter).",
+            file=sys.stderr,
+        )
+        return 1
 
     if args.config:
         try:
@@ -631,15 +750,25 @@ def _handle_build_reference(args: argparse.Namespace) -> int:
     seg_suffix = args.seg_suffix if args.seg_suffix is not None else DEFAULT_SEG_SUFFIX
 
     try:
-        dist = build_reference(
-            args.cohort,
-            source=args.source,
-            build_date=args.build_date,
-            config=cfg,
-            seg_suffix=seg_suffix,
-            size_strata_edges=args.size_strata_edges,
-        )
-    except (OSError, ReferenceArtifactError) as exc:
+        if args.dataset_schema:
+            cohort = _resolve_cohort_from_args(args, role="gt")
+            dist = build_reference_from_cohort(
+                cohort,
+                source=args.source,
+                build_date=args.build_date,
+                config=cfg,
+                size_strata_edges=args.size_strata_edges,
+            )
+        else:
+            dist = build_reference(
+                args.cohort,
+                source=args.source,
+                build_date=args.build_date,
+                config=cfg,
+                seg_suffix=seg_suffix,
+                size_strata_edges=args.size_strata_edges,
+            )
+    except (OSError, ReferenceArtifactError, DatasetSchemaError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
@@ -675,9 +804,10 @@ def _handle_evaluate(args: argparse.Namespace) -> int:
         bundled_default_config,
         load_config,
     )
+    from segqc.datasets import DatasetSchemaError  # noqa: PLC0415
     from segqc.eval.calibrate import calibrate_thresholds, default_calibration_axes  # noqa: PLC0415
     from segqc.eval.cohort import load_cohort_manifest  # noqa: PLC0415
-    from segqc.eval.harness import evaluate_cohort  # noqa: PLC0415
+    from segqc.eval.harness import EvaluationCase, evaluate_cohort  # noqa: PLC0415
     from segqc.eval.metrics import compute_cohort_metrics  # noqa: PLC0415
     from segqc.eval.report import (  # noqa: PLC0415
         EvaluationProvenance,
@@ -693,6 +823,14 @@ def _handle_evaluate(args: argparse.Namespace) -> int:
         args.cohort, args.out, args.config, args.calibrate,
     )
 
+    if bool(args.cohort) == bool(args.dataset_schema):
+        print(
+            "Error: provide exactly one of --cohort (manifest JSON) or "
+            "--dataset-schema (dataset adapter, evaluated as GT-as-expected-pass).",
+            file=sys.stderr,
+        )
+        return 1
+
     # --- 0. Load config (bundled default, or --config override) -------------- #
     if args.config:
         try:
@@ -703,10 +841,26 @@ def _handle_evaluate(args: argparse.Namespace) -> int:
     else:
         cfg = bundled_default_config()
 
-    # --- 1. Load the cohort manifest ------------------------------------------ #
+    # --- 1. Load the cohort (a manifest, or GT-as-expected-pass from an adapter) - #
     try:
-        cases = load_cohort_manifest(args.cohort)
-    except (SegQCInputError, OSError) as exc:
+        if args.dataset_schema:
+            resolved = _resolve_cohort_from_args(args, role="gt")
+            # Each resolved GT case is a should-pass case (candidate == GT itself):
+            # metrics.false_positive_rate is then the fraction of GT wrongly flagged.
+            cases = [
+                EvaluationCase(
+                    case_id=c.case_id,
+                    gt=c.seg_path,
+                    expected={"expected_verdict": "pass"},
+                )
+                for c in resolved
+            ]
+            if not cases:
+                print("Error: --dataset-schema resolved an empty cohort.", file=sys.stderr)
+                return 1
+        else:
+            cases = load_cohort_manifest(args.cohort)
+    except (SegQCInputError, OSError, DatasetSchemaError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
@@ -723,7 +877,8 @@ def _handle_evaluate(args: argparse.Namespace) -> int:
         calibration = None
 
     # --- 4. Build + write reports ---------------------------------------------- #
-    cohort_id = args.cohort_id or pathlib.Path(args.cohort).stem
+    _cohort_src = args.cohort or args.subset or args.dataset_schema
+    cohort_id = args.cohort_id or pathlib.Path(_cohort_src).stem
     provenance = EvaluationProvenance(
         cohort_id=cohort_id,
         cohort_size=metrics.n_cases,

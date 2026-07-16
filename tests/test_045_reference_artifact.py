@@ -587,9 +587,12 @@ def test_adv_determinism_under_cohort_write_order(tmp_path):
 def test_adv_cli_missing_required_cohort_argument_exits_nonzero(capsys):
     from segqc.cli import main
 
-    with pytest.raises(SystemExit) as excinfo:
-        main(["build-reference", "--out", "somewhere.json"])
-    assert excinfo.value.code != 0
+    # Since Stage 13 (item 087), --cohort is optional (one may instead pass
+    # --dataset-schema), so a build-reference with neither is caught by the
+    # handler with a clean Error + exit 1 rather than argparse's SystemExit.
+    rc = main(["build-reference", "--out", "somewhere.json"])
+    assert rc == 1
+    assert "exactly one of --cohort" in capsys.readouterr().err
 
 
 def test_adv_build_reference_does_not_mutate_cohort_directory(tmp_path):
