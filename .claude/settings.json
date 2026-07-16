@@ -27,11 +27,16 @@
       "Bash(git stash:*)",
       "Bash(pytest:*)",
       "Bash(python -m pytest:*)",
+      "Bash(python3 -m pytest:*)",
       "Bash(python -m pip install:*)",
+      "Bash(python3 -m pip install:*)",
       "Bash(python -m venv:*)",
+      "Bash(python3 -m venv:*)",
       "Bash(pip install:*)",
       "Bash(python:*)",
+      "Bash(python3:*)",
       "Bash(python .aide/scripts/aide.py:*)",
+      "Bash(python3 .aide/scripts/aide.py:*)",
       "Bash(.venv/Scripts/python:*)",
       "Bash(.venv/Scripts/pip:*)",
       "Bash(.venv/Scripts/pytest:*)",
@@ -106,7 +111,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/command_hygiene_guard.py"
+            "command": "sh -c 'exec $(command -v python3 || command -v python) $@' _ .claude/hooks/command_hygiene_guard.py"
           }
         ]
       },
@@ -115,7 +120,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/log_permission_event.py"
+            "command": "sh -c 'exec $(command -v python3 || command -v python) $@' _ .claude/hooks/log_permission_event.py"
           }
         ]
       }
@@ -126,7 +131,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/log_permission_event.py"
+            "command": "sh -c 'exec $(command -v python3 || command -v python) $@' _ .claude/hooks/log_permission_event.py"
           }
         ]
       }
