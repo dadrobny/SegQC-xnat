@@ -35,7 +35,7 @@
 | 8 | Image-Based / Radiomics Features | (Phase 2) | ✅ |
 | 9 | Containerisation & XNAT Command | G5 | ✅ |
 | 10 | Portable Compute: GPU Acceleration Path | G6 | ✅ |
-| 11 | Extensibility & Abnormality Classification Arm | G8 | 📋 |
+| 11 | Extensibility & Abnormality Classification Arm | G8 | ⏸️ |
 | 12 | Real-VerSe Grounding & Reference Feature Expansion | G3, G7 | ✅ |
 | 13 | Dataset Ingestion Adapters & Harmonization Schema | (G3/G7 enabler) | ✅ |
 | 14 | Real-Data Grounding & Heuristic Recalibration | G3, G7 | 📋 |
@@ -401,7 +401,12 @@ Stage 15.)*
 
 ---
 
-## Stage 11 — Extensibility & Abnormality Classification Arm (G8) — 📋
+## Stage 11 — Extensibility & Abnormality Classification Arm (G8) — ⏸️ Deferred
+
+> **Deferred 2026-07-17** (explicit user instruction): prioritise the Phase-3
+> real-data validation arm (Stages 14+) ahead of the deferred G8 extensibility
+> objective. Not blocked technically — Stage 7 is its only dependency — simply
+> not queued. Revisit after Stage 14 (and as needed 15/16) close.
 
 **Goal.** Documented extension path + optional classification arm so handled
 abnormalities are accounted for rather than naively flagged.
