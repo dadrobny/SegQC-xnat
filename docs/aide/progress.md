@@ -44,30 +44,25 @@
 
 ## Two kinds of "done" — implementation vs. validation
 
-**This tracker separates two things that are easy to conflate, and were
-conflated here until 2026-07-17.**
+This tracker separates two claims that are easy to conflate:
 
-1. **A stage is ✅ when the *code* is built and verified** — against synthetic
-   fixtures, golden files, and unit/integration tests. That is real evidence,
-   but it is evidence *about the code*, not about the world. Every stage below
-   reached ✅ on this basis.
-2. **An objective is ✅ only when its *measurable outcome* (per
-   [`vision.md`](vision.md) §2) has been demonstrated — on real data where the
-   objective says "real".** Building the machinery that *can* measure an outcome
-   is not the same as having measured it, and measuring it is not the same as
+1. **A stage is ✅ when its *code* is built and verified** — against synthetic
+   fixtures, golden files, and unit/integration tests. That is evidence about the
+   code, not about the world.
+2. **An objective is ✅ only when its *measurable outcome*
+   ([`vision.md`](vision.md) §2) is demonstrated — on real data wherever the
+   outcome says "real".** Building the machinery that *can* measure an outcome is
+   not the same as having measured it, and measuring it is not the same as
    *achieving* it.
 
-Until 2026-07-17 this document derived objective status mechanically from stage
-status (`.aide/conventions.md`'s rollup rule: an objective delivered solely by
-complete stages reads ✅). That rule is sound for tracking delivery, but it
-silently converted "we built and synthetically tested it" into "the objective is
-achieved". **We only began processing actual data on 2026-07-16**, and the first
-real numbers falsified one such inference outright (G3: real held-out FPR
-**0.925**, against a synthetic FPR of 0.0). The objective rows below are now
-stated against the *outcome*, and an objective stays 🚧 until a stage that
-validates it **on real data** is complete. Rows marked 🚧 are **not** a statement
-that the code is missing — in every case the implementation is complete and
-tested; the real-world outcome is not yet demonstrated.
+**Objective status is therefore not derived from stage status.** An objective
+stays 🚧 until a stage that validates it on real data is complete; 🚧 never means
+the code is missing, only that the real-world outcome is not yet demonstrated.
+Real-data and real-environment evidence lives in the verification table below.
+
+*Mechanism:* `.aide/conventions.md`'s rollup derives an objective from the stages
+named in its **Delivered by** cell, so each 🚧 objective names the planned stage
+that will validate it — keeping the derived status 🚧 rather than ✅.
 
 ## Objective coverage
 
@@ -85,8 +80,7 @@ shipped"). See "Two kinds of done" above._
 | G7 Evaluable & regression-testable | Stages 5, 7 *(real data: Stages 14, 16)* | 🚧 |
 | G8 Extensible / classification *(deferred)* | Stage 11 | 📋 |
 
-**What each 🚧 means, precisely** (audited 2026-07-17, after the first real-data
-processing):
+**What each 🚧 means, precisely:**
 
 - **G2** — *"Each failure mode has ≥1 heuristic with documented detection on the
   test corpus."* Met on the **synthetic** corpus (Stage 5), which is what the
@@ -105,9 +99,9 @@ processing):
   table). It has **never been installed on an XNAT server or run on a real XNAT
   session** — the words "on real session data" are unmet. → Stage 15.
 - **G7** — *"Automated test suite over VerSe GT + synthetic failures + curated
-  cases."* Two of three corpora exist: synthetic failures (Stage 5) and, since
-  2026-07-17, real VerSe GT (Stages 12/13). **No curated challenging-case corpus
-  exists** (real pathology / post-op / atypical anatomy — [`vision.md`](vision.md)
+  cases."* Two of three corpora exist: synthetic failures (Stage 5) and real
+  VerSe GT (Stages 12/13). **No curated challenging-case corpus exists** (real
+  pathology / post-op / atypical anatomy — [`vision.md`](vision.md)
   §8), and the DICE-vs-flag correlation backing Success Criterion 6 was measured
   only on a synthetic graded-quality cohort. → Stages 14, 16.
 
@@ -123,22 +117,20 @@ above: a stage reaches ✅ on its graceful-fallback / synthetic-stand-in path
 alone; this tracks whether the real dependency/data has ever been exercised._
 
 _**This table is the evidence base for the "Two kinds of done" split above** — it
-is where "the code works" becomes "the thing works". Two cautions when reading
-it: (1) `✅ Verified` means the gated path **ran for real**, which is *not* the
-same as the objective's outcome being **achieved** — the "Real VerSe GT" row is
-✅ precisely because it ran and returned a number, and that number (FPR 0.925)
-falsifies G3; (2) a row's absence used to be read as "nothing to verify", when in
-several cases it meant "nobody wrote the row" — the XNAT-server and
-real-failure-corpus rows below were added on 2026-07-17 during the over-claim
-audit, having been missing since Stages 9 and 5/7 respectively._
+is where "the code works" becomes "the thing works". Note that `✅ Verified` means
+the gated path **ran for real**, which is *not* the same as the objective's
+outcome being **achieved**: the "Real VerSe GT" row is ✅ precisely because it ran
+and returned a number, and that number (FPR 0.925) falsifies G3. A capability with
+no row here has **not** been shown to work in the real environment — absence of a
+row is not verification._
 
 | Capability | Package / Tool / Data | Introduced by | Status | Notes |
 |------------|-----------------|----------------|--------|-------|
 | Real VerSe GT reference distributions | VerSe ground-truth cohort (external dataset) | Stage 6 *(Items 044, 045)*; closed by Stage 12 *(Item 084)* + Stage 13 adapter | ✅ Verified (2026-07-17, real VerSe19 via `segqc.datasets` adapter, no manual staging) | Exercised for real end-to-end through the Stage-13 dataset adapter (`--dataset-schema verse19.yaml`): `segqc build-reference --subset training` ingested **80 real VerSe19 training subjects** → committed `src/segqc/reference/reference_verse_v1.json` (`provenance.source == "verse-v1"`, schema 1.2, **25 per-level distributions C1…S** — far broader than the synthetic default's L1–L5). Held-out `segqc evaluate` (GT-as-expected-pass) on the **disjoint** validation/test splits then quantified the G3 false-positive rate. **Honest finding — G3 TARGET NOT met by the current hand-set heuristics:** FPR = **0.925** (validation, 40 cases) / **0.975** (test, 40 cases) — i.e. the synthetic-calibrated thresholds (item 057's `clean_control` FPR = 0.0) flag almost all real VerSe GT, driven by the `bounds` / `coverage` (partial-FOV → "missing levels") / `fragmentation` / `border` rules conflating legitimate real-world variation with failure. The real-VerSe *capability* is verified (build + evaluate on real GT, recorded cohort-id `verse19-{validation,test}` + date); the *number* is the quantified G3 gap the vision anticipated, motivating reference-derived-bound recalibration (a follow-on, not this closure). The synthetic `reference_default.json` is retained as the reproducible test baseline. |
 | Radiomics feature extraction | `pyradiomics` (extra: `segqc[radiomics]`) | Stage 8 *(Item 060)* | ✅ Verified (2026-07-14, GitHub Actions CI) | `.github/workflows/ci.yml`'s `verify-environment-gated` job installs `segqc[radiomics]` on `ubuntu-latest` and runs the radiomics tests for real, failing if any report as skipped (`assert_no_skips.py`). First real run exposed — and item 076 fixed — a genuine bug (`compute_label_radiomics` raised on PyRadiomics-rejected degenerate masks instead of degrading). Green since PR #33 (item 076 fix + the two intentional inverse-condition skips allow-listed). |
 | Containerised pipeline (Docker build + run) | Docker (external tool, no pip dependency) | Stage 9 *(Items 066, 069, 070)* | ✅ Verified (2026-07-14, GitHub Actions CI) | The same `verify-environment-gated` job performs a real `docker build` of the item-066 image and `docker run` container smoke tests (`test_066_dockerfile.py`, `test_069_container_smoke.py`, `test_070_acceptance_stage9.py`) on `ubuntu-latest`, all passing. Item 080 additionally hardened `_docker_available()` to require a Linux daemon so these tests skip (not error) on Windows-container-mode hosts. |
-| XNAT Container Service command on a real server | XNAT server + Container Service (external environment) | Stage 9 *(Items 067, 068, 070)*; to be closed by Stage 15 | ❓ Unverified | **Row added 2026-07-17 by the over-claim audit — it should have existed since Stage 9.** What *is* verified is the container itself (see the Docker row): `docker build` + `docker run` on a mounted case, in CI. What has **never** happened: installing `command.json` on an XNAT server, resolving real XNAT session/scan inputs, and writing report resources back to a real session. G5's measurable outcome is *"Runs as an XNAT Container Service command on **real session data**"*, so Stage 9's ✅ (docs + a validating `command.json` + a smoke-tested image) does not close G5. Needs an XNAT instance with the Container Service enabled. |
-| Real automatic-segmentation failure corpus | TotalSegmentator / SPINEPS outputs on real CT (external tool + data) | Stages 5, 7 *(Items 041, 053, 057)*; to be closed by Stage 16 | ❓ Unverified | **Row added 2026-07-17 by the over-claim audit.** Every failure mode in §6 is detected only on **synthetically perturbed** GT (Stage 5's generators). Stage 7's deliverable "runs on VerSe GT, **TotalSegmentator outputs**, synthetic failures" shipped the harness's *capability* to consume such a cohort — item 053 explicitly scoped itself to require "no VerSe/TotalSegmentator download", and no TotalSegmentator output has ever been run through the pipeline. Consequently the recorded per-mode sensitivities (item 057: 1.0 for 5 modes, 0.0 for 3 structurally-invisible ones) describe **the synthetic corpus only**; real-world sensitivity is unmeasured. Also unbuilt: [`vision.md`](vision.md) §8's **curated challenging cases** (real pathology / post-op / atypical anatomy). |
+| XNAT Container Service command on a real server | XNAT server + Container Service (external environment) | Stage 9 *(Items 067, 068, 070)*; to be closed by Stage 15 | ❓ Unverified | What *is* verified is the container itself (see the Docker row): `docker build` + `docker run` on a mounted case, in CI. What has **never** happened: installing `command.json` on an XNAT server, resolving real XNAT session/scan inputs, and writing report resources back to a real session. G5's measurable outcome is *"Runs as an XNAT Container Service command on **real session data**"*, so Stage 9's ✅ (docs + a validating `command.json` + a smoke-tested image) does not close G5. Needs an XNAT instance with the Container Service enabled. |
+| Real automatic-segmentation failure corpus | TotalSegmentator / SPINEPS outputs on real CT (external tool + data) | Stages 5, 7 *(Items 041, 053, 057)*; to be closed by Stage 16 | ❓ Unverified | Every failure mode in §6 is detected only on **synthetically perturbed** GT (Stage 5's generators). Stage 7's deliverable "runs on VerSe GT, **TotalSegmentator outputs**, synthetic failures" shipped the harness's *capability* to consume such a cohort — item 053 explicitly scoped itself to require "no VerSe/TotalSegmentator download", and no TotalSegmentator output has ever been run through the pipeline. Consequently the recorded per-mode sensitivities (item 057: 1.0 for 5 modes, 0.0 for 3 structurally-invisible ones) describe **the synthetic corpus only**; real-world sensitivity is unmeasured. Also unbuilt: [`vision.md`](vision.md) §8's **curated challenging cases** (real pathology / post-op / atypical anatomy). |
 | GPU-accelerated feature extraction | `cupy` (extra: `segqc[gpu]`) | Stage 10 *(Items 071–075)*; closed by *(Item 085)* | ✅ Verified (2026-07-16, Quadro P6000 sm_61, CuPy `cupy-cuda12x` 14.1.1, driver 580.159.04) | First real GPU host (Pascal sm_61 workstation: P400 / GTX 1080 Ti / 2× P6000). CuPy reaches the P6000 (`compute_capability == 61`, a real kernel returns `55`). The first CuPy-present run exposed — and **item 085 fixed** — a genuine NEP-50 regression: `compute_edt_centroids` passed a Python `int` to `cupy.unravel_index`, which `numpy.can_cast` now rejects (`centroids.py:339`, `int()` wrap dropped). With that fixed the Stage-10 GPU-gated suite runs **green on the P6000** with the CPU/GPU equivalence tests **executing** (incl. `test_075_stage10_acceptance.py::test_ac10_gpu_vs_cpu_verdict_identical`): 155 passed, 16 skipped, 0 failed, all skips the allow-listed inverse-condition tests (`assert_no_skips.py --allow "CuPy-absent host"` clean). Install the CUDA-12 wheel (`cupy-cuda12x`) — **not** `cupy-cuda13x`, which drops Pascal (sm_61). No CI coverage (GitHub-hosted runners have no GPU) — see [`docs/gpu-verification.md`](../gpu-verification.md). |
 
 ---

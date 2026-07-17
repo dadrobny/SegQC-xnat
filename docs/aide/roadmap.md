@@ -42,16 +42,16 @@ Per the agreed steering:
 | *(deferred)* G6 Portable / GPU | Stage 10 |
 | *(deferred)* G8 Extensible / classification | Stage 11 |
 
-> **Stages 14–16 exist because building ≠ validating.** Stages 0–13 delivered and
-> synthetically verified the whole pipeline, but the project only began
-> processing **actual data** on 2026-07-16. The first real numbers falsified G3
-> (real held-out FPR **0.925** vs a synthetic 0.0), and an audit on 2026-07-17
-> found three further objectives whose *measurable outcome* names real data yet
-> had only ever been exercised synthetically. Stages 14/15/16 are the real-data
-> validation arm for G3, G5, and G2/G7 respectively — see
-> [`progress.md`](progress.md)'s "Two kinds of done" section. **No stage below is
-> being reopened**: their code is complete and correctly tested. What was wrong
-> was inferring objective achievement from stage completion.
+> **Stages 14–16 exist because building ≠ validating.** Stages 0–13 deliver and
+> synthetically verify the whole pipeline, but several objectives' measurable
+> outcomes name **real** data or environments — real VerSe GT (G3, G7), real
+> session data (G5), real segmentation failures (G2) — and are demonstrated only
+> where real data has judged them. On real held-out VerSe GT the pipeline's
+> false-positive rate is **0.925** (against a synthetic 0.0), so G3 is not yet
+> met. Stages 14/15/16 are the real-data validation arm for G3, G5, and G2/G7
+> respectively — see [`progress.md`](progress.md)'s "Two kinds of done" section.
+> These stages do not reopen any earlier stage's code; they validate outcomes the
+> earlier stages' synthetic tests could not.
 
 ### Stage dependency graph
 
