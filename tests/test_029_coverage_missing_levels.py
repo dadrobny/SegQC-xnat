@@ -272,7 +272,11 @@ def test_ac6_expected_span_beyond_present_fires_when_configured(tmp_path):
     span = _by_tag(run_rules(record, cfg), _SPAN_TAG)
     assert len(span) == 1
     assert span[0].rule_id == "coverage"
-    assert "L4" in span[0].reason and "L5" in span[0].reason
+    # Item 089 (FOV-aware default, border_aware=True): a non-truncated span
+    # end only flags the single canonically-adjacent expected level (L4,
+    # immediately below present L3) — not every remaining absent level.
+    assert "L4" in span[0].reason
+    assert "L5" not in span[0].reason
 
 
 def test_ac6_expected_span_absent_by_default_no_span_finding():
@@ -348,7 +352,11 @@ def test_ac8_non_border_end_still_fires(tmp_path):
     cfg = load_config(_write_yaml(tmp_path, content))
     span = _by_tag(run_rules(record, cfg), _SPAN_TAG)
     assert span, "Non-border-truncated end must still fire the span finding"
-    assert "L4" in span[0].reason and "L5" in span[0].reason
+    # Item 089 (FOV-aware default, border_aware=True): only the single
+    # canonically-adjacent expected level (L4) is flagged beyond a
+    # non-truncated end — the further, non-adjacent L5 is not.
+    assert "L4" in span[0].reason
+    assert "L5" not in span[0].reason
 
 
 # =========================================================================== #
