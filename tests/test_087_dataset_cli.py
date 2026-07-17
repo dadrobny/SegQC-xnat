@@ -54,8 +54,13 @@ def _build_nested(root: Path):
 
 
 def _write_descriptor(path: Path, data_root: Path, *, subsets_block: str = "") -> Path:
+    # ``as_posix()`` matters on Windows: a native path (C:\Users\...\Temp\...)
+    # interpolated into a *double-quoted* YAML scalar is parsed for backslash
+    # escapes (\U -> unicode escape, \t -> tab, ...), so PyYAML raises "while
+    # scanning a double-quoted scalar". Forward slashes carry no escapes and
+    # Path/glob accept them on Windows just fine.
     path.write_text(
-        f'data_root: "{data_root}"\n'
+        f'data_root: "{data_root.as_posix()}"\n'
         'seg: "derivatives/sub-*/**/*_seg-vert_msk.nii.gz"\n'
         'case_id: "(?P<id>sub-verse\\\\d+(?:_split-verse\\\\d+)?)_seg-vert_msk\\\\.nii\\\\.gz$"\n'
         'scan: "rawdata/{id}/{id}_ct.nii.gz"\n'

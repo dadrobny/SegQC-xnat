@@ -172,6 +172,10 @@ class DatasetDescriptor:
     data_root:
         Base directory the dataset lives under. May be overridden at
         :func:`resolve` time (so one committed descriptor works across machines).
+        In YAML, write Windows paths with **forward slashes** (``C:/data/VerSe``)
+        or in single quotes: a *double-quoted* native path (``"C:\\data\\VerSe"``)
+        is parsed for backslash escapes (``\\U`` -> unicode escape, ``\\t`` -> tab)
+        and fails to load. ``Path``/``glob`` accept forward slashes on Windows.
     seg:
         A glob (relative to the resolved root, ``**`` supported) matching every
         segmentation label map, e.g. ``derivatives/sub-*/**/*_seg-vert_msk.nii.gz``.
