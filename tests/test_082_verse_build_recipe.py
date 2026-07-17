@@ -415,8 +415,34 @@ def test_adv_scope_guard_default_reference_artifact_untouched():
     assert dist.schema_version == "1.2"
 
 
-def test_adv_scope_guard_no_committed_real_verse_artifact():
+def test_adv_scope_guard_only_derived_verse_artifacts_committed():
+    """Item 082's *enduring* storage policy: commit only the **derived**
+    distributions artifact, **never** raw VerSe scans/masks.
+
+    This supersedes item 082's original "no ``reference_verse_*.json`` exists"
+    assertion, which encoded that fence for *that item only* ("This item commits
+    no such file"). The recipe explicitly anticipates the file appearing later:
+    "When an actual real-VerSe artifact is built by a data-holding human or CI
+    runner, it is committed under ``src/segqc/reference/`` as package data." That
+    happened on 2026-07-17 (``reference_verse_v1.json``, built from the mounted
+    VerSe19 training split), so the durable invariant is asserted instead: any
+    committed ``reference_verse_*`` is a well-formed derived artifact, LF-pinned,
+    and no raw imaging data rides along.
+    """
     repo_root = pathlib.Path(__file__).resolve().parent.parent
     reference_dir = repo_root / "src" / "segqc" / "reference"
-    matches = sorted(p.name for p in reference_dir.glob("reference_verse_*.json"))
-    assert matches == []
+
+    # Any committed real-VerSe artifact is a well-formed *derived* artifact.
+    for path in sorted(reference_dir.glob("reference_verse_*.json")):
+        dist = load_artifact(path)
+        assert dist.schema_version == "1.2", path.name
+        assert dist.provenance.source.startswith("verse-"), path.name
+        assert dist.levels, path.name
+
+    # Raw VerSe imaging data is never committed (the whole point of the policy).
+    raw = sorted(str(p.relative_to(repo_root)) for p in reference_dir.rglob("*.nii*"))
+    assert raw == [], f"raw imaging data must never be committed: {raw}"
+
+    # The versioned-artifact filename pattern stays LF-pinned for CRLF hygiene.
+    gitattributes = (repo_root / ".gitattributes").read_text(encoding="utf-8")
+    assert "src/segqc/reference/reference_verse_*.json text eol=lf" in gitattributes
