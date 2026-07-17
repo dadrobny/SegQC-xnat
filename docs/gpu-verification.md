@@ -1,77 +1,93 @@
 # GPU capability verification (Stage 10)
 
-Manual checklist for verifying the GPU-accelerated feature-extraction path
-(`segqc.backend`, Stage 10) for real, on a machine that actually has an NVIDIA
-GPU and CUDA driver. This complements `.github/workflows/ci.yml`'s
-`verify-environment-gated` job, which covers pyradiomics (Stage 8) and Docker
-(Stage 9) in CI — GPU hardware isn't available on standard GitHub-hosted
-runners, so this path is manual until a GPU-equipped host (self-hosted
-runner, cloud GPU instance, or a workstation) is available.
+Procedure and record for verifying the GPU-accelerated feature-extraction path
+(`segqc.backend`, Stage 10) for real, on a machine with an NVIDIA GPU + CUDA
+driver. This complements `.github/workflows/ci.yml`'s `verify-environment-gated`
+job (which covers pyradiomics and Docker in CI) — GPU hardware isn't available on
+standard GitHub-hosted runners, so this path is manual.
 
-**Not runnable yet.** Stage 10 (items 071–075) is specced but not yet built
-(`docs/aide/queue/queue-009.md`). This doc is written now, ahead of that
-build, so the verification step isn't reinvented later — treat it as
-pending until Stage 10 lands in `docs/aide/progress.md`.
+**Status: ✅ Verified (2026-07-16).** Ran on a Pascal workstation
+(`lihe007-pc`: Quadro P400 / GTX 1080 Ti / 2× Quadro P6000, all **compute
+capability 6.1 = sm_61**; driver 580.159.04) against a 24 GB Quadro P6000. The
+first-ever CuPy-present run exposed a genuine NEP-50 regression in
+`compute_edt_centroids`, fixed under **item 085**; see `docs/aide/progress.md`'s
+Environment-Gated Capability Verification table for the record. The steps below
+reproduce it.
+
+## Hardware / packaging note (important)
+
+- The cards here are **Pascal, sm_61**. **CUDA 12.x still supports sm_61, but
+  CUDA 13 dropped Pascal** — so install the **CUDA-12** CuPy wheel
+  (`cupy-cuda12x`), *not* `cupy-cuda13x`. The wheel bundles its own CUDA-12
+  runtime, so no system CUDA toolkit is required (the driver, ≥ 525 for CUDA 12,
+  is enough; this host has 580.159.04).
+- CUDA's default device enumeration is *fastest-first*, which does **not** match
+  `nvidia-smi`'s PCI-bus order. Set `CUDA_DEVICE_ORDER=PCI_BUS_ID` if you want
+  `CUDA_VISIBLE_DEVICES` indices to line up with `nvidia-smi`.
 
 ## Prerequisites
 
-- An NVIDIA GPU with a working driver. Confirm with `nvidia-smi` — it must
-  print a device table, not "command not found."
-- A CUDA toolkit version compatible with a `cupy-cudaXXx` wheel (see
-  [CuPy's install guide](https://docs.cupy.dev/en/stable/install.html) for the
-  CUDA-version-to-wheel mapping).
+- An NVIDIA GPU with a working driver — confirm `nvidia-smi` prints a device
+  table. Check compute capability with
+  `nvidia-smi --query-gpu=name,compute_cap --format=csv`.
+- The project venv built from a clean interpreter (see `CLAUDE.md`), e.g.
+  `/usr/bin/python3 -m venv .venv && .venv/bin/python -m pip install -e ".[dev]"`.
 
 ## Steps
 
-1. **Install the `gpu` extra**, picking the wheel that matches your CUDA
-   version (item 071's `pyproject.toml` `gpu` extra pins a loose `cupy`
-   lower bound — you choose the CUDA-matched build):
+1. **Install the CUDA-12 CuPy wheel** into the venv (Linux/macOS shown; on
+   Windows use `.venv\Scripts\python`):
    ```
-   .venv/Scripts/pip install -e .[dev,gpu]
+   .venv/bin/python -m pip install cupy-cuda12x
    ```
-   or, if the extra's loose pin resolves to the wrong CUDA build, install the
-   matched wheel directly first (e.g. `pip install cupy-cuda12x`) then `pip
-   install -e .[dev]`.
 
-2. **Confirm CuPy is genuinely importable** before running anything else:
+2. **Confirm CuPy genuinely reaches a Pascal device** — not just driver
+   enumeration but a real kernel launch (pin a 24 GB P6000 here):
    ```
-   .venv/Scripts/python -c "import cupy; print(cupy.cuda.runtime.getDeviceCount())"
+   CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=2 .venv/bin/python -c \
+     "import cupy; d=cupy.cuda.Device(); \
+      print(cupy.cuda.runtime.getDeviceCount(), d.compute_capability, \
+            int((cupy.arange(6)**2).sum()))"
    ```
-   This must print a number ≥ 1, not raise.
+   Must print a device count ≥ 1, `61`, and `55` (the kernel result), not raise.
 
-3. **Run the GPU-gated test modules directly**, capturing a JUnit report so
-   skips are visible rather than assumed:
+3. **Run the GPU-gated test modules** with a JUnit report so skips are visible.
+   The CUDA env must be set *before* pytest imports the test modules; the
+   simplest reliable way is a tiny in-process runner that sets the env then calls
+   `pytest.main([...])` over the Stage-10 modules:
    ```
-   .venv/Scripts/python -m pytest -v --junitxml=gpu-results.xml ^
-     tests/test_071_backend.py ^
-     tests/test_072_*.py ^
-     tests/test_073_verdict_equivalence.py ^
-     tests/test_074_performance_benchmark.py ^
-     tests/test_075_stage10_acceptance.py
+   tests/test_071_backend.py
+   tests/test_072_backend_feature_port.py
+   tests/test_073_verdict_equivalence.py
+   tests/test_074_benchmark.py
+   tests/test_075_cli_backend.py
+   tests/test_075_stage10_acceptance.py
    ```
-   (Adjust filenames once the items are actually built and their test module
-   names are known — the queue-009 specs name these modules, but confirm
-   against what's actually committed.)
+   On a CuPy-present host the `@requires_cupy` equivalence tests **execute**
+   (e.g. `test_075_stage10_acceptance.py::test_ac10_gpu_vs_cpu_verdict_identical`,
+   `test_072_...::test_ac12_ac13_gpu_cpu_equivalence_spot_check`), and the
+   inverse-condition tests (which assert *CuPy-absent* behaviour) self-skip with
+   reason "…targets a CuPy-absent host only." Expected result on the P6000:
+   **155 passed, 16 skipped, 0 failed**.
 
-4. **Assert none of the GPU-specific cases skipped**, reusing the same
-   zero-skip check CI uses (it takes any JUnit XML, not just CI's):
+4. **Assert no *unexpected* skips**, allow-listing the intentional
+   inverse-condition skips by reason substring (the same checker CI uses):
    ```
-   .venv/Scripts/python .github/scripts/assert_no_skips.py gpu-results.xml
+   .venv/bin/python .github/scripts/assert_no_skips.py gpu-results.xml \
+     --allow "CuPy-absent host"
    ```
-   A skip here means CuPy/the GPU wasn't actually reached by the test run
-   (check step 2 again) — it is **not** evidence of "gracefully unavailable,"
-   since you've already confirmed the hardware/driver/library are present.
+   This prints `OK: 16 skip(s) found, all allow-listed`. A skip *without* that
+   reason means CuPy/the GPU wasn't actually reached (recheck step 2) — it is
+   **not** evidence of "gracefully unavailable."
 
-5. **Update `docs/aide/progress.md`'s Environment-Gated Capability
-   Verification table.** Flip the "GPU-accelerated feature extraction" row
-   from `❓ Unverified` to `✅ Verified (YYYY-MM-DD, <host description, e.g.
-   "RTX 4090 workstation, CUDA 12.4">)`, and add a one-line note on which
-   command/report proved it (link this doc + the date).
+5. **Record it in `docs/aide/progress.md`.** Flip the "GPU-accelerated feature
+   extraction" row to `✅ Verified (YYYY-MM-DD, <card, sm_XX>, CuPy <wheel>,
+   driver <ver>)` with a one-line note on the command/report that proved it.
+   (Done 2026-07-16, item 085.)
 
-## Why this isn't automated in CI yet
+## Why this isn't automated in CI
 
-Standard GitHub-hosted runners have no GPU. Automating this would need either
-a self-hosted runner with an NVIDIA card or a paid GPU-enabled CI service —
-that's an infrastructure/cost decision, not a code change, and is
-deliberately left out of `.github/workflows/ci.yml` rather than faked with a
-job that can't do what it claims.
+Standard GitHub-hosted runners have no GPU. Automating this would need a
+self-hosted runner with an NVIDIA card or a paid GPU CI service — an
+infrastructure/cost decision, deliberately left out of `.github/workflows/ci.yml`
+rather than faked with a job that can't do what it claims.

@@ -344,6 +344,8 @@ def test_ac14_gpu_gate_is_genuine_skip_marker():
     equivalence.py``: the marker is a real ``skipif`` with a ``bool``
     condition (never ``xfail``, never an unconditional pass), and on this
     CuPy-absent host it evaluates truthy."""
+    if cupy_available():
+        pytest.skip("This test targets a CuPy-absent host only.")
     assert requires_cupy.mark.name == "skipif"
     assert isinstance(requires_cupy.mark.args[0], bool)
     assert requires_cupy.mark.args[0] is True
