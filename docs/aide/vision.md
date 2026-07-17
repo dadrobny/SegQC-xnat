@@ -125,6 +125,11 @@ the next tool in an automated data flow.
   precomputed label map.
 - Handle real-world quirks: anisotropic spacing, varying FOV, partial vertebrae
   at image borders, transitional anatomy.
+- **Dataset-agnostic ingestion:** consume cohorts in varied on-disk layouts and
+  naming conventions (VerSe19/20, TotalSegmentator or SPINEPS outputs, …) through
+  a single internal `Cohort`/`Case` interface, via declarative per-dataset
+  adapters — so no dataset's folder structure or filename scheme is hard-wired
+  into the pipeline (Stage 13).
 
 ### 5.2 Feature extraction
 **Segmentation-based (geometric / topological):**

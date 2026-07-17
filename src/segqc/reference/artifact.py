@@ -212,7 +212,6 @@ def build_reference(
     """
     from segqc.config import bundled_default_config
 
-    from .aggregate import aggregate_reference
     from .ingest import ingest_cohort
 
     if config is None:
@@ -230,16 +229,85 @@ def build_reference(
         with_morphology=with_morphology,
     )
 
+    return _aggregate_ingested(
+        cohort,
+        source=source,
+        build_date=build_date,
+        config=config,
+        size_strata_edges=size_strata_edges,
+        stratum_labels=stratum_labels,
+    )
+
+
+def _aggregate_ingested(
+    cohort_ingest,
+    *,
+    source: str,
+    build_date: str,
+    config,
+    size_strata_edges,
+    stratum_labels,
+) -> ReferenceDistribution:
+    """Shared tail of the reference builders: stamp deterministic provenance and
+    aggregate an already-ingested cohort. Used by both :func:`build_reference`
+    (flat directory) and :func:`build_reference_from_cohort` (dataset adapter)."""
+    from .aggregate import aggregate_reference
+
+    stratifying = size_strata_edges is not None
     provenance = Provenance(
         source=source,
         config_hash=config_hash(config),
         build_date=build_date,
         size_proxy_name=(SIZE_PROXY_NAME if stratifying else None),
     )
-
     return aggregate_reference(
-        cohort.records,
+        cohort_ingest.records,
         provenance=provenance,
+        size_strata_edges=size_strata_edges,
+        stratum_labels=stratum_labels,
+    )
+
+
+def build_reference_from_cohort(
+    cohort,
+    *,
+    source: str,
+    build_date: str,
+    config: "Optional[HeuristicConfig]" = None,
+    size_strata_edges: "Optional[Sequence[float]]" = None,
+    stratum_labels: "Optional[Sequence[str]]" = None,
+    with_intensity: bool = True,
+    with_morphology: bool = True,
+) -> ReferenceDistribution:
+    """Build a reference artifact from a resolved :class:`segqc.datasets.Cohort`
+    (Stage 13, item 087) — the dataset-agnostic analogue of
+    :func:`build_reference`.
+
+    Ingests the adapter-resolved cohort via
+    :func:`segqc.reference.ingest.ingest_dataset_cohort` (each case's own
+    ``seg_path`` / ``scan_path`` / ``label_convention``), then shares
+    :func:`build_reference`'s deterministic provenance + aggregation tail. Reads
+    no wall clock; same output shape as :func:`build_reference`.
+    """
+    from segqc.config import bundled_default_config
+
+    from .ingest import ingest_dataset_cohort
+
+    if config is None:
+        config = bundled_default_config()
+
+    ingested = ingest_dataset_cohort(
+        cohort,
+        config=config,
+        with_size_proxy=size_strata_edges is not None,
+        with_intensity=with_intensity,
+        with_morphology=with_morphology,
+    )
+    return _aggregate_ingested(
+        ingested,
+        source=source,
+        build_date=build_date,
+        config=config,
         size_strata_edges=size_strata_edges,
         stratum_labels=stratum_labels,
     )

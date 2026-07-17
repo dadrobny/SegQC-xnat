@@ -1,0 +1,36 @@
+# VerSe19 dataset adapter (Stage 13, item 088).
+#
+# Maps the VerSe19 ground-truth release onto segqc's dataset-agnostic
+# Cohort/Case interface (segqc.datasets.resolve). The three released splits
+# (training / validation / test) are sibling directories under `data_root`,
+# each carrying the same nested BIDS-ish layout:
+#
+#   dataset-verse19<split>/
+#     derivatives/sub-verseNNN/sub-verseNNN[_split-verseMMM]_seg-vert_msk.nii.gz
+#     rawdata/sub-verseNNN/sub-verseNNN_ct.nii.gz
+#
+# Usage:
+#   * pick a split via `--subset training|validation|test` (root override), or
+#   * point `--data-root` directly at one split directory.
+# Resolving with neither yields an empty cohort (the split folders live one level
+# below `data_root`). `data_root` below is the project's known mount and is meant
+# to be overridden with `--data-root` on other machines.
+#
+# `seg`/`scan` are relative to the *resolved* root (i.e. the selected split). The
+# `case_id` regex keeps the split-subject infix, so each `_split-verseMMM` mask is
+# its own case; a split subject whose CT is not named `<case_id>_ct.nii.gz` simply
+# resolves `scan_path = None` (geometry-only), never an error.
+
+data_root: /mnt/data/spine/data/datasets/VerSe/VerSe19
+seg: "derivatives/sub-*/**/*_seg-vert_msk.nii.gz"
+case_id: "(?P<id>sub-verse\\d+(?:_split-verse\\d+)?)_seg-vert_msk\\.nii\\.gz$"
+scan: "rawdata/{id}/{id}_ct.nii.gz"
+label_convention: default
+role: gt
+subsets:
+  training:
+    root: dataset-verse19training
+  validation:
+    root: dataset-verse19validation
+  test:
+    root: dataset-verse19test

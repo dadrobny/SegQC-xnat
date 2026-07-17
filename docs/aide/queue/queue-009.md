@@ -1,7 +1,8 @@
 # Seg-QC-xnat — Work Queue 009
 
-> **Status:** Live · **Created:** 2026-07-13 · **Re-activated:** 2026-07-16
-> (queue-010/Stage 12 completed; resuming Stage 10 GPU work)
+> **Status:** ✅ Completed — items 071–075 done (Stage 10 ✅); GPU path verified
+> on real hardware + NEP-50 fix hardened by item 085 (2026-07-16). Superseded by
+> [`queue-011.md`](queue-011.md) (Stage 13). · **Created:** 2026-07-13
 > Step 4 of the AIDE loop. Derived from [`../vision.md`](../vision.md),
 > [`../roadmap.md`](../roadmap.md), and [`../progress.md`](../progress.md).
 > Follows [`queue-008.md`](queue-008.md) (items 066–070, Stage 9 — all ✅).
