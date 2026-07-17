@@ -1,6 +1,6 @@
 # Seg-QC-xnat — Work Queue 011
 
-> **Status:** Live · **Created:** 2026-07-16
+> **Status:** ✅ Completed — superseded by queue-012 (2026-07-17).
 > Step 4 of the AIDE loop. Derived from [`../vision.md`](../vision.md),
 > [`../roadmap.md`](../roadmap.md), and [`../progress.md`](../progress.md).
 > Opens **Stage 13**; supersedes the completed [`queue-010.md`](queue-010.md)

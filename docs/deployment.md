@@ -8,6 +8,16 @@ data. It closes Stage 9 of the project roadmap (see
 mounted case, producing JSON + human report; `command.json` validates; install
 steps documented"*.
 
+> **Validation status — read before relying on §2/§3.** The Docker half of this
+> guide is verified for real: `docker build` and `docker run` on a mounted case
+> run in CI on every change. The **XNAT half is not**. The install and
+> input-configuration steps below are written from the official XNAT Container
+> Service documentation and have **never been executed against a live XNAT
+> server** — no session has been processed end-to-end, so expect drift and treat
+> §2/§3 as a starting point rather than a tested procedure. Closing that gap is
+> roadmap **Stage 15**; see the "XNAT Container Service command on a real server"
+> row in [`docs/aide/progress.md`](aide/progress.md)'s verification table.
+
 ## Overview / prerequisites
 
 - **CPU-only.** The image is a plain `python:3.11-slim` base with no GPU/CUDA
