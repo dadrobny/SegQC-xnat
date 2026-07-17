@@ -522,7 +522,63 @@ extractors, or `heuristics/__init__.py`'s registration block.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+**Implementation notes (confirmed during build):**
+
+- `src/segqc/heuristics/fov.py` was created exactly as the spec's
+  Implementation Steps describe: a frozen `FovCoverage` dataclass
+  (`superior_end_level`, `inferior_end_level`, `superior_truncated`,
+  `inferior_truncated`, `has_span`) plus convenience properties
+  (`superior_rank`, `inferior_rank`, `superior_adjacent_rank`,
+  `inferior_adjacent_rank`) and predicates (`is_beyond_superior`,
+  `is_beyond_inferior`) used by `coverage.py`. `derive_fov_coverage` builds a
+  module-level `_CANONICAL_RANK` map from `segqc.labels.CANONICAL_ORDER` and
+  a small `_find_entry_by_level_name` scan-lookup, deliberately re-declared
+  locally (a near-duplicate of `coverage.py`'s own helper of the same name)
+  rather than imported from `coverage.py`, so `fov.py` has no import-order
+  dependency on either rule module — both rule modules import from `fov.py`,
+  never the reverse.
+- `coverage.py` check 2 now calls `derive_fov_coverage(record)` once per
+  `evaluate()` and, when `border_aware` is `True` (default), suppresses an
+  absent expected level beyond a truncated end entirely and beyond a
+  non-truncated end unless its canonical rank equals
+  `fov.superior_adjacent_rank` / `fov.inferior_adjacent_rank` exactly (AC8–
+  AC10). When `border_aware` is `False`, the FOV descriptor is still computed
+  but not consulted — every absent expected level beyond either span end is
+  flagged, matching the legacy (pre-089) behaviour (AC11 and its
+  non-truncated-end adversarial counterpart). Checks 1 and 3 are untouched.
+  Coverage's old inline top/bottom-touch lookup (which duplicated
+  `_find_entry_by_level_name` against `top_level`/`bottom_level`) was removed
+  in favour of the shared helper; the module-local
+  `_find_entry_by_level_name` function itself was left in place (unused
+  within `coverage.py` after this change) since `sequence.py`'s docstring
+  references it by name and removing it was out of this item's declared
+  scope (touching `sequence.py` is explicitly excluded by the Implementation
+  Steps).
+- `border.py` now derives `superior_end` / `inferior_end` from
+  `derive_fov_coverage(record).superior_end_level` /
+  `.inferior_end_level` instead of indexing `present_levels[0]` / `[-1]`
+  directly. Since `FovCoverage`'s end levels are defined identically
+  (`present_levels[0]` / `[-1]`, `None` when `present_levels` is empty), this
+  is a pure re-sourcing refactor with no behavioural change — confirmed by
+  AC12–AC15 and the unchanged Stage-5 goldens (AC16). Truncation booleans
+  (`superior_truncated` / `inferior_truncated`) are *not* consulted by
+  `border.py`: item 031's existing classification already treats "is this
+  vertebra the terminal one at this end of the present span" (regardless of
+  whether it actually touches the corresponding face) as the criterion for
+  "expected" placement — a terminal vertebra that does *not* touch its end
+  face is not suspicious either (no touch => `touched` is empty => `continue`
+  before classification). Only which *level* counts as terminal was
+  ambiguous pre-089-refactor risk (two independent derivations); now both
+  rules read the one `FovCoverage.superior_end_level` /
+  `.inferior_end_level` pair, closing that gap structurally (AC15).
+- No `default_config.yaml` edit was needed: `border_aware: true` was already
+  present under `rules.coverage.params` (added defensively ahead of this
+  item, presumably during item 029/035's original authoring) and
+  `coverage.py` already read it via `config.rule_param(..., "border_aware",
+  default=DEFAULT_BORDER_AWARE)` before this item touched the file. This
+  item's change is confined to *how* `border_aware: true` restricts check 2,
+  not to the config surface itself — consistent with the spec's "no config
+  keys added or removed" assumption.
 
 Initial design decisions carried from this spec (confirm or revise while
 building):

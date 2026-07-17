@@ -25,9 +25,12 @@ Design decisions (recorded per item 031 spec):
   vertebra is present and carries a real integer label, in contrast to item
   029's case-level missing-level findings.
 - One finding per offending label, emitted in ascending integer-label order.
-- Terminal position is decided from ``relationships.present_levels``; when
-  unavailable (``relationships`` None/absent or ``present_levels`` empty) a
-  border-touching label is classified **unexpected** (surfaced, not hidden).
+- Terminal position is decided from ``relationships.present_levels``, sourced
+  via the shared ``segqc.heuristics.fov.derive_fov_coverage`` helper (item
+  089) so ``border`` and ``coverage`` resolve the same covered-span ends and
+  can never disagree; when unavailable (``relationships`` None/absent or
+  ``present_levels`` empty) a border-touching label is classified
+  **unexpected** (surfaced, not hidden).
 - Unrecognised severity string raises ValueError before any per-record
   processing; ``end_severity`` is validated only when ``report_expected_ends``
   is true.
@@ -39,6 +42,7 @@ from __future__ import annotations
 from typing import Dict, List
 
 from segqc.heuristics.finding import Finding
+from segqc.heuristics.fov import derive_fov_coverage
 from segqc.heuristics.rule import Rule, register_rule
 from segqc.verdict import Severity
 
@@ -152,12 +156,13 @@ class BorderRule(Rule):
         if not isinstance(per_label, dict) or not per_label:
             return findings
 
-        rel = record.get("relationships")
-        present_levels: List[str] = (
-            list(rel.get("present_levels") or []) if isinstance(rel, dict) else []
-        )
-        superior_end = present_levels[0] if present_levels else None
-        inferior_end = present_levels[-1] if present_levels else None
+        # The FOV-covered-span descriptor (item 089) — the single shared
+        # source both this rule and `coverage` resolve the covered span
+        # through, so terminal-end classification can never disagree between
+        # the two rules (AC15).
+        fov = derive_fov_coverage(record)
+        superior_end = fov.superior_end_level
+        inferior_end = fov.inferior_end_level
 
         end_severity = None  # resolved lazily, only if report_expected_ends
 

@@ -15,16 +15,22 @@ finding's ``reason`` string:
 
 2. **Incomplete coverage vs an expected span** *(opt-in via
    ``expected_levels``)* — flags configured expected levels absent *beyond* the
-   present span's ends, suppressing (by default) any such level beyond a span
-   end whose vertebra touches the corresponding image face
-   (``touches_superior`` / ``touches_inferior``, item 011) — only the ends can
-   be FOV-truncated, so border-awareness lives here, not in check 1.
+   present span's ends. This check is **FOV-aware** (item 089, default
+   ``border_aware: true``): it resolves the covered span through the shared
+   :func:`segqc.heuristics.fov.derive_fov_coverage` helper — a span end that is
+   *truncated* (its extremal vertebra touches the corresponding cranio-caudal
+   image face, item 011) means the FOV was cropped there, so nothing beyond it
+   is flagged; a *non-truncated* end has headroom, so only the single
+   immediately-adjacent canonical level beyond it is flagged (the conservative
+   floor — see item 089's Assumptions). ``border_aware: false`` reverts to the
+   legacy behaviour — flag every absent expected level beyond a span end,
+   regardless of truncation.
 
 3. **Below an expected count** *(opt-in via ``expected_count``)* — a raw, non-
    border-aware hard minimum on the number of recognised present levels (Use
    Case C dataset curation).
 
-Design decisions (recorded per item 029 spec):
+Design decisions (recorded per item 029 spec; item 089 amendments noted):
 - One rule, three finding kinds, one ``rule_id == "coverage"``; a case can emit
   up to three findings in the fixed order missing-interior -> incomplete-span
   -> count-shortfall (AC14).
@@ -33,7 +39,8 @@ Design decisions (recorded per item 029 spec):
   names are carried in the ``reason`` string.
 - Both opt-in checks default to disabled (``expected_levels: []``,
   ``expected_count: None``); the rule ships no hand-set numeric thresholds.
-- A span-end level's border flags are looked up by matching ``level_name`` in
+- A span-end level's border flags are looked up (via the shared
+  ``segqc.heuristics.fov`` helper, item 089) by matching ``level_name`` in
   ``record["per_label"]``; if absent, treated as **not** touching the border
   (the conservative choice — surfaces a possible miss rather than hiding it).
 - Unrecognised severity string raises ValueError before any per-record
@@ -46,6 +53,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from segqc.heuristics.finding import Finding
+from segqc.heuristics.fov import derive_fov_coverage
 from segqc.heuristics.rule import Rule, register_rule
 from segqc.labels import CANONICAL_ORDER
 from segqc.verdict import Severity
@@ -197,24 +205,13 @@ class CoverageRule(Rule):
         if expected_levels and present_levels:
             expected_ordered = _canonical_sort(set(expected_levels))
             present_set = set(present_levels)
-            top_level = present_levels[0]
-            bottom_level = present_levels[-1]
-            top_rank = _CANONICAL_RANK.get(top_level, -1)
-            bottom_rank = _CANONICAL_RANK.get(bottom_level, -1)
+            top_rank = _CANONICAL_RANK.get(present_levels[0], -1)
+            bottom_rank = _CANONICAL_RANK.get(present_levels[-1], -1)
 
-            # per_label is keyed by integer label, not level name, in the real
-            # feature record — locate each span-end entry by scanning for a
-            # matching level_name (per the spec's pinned lookup convention).
-            top_entry = _find_entry_by_level_name(per_label, top_level)
-            bottom_entry = _find_entry_by_level_name(per_label, bottom_level)
-            top_touches_superior = bool(
-                (top_entry or {}).get("geometry", {}).get("touches_superior", False)
-            )
-            bottom_touches_inferior = bool(
-                (bottom_entry or {}).get("geometry", {}).get(
-                    "touches_inferior", False
-                )
-            )
+            # The FOV-covered-span descriptor (item 089) — the single shared
+            # source both this rule and `border` resolve the covered span
+            # through, so they can never disagree about where it ends.
+            fov = derive_fov_coverage(record)
 
             beyond_end_absent: List[str] = []
             for name in expected_ordered:
@@ -223,13 +220,23 @@ class CoverageRule(Rule):
                 rank = _CANONICAL_RANK[name]
                 if top_rank != -1 and rank < top_rank:
                     # Beyond the superior end.
-                    if border_aware and top_touches_superior:
-                        continue
+                    if border_aware:
+                        # FOV-aware (item 089): truncated -> outside the
+                        # covered FOV, never flagged; non-truncated -> only
+                        # the single immediately-adjacent level is inside the
+                        # covered FOV (the conservative floor — AC9/AC10).
+                        if fov.superior_truncated:
+                            continue
+                        if rank != fov.superior_adjacent_rank:
+                            continue
                     beyond_end_absent.append(name)
                 elif bottom_rank != -1 and rank > bottom_rank:
-                    # Beyond the inferior end.
-                    if border_aware and bottom_touches_inferior:
-                        continue
+                    # Beyond the inferior end — symmetric.
+                    if border_aware:
+                        if fov.inferior_truncated:
+                            continue
+                        if rank != fov.inferior_adjacent_rank:
+                            continue
                     beyond_end_absent.append(name)
                 # Levels ranked strictly between top_rank and bottom_rank are
                 # interior — already reported (or would be) by check 1; excluded
