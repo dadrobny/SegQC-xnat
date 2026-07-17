@@ -34,13 +34,24 @@ Per the agreed steering:
 | Objective | Delivered by |
 |-----------|--------------|
 | G1 Detect empty / trivially-failed | Stage 1 |
-| G2 Detect catalogued failure modes (§6) | Stages 4, 5 |
-| G3 Distinguish failure from variation | Stages 6, 7 (real-VerSe grounding: Stage 12) |
+| G2 Detect catalogued failure modes (§6) | Stages 4, 5 (real failures: **Stage 16**) |
+| G3 Distinguish failure from variation | Stages 6, 7 (real-VerSe grounding: Stage 12; **recalibration: Stage 14**) |
 | G4 Per-case QC report (JSON + human) | Stage 1 (extended by 2–4) |
-| G7 Evaluable & regression-testable | Stages 5, 7 (real-VerSe evaluation: Stage 12) |
-| *(deferred)* G5 Deploy on XNAT | Stage 9 |
+| G7 Evaluable & regression-testable | Stages 5, 7 (real-VerSe evaluation: Stage 12; **real data: Stages 14, 16**) |
+| *(deferred)* G5 Deploy on XNAT | Stage 9 (**real session data: Stage 15**) |
 | *(deferred)* G6 Portable / GPU | Stage 10 |
 | *(deferred)* G8 Extensible / classification | Stage 11 |
+
+> **Stages 14–16 exist because building ≠ validating.** Stages 0–13 deliver and
+> synthetically verify the whole pipeline, but several objectives' measurable
+> outcomes name **real** data or environments — real VerSe GT (G3, G7), real
+> session data (G5), real segmentation failures (G2) — and are demonstrated only
+> where real data has judged them. On real held-out VerSe GT the pipeline's
+> false-positive rate is **0.925** (against a synthetic 0.0), so G3 is not yet
+> met. Stages 14/15/16 are the real-data validation arm for G3, G5, and G2/G7
+> respectively — see [`progress.md`](progress.md)'s "Two kinds of done" section.
+> These stages do not reopen any earlier stage's code; they validate outcomes the
+> earlier stages' synthetic tests could not.
 
 ### Stage dependency graph
 
@@ -51,6 +62,10 @@ Per the agreed steering:
 Phase 2 (after 7):  8 (img features) · 9 (XNAT) · 10 (GPU) · 11 (extensibility)
                     12 (real-VerSe grounding & reference feature expansion)
                     13 (dataset ingestion adapters & harmonization schema)
+
+Phase 3 — real-data validation (the outcome arm; needs real data/environments):
+                    12 ─► 13 ─► 14 (recalibrate on real GT)  ─► 16 (real failures)
+                                 9 ─► 15 (real XNAT server)
 ```
 
 > **Stage 12** deepens Stages 6/7 (G3, G7): it was scoped after those stages
@@ -475,6 +490,121 @@ Independent of Stages 8–11. **Unblocks the real-data half of Stage 12.**
   validation) drives a held-out build-vs-evaluate flow the framework treats as two
   plain cohorts.
 - Existing synthetic tests stay green (the flat ingestion path is retained).
+
+---
+
+# Phase 3 — Real-Data Validation (the outcome arm)
+
+> Stages 0–13 answer *"did we build it correctly?"* — on synthetic fixtures,
+> goldens, and unit tests. Phase 3 answers *"does it work on reality?"*, which
+> is what [`vision.md`](vision.md) §2's measurable outcomes actually ask. These
+> stages are gated on **real data and real environments**, not on more code, and
+> each one closes a specific objective that is currently 🚧.
+
+## Stage 14 — Real-Data Grounding & Heuristic Recalibration (G3, G7)
+
+**Goal.** Make real ground truth pass. Stages 6/7 calibrated the heuristics
+against a synthetic stand-in and recorded an FPR of 0.0; the first real
+measurement (2026-07-17, through the Stage-13 adapter) put the **held-out real
+VerSe19 FPR at 0.925 (validation) / 0.975 (test)**. The rules are conflating
+legitimate real-world variation with failure. This stage re-grounds them in the
+real per-level distributions now available in `reference_verse_v1.json` (25
+levels, C1…S, from 80 real training subjects).
+
+**The failure is diagnosed, not mysterious.** The four contributing rules, from
+the held-out run: `bounds` (4/6 of flagged cases), `fragmentation` (3/6),
+`coverage` (3/6 — partial-FOV scans read as "missing levels"), `border` (2/6).
+One real case passed entirely clean, which is what rules out a systematic bug and
+points at calibration.
+
+**Deliverables.**
+- **Reference-derived bounds by default.** Item 048 already built the config
+  switch from hand-set to reference-derived bounds; the shipped default is still
+  the synthetic-calibrated hand-set one. Ground it on `reference_verse_v1.json`.
+- **FOV-aware `coverage` / `border` rules.** The key conceptual fix: real scans
+  are legitimately partial (cervical-only, lumbar-only). A level *outside* the
+  field of view is not a missing level; a vertebra clipped by the FOV boundary is
+  not a border defect. Only levels *expected inside the FOV* may be reported
+  missing.
+- **`fragmentation` / `bounds` tolerances re-derived** from real per-level
+  variation instead of synthetic-clean geometry.
+- **Recalibration run** using the Stage-7 `calibrate.py` grid search, fitted on
+  the VerSe19 **training** subset and measured on the **held-out**
+  validation/test subsets, resolved as disjoint adapter subsets (no circularity —
+  the framework sees only "calibration cohort" and "eval cohort").
+- **Anti-gaming sensitivity guard.** Re-run the Stage-5 synthetic corpus *and*
+  Stage-5 perturbations applied to **real** VerSe GT, asserting per-mode
+  sensitivity does not regress below item 057's baseline.
+- **Committed G3 target** in `vision.md` §2 + recorded metrics in `progress.md`.
+
+**Dependencies.** Stages 12, 13 (✅ — the real artifact and the adapter exist).
+
+**Validation / acceptance.**
+- Held-out real VerSe19 GT yields **FPR ≤ 0.10** (**G3**).
+- Per-mode sensitivity ≥ item 057's synthetic baseline (5/8 pipeline-detectable
+  modes at 1.0), and those modes still fire on perturbed **real** GT (**G7**).
+  *FPR and sensitivity are acceptance criteria as a **pair**: FPR alone is
+  trivially driven to 0.0 by loosening or disabling rules.*
+- Flags on real cases still carry reasons + offending labels (explainability is
+  not traded for specificity).
+
+---
+
+## Stage 15 — Real-XNAT Deployment Validation (G5)
+
+**Goal.** Do what Stage 9 documented. G5's measurable outcome is *"Runs as an
+XNAT Container Service command on **real session data**"*; Stage 9 shipped a
+validating `command.json`, an entry script, deployment docs, and a CI-verified
+`docker build`/`docker run` — but nothing has ever touched an XNAT server. The
+install steps were written from the XNAT documentation and never executed.
+
+**Deliverables.**
+- A reachable XNAT instance with the Container Service enabled (test/staging is
+  fine). **This is an external prerequisite the project does not currently
+  have** — the stage is blocked on access, not on engineering.
+- Image published where that server can pull it; `command.json` installed +
+  enabled.
+- One real session (scan + segmentation resource) run end-to-end, reports landing
+  back as session resources.
+- Deployment docs reconciled with what the real install actually required.
+
+**Dependencies.** Stage 9 (✅). Blocked on XNAT server access.
+
+**Validation / acceptance.** The command runs on a real XNAT session producing
+JSON + human reports as resources (**G5**); documented steps match reality; the
+verification row flips to ✅.
+
+---
+
+## Stage 16 — Real Failure Corpus & Sensitivity Validation (G2, G7)
+
+**Goal.** Show the heuristics catch the failures a **real segmenter actually
+makes**, and build the curated challenging-case corpus §8 of the vision has
+always required but which has never existed. Today every §6 failure mode is
+detected only on *synthetically perturbed* GT: the corpus proves each mode is
+*detectable in principle*, not that real tools produce it or that we catch it
+when they do.
+
+**Deliverables.**
+- **Real candidate cohort**: run **TotalSegmentator** (the vision's reference
+  segmenter) and/or **SPINEPS** over real VerSe CT, ingested as `role: candidate`
+  through the Stage-13 adapter and scored against real GT.
+- **Real per-mode sensitivity + DICE-vs-flag correlation**, superseding the
+  synthetic-only figures in Stage 7's metrics block (Success Criterion 6).
+- **Curated challenging-case corpus** — real pathology / post-op / atypical
+  anatomy, with expected verdicts (`VerSe_fracture_grading.xlsx` is a natural
+  seed) — the direct test of failure-vs-variation on cases that matter.
+- **A recorded account of which §6 modes real segmenters actually produce**, and
+  at what rate; modes absent from real data are recorded as untested rather than
+  silently credited.
+
+**Dependencies.** Stages 13, 14 (calibrate first — sensitivity is only meaningful
+against the rules we intend to ship). Feeds Stage 11's abnormality arm.
+
+**Validation / acceptance.** ≥1 heuristic fires on a **real** instance of each §6
+mode present in the cohort (**G2**); real DICE-vs-flag correlation measured and
+correctly signed (**G7**); curated cases run with recorded outcomes and
+legitimate variation is not flagged at Stage 14's FPR bar.
 
 ---
 

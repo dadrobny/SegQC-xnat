@@ -46,6 +46,10 @@ usable at population scale.
   level, subject size, spine curvature, pathology, post-operative state).
 - **Reference-grounded.** Build expected feature distributions from trusted
   ground truth (VerSe) rather than hand-guessed constants where possible.
+- **Validated on reality, not just tested.** Synthetic fixtures prove the code
+  does what we meant; only real cohorts prove what we meant is right. Thresholds
+  fitted to synthetic data are hypotheses until real data has judged them, and a
+  claim is worded to say which of the two backs it.
 - **Portable compute.** Run on CPU-only hosts, optionally accelerate with GPU
   libraries; never *require* a GPU.
 - **Extensible.** Be a foundation that human-labelled abnormalities can extend,
@@ -59,7 +63,7 @@ usable at population scale.
 |---|-----------|--------------------|
 | G1 | Detect empty / trivially-failed segmentations | 100% of empty or near-empty label maps flagged |
 | G2 | Detect the catalogued failure modes (§6) | Each failure mode has ≥1 heuristic with documented detection on the test corpus |
-| G3 | Distinguish failure from legitimate variation | Ground-truth (VerSe) segmentations pass QC at a high rate (target: low false-positive rate, to be quantified) |
+| G3 | Distinguish failure from legitimate variation | Ground-truth (VerSe) segmentations pass QC at a high rate: **false-positive rate ≤ 0.10 on real, held-out VerSe GT**, *without* regressing failure-mode sensitivity below the recorded baseline |
 | G4 | Produce a clear per-case QC report | Machine-readable (JSON) + human-readable report emitted per scan |
 | G5 | Deploy on XNAT | Runs as an XNAT Container Service command on real session data |
 | G6 | Portable execution | Identical results CPU-only; optional GPU acceleration path |
@@ -67,8 +71,19 @@ usable at population scale.
 | G8 | Be extensible | Documented path to add new abnormality classes and heuristics |
 
 These objectives are **directional**; concrete numeric thresholds (sensitivity,
-specificity, FPR) are to be calibrated during the evaluation stage against the
-VerSe reference set and recorded in the roadmap/progress documents.
+specificity, FPR) are calibrated during the evaluation stage against the VerSe
+reference set and recorded in the roadmap/progress documents.
+
+**An objective is achieved only when its measurable outcome is demonstrated on
+the kind of data the outcome names.** Several outcomes above say *real* — real
+VerSe GT (G3, G7), real session data (G5), real segmentation failures (G2).
+Building and testing the machinery that measures such an outcome is a
+prerequisite for achieving it, never a substitute: code verified against
+synthetic fixtures is evidence about the code, not about the world, and the two
+diverge sharply in practice. Implementation status is therefore tracked per stage
+in [`progress.md`](progress.md); objective status is tracked separately, against
+the outcome, with real-data and real-environment evidence recorded in that
+document's verification table.
 
 ---
 
