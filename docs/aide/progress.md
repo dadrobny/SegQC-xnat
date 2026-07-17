@@ -38,7 +38,7 @@
 | 11 | Extensibility & Abnormality Classification Arm | G8 | ⏸️ |
 | 12 | Real-VerSe Grounding & Reference Feature Expansion | G3, G7 | ✅ |
 | 13 | Dataset Ingestion Adapters & Harmonization Schema | (G3/G7 enabler) | ✅ |
-| 14 | Real-Data Grounding & Heuristic Recalibration | G3, G7 | 📋 |
+| 14 | Real-Data Grounding & Heuristic Recalibration | G3, G7 | 🚧 |
 | 15 | Real-XNAT Deployment Validation | G5 | 📋 |
 | 16 | Real Failure Corpus & Sensitivity Validation | G2, G7 | 📋 |
 
@@ -484,7 +484,7 @@ through a clean interface. Scoped + built 2026-07-16 (queue-011, items 086–088
 
 ---
 
-## Stage 14 — Real-Data Grounding & Heuristic Recalibration (G3, G7) — 📋
+## Stage 14 — Real-Data Grounding & Heuristic Recalibration (G3, G7) — 🚧
 
 **Goal.** Close the G3 gap the first real-data run exposed: recalibrate and
 reshape the heuristics against **real** VerSe-derived distributions so real GT
@@ -496,11 +496,11 @@ regression** against item 057's recorded synthetic baseline.
 - 📋 Default config switches from hand-set to **reference-derived bounds** grounded
   on `reference_verse_v1.json` (the switch exists — item 048 — but the shipped
   default is still the synthetic-calibrated hand-set one).
-- 📋 **FOV-aware `coverage` / `border` rules** — the largest single contributor.
+- 🚧 **FOV-aware `coverage` / `border` rules** — the largest single contributor.
   Real scans are legitimately partial (cervical-only, lumbar-only): a level
   outside the field of view is *not* a missing level, and a vertebra cut by the
   FOV edge is *not* a border defect. Distinguish "absent though inside FOV"
-  (a real failure) from "outside FOV" (normal).
+  (a real failure) from "outside FOV" (normal). *(Item 089)*
 - 📋 **`fragmentation` / `bounds` tolerance re-derived from real per-level
   variation** rather than synthetic-clean geometry.
 - 📋 **Recalibration run** via the Stage-7 `calibrate.py` grid search fitted on the
