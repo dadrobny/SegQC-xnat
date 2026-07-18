@@ -493,7 +493,7 @@ Scoped 2026-07-17. Target: **held-out real-GT FPR ≤ 0.10 with no sensitivity
 regression** against item 057's recorded synthetic baseline.
 
 **Deliverables.**
-- 🚧 Default config switches from hand-set to **reference-derived bounds** grounded
+- ✅ Default config switches from hand-set to **reference-derived bounds** grounded
   on `reference_verse_v1.json` (the switch exists — item 048 — but the shipped
   default is still the synthetic-calibrated hand-set one). *(Item 090)*
 - ✅ **FOV-aware `coverage` / `border` rules** — the largest single contributor.
@@ -501,7 +501,7 @@ regression** against item 057's recorded synthetic baseline.
   outside the field of view is *not* a missing level, and a vertebra cut by the
   FOV edge is *not* a border defect. Distinguish "absent though inside FOV"
   (a real failure) from "outside FOV" (normal). *(Item 089)*
-- 🚧 **`fragmentation` / `bounds` tolerance re-derived from real per-level
+- ✅ **`fragmentation` / `bounds` tolerance re-derived from real per-level
   variation** rather than synthetic-clean geometry. *(Item 090)*
 - 📋 **Recalibration run** via the Stage-7 `calibrate.py` grid search fitted on the
   VerSe19 **training** subset only, then measured on the **held-out**
