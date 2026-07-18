@@ -747,4 +747,31 @@ in-process (not subprocesses) into `tmp_path`.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **No `src/segqc/**` change was needed (A1 confirmed).** The test-writer's
+  `tests/test_091_stage14_acceptance.py` (committed at `d7a5d00`) already
+  implements all eight required helpers (`real_verse_cohort_dir`,
+  `build_standin_splits`, `calibrate_then_measure`, `per_mode_sensitivity`,
+  `sensitivity_baseline`, `sensitivity_regressed`, `g3_recalibration_record`,
+  `may_flip_g3`) directly in the test module body, composing the already-merged
+  `segqc.eval.calibrate` / `segqc.eval.harness` / `segqc.eval.metrics` /
+  `segqc.synth.*` / `segqc.datasets` surfaces exactly per the spec's public
+  surface section and Implementation Steps. This mirrors item 084's precedent,
+  where the acceptance module's helpers were likewise written whole by the
+  test-writer with no separate builder implementation commit (084's history
+  goes straight from the test commit to `progress -> in-progress/done`, no
+  intervening `feat(084)` commit).
+- **Builder's role for this item was verification, not implementation.**
+  Confirmed: (1) every helper body is complete (no stubs, no
+  `NotImplementedError`/`TODO`/`pass` placeholders — checked via grep); (2) the
+  helpers match the spec's Implementation Steps section 1 line-for-line
+  (`sensitivity_regressed`'s `any(achieved.get(mode) is None or achieved[mode]
+  < floor ...)`, `may_flip_g3`'s conjunction, `g3_recalibration_record`'s
+  key set); (3) `requires_verse` is declared as a module-level
+  `pytest.mark.skipif(real_verse_cohort_dir() is None, reason=...)` mirroring
+  items 069/084/088 byte-for-byte (AC12); (4) the diff introduces no
+  `src/segqc/**` or `scripts/**` file and no new `pyproject.toml` dependency
+  (AC17, also self-checked by the test suite's own `test_ac17_no_new_
+  dependency`). No production code was written or is needed for this item.
+- **No deviation from the spec.** The committed test file's helper
+  implementations align with every AC and Implementation Step; no interface
+  divergence was found that would require handing back per Assumptions A1/A11.
