@@ -597,4 +597,70 @@ the FOV rules, or `SUPPORTED_SCHEMA_VERSION`.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`fragmentation.py`'s reference path mirrors `bounds.py`'s item-048 shape
+  exactly**, including validating `source` up-front (before any per-label
+  iteration) and validating `reference_lower_pct`/`reference_upper_pct` inside
+  `reference_fragmentation_for_level` itself (called once per label, exactly
+  like `reference_bounds_for_level`) rather than duplicating the percentile
+  check in `evaluate`. This keeps the two rules' reference-mode code shape
+  identical and both percentile-membership checks share one implementation.
+
+- **The excess-fragment reference-mode finding reuses the existing
+  `"Rogue island(s):"` reason tag** rather than minting a third tag. AC8 only
+  requires the *index* finding's reference-mode reason to be distinct from
+  its hand-set counterpart (which it is); nothing requires a distinct tag for
+  the excess-fragment finding, and reusing the tag keeps `"Rogue island"`
+  substring matching (used by the uncovered-level fallback tests, AC11)
+  working uniformly whether the check fired via the hand-set floor or the
+  reference ceiling.
+
+- **`reference_fragmentation_for_level` validates percentile membership even
+  when the level/stratum turns out to be uncovered** (validates first, then
+  looks up the level) -- matching `reference_bounds_for_level`'s order
+  exactly, so a bad percentile pair raises `ValueError` regardless of which
+  level is being queried, not just for covered ones.
+
+- **CLI**: `reference_enabled` is now
+  `(bool(args.reference) or bool(cfg.reference_param("enabled", True))) and
+  not bool(args.no_reference)` -- the code-side default for
+  `reference_param("enabled", ...)` flips from `False` to `True`, and
+  `--no-reference` unconditionally forces it off (wins over both `--reference`
+  and any `reference.enabled: true` in a loaded config), per the Assumptions.
+  The default artifact load (no `--reference-artifact` / no
+  `reference.artifact_path`) now calls `bundled_production_reference()`
+  (verse-v1) instead of `bundled_default_reference()` (synthetic).
+
+- **`default_config.yaml`**: only comments were added/edited (the bounds
+  `source` block, a new fragmentation `source` block mirroring it, and the
+  `reference:` block's default-value comments) -- no active YAML key changed,
+  confirmed by `config_hash(bundled_default_config())` still equalling the
+  pre-existing hash recorded in `reference_verse_v1.json`'s own provenance
+  (`87c73ab3...c96ac8`), verified by hand against the bundled artifact.
+
+- **Flagging a pre-existing test-file issue, not fixed here (out of scope for
+  a builder to "fix" by changing behaviour):** AC16's
+  `test_ac16_load_config_default_path_equals_default_config` asserts
+  `load_config(default_config_path()) == default_config()`. This equality is
+  a **documented, long-standing false equality** in this codebase --
+  `default_config()`'s `rules`/`verdict`/`reference`/`intensity` fields are
+  intentionally `{}` (meaning "all rules enabled with built-in code
+  defaults", items 026/034), while `load_config(default_config_path())`
+  materialises the full seven-rule-id dict from the bundled YAML (item 035);
+  they have never been equal, verified by hand both before and after every
+  change made in this item (`git stash` back to the pre-090 tree reproduces
+  the same `False`). `tests/test_065_config_intensity.py`'s own module
+  docstring documents this exact gotcha in detail and deliberately avoids
+  asserting it, instead asserting `config_hash(load_config(...)) ==
+  <committed provenance hash>` (the same pattern `test_heuristics_bounds_source.py`'s
+  AC7 established for item 048). This item's own AC16 spec text carried the
+  same (apparently mistaken) claim forward from the one-liner queue entry
+  into the committed test, and the test-writer transcribed it literally. No
+  production-code change would make this specific assertion pass without
+  either (a) making `default_config()` materialise the full bundled rules
+  dict (a substantial, out-of-scope behavioural change risking every other
+  test that relies on `default_config().rules == {}`), or (b) the test being
+  corrected to the `config_hash`-based pattern its sibling tests already use.
+  Every *other* AC16 assertion (schema_version == "0.1", and the config_hash
+  snapshot against `bundled_production_reference().provenance.config_hash`)
+  was hand-verified to pass. Flagging for the validator/test-writer rather
+  than silently reshaping `config.py`'s default-construction semantics.

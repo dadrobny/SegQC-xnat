@@ -181,10 +181,24 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help=(
-            "Enable reference mode (item 049): compute a delta-to-reference "
-            "block against a VerSe-style reference distribution and embed it "
-            "in the report. OFF by default -- falls back to config "
-            "reference.enabled when the flag itself is not given."
+            "Explicitly enable reference mode (item 049): compute a "
+            "delta-to-reference block against a VerSe-style reference "
+            "distribution and embed it in the report. Reference mode is ON "
+            "by default as of item 090 (grounded on the bundled verse-v1 "
+            "production artifact) -- this flag is now redundant with the "
+            "default but kept for explicitness/back-compat; use "
+            "--no-reference to disable."
+        ),
+    )
+    run_parser.add_argument(
+        "--no-reference",
+        action="store_true",
+        default=False,
+        help=(
+            "Disable reference mode (item 090), restoring the reference-"
+            "less report shape (item 049's original OFF-by-default "
+            "behaviour). Overrides --reference and any config "
+            "reference.enabled: true."
         ),
     )
     run_parser.add_argument(
@@ -193,8 +207,10 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="<json>",
         help=(
             "Path to a reference artifact JSON (item 045) to load when "
-            "reference mode is enabled. When omitted, the bundled default "
-            "artifact (bundled_default_reference()) is used."
+            "reference mode is enabled. When omitted, the bundled "
+            "production artifact (bundled_production_reference(), "
+            "verse-v1) is used (item 090; was bundled_default_reference() "
+            "under item 049)."
         ),
     )
     run_parser.add_argument(
@@ -582,11 +598,13 @@ def _handle_run(args: argparse.Namespace) -> int:
         ]
 
     # --- 5. Extract features, run the Stage 4 rules, aggregate the verdict --- #
-    # Reference mode (item 049) -- OFF by default; enabled via --reference or
-    # config reference.enabled.
-    reference_enabled = bool(args.reference) or bool(
-        cfg.reference_param("enabled", False)
-    )
+    # Reference mode -- ON by default as of item 090 (was OFF by default,
+    # item 049); enabled via --reference or config reference.enabled (now
+    # defaulting True), and forced off via --no-reference regardless of
+    # either.
+    reference_enabled = (
+        bool(args.reference) or bool(cfg.reference_param("enabled", True))
+    ) and not bool(args.no_reference)
     # Intensity mode (item 065) -- OFF by default; enabled via --intensity or
     # config intensity.enabled.
     intensity_enabled = bool(args.intensity) or bool(
@@ -598,7 +616,7 @@ def _handle_run(args: argparse.Namespace) -> int:
     if reference_enabled:
         from segqc.reference import (  # noqa: PLC0415
             ReferenceArtifactError,
-            bundled_default_reference,
+            bundled_production_reference,
             load_artifact,
         )
 
@@ -609,7 +627,10 @@ def _handle_run(args: argparse.Namespace) -> int:
             if artifact_path:
                 reference = load_artifact(artifact_path)
             else:
-                reference = bundled_default_reference()
+                # Item 090: the default production reference is verse-v1
+                # (was the synthetic bundled_default_reference() under item
+                # 049).
+                reference = bundled_production_reference()
         except (ReferenceArtifactError, OSError) as exc:
             print(f"Error: {exc}", file=sys.stderr)
             return 1

@@ -33,7 +33,7 @@ from segqc.verdict import Severity
 if TYPE_CHECKING:  # pragma: no cover - type-only import, no runtime dependency
     from segqc.reference.schema import ReferenceDistribution
 
-__all__ = ["BoundsRule", "DEFAULT_BOUNDS", "reference_bounds_for_level"]
+__all__ = ["BoundsRule", "DEFAULT_BOUNDS", "reference_bounds_for_level", "DEFAULT_SOURCE"]
 
 
 # --------------------------------------------------------------------------- #
@@ -145,6 +145,16 @@ _VALID_SOURCES = frozenset({_SOURCE_HAND_SET, _SOURCE_REFERENCE})
 DEFAULT_REFERENCE_LOWER_PCT = 1
 DEFAULT_REFERENCE_UPPER_PCT = 99
 DEFAULT_REFERENCE_STRATUM = "all"
+
+#: Code-side default ``source`` (item 090): flips from ``"hand-set"`` (item
+#: 048's original default) to ``"reference"`` -- the shipped default now
+#: sources bounds from a covering reference when one is attached, falling
+#: back to the hand-set group bounds for uncovered levels/metrics or when no
+#: reference is attached at all (item 048 AC9). ``default_config.yaml``
+#: documents this as a COMMENT only, so the parsed config dict (and hence
+#: ``config_hash``) is unaffected -- the flip lives in code (item 090
+#: Assumptions).
+DEFAULT_SOURCE = _SOURCE_REFERENCE
 
 
 def reference_bounds_for_level(
@@ -303,7 +313,7 @@ class BoundsRule(Rule):
         # Read the bounds-source switch (item 048). Validated up-front, before
         # any per-label processing, even for an empty per_label (AC10).
         source: str = config.rule_param(
-            self.rule_id, "source", default=_SOURCE_HAND_SET
+            self.rule_id, "source", default=DEFAULT_SOURCE
         )
         if source not in _VALID_SOURCES:
             raise ValueError(
