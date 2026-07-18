@@ -121,11 +121,16 @@ def test_run_json_inventory_matches_fixture(labelled_blocks_files, tmp_path, cap
     mm, far below the anatomical bounds thresholds) now legitimately produce
     ``bounds`` findings, so the overall verdict is 'flagged-for-review' (exit code
     stays 0). The case_id is derived from the scan filename stem ('scan').
+
+    Item 090 turns reference mode ON by default, which would add unrelated
+    ``reference_delta`` findings against the real verse-v1 bands, so
+    ``--no-reference`` keeps this test isolated to the inventory/bounds
+    wiring it actually validates.
     """
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     code, _stdout, _stderr = _run(
-        ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
+        ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir), "--no-reference"],
         capsys,
     )
     assert code == 0
@@ -396,6 +401,11 @@ def test_run_anisotropic_spacing_pass_verdict(tmp_path, capsys):
     ``bounds`` findings (exit code stays 0). This still confirms the CLI handles
     non-isotropic affines without crashing and the v0 report is written
     correctly.
+
+    Item 090 turns reference mode ON by default, which would add unrelated
+    ``reference_delta`` findings against the real verse-v1 bands, so
+    ``--no-reference`` keeps this test isolated to the anisotropic/bounds
+    behaviour it actually validates.
     """
     import sys
     sys.path.insert(0, str(pathlib.Path(__file__).parent))
@@ -405,7 +415,7 @@ def test_run_anisotropic_spacing_pass_verdict(tmp_path, capsys):
     out_dir = tmp_path / "out"
     code, _stdout, _stderr = _run(
         ["run", "--scan", str(scan_path), "--seg", str(seg_path),
-         "--out", str(out_dir)],
+         "--out", str(out_dir), "--no-reference"],
         capsys,
     )
     assert code == 0
@@ -472,6 +482,11 @@ def test_run_single_voxel_volume(tmp_path, capsys):
     thresholds and touches every image face, so it legitimately fires both
     rules and the verdict is 'flagged-for-review' rather than 'pass' (exit code
     stays 0). The v0 report must still contain all required schema fields.
+
+    Item 090 turns reference mode ON by default, which would add unrelated
+    ``reference_delta`` findings against the real verse-v1 bands, so
+    ``--no-reference`` keeps this test isolated to the bounds/border
+    single-voxel behaviour it actually validates.
     """
     import nibabel as nib
     import numpy as np
@@ -485,7 +500,7 @@ def test_run_single_voxel_volume(tmp_path, capsys):
     out_dir = tmp_path / "out"
     code, stdout, _stderr = _run(
         ["run", "--scan", str(scan_path), "--seg", str(seg_path),
-         "--out", str(out_dir)],
+         "--out", str(out_dir), "--no-reference"],
         capsys,
     )
     assert code == 0

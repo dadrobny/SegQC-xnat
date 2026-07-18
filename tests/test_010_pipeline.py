@@ -250,12 +250,16 @@ def test_ac13_populated_fixture_json_verdict_is_pass(labelled_blocks_files, tmp_
     ``min_volume_mm3``), so they now legitimately fire ``bounds`` findings and the
     verdict is ``flagged-for-review`` rather than ``pass`` (exit code stays 0).
     What this test actually verifies is that the CLI wiring produces a
-    schema-shaped, non-empty ``findings`` list alongside the verdict.
+    schema-shaped, non-empty ``findings`` list alongside the verdict. Item
+    090 turns reference mode ON by default, which would add unrelated
+    ``reference_delta`` findings against the real verse-v1 bands, so
+    ``--no-reference`` is passed to keep this test isolated to the
+    ``bounds``/``border`` wiring it is actually validating.
     """
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     code, _stdout, _stderr = _run(
-        ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
+        ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir), "--no-reference"],
         capsys,
     )
     assert code == 0

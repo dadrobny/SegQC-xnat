@@ -147,15 +147,18 @@ def _install_compute_spy(sub, monkeypatch, recorder):
     ``os.environ.get("SEGQC_BACKEND")`` at call time, then delegates to the
     real implementation so the run completes normally (AC4)."""
     if sub == "run":
+        # Item 090: reference mode is ON by default, so a default `run`
+        # invocation now dispatches through run_qc_with_reference rather
+        # than the reference-less run_qc (cli.py's _handle_run).
         import segqc.pipeline as mod
 
-        original = mod.run_qc
+        original = mod.run_qc_with_reference
 
         def spy(*args, **kwargs):
             recorder["env"] = os.environ.get("SEGQC_BACKEND")
             return original(*args, **kwargs)
 
-        monkeypatch.setattr(mod, "run_qc", spy)
+        monkeypatch.setattr(mod, "run_qc_with_reference", spy)
     elif sub == "evaluate":
         import segqc.eval.harness as mod
 

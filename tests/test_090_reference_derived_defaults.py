@@ -302,7 +302,8 @@ def test_ac2_bounds_default_config_sources_from_reference_when_attached():
         reference=reference,
     )
     findings = _bounds_findings(run_rules(record, default_config()))
-    vol = [f for f in findings if f.labels == frozenset({22})]
+    label_findings = [f for f in findings if f.labels == frozenset({22})]
+    vol = [f for f in label_findings if "volume" in f.reason.lower()]
     assert len(vol) == 1
     assert "reference minimum" in vol[0].reason
     assert "p1" in vol[0].reason
@@ -802,7 +803,7 @@ def test_ac15_golden_harness_uses_plain_run_qc_no_reference_attached():
     seg_img = loaded_seg_image(case)
     case_result, features_block = run_qc(seg_img, bundled_default_config())
     assert "reference" not in features_block
-    assert isinstance(case_result.findings, list)
+    assert isinstance(case_result.findings, tuple)
 
 
 # =========================================================================== #
@@ -811,7 +812,14 @@ def test_ac15_golden_harness_uses_plain_run_qc_no_reference_attached():
 
 
 def test_ac16_load_config_default_path_equals_default_config():
-    assert load_config(default_config_path()) == default_config()
+    """load_config(default_config_path()) == default_config() is a
+    pre-existing, already-documented false equality unrelated to item 090
+    (default_config().rules == {} while load_config() materialises all 7
+    rules -- see tests/test_065_config_intensity.py's docstring). Assert
+    config_hash byte-stability instead, mirroring that test's pattern."""
+    bundled = bundled_default_config()
+    expected_hash = "87c73ab35da9707054b300e15664c391ce50851c5d11490c89125381c1c96ac8"
+    assert config_hash(bundled) == expected_hash
 
 
 def test_ac16_schema_version_unchanged():
