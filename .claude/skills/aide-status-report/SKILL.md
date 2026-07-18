@@ -19,20 +19,29 @@ itself.
 
 ## What it produces
 
-A single HTML file (default `docs/aide/status/index.html`):
+A single HTML file (default `docs/aide/status/index.html`). A typical report
+includes, at minimum, these framework-derived sections:
 
 1. **Work-Queue Overview** — finished / in-progress / upcoming items, mapped to
    roadmap stages.
-2. **Project Phase Alignment** — the stage table with completion status and an
-   overall progress bar.
+2. **Roadmap phase & stage alignment** — stages with completion status and an
+   overall progress bar; group stages under their `# Phase N` headers when
+   `progress.md` defines phases.
 3. **Vision Objective Coverage** — G-code objectives and their delivery status.
 4. **Testing Overview** — test counts; pass/fail outcomes when a JUnit XML is
    supplied.
-5. **Project Feature Highlights** — image galleries (extension points; they
-   render a placeholder until the artifacts exist).
+5. **Feature highlights / galleries** — image or plot galleries (extension
+   points; they render a placeholder until the artifacts exist).
 
-The generator (`scripts/aide_status_report.py`) is deterministic given the same
-inputs (only the timestamp varies).
+The generator (`scripts/aide_status_report.py`) is **project-owned** — it is not
+part of the framework engine, so each project extends it with **domain-specific
+panels** beyond the list above (e.g. a test-corpus coverage table, a
+reference-dataset / distributions panel, QC-overlay galleries). When a panel
+surfaces data derived from a **stand-in** (a synthetic cohort, a mocked
+dependency), label that provenance honestly in the panel rather than implying
+the real thing — mirror the "Environment-Gated Capability Verification" honesty
+principle. The generator is deterministic given the same inputs (only the
+timestamp varies).
 
 ## How to run
 
