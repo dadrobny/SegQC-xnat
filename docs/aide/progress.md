@@ -503,11 +503,11 @@ regression** against item 057's recorded synthetic baseline.
   (a real failure) from "outside FOV" (normal). *(Item 089)*
 - ✅ **`fragmentation` / `bounds` tolerance re-derived from real per-level
   variation** rather than synthetic-clean geometry. *(Item 090)*
-- 🚧 **Recalibration run** via the Stage-7 `calibrate.py` grid search fitted on the
+- ✅ **Recalibration run** via the Stage-7 `calibrate.py` grid search fitted on the
   VerSe19 **training** subset only, then measured on the **held-out**
   validation/test subsets through the Stage-13 adapter (disjoint cohorts — no
   circularity). *(Item 091)*
-- 🚧 **Anti-gaming sensitivity guard**: re-run the Stage-5 synthetic corpus **and**
+- ✅ **Anti-gaming sensitivity guard**: re-run the Stage-5 synthetic corpus **and**
   Stage-5 perturbations applied to **real** VerSe GT, asserting per-mode
   sensitivity does not regress below item 057's baseline. FPR alone is trivially
   driven to 0.0 by loosening rules; the FPR/sensitivity **pair** is the bar.
