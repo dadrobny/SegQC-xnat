@@ -188,6 +188,10 @@ def test_ac10_no_intensity_flag_omits_image_features_key(tmp_path):
 
 
 def test_ac10_no_intensity_flag_report_shape_matches_pre_065_shape(tmp_path):
+    """Item 090 turns reference mode ON by default, which would add a
+    reference_delta key unrelated to what this test is isolating (the
+    intensity flag's own effect on report shape) -- pass --no-reference so
+    the pre-065 shape comparison stays about intensity, not reference mode."""
     from segqc.cli import main
 
     scan_path, seg_path = _case_paths("clean_hu")
@@ -199,6 +203,7 @@ def test_ac10_no_intensity_flag_report_shape_matches_pre_065_shape(tmp_path):
             "--scan", scan_path,
             "--seg", seg_path,
             "--out", str(out_dir),
+            "--no-reference",
         ]
     )
     report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))

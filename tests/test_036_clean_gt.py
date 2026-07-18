@@ -132,23 +132,36 @@ def test_ac3_cli_run_exits_zero(tmp_path):
 
 
 def test_ac3_cli_report_verdict_is_pass(tmp_path):
-    """AC3: the emitted segqc_report.json has "verdict" == "pass"."""
+    """AC3: the emitted segqc_report.json has "verdict" == "pass".
+
+    Item 090 turns reference mode ON by default, and this synthetic clean-GT
+    fixture's geometry is not grounded against the real verse-v1 reference
+    bands, so it now fires reference_delta findings under the new default.
+    This test's intent -- "a clean synthetic GT case passes cleanly" -- is a
+    claim about the reference-less/synthetic-only invocation, so it now
+    passes --no-reference explicitly.
+    """
     clean = _clean()
     scan_path = write_nifti(clean.scan_img, tmp_path / "scan.nii.gz")
     seg_path = write_nifti(clean.seg_img, tmp_path / "seg.nii.gz")
     out_dir = tmp_path / "out"
-    main(["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)])
+    main(["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir), "--no-reference"])
     data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
     assert data["verdict"] == "pass"
 
 
 def test_ac3_cli_report_findings_empty(tmp_path):
-    """AC3: the emitted segqc_report.json has an empty "findings" array."""
+    """AC3: the emitted segqc_report.json has an empty "findings" array.
+
+    See test_ac3_cli_report_verdict_is_pass above for why --no-reference is
+    now required to isolate this synthetic fixture's "clean" invariant from
+    item 090's default reference_delta findings against real verse-v1 bands.
+    """
     clean = _clean()
     scan_path = write_nifti(clean.scan_img, tmp_path / "scan.nii.gz")
     seg_path = write_nifti(clean.seg_img, tmp_path / "seg.nii.gz")
     out_dir = tmp_path / "out"
-    main(["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)])
+    main(["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir), "--no-reference"])
     data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
     assert data["findings"] == []
 

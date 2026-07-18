@@ -29,25 +29,28 @@ rules:
     enabled: true
     params:
       # -------------------------------------------------------------- #
-      # Bounds-source switch (item 048) -- documented here as COMMENTS
-      # ONLY. Adding an active `source` (or `reference_*`) key would change
-      # this file's parsed `rules` dict and hence `config_hash` (item 045
-      # provenance) and could regress the Stage 5 golden snapshots, so the
-      # code-side default is supplied instead via
-      # HeuristicConfig.rule_param(..., default="hand-set"). Uncomment and
-      # adjust to opt a deployment into reference-derived bounds once a
-      # reference is attached to the record (item 049).
+      # Bounds-source switch (item 048; code-default flipped by item 090)
+      # -- documented here as COMMENTS ONLY. Adding an active `source` (or
+      # `reference_*`) key would change this file's parsed `rules` dict and
+      # hence `config_hash` (item 045 provenance) and could regress the
+      # Stage 5 golden snapshots, so the code-side default is supplied
+      # instead via HeuristicConfig.rule_param(..., default=...) --
+      # heuristics/bounds.py::DEFAULT_SOURCE, which item 090 flips from
+      # "hand-set" to "reference". Uncomment to pin a deployment to the
+      # opposite mode explicitly.
       #
       # source: hand-set | reference
-      #   hand-set (default) -- today's behaviour: coarse per-group
+      #   hand-set -- item 028's original behaviour: coarse per-group
       #   (cervical/thoracic/lumbar) bounds below, unchanged.
-      #   reference -- per-level bounds derived from the
-      #   ReferenceDistribution attached at record["reference"] (item 045),
-      #   using the level's stored reference_lower_pct/reference_upper_pct
-      #   percentiles. Any level the reference does not cover (or does not
-      #   cover for reference_stratum), and any tracked metric a covered
-      #   level lacks, falls back to the hand-set group bounds below --
-      #   never crashes.
+      #   reference (item 090 code-default) -- per-level bounds derived
+      #   from the ReferenceDistribution attached at record["reference"]
+      #   (item 045; ON by default in the run path as of item 090, pointing
+      #   at the bundled verse-v1 production artifact -- see the
+      #   `reference:` block below), using the level's stored
+      #   reference_lower_pct/reference_upper_pct percentiles. Any level the
+      #   reference does not cover (or does not cover for reference_stratum),
+      #   and any tracked metric a covered level lacks, falls back to the
+      #   hand-set group bounds below -- never crashes.
       #
       # reference_lower_pct: 1
       # reference_upper_pct: 99
@@ -90,11 +93,40 @@ rules:
   fragmentation:
     enabled: true
     params:
+      # -------------------------------------------------------------- #
+      # Fragmentation-source switch (item 090, mirroring bounds' item 048
+      # design exactly) -- documented here as COMMENTS ONLY, for the same
+      # config_hash/golden-stability reason as the bounds source switch
+      # above. Code-side default supplied via
+      # heuristics/fragmentation.py::DEFAULT_SOURCE ("reference"). Uncomment
+      # to pin a deployment to the opposite mode explicitly.
+      #
+      # source: hand-set | reference
+      #   hand-set -- item 028's original behaviour: the fixed
+      #   fragmentation_index_threshold / island_min_voxels constants below,
+      #   compared against every label regardless of level.
+      #   reference (item 090 code-default) -- per-level tolerances derived
+      #   from the ReferenceDistribution attached at record["reference"]:
+      #     fragmentation_index_threshold <- largest_component_fraction p{lower}
+      #     max_component_count           <- component_count p{upper}
+      #   The excess-component_count ceiling REPLACES (not ANDs) the
+      #   absolute island_min_voxels floor for a level the reference covers.
+      #   Any level the reference does not cover (or does not cover for
+      #   reference_stratum), or a covered level missing one of the two
+      #   tracked stats, falls back to the hand-set constant for that
+      #   metric -- never crashes.
+      #
+      # reference_lower_pct: 1
+      # reference_upper_pct: 99
+      # reference_stratum: all
+      #
       # Below this fraction, the largest component no longer dominates the
-      # label -- judged split into comparable pieces (item 028 default).
+      # label -- judged split into comparable pieces (item 028 default;
+      # hand-set fallback under item 090's reference-mode default).
       fragmentation_index_threshold: 0.75
       # A non-dominant component smaller than this voxel count is a rogue
-      # island rather than meaningful anatomy (item 028 default).
+      # island rather than meaningful anatomy (item 028 default; hand-set
+      # fallback under item 090's reference-mode default).
       island_min_voxels: 50
       severity: flagged-for-review
 
@@ -202,17 +234,23 @@ verdict:
   # built-in aggregate_verdict default.
   flag_escalation_count: 0
 
-# Reference-mode switch (item 049) -- documented here as COMMENTS ONLY. An
-# active `reference:` section would change this file's parsed dict and hence
-# `load_config(default_config_path()) == default_config()` (AC8) plus
-# `config_hash`-adjacent expectations, so the code-side defaults are supplied
-# instead via HeuristicConfig.reference_param(key, default). Uncomment and
-# adjust to opt a deployment into reference mode without the `--reference`
-# CLI flag.
+# Reference-mode switch (item 049; code-default flipped ON by item 090) --
+# documented here as COMMENTS ONLY. An active `reference:` section would
+# change this file's parsed dict and hence
+# `load_config(default_config_path()) == default_config()` (AC8/item 090
+# AC16) plus `config_hash`-adjacent expectations (the `reference` section is
+# excluded from config_hash's canonical field list regardless), so the
+# code-side defaults are supplied instead via
+# HeuristicConfig.reference_param(key, default) and cli.py's `_handle_run`
+# resolution. Uncomment and adjust to override the shipped default
+# explicitly; `segqc run --no-reference` always forces reference mode off
+# regardless of this section.
 #
 # reference:
-#   enabled: false          # off by default -- see item 049's Assumptions.
-#   artifact_path: null     # null/absent -- loads bundled_default_reference().
+#   enabled: true           # ON by default as of item 090 (was false, item 049).
+#   artifact_path: null     # null/absent -- loads bundled_production_reference()
+#                           # (verse-v1, item 090; was bundled_default_reference()
+#                           # / reference_default.json under item 049).
 #   lower_pct: 1
 #   upper_pct: 99
 #   stratum: all

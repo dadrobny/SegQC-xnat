@@ -56,6 +56,7 @@ from segqc.reference import (
     compute_reference_delta,
     reference_delta_to_dict,
 )
+from segqc.reference.artifact import bundled_production_reference
 from segqc.synth.clean_gt import build_clean_spine
 
 
@@ -331,6 +332,9 @@ def test_ac5_cli_reference_flag_reference_delta_findings_in_json_and_txt(tmp_pat
 
 
 def test_ac6_no_reference_flag_omits_reference_delta_key(tmp_path):
+    """Item 090 flips reference mode ON by default; this test's whole point
+    is proving the reference-LESS shape, so it now must invoke --no-reference
+    explicitly rather than rely on default-off."""
     from segqc.cli import main
 
     scan_path, seg_path = _write_case_inputs(tmp_path)
@@ -342,6 +346,7 @@ def test_ac6_no_reference_flag_omits_reference_delta_key(tmp_path):
             "--scan", str(scan_path),
             "--seg", str(seg_path),
             "--out", str(out_dir),
+            "--no-reference",
         ]
     )
     report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
@@ -349,6 +354,10 @@ def test_ac6_no_reference_flag_omits_reference_delta_key(tmp_path):
 
 
 def test_ac6_default_report_shape_matches_pre_item_shape(tmp_path):
+    """Item 090 makes reference mode ON by default; --no-reference is now
+    the only way to reach the pre-item (reference-less) report shape, so
+    this test invokes it explicitly to prove --no-reference still restores
+    that exact key set."""
     from segqc.cli import main
 
     scan_path, seg_path = _write_case_inputs(tmp_path)
@@ -360,6 +369,7 @@ def test_ac6_default_report_shape_matches_pre_item_shape(tmp_path):
             "--scan", str(scan_path),
             "--seg", str(seg_path),
             "--out", str(out_dir),
+            "--no-reference",
         ]
     )
     report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
@@ -376,6 +386,10 @@ def test_ac6_default_report_shape_matches_pre_item_shape(tmp_path):
 
 
 def test_ac7_default_reference_artifact_is_bundled_default(tmp_path):
+    """Item 090 flips the run path's default reference artifact from the
+    synthetic bundled_default_reference() to bundled_production_reference()
+    (verse-v1) -- this test's intent (no --reference-artifact override loads
+    "the" bundled default) now points at that new default artifact."""
     from segqc.cli import main
 
     scan_path, seg_path = _write_case_inputs(tmp_path)
@@ -391,7 +405,7 @@ def test_ac7_default_reference_artifact_is_bundled_default(tmp_path):
         ]
     )
     report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
-    bundled = bundled_default_reference()
+    bundled = bundled_production_reference()
     assert report["reference_delta"]["reference_schema_version"] == bundled.schema_version
     assert report["reference_delta"]["reference_source"] == bundled.provenance.source
 

@@ -89,6 +89,7 @@ __all__ = [
     "DEFAULT_ARTIFACT_NAME",
     "DEFAULT_SOURCE",
     "DEFAULT_BUILD_DATE",
+    "PRODUCTION_ARTIFACT_NAME",
     "ReferenceArtifactError",
     "config_hash",
     "build_reference",
@@ -96,6 +97,8 @@ __all__ = [
     "load_artifact",
     "default_artifact_path",
     "bundled_default_reference",
+    "bundled_production_reference_path",
+    "bundled_production_reference",
     "build_default_cohort",
     "build_and_write_default",
     "main",
@@ -114,6 +117,12 @@ DEFAULT_SOURCE: str = "synthetic-verse-cohort"
 #: deterministic regardless of when ``python -m segqc.reference.artifact``
 #: is actually run.
 DEFAULT_BUILD_DATE: str = "2026-07-11"
+
+#: Bundled package-data filename for the committed **production** artifact
+#: (item 090) -- the real, held-out-training VerSe19 distribution that the
+#: run path attaches by default, distinct from the synthetic
+#: :data:`DEFAULT_ARTIFACT_NAME` Plane-1 baseline.
+PRODUCTION_ARTIFACT_NAME: str = "reference_verse_v1.json"
 
 
 class ReferenceArtifactError(Exception):
@@ -408,6 +417,37 @@ def bundled_default_reference() -> ReferenceDistribution:
     """``load_artifact(default_artifact_path())`` -- the default artifact
     loaded into the 043 data model."""
     return load_artifact(default_artifact_path())
+
+
+# --------------------------------------------------------------------------- #
+# Bundled production artifact accessors (item 090)
+# --------------------------------------------------------------------------- #
+
+
+def bundled_production_reference_path() -> Path:
+    """Absolute path to the bundled ``reference_verse_v1.json`` (via
+    ``importlib.resources``), mirroring :func:`default_artifact_path`.
+
+    This is the **production** reference artifact -- built from real VerSe19
+    training-split subjects (``provenance.source == "verse-v1"``) -- that the
+    run path attaches by default (item 090), distinct from the synthetic
+    Plane-1 baseline :func:`default_artifact_path` still points at.
+    """
+    import importlib.resources as _pkg_resources
+
+    import segqc.reference as _reference_pkg
+
+    ref = _pkg_resources.files(_reference_pkg).joinpath(PRODUCTION_ARTIFACT_NAME)
+    return Path(str(ref))
+
+
+def bundled_production_reference() -> ReferenceDistribution:
+    """``load_artifact(bundled_production_reference_path())`` -- the
+    committed real VerSe19 (``verse-v1``) reference artifact loaded into the
+    043 data model. This is the shipped **default** production reference
+    (item 090); :func:`bundled_default_reference` remains the untouched
+    synthetic Plane-1 baseline."""
+    return load_artifact(bundled_production_reference_path())
 
 
 # --------------------------------------------------------------------------- #
