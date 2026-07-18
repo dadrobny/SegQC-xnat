@@ -111,7 +111,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'exec $(command -v python3 || command -v python) $@' _ .claude/hooks/command_hygiene_guard.py"
+            "command": "sh -c 'for py in python3 python; do command -v \"$py\" >/dev/null 2>&1 || continue; \"$py\" -c \"\" >/dev/null 2>&1 || continue; exec \"$py\" \"$@\"; done; exit 0' _ .claude/hooks/command_hygiene_guard.py"
           }
         ]
       },
@@ -120,7 +120,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'exec $(command -v python3 || command -v python) $@' _ .claude/hooks/log_permission_event.py"
+            "command": "sh -c 'for py in python3 python; do command -v \"$py\" >/dev/null 2>&1 || continue; \"$py\" -c \"\" >/dev/null 2>&1 || continue; exec \"$py\" \"$@\"; done; exit 0' _ .claude/hooks/log_permission_event.py"
           }
         ]
       }
@@ -131,7 +131,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'exec $(command -v python3 || command -v python) $@' _ .claude/hooks/log_permission_event.py"
+            "command": "sh -c 'for py in python3 python; do command -v \"$py\" >/dev/null 2>&1 || continue; \"$py\" -c \"\" >/dev/null 2>&1 || continue; exec \"$py\" \"$@\"; done; exit 0' _ .claude/hooks/log_permission_event.py"
           }
         ]
       }
