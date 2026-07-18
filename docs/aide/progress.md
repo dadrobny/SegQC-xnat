@@ -496,7 +496,7 @@ regression** against item 057's recorded synthetic baseline.
 - 📋 Default config switches from hand-set to **reference-derived bounds** grounded
   on `reference_verse_v1.json` (the switch exists — item 048 — but the shipped
   default is still the synthetic-calibrated hand-set one).
-- 🚧 **FOV-aware `coverage` / `border` rules** — the largest single contributor.
+- ✅ **FOV-aware `coverage` / `border` rules** — the largest single contributor.
   Real scans are legitimately partial (cervical-only, lumbar-only): a level
   outside the field of view is *not* a missing level, and a vertebra cut by the
   FOV edge is *not* a border defect. Distinguish "absent though inside FOV"
