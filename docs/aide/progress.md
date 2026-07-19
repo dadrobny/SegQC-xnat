@@ -90,10 +90,27 @@ shipped"). See "Two kinds of done" above._
   deliverable shipped the *harness capability*, never an actual TotalSegmentator
   run (item 053 explicitly required "no VerSe/TotalSegmentator download"). Real
   sensitivity is **unknown**. → Stage 16.
-- **G3** — *"GT passes QC at a high rate (low FPR)."* **Falsified on real data**,
-  not merely unvalidated: real held-out VerSe19 GT is flagged at **0.925**
-  (validation, 40 cases) / **0.975** (test, 40 cases) by thresholds calibrated on
-  synthetic data to an FPR of 0.0. → Stage 14.
+- **G3** — *"GT passes QC at a high rate (low FPR)."* **Still falsified on real
+  data after Stage 14's recalibration attempt.** Items 089/090 shipped FOV-aware
+  coverage/border rules and reference-derived bounds/fragmentation, but item 091's
+  own held-out measurement discovered (via the evaluation harness, not
+  `segqc run`) never actually exercised them: `eval.harness.evaluate_case` called
+  plain `run_qc`, which never attaches a reference, so the reference-derived
+  rules and the `reference_delta` rule stayed silently inert under every
+  `segqc evaluate`/`calibrate_thresholds` call — item 092 fixed that. Once
+  correctly measured, held-out real VerSe19 GT is flagged at **0.90** (validation,
+  40 cases) / **0.95** (test, 40 cases) even after a training-fitted calibration
+  of the `reference_delta` thresholds — *worse* than the pre-Stage-14 baseline
+  (0.925/0.975), because the previously-inert `reference_delta` rule's hand-set
+  z-score thresholds (`max_robust_z=3.5`) turn out to be far too tight for real
+  per-level variability, and loosening them (to 15/8, the loosest setting a grid
+  search found without regressing the synthetic corpus) barely helps. Worse: the
+  anti-gaming sensitivity guard **fails** — the same loosened thresholds drop
+  real-GT-perturbation sensitivity for `fragment` (0.90) and `sequence_break`
+  (0.8125) below the 1.0 floor, confirming the loosening bought FPR at
+  sensitivity's expense. → Stage 14 remains open; a threshold-only fix cannot
+  clear the bar — the `reference_delta` rule's z-score mechanism itself needs
+  reworking (deferred, see Stage 14 below).
 - **G5** — *"Runs as an XNAT Container Service command on real session data."*
   The container builds and runs, verified for real in CI (see the verification
   table). It has **never been installed on an XNAT server or run on a real XNAT
@@ -126,7 +143,7 @@ row is not verification._
 
 | Capability | Package / Tool / Data | Introduced by | Status | Notes |
 |------------|-----------------|----------------|--------|-------|
-| Real VerSe GT reference distributions | VerSe ground-truth cohort (external dataset) | Stage 6 *(Items 044, 045)*; closed by Stage 12 *(Item 084)* + Stage 13 adapter | ✅ Verified (2026-07-17, real VerSe19 via `segqc.datasets` adapter, no manual staging) | Exercised for real end-to-end through the Stage-13 dataset adapter (`--dataset-schema verse19.yaml`): `segqc build-reference --subset training` ingested **80 real VerSe19 training subjects** → committed `src/segqc/reference/reference_verse_v1.json` (`provenance.source == "verse-v1"`, schema 1.2, **25 per-level distributions C1…S** — far broader than the synthetic default's L1–L5). Held-out `segqc evaluate` (GT-as-expected-pass) on the **disjoint** validation/test splits then quantified the G3 false-positive rate. **Honest finding — G3 TARGET NOT met by the current hand-set heuristics:** FPR = **0.925** (validation, 40 cases) / **0.975** (test, 40 cases) — i.e. the synthetic-calibrated thresholds (item 057's `clean_control` FPR = 0.0) flag almost all real VerSe GT, driven by the `bounds` / `coverage` (partial-FOV → "missing levels") / `fragmentation` / `border` rules conflating legitimate real-world variation with failure. The real-VerSe *capability* is verified (build + evaluate on real GT, recorded cohort-id `verse19-{validation,test}` + date); the *number* is the quantified G3 gap the vision anticipated, motivating reference-derived-bound recalibration (a follow-on, not this closure). The synthetic `reference_default.json` is retained as the reproducible test baseline. |
+| Real VerSe GT reference distributions | VerSe ground-truth cohort (external dataset) | Stage 6 *(Items 044, 045)*; closed by Stage 12 *(Item 084)* + Stage 13 adapter; recalibration attempted by Stage 14 *(Items 089-092)* | ✅ Verified (2026-07-19, real VerSe19 via `segqc.datasets` adapter + a corrected reference-aware harness, no manual staging) | Exercised for real end-to-end through the Stage-13 dataset adapter (`--dataset-schema verse19.yaml`): `segqc build-reference --subset training` ingested **80 real VerSe19 training subjects** → committed `src/segqc/reference/reference_verse_v1.json` (`provenance.source == "verse-v1"`, schema 1.2, **25 per-level distributions C1…S**). **Item 084's original 0.925/0.975 FPR, and Stage 14's first recalibration attempt, both measured the wrong config**: `eval.harness.evaluate_case` called plain `run_qc`, which never attaches a reference, so items 089/090's FOV-aware coverage/border and reference-derived bounds/fragmentation never actually engaged when FPR was measured this way (only single-case `segqc run` attached one). **Item 092 fixed the harness** (an opt-in `reference=` parameter threaded into `evaluate_case`/`evaluate_cohort`/`calibrate_thresholds`, routing through `run_qc_with_reference`); re-measuring with the fix in place is the number that now actually reflects Stage 14's rules. **Honest finding — G3 TARGET STILL NOT met, and the deficit moved, not closed:** with the reference genuinely attached, the shipped Stage-14 default measures **0.975** (validation) / **1.0** (test) — *worse* than item 084's original number, because the previously-inert `reference_delta` rule's hand-set z-score thresholds (`max_robust_z=3.5`, from item 047, never fit to real data) are far too tight for real per-level variability and are now the dominant flag source (38/40 validation cases). A training-fitted grid-search calibration of those thresholds (item 091's `calibrate_thresholds`, widened up to `max_robust_z=15`/`max_distribution_distance=8` — the loosest setting that did not regress the Stage-5 synthetic corpus) only recovers held-out FPR to **0.90** (validation) / **0.95** (test) — nowhere near the ≤0.10 target — **and the anti-gaming sensitivity guard rejects it**: applying the Stage-5 perturbation operators to real VerSe19 training GT under the calibrated config drops `fragment` to sensitivity 0.90 and `sequence_break` to 0.8125 (both below the 1.0 floor), confirming the loosening bought FPR at real sensitivity's expense — exactly the trade-off the guard exists to catch. **G3 stays 🚧.** Threshold-loosening alone cannot clear the bar; the `reference_delta` rule's z-score-vs-fixed-constant mechanism needs reworking (e.g. deriving the threshold directly from the training distribution's own percentiles, the same way `bounds`/`fragmentation` already do, rather than grid-searching hand-picked candidate constants) — explicitly deferred (a "keep it simple for now" steer) rather than attempted here. The synthetic `reference_default.json` is retained as the reproducible test baseline. |
 | Radiomics feature extraction | `pyradiomics` (extra: `segqc[radiomics]`) | Stage 8 *(Item 060)* | ✅ Verified (2026-07-14, GitHub Actions CI) | `.github/workflows/ci.yml`'s `verify-environment-gated` job installs `segqc[radiomics]` on `ubuntu-latest` and runs the radiomics tests for real, failing if any report as skipped (`assert_no_skips.py`). First real run exposed — and item 076 fixed — a genuine bug (`compute_label_radiomics` raised on PyRadiomics-rejected degenerate masks instead of degrading). Green since PR #33 (item 076 fix + the two intentional inverse-condition skips allow-listed). |
 | Containerised pipeline (Docker build + run) | Docker (external tool, no pip dependency) | Stage 9 *(Items 066, 069, 070)* | ✅ Verified (2026-07-14, GitHub Actions CI) | The same `verify-environment-gated` job performs a real `docker build` of the item-066 image and `docker run` container smoke tests (`test_066_dockerfile.py`, `test_069_container_smoke.py`, `test_070_acceptance_stage9.py`) on `ubuntu-latest`, all passing. Item 080 additionally hardened `_docker_available()` to require a Linux daemon so these tests skip (not error) on Windows-container-mode hosts. |
 | XNAT Container Service command on a real server | XNAT server + Container Service (external environment) | Stage 9 *(Items 067, 068, 070)*; to be closed by Stage 15 | ❓ Unverified | What *is* verified is the container itself (see the Docker row): `docker build` + `docker run` on a mounted case, in CI. What has **never** happened: installing `command.json` on an XNAT server, resolving real XNAT session/scan inputs, and writing report resources back to a real session. G5's measurable outcome is *"Runs as an XNAT Container Service command on **real session data**"*, so Stage 9's ✅ (docs + a validating `command.json` + a smoke-tested image) does not close G5. Needs an XNAT instance with the Container Service enabled. |
@@ -512,18 +529,61 @@ regression** against item 057's recorded synthetic baseline.
   sensitivity does not regress below item 057's baseline. FPR alone is trivially
   driven to 0.0 by loosening rules; the FPR/sensitivity **pair** is the bar.
   *(Item 091)*
-- 📋 Recorded metrics + the G3 target committed in [`vision.md`](vision.md) §2 and here.
+- ✅ **Evaluation-harness reference wiring** (found + fixed while executing this
+  stage's own held-out measurement): `eval.harness.evaluate_case`/
+  `evaluate_cohort` and `eval.calibrate.calibrate_thresholds` called plain
+  `run_qc` unconditionally, so items 089/090's reference-derived rules and the
+  `reference_delta` rule never engaged when FPR was measured via `segqc
+  evaluate` — only single-case `segqc run` attached a reference. Every
+  historical "Real VerSe GT" FPR (item 084's, and this stage's own first
+  measurement) was computed against the wrong config. Fixed with an opt-in
+  `reference=` parameter (default `None`, byte-identical for every existing
+  caller) + `segqc evaluate --reference/--reference-artifact` CLI wiring.
+  *(Item 092)*
+- ✅ Recorded metrics + the G3 target: **target NOT met** (see below); recorded
+  honestly rather than committed as achieved.
 
 **Acceptance.**
 - [ ] Held-out real VerSe19 GT (validation + test, adapter-resolved, disjoint from
-  the calibration subset) yields **FPR ≤ 0.10** (**G3**).
+  the calibration subset) yields **FPR ≤ 0.10** (**G3**). **NOT MET** — once the
+  item-092 harness fix let the reference-derived rules actually engage, held-out
+  FPR measures **0.90** (validation) / **0.95** (test) even after a
+  training-fitted calibration of the `reference_delta` thresholds (item 091);
+  the pre-calibration reference-aware number was **0.975/1.0**, worse than item
+  084's original 0.925/0.975 — see the "Real VerSe GT" verification row for the
+  full diagnosis.
 - [ ] Per-mode sensitivity on the synthetic corpus is **no worse** than item 057's
   baseline (5/8 pipeline-detectable modes at 1.0), and the same modes are detected
-  on perturbed **real** GT (**G7**).
+  on perturbed **real** GT (**G7**). **Half met, half failed**: the synthetic
+  corpus shows **no regression** under the calibrated config (`{2,3,5,6,7}` all
+  at 1.0), but Stage-5 perturbations applied to **real** VerSe19 training GT
+  drop `fragment` (mode 2) to sensitivity **0.90** and `sequence_break` (mode 7)
+  to **0.8125** — both below the 1.0 floor. The anti-gaming guard **fails**:
+  the calibration that narrowed FPR bought it at real sensitivity's expense.
 - [ ] Every flag on a real case still carries a reason + offending labels
-  (explainability is not traded away for specificity).
-- [ ] The "Real VerSe GT" verification row is updated with the post-recalibration
-  number; G3 flips to ✅ **only** if both bars above are met.
+  (explainability is not traded away for specificity). Structurally still true
+  (every rule still emits a reason + labels) — left unchecked because it is
+  **moot pending the two bars above**, not because it is itself false.
+- [x] The "Real VerSe GT" verification row is updated with the post-recalibration
+  number (2026-07-19); G3 flips to ✅ **only** if both bars above are met —
+  **neither is, so G3 stays 🚧.**
+
+**Why Stage 14 is not closed, and what would close it.** Threshold-loosening
+alone cannot clear the FPR bar without breaking the sensitivity guard: the
+`reference_delta` rule compares a per-feature z-score (`robust_z`, computed
+against the reference's median/IQR) to a single fixed constant across all
+levels/features; real per-level distributions have a heavy tail (median
+`robust_z` ≈ 0.7, p90 ≈ 1.5, but max ≈ 25 on an 8-case sample), so a threshold
+loose enough to admit the tail is also loose enough to admit a genuinely
+fragmented or reordered real level. The grid search used here (a handful of
+hand-picked candidate thresholds) is a coarser tool than the percentile-derived
+approach `bounds`/`fragmentation` already use (item 090: read the threshold
+directly off the training distribution's own percentile grid). Deriving
+`reference_delta`'s threshold the same way — directly from the training
+cohort's own `robust_z`/`distribution_distance` distribution, rather than
+grid-searching guessed constants — is the natural next step, but was explicitly
+**deferred** ("keep it simple for now" — a more elaborate rule-making scheme is
+follow-on work, not part of this closure).
 
 ---
 
