@@ -114,12 +114,13 @@ def _stub_case(outcome_kwargs, case_id="c") -> CaseEvaluation:
 
 def _make_evaluate_cohort_stub(builder):
     """Return a stand-in for ``segqc.eval.harness.evaluate_cohort`` that
-    ignores ``cases``/``positive_severity`` and instead derives the cohort
-    entirely from ``config`` via ``builder(config) -> list[CaseEvaluation]``,
-    so a grid point's config value deterministically controls the resulting
-    metrics without running the real pipeline."""
+    ignores ``cases``/``positive_severity``/the item-092 reference kwargs and
+    instead derives the cohort entirely from ``config`` via
+    ``builder(config) -> list[CaseEvaluation]``, so a grid point's config
+    value deterministically controls the resulting metrics without running
+    the real pipeline."""
 
-    def _stub(cases, config, *, positive_severity=None):
+    def _stub(cases, config, *, positive_severity=None, **_reference_kwargs):
         return CohortEvaluation(cases=tuple(builder(config)))
 
     return _stub

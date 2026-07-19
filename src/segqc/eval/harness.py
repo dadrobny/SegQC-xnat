@@ -42,12 +42,17 @@ Public API
 ``CohortEvaluation``
     Frozen dataclass wrapping a tuple of :class:`CaseEvaluation` records, with
     ``n_cases`` and a JSON-serialisable ``to_dict()``.
-``evaluate_case(case, config, *, positive_severity=Severity.FLAG) ->
-CaseEvaluation``
+``evaluate_case(case, config, *, positive_severity=Severity.FLAG,
+reference=None, stratum="all", lower_pct=1, upper_pct=99) -> CaseEvaluation``
     Drive one case through the pipeline and the three comparison primitives.
-``evaluate_cohort(cases, config, *, positive_severity=Severity.FLAG) ->
+    ``reference=None`` (default) calls plain ``run_qc``; a given
+    ``ReferenceDistribution`` calls ``run_qc_with_reference`` instead (item
+    092), so the reference-derived rule defaults (item 090) actually engage.
+``evaluate_cohort(cases, config, *, positive_severity=Severity.FLAG,
+reference=None, stratum="all", lower_pct=1, upper_pct=99) ->
 CohortEvaluation``
-    Drive many cases, in order, into a cohort.
+    Drive many cases, in order, into a cohort; *reference* forwarded to every
+    case unchanged.
 """
 
 from __future__ import annotations
@@ -68,6 +73,7 @@ if TYPE_CHECKING:
     import numpy as np
 
     from segqc.config import HeuristicConfig
+    from segqc.reference.schema import ReferenceDistribution
 
 __all__ = [
     "EvaluationCase",
@@ -308,17 +314,31 @@ def evaluate_case(
     config: "HeuristicConfig",
     *,
     positive_severity: Severity = Severity.FLAG,
+    reference: "Optional[ReferenceDistribution]" = None,
+    stratum: str = "all",
+    lower_pct: float = 1,
+    upper_pct: float = 99,
 ) -> CaseEvaluation:
     """Drive one :class:`EvaluationCase` through the pipeline and comparisons.
 
     The subject under QC is the candidate when present, otherwise the GT.
-    ``run_qc`` is always called on the subject and the result is classified
-    via ``classify_outcome`` (item 052) against ``case.expected`` -- this is
-    always populated. When a candidate is present, it is additionally scored
-    against the GT for DICE overlap (item 050, using the candidate's already
-    -computed features block re-used for feature-set divergence, item 051);
-    when absent, both stay ``None`` and ``candidate_present`` is ``False`` --
-    no error is raised for a missing candidate.
+    When *reference* is ``None`` (the default), ``run_qc`` is called on the
+    subject -- the item-053 original, reference-blind behaviour, unchanged
+    for every existing caller (the Stage-5 golden harness, the Stage-7/12/14
+    FPR measurements taken before item 092). When *reference* is given,
+    ``run_qc_with_reference`` is called instead, attaching the delta-to
+    -reference block (item 046) to the record fed to the rule engine so the
+    reference-derived ``bounds``/``fragmentation`` sources (item 090) and the
+    ``reference_delta`` rule (item 047) actually engage -- mirroring the CLI's
+    ``segqc run`` reference wiring (``cli.py::_handle_run``), which is the
+    only place that previously exercised this path. The subject is then
+    classified via ``classify_outcome`` (item 052) against ``case.expected``
+    -- this is always populated. When a candidate is present, it is
+    additionally scored against the GT for DICE overlap (item 050, using the
+    candidate's already-computed features block re-used for feature-set
+    divergence, item 051); when absent, both stay ``None`` and
+    ``candidate_present`` is ``False`` -- no error is raised for a missing
+    candidate.
 
     Parameters
     ----------
@@ -329,6 +349,13 @@ def evaluate_case(
         ``run_qc``/``extract_feature_record``. Not mutated.
     positive_severity:
         Threshold severity passed through to ``classify_outcome`` (item 052).
+    reference:
+        Optional :class:`~segqc.reference.schema.ReferenceDistribution`.
+        When given, the subject is run through ``run_qc_with_reference``
+        instead of plain ``run_qc`` (item 092). Not mutated.
+    stratum, lower_pct, upper_pct:
+        Forwarded to ``run_qc_with_reference`` when *reference* is given
+        (item 046's delta-computation parameters); ignored otherwise.
 
     Returns
     -------
@@ -343,7 +370,7 @@ def evaluate_case(
     from segqc.eval.feature_match import compute_feature_match
     from segqc.eval.outcome import classify_outcome
     from segqc.eval.overlap import compute_overlap
-    from segqc.pipeline import extract_feature_record, run_qc
+    from segqc.pipeline import extract_feature_record, run_qc, run_qc_with_reference
 
     import numpy as np
 
@@ -356,7 +383,17 @@ def evaluate_case(
     subject_img = candidate_img if candidate_present else gt_img
     subject = "candidate" if candidate_present else "gt"
 
-    case_result, subject_block = run_qc(subject_img, config)
+    if reference is not None:
+        case_result, subject_block, _reference_delta = run_qc_with_reference(
+            subject_img,
+            config,
+            reference,
+            stratum=stratum,
+            lower_pct=lower_pct,
+            upper_pct=upper_pct,
+        )
+    else:
+        case_result, subject_block = run_qc(subject_img, config)
     outcome = classify_outcome(
         case.expected, case_result, positive_severity=positive_severity
     )
@@ -393,6 +430,10 @@ def evaluate_cohort(
     config: "HeuristicConfig",
     *,
     positive_severity: Severity = Severity.FLAG,
+    reference: "Optional[ReferenceDistribution]" = None,
+    stratum: str = "all",
+    lower_pct: float = 1,
+    upper_pct: float = 99,
 ) -> CohortEvaluation:
     """Drive many :class:`EvaluationCase`\\ s, in order, into a :class:`CohortEvaluation`.
 
@@ -407,6 +448,10 @@ def evaluate_cohort(
     positive_severity:
         Threshold severity passed through to :func:`evaluate_case` for every
         case.
+    reference, stratum, lower_pct, upper_pct:
+        Forwarded unchanged to :func:`evaluate_case` for every case (item
+        092). ``reference=None`` (the default) preserves the original
+        reference-blind ``run_qc`` behaviour for every existing caller.
 
     Returns
     -------
@@ -428,7 +473,15 @@ def evaluate_cohort(
         seen.add(case.case_id)
 
     records = tuple(
-        evaluate_case(case, config, positive_severity=positive_severity)
+        evaluate_case(
+            case,
+            config,
+            positive_severity=positive_severity,
+            reference=reference,
+            stratum=stratum,
+            lower_pct=lower_pct,
+            upper_pct=upper_pct,
+        )
         for case in cases
     )
     return CohortEvaluation(cases=records)

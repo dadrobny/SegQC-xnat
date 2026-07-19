@@ -66,13 +66,16 @@ import copy
 import dataclasses
 import itertools
 from dataclasses import dataclass
-from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, Tuple
 
 from segqc.config import HeuristicConfig
 from segqc.eval.harness import EvaluationCase, evaluate_cohort
 from segqc.eval.metrics import CohortMetrics, compute_cohort_metrics
 from segqc.io import SegQCInputError
 from segqc.verdict import Severity
+
+if TYPE_CHECKING:
+    from segqc.reference.schema import ReferenceDistribution
 
 __all__ = [
     "ThresholdAxis",
@@ -394,6 +397,10 @@ def calibrate_thresholds(
     correlation_method: str = "pearson",
     dice_metric: str = "mean_dice",
     failure_modes: Optional[Any] = None,
+    reference: "Optional[ReferenceDistribution]" = None,
+    stratum: str = "all",
+    lower_pct: float = 1,
+    upper_pct: float = 99,
 ) -> CalibrationResult:
     """Sweep *axes*' grid, evaluate every candidate, and select the best.
 
@@ -426,6 +433,10 @@ def calibrate_thresholds(
     positive_severity, correlation_method, dice_metric, failure_modes:
         Forwarded to ``evaluate_cohort``/``compute_cohort_metrics``
         respectively, with the same defaults those functions declare.
+    reference, stratum, lower_pct, upper_pct:
+        Forwarded unchanged to ``evaluate_cohort`` for every candidate (item
+        092). ``reference=None`` (the default) preserves the original
+        reference-blind behaviour.
 
     Returns
     -------
@@ -450,7 +461,13 @@ def calibrate_thresholds(
     for index, assignment in enumerate(grid):
         candidate_config = apply_assignment(base_config, assignment, axes)
         cohort = evaluate_cohort(
-            cases, candidate_config, positive_severity=positive_severity
+            cases,
+            candidate_config,
+            positive_severity=positive_severity,
+            reference=reference,
+            stratum=stratum,
+            lower_pct=lower_pct,
+            upper_pct=upper_pct,
         )
         metrics = compute_cohort_metrics(
             cohort,

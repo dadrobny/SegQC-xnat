@@ -405,6 +405,33 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="<cpu|gpu|auto>",
         help=_BACKEND_HELP,
     )
+    evaluate_parser.add_argument(
+        "--reference",
+        action="store_true",
+        default=False,
+        help=(
+            "Attach a reference distribution (item 046) while evaluating: "
+            "every case is run through run_qc_with_reference instead of "
+            "plain run_qc, so the reference-derived bounds/fragmentation "
+            "rule sources (item 090) and the reference_delta rule (item 047) "
+            "actually engage (item 092). OFF by default -- unlike `segqc "
+            "run`, evaluate does NOT default this on from config, since a "
+            "cohort evaluated without an explicit, matching reference "
+            "artifact (e.g. a synthetic corpus against the real verse-v1 "
+            "artifact) would silently score against the wrong distribution "
+            "(the three-planes discipline, item 090)."
+        ),
+    )
+    evaluate_parser.add_argument(
+        "--reference-artifact",
+        default=None,
+        metavar="<json>",
+        help=(
+            "Path to a reference artifact JSON (item 045) to load when "
+            "--reference is given. When omitted, the bundled production "
+            "artifact (bundled_production_reference(), verse-v1) is used."
+        ),
+    )
     _add_dataset_schema_args(evaluate_parser)
     evaluate_parser.set_defaults(handler=_handle_evaluate)
 
@@ -885,14 +912,51 @@ def _handle_evaluate(args: argparse.Namespace) -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
+    # --- 1b. Optional reference distribution (item 092) ------------------------ #
+    reference = None
+    if args.reference:
+        from segqc.reference import (  # noqa: PLC0415
+            ReferenceArtifactError,
+            bundled_production_reference,
+            load_artifact,
+        )
+
+        try:
+            if args.reference_artifact:
+                reference = load_artifact(args.reference_artifact)
+            else:
+                reference = bundled_production_reference()
+        except (ReferenceArtifactError, OSError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+
+    stratum = cfg.reference_param("stratum", "all")
+    lower_pct = cfg.reference_param("lower_pct", 1)
+    upper_pct = cfg.reference_param("upper_pct", 99)
+
     # --- 2. Drive the harness + metrics --------------------------------------- #
-    cohort = evaluate_cohort(cases, cfg)
+    cohort = evaluate_cohort(
+        cases,
+        cfg,
+        reference=reference,
+        stratum=stratum,
+        lower_pct=lower_pct,
+        upper_pct=upper_pct,
+    )
     metrics = compute_cohort_metrics(cohort)
 
     # --- 3. Optional calibration ----------------------------------------------- #
     if args.calibrate:
         axes = default_calibration_axes()
-        calibration = calibrate_thresholds(cases, cfg, axes)
+        calibration = calibrate_thresholds(
+            cases,
+            cfg,
+            axes,
+            reference=reference,
+            stratum=stratum,
+            lower_pct=lower_pct,
+            upper_pct=upper_pct,
+        )
     else:
         axes = None
         calibration = None
