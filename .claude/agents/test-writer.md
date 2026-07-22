@@ -46,25 +46,49 @@ never assume a package name.
      missing fields, unreadable paths, truncated/garbage content); invariants
      (immutability, determinism, error type/message quality); off-by-one and
      tolerance edges where the spec mentions tolerances.
-4. **Commit the tests** on the current branch — two separate Bash calls:
+4. **Reconcile the stale tests the spec lists.** When the Testing Strategy
+   names "existing tests to reconcile" (the spec changes an existing
+   default/behaviour), update those assertions to the NEW specified behaviour
+   in this same pass — leaving them is a guaranteed round-1 validation
+   failure on stale assumptions rather than on the new code. This is the one
+   sanctioned edit to pre-existing test files; keep it limited to the listed
+   tests.
+5. **Commit the tests** on the current branch — two separate Bash calls:
    ```
    git add <tests_dir>
    git commit -m "tests: NNN <short-name>"
    ```
    Plain single-line message, no co-author trailer, no command substitution.
-5. **Return** a bullet list mapping each AC to the test(s) that cover it, plus a
-   summary of adversarial scenarios included.
+6. **Return** a bullet list mapping each AC to the test(s) that cover it, plus a
+   summary of adversarial scenarios included and any pre-existing tests
+   reconciled.
 
 ## Hard limits
 
 - Write only test files under `tests_dir`. Do **not** touch `source_dir` or any
-  other directory.
+  other directory. Pre-existing tests may be edited **only** when the spec's
+  Testing Strategy lists them as "existing tests to reconcile".
 - Do **not** run `pytest` or execute any code.
 - Do **not** modify shared `conftest.py` unless a fixture is genuinely necessary
   and cannot be handled with inline `tmp_path`.
 - Tests must be deterministic and cross-platform (Windows + macOS + Linux). No
   network calls, no absolute paths.
 - Match the surrounding test style exactly. No extra imports, no dead code.
+
+## Out-of-scope insights (compound engineering)
+
+When you learn something true but OUT OF SCOPE for this task — a doc gap, a
+latent defect, a missing capability, a recurring manual step that
+deterministic code could replace, or an AIDE-framework issue — append ONE
+line to `docs/aide/insights.md` (create it from
+`.aide/templates/insights.md`, copied verbatim, if missing) and carry on.
+Never act on it here. Entry shape:
+
+    - [ ] <knowledge|defect|gap|automation|framework> — <one line> *(item NNN, YYYY-MM-DD)*
+
+The feedback loop triages the inbox at the queue boundary. Capturing is cheap
+and always in scope; acting out of scope is forbidden. This append is the one
+write allowed outside your edit scope.
 
 ## Command hygiene
 

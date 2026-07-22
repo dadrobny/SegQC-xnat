@@ -39,6 +39,12 @@ stop_after = ""
 # Override the OAuth credentials file (empty = ~/.claude/.credentials.json).
 credentials_path = ""
 
-# Command to run each pass (empty = claude "/aide-run-roadmap"). The ERR/re-auth
-# path runs this same plain command — never pass a removed --continuous flag.
+# Command to run each pass (empty = `claude -p "/aide-run-roadmap"` — a top-level
+# print-mode session that exits when the step finishes; an interactive session
+# would never return control to the supervisor). Permissions must come from the
+# committed .claude/settings.json allow-list: in print mode an unlisted call is
+# DENIED, not prompted — fix that by extending the allow-list via
+# /aide-review-permissions, never by adding a skip-permissions flag here. The
+# ERR/re-auth path runs this same plain command — never pass a removed
+# --continuous flag.
 command = ""

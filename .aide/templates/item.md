@@ -66,6 +66,16 @@ _What to test: one focused test per AC, plus adversarial / edge cases (empty,
 degenerate, malformed, boundary, determinism, immutability). Name the test
 module._
 
+## Validation  <!-- OPTIONAL: how to OBSERVE this working, beyond the tests -->
+
+_Only when meaningful observation goes beyond the test suite: a command to
+run, output to inspect, a dataset slice to process, a use case to replay. The
+validator must EXECUTE this section, not just re-run the tests. If it needs an
+environment the loop's machine may lack, name the `[validation]` profile
+(checked via `python .aide/scripts/aide.py env --profile <name>`) and the
+honest downgrade when absent (record `❓ Unverified`, never a silent pass).
+Delete the section if the tests alone genuinely demonstrate the behaviour._
+
 ## Dependencies
 
 _Other item numbers this relies on (must be ✅/🚧), and what each provides.

@@ -22,7 +22,20 @@ CPU-only, cross-platform (Windows/macOS/Linux), Python 3.9+.
 All framework↔project settings live in **[`aide.toml`](aide.toml)**: source/test
 paths (`src/segqc`, `tests`), the venv layout and bootstrap, the test command,
 the git merge mode, and loop knobs. Agents and scripts read it; edit `aide.toml`
-(not the framework) to change project facts.
+(not the framework) to change project facts. It also carries `[framework] repo`
+(where `framework`-typed insights are handed over) and `[validation]` — named
+environment profiles (`pyradiomics`, `docker`, `gpu`) that
+`aide env --profile <name>` evaluates so a stage validation gated on an absent
+capability records **❓ Unverified** instead of silently passing.
+
+**`.claude/settings.json` is a generated artifact.** This repo has adopted
+[`.claude/settings.overlay.json`](.claude/settings.overlay.json), so every
+`install.py --update` regenerates `settings.json` as a deterministic deep-merge
+of the framework default and that overlay. Edit the **overlay**, never
+`settings.json` — including permission rules promoted by
+`/aide-review-permissions`, which belong in the overlay's
+`permissions.allow.add` list. The `src/segqc/**` and `tests/**` write-scope
+globs are templated from `aide.toml` and need no override.
 
 ## Virtual environment
 
@@ -159,7 +172,13 @@ already written down there rather than in `docs/aide/`.
   [`.aide/conventions.md`](.aide/conventions.md). Follow the command-hygiene rules
   there or unattended runs stall on permission prompts.
 - **Document templates** — [`.aide/templates/`](.aide/templates/).
-- **CLI** — `python .aide/scripts/aide.py {check,progress,queue,claim,merge,env}`.
+- **CLI** — `python .aide/scripts/aide.py
+  {check,progress,queue,claim,merge,env,sync,gc,status}`. If a verb covers it,
+  the raw git form is wrong: session preflight is `sync`, branch clean-up is
+  `gc`, the state report is `status`.
+- **Insight inbox** — [`docs/aide/insights.md`](docs/aide/insights.md): append a
+  one-line `- [ ] <type> — …` when you learn something out of scope, then return
+  to your task. Triaged at the queue boundary by `/aide-feedback-loop`.
 - **Skills / commands** — `/aide-*` (create-vision … feedback-loop, spec-queue)
   and the `/aide-run-{item,queue,roadmap}` orchestrators.
 

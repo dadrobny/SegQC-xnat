@@ -1,0 +1,24 @@
+{
+  "//": [
+    "AIDE settings overlay — project-owned, like aide.toml. While this file",
+    "exists, .claude/settings.json is REGENERATED on every install/--update as a",
+    "deterministic deep-merge of the framework default and this overlay — so",
+    "edit THIS file, never settings.json (your edits there are overwritten).",
+    "",
+    "Merge rules: objects deep-merge (overlay wins). For list values (the",
+    "permission allow/ask/deny lists, hook groups) use the operator",
+    "{ \"add\": [...], \"remove\": [...] } — additive by default, so a framework",
+    "update that adds a new default still reaches you. A plain list replaces the",
+    "framework value outright (escape hatch). Prefer adding to `deny` over",
+    "removing from `allow` when tightening — deny is explicit and update-proof.",
+    "Keys starting with // are comments and never appear in the output.",
+    "",
+    "SegQC-xnat notes: the src/tests write-scope globs are NOT set here — the",
+    "installer templates them from aide.toml source_dir/tests_dir (src/segqc,",
+    "tests). Permission rules promoted by /aide-review-permissions belong in the",
+    "`allow.add` list below, not in the generated settings.json."
+  ],
+  "permissions": {
+    "allow": { "add": [] }
+  }
+}

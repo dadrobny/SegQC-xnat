@@ -190,11 +190,21 @@ def decide_action(usage: Dict[str, object], cfg: Dict[str, object],
 # supervisor loop
 # --------------------------------------------------------------------------- #
 def _command(cfg: Dict[str, object]):
+    """The command each pass runs. The default encodes the unattended launch
+    contract (see the adapter's ``execution-surfaces.md``): a TOP-LEVEL print-
+    mode session (``-p``) so the process exits when the roadmap step finishes —
+    an interactive session would never return control to this supervisor. All
+    permissions must come from the committed allow-list; in print mode an
+    unlisted call is denied rather than prompted, which is the intended signal
+    to extend the allow-list (via /aide-review-permissions), never to bypass
+    with a skip-permissions flag. This is unrelated to the abandoned NESTED
+    headless design — the orchestrator still spawns no ``claude -p`` children.
+    """
     raw = str(cfg.get("command") or "").strip()
     if raw:
         import shlex
         return shlex.split(raw)
-    return ["claude", "/aide-run-roadmap"]
+    return ["claude", "-p", "/aide-run-roadmap"]
 
 
 def _past_deadline(cfg: Dict[str, object], now: _dt.datetime) -> bool:

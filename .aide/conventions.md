@@ -36,6 +36,15 @@ slot spells the format out so no separate lookup is needed.
 Rank is used when one item is referenced on several lines: the most-advanced
 status wins.
 
+**Structural positions only.** The parsers read icons *only* at structural
+positions: a table row's **Status (last) cell**, a stage header's **trailing**
+`— <icon>`, and the **leading** icon of a deliverable bullet. An icon anywhere
+else — prose, mid-bullet, a title — is plain text and is never read as status,
+so authors need not avoid the icon vocabulary in free text. `aide check` still
+*warns* on such stray icons in the status-bearing documents (`progress.md`,
+queue files) so they stay unambiguous for human readers; other documents are
+not scanned.
+
 ### `progress.md` (the single source of truth for status)
 
 Mandatory, in order (consumer in brackets):
@@ -62,9 +71,12 @@ completion (per-item AC ticking is not deterministic).
 
 ### `queue-NNN.md`
 
-- One header line `> **Status:** Live` on the active queue; superseded queues
-  carry `> **Status:** ✅ Completed — superseded by queue-NNN (YYYY-MM-DD).`
-  **Exactly one** queue is `Live`. *(aide check, queue tidy)*
+- **Queue state is derived, not declared.** A queue is **open** iff any of its
+  items is 📋/🚧 in `progress.md`, else **done**; "the live queue" is the
+  lowest-numbered open one (`aide claim`'s default). A `> **Status:**` line is
+  optional decoration for human readers — `aide queue tidy` stamps a completion
+  note on superseded queues, and `aide check` warns only when a declared status
+  contradicts the derived state. *(aide check, claim, queue tidy)*
 - Work items as `### Item NNN: Short Title` + a description paragraph. Item
   numbers are **globally sequential across all queues** — never restart. *(aide
   check, scout/claim, spec-author)*
@@ -77,6 +89,31 @@ completion (per-item AC ticking is not deterministic).
   header carries `Created`, Stage, Queue, Objectives, Suggested branch, and a
   mandatory **Assumptions** block (see the item template). *(spec-author,
   validator)*
+
+### `insights.md` (optional, additive — the compound-engineering inbox)
+
+Where out-of-scope learning goes so it is never lost *and* never acted on out
+of scope. Any role, at any time, appends **one line** and returns to its task:
+
+```
+- [ ] <type> — <one line> *(item NNN, YYYY-MM-DD)*
+```
+
+with `<type>` one of **knowledge** (document it), **defect** (fix it), **gap**
+(plan it), **automation** (a recurring manual/agent action deterministic code
+could replace — script it), **framework** (belongs to AIDE itself). The item
+ref is optional for roles outside an item. The file is **append-only**;
+`aide check` shape-checks entries (warning, never error — capture must stay
+cheap). Template: `.aide/templates/insights.md` (copy verbatim).
+
+**Triage** happens at the queue boundary (the feedback loop): each unchecked
+entry is routed — `knowledge` → the owning document; `defect`/`gap` →
+candidate items for the queue being authored (so the queue PR reviews them);
+`automation` → a candidate item that adds a CLI verb/script *and* the
+skill/agent edit mandating it; `framework` → a GitHub issue on
+`[framework] repo` from `aide.toml` (via `gh`; if unset/offline the entry
+stays pending). A routed entry is ticked in place:
+`- [x] … → <where it landed>`.
 
 ### Environment-gated capabilities (optional, additive)
 
@@ -103,6 +140,21 @@ default. Two additive, non-blocking mechanisms close it:
 Both mechanisms are opt-in: a project with no environment-gated capability
 omits them entirely.
 
+Two additions make the verification *planned* rather than hoped-for:
+
+- **`[validation]` environment profiles** (`aide.toml`, optional) — named,
+  deterministic environment checks: `<name> = "<python expression>"`, true iff
+  the environment provides the capability (e.g.
+  `gpu = "__import__('torch').cuda.is_available()"`). Evaluated by
+  `aide env --profile <name>` (exit 0 iff satisfied) in the project venv.
+- **Stage-validation items** — a queue that closes a roadmap stage ends with a
+  `Validate stage N` item that replays the stage's use cases end-to-end and
+  updates the capability table (✅ Verified where the profile is satisfied,
+  else an explicit ❓ Unverified with the reason). Item specs may also carry an
+  optional **Validation** section (see the item template) that the validator
+  must execute — tests prove the code runs; validation observes that it does
+  something meaningful.
+
 ---
 
 ## 2. Claim protocol — how "in progress" is signalled
@@ -113,14 +165,19 @@ taken" signal is the **pushed `<branch_prefix>NNN-*` branch** (config
 `git.branch_prefix`, default `aide/`). `aide claim` owns this:
 
 1. `git fetch --all --prune`; list remote `aide/*` branches.
-2. Read the live queue + `progress.md`; pick the **first** item that is 📋, whose
-   dependencies are all ✅, and that has no existing `aide/NNN-*` branch.
+2. Read the live queue (lowest-numbered open queue) + `progress.md`; pick the
+   **first** item that is 📋, whose dependencies are all ✅, and that has no
+   existing `aide/NNN-*` branch. With `loop.claim_scope = "all-open"` in
+   `aide.toml`, claiming scans **every** open queue in number order instead —
+   opt-in, because the one-queue scope is also the human-checkpoint boundary.
 3. Create and push `aide/NNN-short-name` (push depends on `git.mode`; `local`
    mode does not push and so has no multi-machine claim signal).
 
 One person (or one loop) owns an item at a time. Abandoning an item means
 deleting its remote branch so the item returns to the pool; `aide check` flags a
-claim branch whose item is already ✅ (stale claim).
+claim branch whose item is already ✅ (stale claim), and `aide gc` deletes such
+branches — local and remote — deterministically (dry-run by default, `--yes` to
+act; `--merged` also collects branches already merged into main).
 
 ---
 
@@ -136,6 +193,12 @@ demands on top of them, are *adapter* concerns — see the adapter's README.
 
 The rules (runtime-general):
 
+- **If an `aide` verb covers it, the raw git form is wrong.** Session preflight
+  (fetch, clean-tree check, landing on the right branch) is `aide sync
+  [--item NNN]`; claiming is `aide claim`; landing is `aide merge`; branch
+  clean-up is `aide gc`. Do not improvise the equivalent `git fetch`/`git
+  status`/`git switch` sequences — the verbs exist so every run does these
+  steps identically and no step is forgotten.
 - **One command per call.** Never chain with `&&` or `;` — separate calls localise
   failures and keep each invocation legible.
 - **No `cd` prefix and no directory-changing wrapper** (`git -C "<path>"`). The

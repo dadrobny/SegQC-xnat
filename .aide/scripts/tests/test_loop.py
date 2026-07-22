@@ -103,8 +103,10 @@ def test_parse_toml_reads_loop_table():
     assert cfg["max_weekly_pct"] == 80
 
 
-def test_command_default_is_plain_roadmap():
-    assert loop._command({}) == ["claude", "/aide-run-roadmap"]
+def test_command_default_is_print_mode_roadmap():
+    # -p: the supervisor needs a session that EXITS when the step finishes;
+    # permissions come from the committed allow-list (denied, not prompted).
+    assert loop._command({}) == ["claude", "-p", "/aide-run-roadmap"]
 
 
 def test_past_deadline():

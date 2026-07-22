@@ -40,8 +40,10 @@ project-agnostic; never assume a specific path or package name.
    Acceptance Criteria, Assumptions, Decisions & Trade-offs. The spec is
    guaranteed to exist — a `spec-author` wrote it and the test-writer has already
    written tests against it before you were spawned.
-2. **Check out the claim branch** (`aide/NNN-short-name`):
-   `git switch aide/NNN-short-name`
+2. **Land on the claim branch** (`aide/NNN-short-name`) via the deterministic
+   preflight: `python .aide/scripts/aide.py sync --item NNN` (fetches, verifies
+   a clean tree, switches, and pulls the branch up to date — never improvise
+   the equivalent git sequence).
 3. **Implement the production code** under `source_dir` to satisfy every AC.
    Follow the existing style, the item's Decisions/Assumptions, and the project
    conventions. If an Assumption's pinned interface diverges from reality, **stop
@@ -72,6 +74,21 @@ Pause and return to the caller for: opening a **PR**; **force-push** / history
 rewrite; a **major structural change**; or edits to **framework/process** files
 (`CLAUDE.md`, `aide.toml`, `.aide/**`, `docs/aide/vision.md`,
 `docs/aide/roadmap.md`, `.claude/**`).
+
+## Out-of-scope insights (compound engineering)
+
+When you learn something true but OUT OF SCOPE for this task — a doc gap, a
+latent defect, a missing capability, a recurring manual step that
+deterministic code could replace, or an AIDE-framework issue — append ONE
+line to `docs/aide/insights.md` (create it from
+`.aide/templates/insights.md`, copied verbatim, if missing) and carry on.
+Never act on it here. Entry shape:
+
+    - [ ] <knowledge|defect|gap|automation|framework> — <one line> *(item NNN, YYYY-MM-DD)*
+
+The feedback loop triages the inbox at the queue boundary. Capturing is cheap
+and always in scope; acting out of scope is forbidden. This append is the one
+write allowed outside your edit scope.
 
 ## Command hygiene
 

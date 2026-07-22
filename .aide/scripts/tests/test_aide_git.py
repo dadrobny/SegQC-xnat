@@ -129,6 +129,19 @@ def test_env_status_missing(tmp_path: Path):
     assert aide.env_status(tmp_path, cfg) == "missing"
 
 
+def test_env_profile_satisfied_and_not(tmp_path: Path, capsys):
+    (tmp_path / "aide.toml").write_text(
+        AIDE_TOML.format(mode="local")
+        + '\n[validation]\nyes = "1 + 1 == 2"\nno = "False"\n',
+        encoding="utf-8",
+    )
+    assert aide.main(["--repo", str(tmp_path), "env", "--profile", "yes"]) == 0
+    assert aide.main(["--repo", str(tmp_path), "env", "--profile", "no"]) == 1
+    assert aide.main(["--repo", str(tmp_path), "env", "--profile", "nope"]) == 2
+    err = capsys.readouterr().err
+    assert "unknown profile 'nope'" in err
+
+
 def test_pick_item_skips_done_and_claimed(tmp_path: Path):
     root = _init_repo(tmp_path / "r")
     cfg = aide.load_config(root)
@@ -224,6 +237,151 @@ def test_merge_missing_branch_errors(tmp_path: Path):
     root = _init_repo(tmp_path / "r", mode="local")
     rc = aide.main(["--repo", str(root), "merge", "99", "--no-test"])
     assert rc == 1
+
+
+# --------------------------------------------------------------------------- #
+# claim scope (WI-2: derived queue state, opt-in cross-queue claiming)
+# --------------------------------------------------------------------------- #
+QUEUE_NEXT = """\
+# Demo — Work Queue 004
+
+> **Created:** 2026-07-02
+
+### Item 029: Extra rules
+Extra.
+"""
+
+
+def _add_next_queue_and_claim_all(root: Path) -> None:
+    (root / "docs" / "aide" / "queue" / "queue-004.md").write_text(QUEUE_NEXT, encoding="utf-8")
+    _run(["git", "add", "-A"], root)
+    _run(["git", "commit", "-m", "queue 004"], root)
+    # Claim branches exist for every open item of queue-003.
+    _run(["git", "branch", "aide/027-bounds-rules"], root)
+    _run(["git", "branch", "aide/028-coverage-rules"], root)
+
+
+def test_claim_default_scope_stops_at_live_queue(tmp_path: Path, capsys):
+    root = _init_repo(tmp_path / "r", mode="local")
+    _add_next_queue_and_claim_all(root)
+    rc = aide.main(["--repo", str(root), "claim", "--dry-run"])
+    assert rc == 0
+    assert "none left" in capsys.readouterr().out
+
+
+def test_claim_all_open_scope_spans_queues(tmp_path: Path, capsys):
+    root = _init_repo(tmp_path / "r", mode="local")
+    _add_next_queue_and_claim_all(root)
+    toml = (root / "aide.toml").read_text(encoding="utf-8")
+    (root / "aide.toml").write_text(
+        toml + '\n[loop]\nclaim_scope = "all-open"\n', encoding="utf-8")
+    rc = aide.main(["--repo", str(root), "claim", "--dry-run"])
+    assert rc == 0
+    assert "would claim item 029" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------- #
+# sync (WI-3: deterministic preflight)
+# --------------------------------------------------------------------------- #
+def test_sync_ok_on_clean_tree(tmp_path: Path, capsys):
+    root = _init_repo(tmp_path / "r", mode="local")
+    rc = aide.main(["--repo", str(root), "sync"])
+    assert rc == 0
+    assert "OK" in capsys.readouterr().out
+
+
+def test_sync_fails_on_dirty_tree(tmp_path: Path, capsys):
+    root = _init_repo(tmp_path / "r", mode="local")
+    (root / "uncommitted.txt").write_text("wip\n", encoding="utf-8")
+    rc = aide.main(["--repo", str(root), "sync"])
+    assert rc == 1
+    assert "not clean" in capsys.readouterr().err
+
+
+def test_sync_item_switches_to_claim_branch(tmp_path: Path):
+    root = _init_repo(tmp_path / "r", mode="local")
+    _make_item_branch(root, "aide/027-bounds-rules", "feature.txt")  # ends on main
+    rc = aide.main(["--repo", str(root), "sync", "--item", "27"])
+    assert rc == 0
+    assert _current_branch(root) == "aide/027-bounds-rules"
+
+
+def test_sync_item_without_claim_branch_errors(tmp_path: Path, capsys):
+    root = _init_repo(tmp_path / "r", mode="local")
+    rc = aide.main(["--repo", str(root), "sync", "--item", "28"])
+    assert rc == 1
+    assert "no claim branch" in capsys.readouterr().err
+
+
+def test_sync_fast_forwards_main(tmp_path: Path):
+    remote = _mkbare(tmp_path / "remote.git")
+    root = _init_repo(tmp_path / "r", mode="auto-merge")
+    _run(["git", "remote", "add", "origin", str(remote)], root)
+    _run(["git", "push", "-u", "origin", "main"], root)
+    # A second clone advances origin/main past our local main.
+    other = tmp_path / "other"
+    _run(["git", "clone", str(remote), str(other)], tmp_path)
+    _run(["git", "config", "user.email", "t@example.com"], other)
+    _run(["git", "config", "user.name", "Tester"], other)
+    (other / "new.txt").write_text("x\n", encoding="utf-8")
+    _run(["git", "add", "-A"], other)
+    _run(["git", "commit", "-m", "remote work"], other)
+    _run(["git", "push"], other)
+    rc = aide.main(["--repo", str(root), "sync"])
+    assert rc == 0
+    assert (root / "new.txt").is_file()  # local main caught up
+
+
+# --------------------------------------------------------------------------- #
+# gc (WI-3: claim-branch garbage collection)
+# --------------------------------------------------------------------------- #
+def test_gc_dry_run_lists_stale_branch(tmp_path: Path, capsys):
+    root = _init_repo(tmp_path / "r", mode="local")
+    # Item 026 is ✅ in progress.md; its leftover claim branch is stale.
+    _make_item_branch(root, "aide/026-rule-engine-core", "core.txt")
+    rc = aide.main(["--repo", str(root), "gc"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "would delete aide/026-rule-engine-core" in out
+    assert "dry run" in out
+    branches = _run(["git", "branch"], root).stdout
+    assert "aide/026-rule-engine-core" in branches  # nothing deleted
+
+
+def test_gc_yes_deletes_local_and_remote(tmp_path: Path):
+    remote = _mkbare(tmp_path / "remote.git")
+    root = _init_repo(tmp_path / "r", mode="auto-merge")
+    _run(["git", "remote", "add", "origin", str(remote)], root)
+    _run(["git", "push", "-u", "origin", "main"], root)
+    _make_item_branch(root, "aide/026-rule-engine-core", "core.txt")
+    _run(["git", "push", "-u", "origin", "aide/026-rule-engine-core"], root)
+    rc = aide.main(["--repo", str(root), "gc", "--yes"])
+    assert rc == 0
+    branches = _run(["git", "branch"], root).stdout
+    assert "aide/026-rule-engine-core" not in branches
+    refs = _run(["git", "ls-remote", "--heads", str(remote)], root).stdout
+    assert "aide/026-rule-engine-core" not in refs
+
+
+def test_gc_keeps_active_item_branch(tmp_path: Path, capsys):
+    root = _init_repo(tmp_path / "r", mode="local")
+    # Item 027 is 📋 (not complete) — its claim branch must survive gc.
+    _make_item_branch(root, "aide/027-bounds-rules", "feature.txt")
+    rc = aide.main(["--repo", str(root), "gc", "--yes"])
+    assert rc == 0
+    branches = _run(["git", "branch"], root).stdout
+    assert "aide/027-bounds-rules" in branches
+
+
+def test_gc_merged_deletes_merged_branch(tmp_path: Path):
+    root = _init_repo(tmp_path / "r", mode="local")
+    # Branch for 📋 item merged into main (e.g. landed by hand): --merged collects it.
+    _make_item_branch(root, "aide/027-bounds-rules", "feature.txt")
+    _run(["git", "merge", "--no-edit", "aide/027-bounds-rules"], root)
+    rc = aide.main(["--repo", str(root), "gc", "--merged", "--yes"])
+    assert rc == 0
+    branches = _run(["git", "branch"], root).stdout
+    assert "aide/027-bounds-rules" not in branches
 
 
 def _mkbare(path: Path) -> Path:

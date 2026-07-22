@@ -1,0 +1,20 @@
+{
+  "//": [
+    "AIDE settings overlay — project-owned, like aide.toml. Copy this file to",
+    "settings.overlay.json (drop the .example) to activate. While it exists,",
+    ".claude/settings.json is REGENERATED on every install/--update as a",
+    "deterministic deep-merge of the framework default and this overlay — so",
+    "edit THIS file, never settings.json (your edits there are overwritten).",
+    "",
+    "Merge rules: objects deep-merge (overlay wins). For list values (the",
+    "permission allow/ask/deny lists, hook groups) use the operator",
+    "{ \"add\": [...], \"remove\": [...] } — additive by default, so a framework",
+    "update that adds a new default still reaches you. A plain list replaces the",
+    "framework value outright (escape hatch). Prefer adding to `deny` over",
+    "removing from `allow` when tightening — deny is explicit and update-proof.",
+    "Keys starting with // are comments and never appear in the output."
+  ],
+  "permissions": {
+    "allow": { "add": [] }
+  }
+}
