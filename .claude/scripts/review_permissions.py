@@ -45,6 +45,11 @@ _ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_LOG = _ROOT / "docs" / "aide" / "permissions" / "log.jsonl"
 DEFAULT_REVIEWED = _ROOT / "docs" / "aide" / "permissions" / "log.reviewed.jsonl"
 DEFAULT_SETTINGS = _ROOT / ".claude" / "settings.json"
+# Project-owned overlay. When it exists, settings.json is a GENERATED artifact
+# (install.py regenerates it as base+overlay on every --update), so a promoted
+# rule written into settings.json is silently lost on the next update. The rule
+# has to go into the overlay's additive `permissions.allow.add` list instead.
+DEFAULT_OVERLAY = _ROOT / ".claude" / "settings.overlay.json"
 
 # How many leading tokens form a stable Bash prefix per CLI (subcommand depth).
 _BASH_PREFIX_DEPTH = {
@@ -274,6 +279,36 @@ def load_rules(settings_path):
     return perms.get("allow", []), perms.get("ask", [])
 
 
+def promotion_target(settings_path, overlay_path):
+    """Where a promoted rule must be written, as ``(path, json_location)``.
+
+    An adopted overlay makes ``settings.json`` a generated artifact, so the answer
+    is the overlay's additive ``permissions.allow.add`` list; without one it is
+    ``permissions.allow`` in ``settings.json`` itself. Pure — only tests existence,
+    so it is safe to call before anything is written.
+    """
+    overlay = Path(overlay_path)
+    if overlay.is_file():
+        return overlay, "permissions.allow.add"
+    return Path(settings_path), "permissions.allow"
+
+
+def render_promotion_hint(settings_path, overlay_path):
+    """The 'where do these rules go' guidance, matched to the project's layout."""
+    target, location = promotion_target(settings_path, overlay_path)
+    lines = [
+        f"\nAdd the safe/routine ones to {location} in {target.name},",
+        "leave anything with side effects under `ask`. Lands via PR (framework file).",
+    ]
+    if location.endswith(".add"):
+        lines.append(
+            f"NOTE: {target.name} is adopted, so settings.json is GENERATED from it on "
+            "every\ninstall --update -- a rule written into settings.json would be lost. "
+            "Edit the overlay."
+        )
+    return "\n".join(lines)
+
+
 def _render_table(rows):
     if not rows:
         return "No prompt-eligible tool calls in the log (if you ARE hitting prompts, see the trust note above).\n"
@@ -293,6 +328,9 @@ def main(argv=None):
     parser.add_argument("--log", default=str(DEFAULT_LOG))
     parser.add_argument("--reviewed", default=str(DEFAULT_REVIEWED))
     parser.add_argument("--settings", default=str(DEFAULT_SETTINGS))
+    parser.add_argument("--overlay", default=str(DEFAULT_OVERLAY),
+                        help="project settings overlay; when it exists, promoted rules "
+                             "belong in its permissions.allow.add list, not settings.json")
     parser.add_argument("--json", action="store_true", help="machine-readable output")
     parser.add_argument(
         "--rotate",
@@ -313,8 +351,12 @@ def main(argv=None):
 
     new_rules = [r for r in rows if r["status"] == "new"]
 
+    target, location = promotion_target(args.settings, args.overlay)
+
     if args.json:
-        print(json.dumps({"rows": rows, "suggested_allow": [r["rule"] for r in new_rules]},
+        print(json.dumps({"rows": rows,
+                          "suggested_allow": [r["rule"] for r in new_rules],
+                          "promotion_target": {"path": str(target), "location": location}},
                          indent=2))
         return 0
 
@@ -326,8 +368,7 @@ def main(argv=None):
         print("\nSuggested `allow` additions (review each - full command shown above):")
         for r in new_rules:
             print(f'  "{r["rule"]}",')
-        print("\nAdd the safe/routine ones to permissions.allow in .claude/settings.json,")
-        print("leave anything with side effects under `ask`. Lands via PR (framework file).")
+        print(render_promotion_hint(args.settings, args.overlay))
     else:
         print("\nNo new bottlenecks: every prompted call is already covered or intentionally gated.")
     return 0

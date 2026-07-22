@@ -196,6 +196,18 @@ adapter (→ `.claude/`). **Never hand-edit `.aide/**` or the `aide-*` files und
 `.claude/**` in this repo** — they are generated, and a manual edit is silently
 overwritten on the next update.
 
+To find out whether this repo is behind the framework, compare versions — it
+writes nothing and exits non-zero when behind:
+
+```bash
+python "$AIDE_LOOP/install.py" --into . --check
+```
+
+`.aide/VERSION` records the installed engine; `aide-loop`'s `CHANGELOG.md` says
+what each version changed. The framework bumps its version on every commit that
+touches what a consumer installs, so a matching version now genuinely means
+up to date.
+
 Clean workflow to change the framework (no push required — the installer copies
 from the local working tree):
 

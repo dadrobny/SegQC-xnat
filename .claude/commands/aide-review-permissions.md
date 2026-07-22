@@ -38,15 +38,23 @@ Target log: **$ARGUMENTS** (if empty, the default
    - **Leave** one-offs that won't recur.
    Present a short list: rule → recommend allow / ask / leave, with a one-line reason.
 
-3. **Apply (on user confirmation).** Edit `.claude/settings.json`, adding the agreed
-   rules to `permissions.allow` (or `ask`). This edit **prompts** per the existing
-   policy — that is intended. Keep rules tightly scoped (prefer `Bash(gh pr view:*)`
-   over `Bash(gh:*)`).
+3. **Apply (on user confirmation) — to the right file.** Where the agreed rules go
+   depends on whether this project has adopted the settings overlay. The reviewer
+   prints the answer at the end of its output; it is:
+   - **`.claude/settings.overlay.json` exists** → add the rules to its
+     `permissions.allow.add` list. `settings.json` is a **generated** artifact here
+     (`install.py --update` regenerates it as framework-base + overlay), so a rule
+     written into `settings.json` is silently discarded on the next update.
+   - **no overlay** → add them to `permissions.allow` in `.claude/settings.json`
+     directly, as before.
 
-4. **Land via PR.** `.claude/settings.json` is a framework/process file: per
-   `CLAUDE.md` the change must go on a branch and merge **only after PR review** — do
-   **not** direct-merge. State this to the user; stop at the PR (gh pr create is
-   `ask`-gated).
+   Either edit **prompts** per the existing policy — that is intended. Keep rules
+   tightly scoped (prefer `Bash(gh pr view:*)` over `Bash(gh:*)`).
+
+4. **Land via PR.** The settings file you edited — overlay or `settings.json` — is a
+   framework/process file: per `CLAUDE.md` the change must go on a branch and merge
+   **only after PR review** — do **not** direct-merge. State this to the user; stop
+   at the PR (gh pr create is `ask`-gated).
 
 5. **Rotate the log** so the same prompts aren't re-reviewed next time and the
    raw log doesn't grow without bound. Run:

@@ -28,5 +28,5 @@
 
 _Entries below, newest last._
 
-- [ ] framework — `/aide-review-permissions` and `.claude/scripts/review_permissions.py` still tell the human to add promoted rules to `.claude/settings.json`, which is a *generated* artifact once `settings.overlay.json` is adopted; they should target `permissions.allow.add` in the overlay instead *(2026-07-22)*
+- [x] framework — `/aide-review-permissions` and `.claude/scripts/review_permissions.py` still tell the human to add promoted rules to `.claude/settings.json`, which is a *generated* artifact once `settings.overlay.json` is adopted; they should target `permissions.allow.add` in the overlay instead *(2026-07-22)* → fixed in aide-loop PR #8, shipped in engine 1.2.0 and installed here
 - [ ] knowledge — a stage validation must resolve `[validation]` profiles per machine via `aide env --profile <name>` and record ❓ Unverified on a non-zero exit; never assume a capability from a previous run's result, which is local state and is deliberately not stored *(2026-07-22)*
