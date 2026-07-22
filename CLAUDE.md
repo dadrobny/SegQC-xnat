@@ -185,8 +185,12 @@ already written down there rather than in `docs/aide/`.
 ## Updating the framework (the `aide-loop` repo)
 
 The framework is **not maintained in-tree here** — it is developed in the
-standalone **`aide-loop`** repo (locally `C:\Users\david\aide-loop`) and
-*materialised* into this repo by its installer. In `aide-loop`, `core/` is the
+standalone **`aide-loop`** repo — `github.com/dadrobny/aide-loop`, recorded as
+`[framework] repo` in [`aide.toml`](aide.toml) — and *materialised* here by its
+installer. Where *your* checkout lives is per-machine and deliberately not
+recorded in any shared file; the commands below write it as `$AIDE_LOOP`
+(Windows: `$env:AIDE_LOOP`). Set it once per shell, or substitute your own path
+inline. In `aide-loop`, `core/` is the
 provider-agnostic engine (→ `.aide/`) and `adapters/claude/` is the Claude
 adapter (→ `.claude/`). **Never hand-edit `.aide/**` or the `aide-*` files under
 `.claude/**` in this repo** — they are generated, and a manual edit is silently
@@ -200,11 +204,14 @@ from the local working tree):
    an engine change. Commit on a branch there.
 2. **Reinstall into this repo** from the local checkout:
    ```bash
-   python C:/Users/david/aide-loop/install.py --adapter claude --into . --update
+   python "$AIDE_LOOP/install.py" --adapter claude --into . --update
    ```
    `--update` re-copies the engine + adapter but **never touches `aide.toml` or
-   `docs/aide/`** (project-owned); `settings.json` is non-clobbering (an existing
-   one is kept and a `.aide-merge` diff is emitted for you to reconcile by hand).
+   `docs/aide/`** (project-owned). Because this repo has adopted
+   `.claude/settings.overlay.json`, `settings.json` is **regenerated** from
+   framework-base + overlay on every run — so it needs no reconciliation and no
+   `.aide-merge` is emitted; put project-specific permission rules in the
+   overlay.
 3. **Review the `git diff`** — it should be exactly the intended change (most
    copied files are byte-identical no-ops git shows nothing for). Run the suite.
 4. **Land via a reviewed PR** (framework/process files are PR-gated — see the last
