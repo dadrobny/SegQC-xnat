@@ -37,6 +37,12 @@ repo = "dadrobny/aide-loop"
 # `python .aide/scripts/aide.py env --profile <name>` (exit 0 iff satisfied). A stage
 # validation gated on an unsatisfied profile records ❓ Unverified, never a silent pass.
 # These mirror the environment-gated capabilities described in CLAUDE.md.
+#
+# These are DEFINITIONS, not observations — the same on every machine and in CI, which
+# is why they are committed. The per-machine *answer* is computed at runtime by
+# `env --profile` and is deliberately never stored. Keep it that way: nothing here may
+# encode a local path, mount, device index, or host name. Machine-varying inputs go in
+# the environment instead (as the real VerSe19 cohort does, via SEGQC_VERSE_COHORT).
 pyradiomics = "__import__('radiomics') is not None"
 docker = "__import__('subprocess').run(['docker', 'info'], capture_output=True).returncode == 0"
 gpu = "__import__('cupy').cuda.runtime.getDeviceCount() > 0"

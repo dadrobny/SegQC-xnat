@@ -29,4 +29,4 @@
 _Entries below, newest last._
 
 - [ ] framework — `/aide-review-permissions` and `.claude/scripts/review_permissions.py` still tell the human to add promoted rules to `.claude/settings.json`, which is a *generated* artifact once `settings.overlay.json` is adopted; they should target `permissions.allow.add` in the overlay instead *(2026-07-22)*
-- [ ] knowledge — this machine satisfies none of the three `[validation]` profiles (`docker` CLI absent, no `cupy`, `pyradiomics` installed but broken against the pinned numpy), so any stage validation gated on them must record ❓ Unverified here *(2026-07-22)*
+- [ ] knowledge — a stage validation must resolve `[validation]` profiles per machine via `aide env --profile <name>` and record ❓ Unverified on a non-zero exit; never assume a capability from a previous run's result, which is local state and is deliberately not stored *(2026-07-22)*
