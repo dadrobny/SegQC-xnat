@@ -644,10 +644,3 @@ then measure sensitivity against the calibrated rules).
   legitimate variation is not flagged at the Stage-14 FPR bar.
 - [ ] The "Real automatic-segmentation failure corpus" verification row reads
   ✅ Verified.
-
----
-
-## Next Step
-
-Review this progress tracker. When ready, start a **new chat session** and run
-`/aide-create-queue` to generate the next batch of prioritized work items.

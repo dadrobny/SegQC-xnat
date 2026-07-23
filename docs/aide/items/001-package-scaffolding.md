@@ -284,24 +284,3 @@ Concrete, verifiable results:
 - [x] Verified on OS: **Windows 11** (Python 3.11.2). No platform-specific code;
       cross-platform behaviour relies on stdlib-only, pure-Python design (CI
       matrix deferred per the item's testing strategy).
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 0 **"Python package `segqc/` … `pyproject.toml` …"** deliverable
-  from 📋 → ✅ (and mark it 🚧 while in progress).
-- Do **not** mark the Stage 0 *Acceptance* checkboxes that depend on later items
-  (loader, label inventory, stub JSON) — those close with Items 003/004/006.
-- Per `CLAUDE.md`: work on a branch (`aide/001-package-scaffolding`),
-  `git pull --rebase` before editing `progress.md`, keep the edit scoped to this
-  item's rows, and open a PR rather than committing to `main`.
-
----
-
-## Next Step
-
-Start a **new chat session** and run `/speckit-aide-execute-item 001` to
-implement this work item.

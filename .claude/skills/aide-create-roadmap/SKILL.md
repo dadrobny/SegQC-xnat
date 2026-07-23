@@ -43,7 +43,9 @@ from the template **`.aide/templates/roadmap.md`**.
 Save to `docs/aide/roadmap.md`. Roadmap changes are framework-level: reviewed PR,
 never a direct merge.
 
-## Next Step
+## Hand-off
 
-After reviewing the roadmap, start a **new chat session** and run
-`/aide-create-progress`.
+Close your turn by telling the user, in chat:
+
+> Review `docs/aide/roadmap.md`, then start a **fresh chat session** and run
+> `/aide-create-progress`.

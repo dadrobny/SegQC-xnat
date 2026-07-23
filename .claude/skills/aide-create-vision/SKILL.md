@@ -48,7 +48,12 @@ Requirements:
 Save to `docs/aide/vision.md`. Vision changes are framework-level: they land via
 a reviewed PR, never a direct merge.
 
-## Next Step
+## Hand-off
 
-After reviewing the vision, start a **new chat session** and run
-`/aide-create-roadmap`.
+Close your turn by telling the user, in chat:
+
+> Review `docs/aide/vision.md`, then start a **fresh chat session** and run
+> `/aide-create-roadmap`.
+
+A fresh session matters here: the roadmap should be derived from the written
+vision, not from this conversation's memory of drafting it.

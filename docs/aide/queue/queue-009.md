@@ -231,11 +231,3 @@ GPU-gated tests are expected to skip cleanly here (mirroring items 060/069) —
 this is by design, not a gap, and is explicitly called out in item 075's
 acceptance reporting. This queue is landing via a human-reviewed queue PR (the
 Phase-2 batch checkpoint).
-
-## Next Step
-
-Per `CLAUDE.md`: `git fetch --all --prune` and check `aide/*` branches first, then
-branch per item (`aide/NNN-short-name`) and push immediately to claim it;
-`git pull --rebase` before any `progress.md` edit. Start with **071**. Two ways
-to proceed: spec the whole queue now with `/aide-spec-queue 009` in one
-interactive sitting, or spec per-item during execution via `/aide-run-queue 009`.

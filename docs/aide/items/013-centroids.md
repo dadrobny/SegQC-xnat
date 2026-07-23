@@ -167,14 +167,3 @@ in `segqc/features/centroids.py`.
 
 - `pytest tests/test_013_centroids.py` reports 0 failures.
 - `pytest` (full suite) reports 0 failures — no regressions in items 001–012.
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 2 **"Centroids"** deliverable from 🚧 → ✅.
-- Per `CLAUDE.md`: work on branch `aide/013-centroids`, `git pull --rebase`
-  before editing `progress.md`, keep edits scoped to this item's rows, and
-  direct-merge (no PR required) once green.

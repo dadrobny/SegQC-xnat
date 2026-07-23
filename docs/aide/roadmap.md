@@ -605,10 +605,3 @@ against the rules we intend to ship). Feeds Stage 11's abnormality arm.
 mode present in the cohort (**G2**); real DICE-vs-flag correlation measured and
 correctly signed (**G7**); curated cases run with recorded outcomes and
 legitimate variation is not flagged at Stage 14's FPR bar.
-
----
-
-## Next Step
-
-Review this roadmap. When you're happy with it, start a **new chat session** and
-run `/aide-create-progress` to create the progress-tracking file.

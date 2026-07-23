@@ -157,9 +157,3 @@ recipe) and **083** (refresh wrapper) follow; **084** (real-VerSe evaluation)
 closes the stage. Every real-VerSe-touching item degrades gracefully when the
 (uncommitted) VerSe cohort is absent. This queue lands together with the Stage-12
 roadmap addition via a single human-reviewed PR (roadmap is PR-gated).
-
-## Next Step
-
-Two ways to proceed: spec the whole queue now with `/aide-spec-queue 010` in one
-interactive sitting, or spec per-item during execution via `/aide-run-queue 010`.
-Start with **081** (feature expansion — no VerSe data needed).

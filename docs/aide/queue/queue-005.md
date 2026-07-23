@@ -227,10 +227,3 @@ all merged. GT fixtures fall within the reference ranges (pass) while perturbed
 cases fall outside (flagged) — the reference-grounded half of **G3**. Superseded by
 [`queue-006.md`](queue-006.md), which delivers Stage 7 (evaluation, calibration &
 metrics) on top of this reference substrate and closes Phase 1.
-
-## Next Step
-
-Per `CLAUDE.md`: `git fetch --all --prune` and check `aide/*` branches first, then
-branch per item (`aide/NNN-short-name`) and push immediately to claim it;
-`git pull --rebase` before any `progress.md` edit. Stage 6 is complete — proceed
-to [`queue-006.md`](queue-006.md).

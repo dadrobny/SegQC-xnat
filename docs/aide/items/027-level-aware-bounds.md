@@ -365,19 +365,3 @@ Pinned during implementation (2026-06-30):
 - **Metric order is fixed by `_METRICS` list.** Output order within a label
   is volume → extent_x → extent_y → extent_z, making the rule deterministic
   (AC13) regardless of dict-iteration order in the geometry sub-dict.
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md) (scoped to
-this item's rows only; `git pull --rebase` first):
-
-- Flip the Stage 4 deliverable sub-row **"min/max bounds (volume, extent),
-  level-aware"** (line ~150) from 📋 → ✅.
-- Leave the Stage 4 **acceptance checkboxes** (lines ~161–163) and the **stage
-  rollup** (line 143, and the index row at line 29) as they are — Stage 4 closes
-  only when item 035 lands the per-failure-mode end-to-end tests; the validator
-  reconciles the stage ✅ at that point.
-- Per `CLAUDE.md`: work on branch `aide/027-level-aware-bounds`, keep
-  `progress.md` edits scoped to this item, and direct-merge (no PR) once green.

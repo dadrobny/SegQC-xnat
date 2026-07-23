@@ -388,10 +388,3 @@ The project is successful when the tool can **automatically**:
 7. **Catch all catalogued failure modes** (§6) on the synthetic/curated corpus.
 8. **Deploy and run on XNAT** as a container, producing JSON + human reports.
 9. **Run CPU-only** with an optional GPU-accelerated path.
-
----
-
-## Next Step
-
-Review this vision, then start a **new chat session** and run
-`/aide-create-roadmap` to generate a staged development roadmap.

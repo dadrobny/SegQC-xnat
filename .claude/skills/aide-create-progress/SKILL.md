@@ -45,7 +45,9 @@ Run `python .aide/scripts/aide.py check` after writing — it must pass.
 
 Save to `docs/aide/progress.md`.
 
-## Next Step
+## Hand-off
 
-After reviewing, start a **new chat session** and run `/aide-create-queue` to
-generate the first batch of work items.
+Close your turn by telling the user, in chat:
+
+> Review `docs/aide/progress.md`, then start a **fresh chat session** and run
+> `/aide-create-queue` to generate the first batch of work items.

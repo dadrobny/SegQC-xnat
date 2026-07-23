@@ -391,21 +391,3 @@ and `segqc.config` (PyYAML). No NumPy/SciPy/NiBabel needed for the engine core.
   record, tolerating empty rule sets and label-free records without mutation.
 - `HeuristicConfig` exposes `rule_enabled` / `rule_param` with documented
   defaults; existing config loading is unaffected.
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 4 **"Config-driven rule engine: each rule emits flag +
-  human-readable reason + offending labels"** deliverable row from 📋 → ✅
-  (the engine core delivers the flag/reason/offending-label data model and the
-  config-driven runner; the individual rule-family rows remain 📋 until
-  027–033).
-- Leave the Stage 4 **acceptance checkboxes** and the **stage rollup** status as
-  they are — they close only when item 035 lands the per-failure-mode tests
-  (the validator reconciles ✅ at that point).
-- Per `CLAUDE.md`: work on branch `aide/026-rule-engine-core`, `git pull
-  --rebase` before editing `progress.md`, keep edits scoped to this item's rows,
-  and direct-merge (no PR required) once green.

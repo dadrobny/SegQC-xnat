@@ -23,6 +23,14 @@ left in a generated `docs/aide/**.md` file as an unfilled template slot.
 Dates are always **ISO 8601** (`YYYY-MM-DD`) — the templates' `{{yyyy-mm-dd}}`
 slot spells the format out so no separate lookup is needed.
 
+**Header blockquote** — every living document opens with one, carrying its step
+number in the loop, what it derives from, and what derives from it. Those are
+structural facts that hold as long as the document exists, so a reader landing
+anywhere in `docs/aide/` can place the file without cross-referencing. Keep the
+line current when a document's relationships change. The transient hand-off
+("run `/aide-…` next") is spoken by the skill that wrote the file, not stored
+in it.
+
 ### Status icons (the only five)
 
 | Icon | Meaning | Rank |

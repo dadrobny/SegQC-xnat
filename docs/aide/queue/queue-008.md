@@ -198,11 +198,3 @@ yet. **066** (Dockerfile) is the shared foundation and should merge first;
 **069** (smoke test) depends on both; **070** (docs + acceptance) closes the
 stage. This queue is landing via a human-reviewed queue PR (the Phase-2 batch
 checkpoint).
-
-## Next Step
-
-Per `CLAUDE.md`: `git fetch --all --prune` and check `aide/*` branches first, then
-branch per item (`aide/NNN-short-name`) and push immediately to claim it;
-`git pull --rebase` before any `progress.md` edit. Start with **066**. Two ways
-to proceed: spec the whole queue now with `/aide-spec-queue 008` in one
-interactive sitting, or spec per-item during execution via `/aide-run-queue 008`.

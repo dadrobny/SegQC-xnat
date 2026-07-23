@@ -504,19 +504,3 @@ implementation):
   independently and unambiguously testable.
 - **No shipped numeric thresholds.** Both opt-in checks default to disabled;
   reference-derived expected spans/counts are Stage 6.
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md) (scoped to
-this item's rows only; `git pull --rebase` first):
-
-- Flip the Stage 4 deliverable sub-row **"incomplete coverage / missing levels
-  (count vs expected sequence)"** (line ~153) from 📋 → ✅, annotating it
-  `*(Item 029)*`.
-- Leave the Stage 4 **acceptance checkboxes** and the **stage rollup** (the
-  Stage 4 index row and the objective-coverage rows) as they are — Stage 4 closes
-  only when item 035 lands the per-failure-mode end-to-end tests; the validator
-  reconciles the stage ✅ at that point.
-- Per `CLAUDE.md`: work on branch
-  `aide/029-incomplete-coverage-missing-level-rules`, keep `progress.md` edits
-  scoped to this item, and direct-merge (no PR) once green.

@@ -28,8 +28,9 @@
 # {{project-name}} — Progress Tracker
 
 > **Status:** Draft v1 · **Created:** {{yyyy-mm-dd}}
-> Step 3 of the AIDE loop. Single source of truth for status, per stage,
-> deliverable, and acceptance criterion.
+> Step 3 of the AIDE loop · mirrors [`roadmap.md`](roadmap.md) · the single
+> source of truth for status; queue state is derived from it, and item specs
+> deliberately carry none.
 
 ## Status legend
 
@@ -90,7 +91,3 @@ _One checkbox per acceptance criterion from the matching roadmap stage._
 ---
 
 _Repeat "## Stage N — Title — icon" per stage._
-
----
-
-Next: run `/aide-create-queue` to generate the first batch.

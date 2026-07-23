@@ -78,7 +78,9 @@ Follow the `aide-create-queue` skill in full. In brief:
    ```
 7. **Return** a tight summary: queue number, the item-number range and one-line
    titles, and confirmation the previous queue was tidied and every item wired
-   into `progress.md`.
+   into `progress.md`. Name the two ways to proceed (`/aide-spec-queue NNN` up
+   front, or per-item during `/aide-run-queue NNN`) in the summary — the
+   orchestrator carries it into the queue-PR body.
 
 ## Hard limits
 

@@ -18,7 +18,8 @@
 # {{project-name}} — Project Vision
 
 > **Status:** Draft v1 · **Created:** {{yyyy-mm-dd}}
-> Step 1 of the AIDE loop. Source of truth for roadmap, progress, and work items.
+> Step 1 of the AIDE loop · the root document: [`roadmap.md`](roadmap.md),
+> [`progress.md`](progress.md), every queue and every work item derive from this.
 
 ---
 
@@ -75,7 +76,3 @@ _One bullet per exclusion, each with a one-line reason._
 _Observable, testable statements — one per criterion._
 
 1. {{success criterion}}
-
----
-
-Next: start a fresh chat and run `/aide-create-roadmap`.

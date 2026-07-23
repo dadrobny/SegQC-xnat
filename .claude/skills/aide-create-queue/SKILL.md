@@ -106,9 +106,10 @@ git commit -m "docs(aide): add work queue NNN"
   only; the orchestrator pushes the `aide/queue-NNN` branch and opens the
   human-reviewed queue PR.
 
-## Next Step
+## Hand-off
 
-Two ways to proceed — suggest both to the user (and in the queue-PR body):
+Close your turn by naming both ways to proceed — in chat, and in the queue-PR
+body if one is opened:
 
 - **Spec the whole queue now** — run `/aide-spec-queue NNN` in one interactive
   sitting (clarify questions answered while a human is present), then let

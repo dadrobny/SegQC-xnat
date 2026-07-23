@@ -88,8 +88,12 @@ git commit -m "docs(NNN): work item spec for <short title>"
 
 (Inside `/aide-run-item`, the `spec-author` agent performs this commit.)
 
-## Next Step
+## Hand-off
 
-Start a **new chat session** and run `/aide-execute-item NNN` to implement it —
-or, if batch-speccing the queue via `/aide-spec-queue`, continue to the next
-unspecced item.
+Close your turn by telling the user, in chat:
+
+> Start a **fresh chat session** and run `/aide-execute-item NNN` to implement
+> it.
+
+If batch-speccing the queue via `/aide-spec-queue`, continue to the next
+unspecced item instead — the batch skill owns the hand-off.
