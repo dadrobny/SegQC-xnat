@@ -23,6 +23,21 @@ left in a generated `docs/aide/**.md` file as an unfilled template slot.
 Dates are always **ISO 8601** (`YYYY-MM-DD`) — the templates' `{{yyyy-mm-dd}}`
 slot spells the format out so no separate lookup is needed.
 
+**No next-step pointers inside a living document.** A `docs/aide/` document is
+read for the whole life of the project, but a "Next: run `/aide-…`" line is
+true only in the minutes after the file is written — `progress.md` would still
+advertise "generate the first batch" at queue 7, and the reader cannot tell a
+stale pointer from a current one. So the transient hand-off is **spoken, not
+stored**: the skill that creates the document names the typical next step in
+its closing message to the user (and, for a queue, in the PR body), and writes
+none of it into the file.
+
+What *is* durable goes in the document's **header blockquote**: its step number
+in the loop, what it derives from, and what derives from it. Those are
+structural facts that hold as long as the document exists, so the direction
+stays legible without anything going out of date. Keep that line current when a
+document's relationships change; never grow it into a to-do list.
+
 ### Status icons (the only five)
 
 | Icon | Meaning | Rank |

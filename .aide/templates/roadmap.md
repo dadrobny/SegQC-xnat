@@ -11,11 +11,17 @@
 
   Fill-in conventions: `{{slot}}` = literal value; _italic line_ = guidance to
   read then replace. Delete this comment in the generated file.
+
+  Do NOT end the generated file with a "Next: run /aide-…" pointer — it is
+  stale as soon as the loop moves past step 2. The header blockquote carries
+  the durable orientation instead; the transient hand-off is spoken once, by
+  the skill that wrote the file.
 -->
 # {{project-name}} — Development Roadmap
 
 > **Status:** Draft v1 · **Created:** {{yyyy-mm-dd}}
-> Step 2 of the AIDE loop. Derived from [`vision.md`](vision.md).
+> Step 2 of the AIDE loop · derived from [`vision.md`](vision.md) · its stages
+> are mirrored by [`progress.md`](progress.md) and scoped into the queues.
 
 ---
 
@@ -65,7 +71,3 @@ boxes for this stage._
 
 _Repeat "## Stage N — Title" per stage. Group stages into phases with a
 `# Phase N — name` header above the first stage of the phase, if useful._
-
----
-
-Next: review, then run `/aide-create-progress`.

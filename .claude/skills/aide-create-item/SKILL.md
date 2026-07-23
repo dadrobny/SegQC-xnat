@@ -76,6 +76,14 @@ with its downstream consumer):
 Add project-specific sections only when the project genuinely needs them (e.g. a
 services checklist for a system with external services) — not by default.
 
+**Write no "Next:" line into the spec.** The spec is re-read by test-writer,
+builder, and validator, and stays as the record of the item afterwards — a
+next-step pointer inside it is stale from the moment the first downstream agent
+picks it up (see `.aide/conventions.md` §1, "No next-step pointers inside a
+living document"). The header block already carries the durable orientation
+(stage, queue, objectives, where status lives). End the file at **Decisions &
+Trade-offs**.
+
 ### Commit the spec immediately (do not leave it untracked)
 
 The spec is the source of truth for every downstream step. Commit it on the
@@ -88,8 +96,13 @@ git commit -m "docs(NNN): work item spec for <short title>"
 
 (Inside `/aide-run-item`, the `spec-author` agent performs this commit.)
 
-## Next Step
+## Hand-off (say this, don't save it)
 
-Start a **new chat session** and run `/aide-execute-item NNN` to implement it —
-or, if batch-speccing the queue via `/aide-spec-queue`, continue to the next
-unspecced item.
+Close your turn by telling the user the typical next step — in chat, not in the
+spec:
+
+> Start a **fresh chat session** and run `/aide-execute-item NNN` to implement
+> it.
+
+If batch-speccing the queue via `/aide-spec-queue`, say nothing here and
+continue to the next unspecced item instead — the batch skill owns the hand-off.

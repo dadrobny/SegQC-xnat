@@ -14,11 +14,18 @@
   Delete this comment block in the generated file; the inline MANDATORY
   annotations further down are for framework maintainers and agents, not
   readers of the finished vision — leave those in place.
+
+  Do NOT end the generated file with a "Next: run /aide-…" pointer. This
+  document outlives the step that created it, so a next-step line is stale as
+  soon as the loop moves on. The header blockquote already carries the durable
+  orientation (position in the loop, what derives from this); the transient
+  hand-off is spoken once, by the skill that wrote the file.
 -->
 # {{project-name}} — Project Vision
 
 > **Status:** Draft v1 · **Created:** {{yyyy-mm-dd}}
-> Step 1 of the AIDE loop. Source of truth for roadmap, progress, and work items.
+> Step 1 of the AIDE loop · the root document: [`roadmap.md`](roadmap.md),
+> [`progress.md`](progress.md), every queue and every work item derive from this.
 
 ---
 
@@ -75,7 +82,3 @@ _One bullet per exclusion, each with a one-line reason._
 _Observable, testable statements — one per criterion._
 
 1. {{success criterion}}
-
----
-
-Next: start a fresh chat and run `/aide-create-roadmap`.

@@ -88,6 +88,16 @@ state (✅ done, ⏸️/❌ if carried or dropped). Skip if this is the first qu
 
 Save to `docs/aide/queue/queue-NNN.md` (next sequential number).
 
+**Write no "Next:" line into the queue file.** A queue is read throughout its
+own execution and again afterwards as history, so a next-step pointer inside it
+drifts out of date while the file is still in active use (see
+`.aide/conventions.md` §1, "No next-step pointers inside a living document").
+The template's header blockquote carries the durable orientation — what the
+batch derives from, and that its items are specced into `../items/` and tracked
+in `progress.md`. The only status line a queue may carry is the completion stamp
+`aide queue tidy` writes on a superseded queue. End the file after the last
+`### Item NNN` section.
+
 ### Commit the queue immediately (do not leave it untracked)
 
 The queue is a shared project document; `aide claim` reads the committed file.
@@ -106,9 +116,12 @@ git commit -m "docs(aide): add work queue NNN"
   only; the orchestrator pushes the `aide/queue-NNN` branch and opens the
   human-reviewed queue PR.
 
-## Next Step
+## Hand-off (say this, don't save it)
 
-Two ways to proceed — suggest both to the user (and in the queue-PR body):
+Close your turn by naming both ways to proceed — in chat, and in the queue-PR
+body if one is opened. A PR body is the right home for a transient pointer: it
+is read once, at review time, and is never mistaken for current state
+afterwards. The queue file itself gets none of this.
 
 - **Spec the whole queue now** — run `/aide-spec-queue NNN` in one interactive
   sitting (clarify questions answered while a human is present), then let

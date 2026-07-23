@@ -70,7 +70,12 @@ in the **Assumptions** block (the builder/validator hand back if reality diverge
    whenever meaningful observation goes beyond the unit suite: the command to
    run / output to inspect / use case to replay, and — if it needs a special
    environment — the `[validation]` profile name plus the honest downgrade
-   when absent (see the item template).
+   when absent (see the item template). **End the file at Decisions &
+   Trade-offs — no "Next: …" pointer.** The spec is re-read by test-writer,
+   builder, and validator and kept as the item's record, so a next-step line is
+   stale from the first downstream read; the header block already carries the
+   durable orientation (see [`.aide/conventions.md` §1](../../.aide/conventions.md),
+   "No next-step pointers inside a living document").
 4. **Sweep for stale test assumptions.** If the spec (or an Assumption)
    changes an existing default or behaviour, grep `tests_dir` for tests
    pinning the OLD behaviour and list every hit in the Testing Strategy as

@@ -13,12 +13,21 @@
 
   Fill-in conventions: `{{slot}}` = literal value; _italic line_ = guidance to
   read then replace. Delete this comment in the generated file.
+
+  Do NOT end the generated file with a "Next: run /aide-…" pointer — a queue is
+  read throughout its own execution and again as history afterwards, so a
+  next-step line drifts out of date while the file is still in active use. The
+  header blockquote carries the durable orientation; the transient hand-off is
+  spoken once, by the skill that wrote the file (and repeated in the queue PR
+  body, where it is genuinely a one-time message).
 -->
 # {{project-name}} — Work Queue {{nnn}}
 
 > **Created:** {{yyyy-mm-dd}}
-> Step 4 of the AIDE loop. Derived from [`../vision.md`](../vision.md),
-> [`../roadmap.md`](../roadmap.md), and [`../progress.md`](../progress.md).
+> Step 4 of the AIDE loop · derived from [`../vision.md`](../vision.md),
+> [`../roadmap.md`](../roadmap.md), and [`../progress.md`](../progress.md) ·
+> each item below is specced into [`../items/`](../items/) and tracked in
+> `../progress.md` (queue state is derived there, never declared here).
 
 ---
 
@@ -42,8 +51,3 @@ _One "### Item NNN: Title" section per item — add as many as this batch needs
 
 {{one paragraph: scope and deliverables for this item}}. *Testable:*
 {{how it is verified locally}}.
-
----
-
-Next: `aide claim` picks the first unclaimed unblocked item, or run
-`/aide-create-item NNN` to spec one.

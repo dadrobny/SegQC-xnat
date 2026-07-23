@@ -48,7 +48,20 @@ Requirements:
 Save to `docs/aide/vision.md`. Vision changes are framework-level: they land via
 a reviewed PR, never a direct merge.
 
-## Next Step
+**Write no "Next:" line into the document.** `vision.md` outlives this step by
+the whole life of the project, so a next-step pointer inside it is stale as soon
+as the roadmap exists (see `.aide/conventions.md` §1, "No next-step pointers
+inside a living document"). The durable orientation is already in the header
+blockquote the template provides — keep that, and stop the file at Success
+criteria.
 
-After reviewing the vision, start a **new chat session** and run
-`/aide-create-roadmap`.
+## Hand-off (say this, don't save it)
+
+Close your turn by telling the user the typical next step — in chat, not in the
+file:
+
+> Review `docs/aide/vision.md`, then start a **fresh chat session** and run
+> `/aide-create-roadmap`.
+
+A fresh session matters here: the roadmap should be derived from the written
+vision, not from this conversation's memory of drafting it.
