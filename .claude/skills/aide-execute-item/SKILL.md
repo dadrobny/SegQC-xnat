@@ -83,11 +83,9 @@ and stops for a human PR; `local` merges offline.)
 If you hit unclear requirements or a blocker: document it in the work item and
 run `/aide-feedback-loop` to adjust the process.
 
-## Hand-off (say this, don't save it)
+## Hand-off
 
-Close your turn by telling the user where the loop stands — in chat. Nothing
-here goes into `progress.md` or the item spec; the documents record state, not
-instructions.
+Close your turn by telling the user, in chat, where the loop stands:
 
 - **More items in queue?** New chat → `/aide-create-item` then
   `/aide-execute-item` (or let `/aide-run-queue` drive them).

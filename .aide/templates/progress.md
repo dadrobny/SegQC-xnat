@@ -24,12 +24,6 @@
 
   Fill-in conventions: `{{slot}}` = literal value; _italic line_ = guidance to
   read then replace. Delete this comment in the generated file.
-
-  Do NOT end the generated file with a "Next: run /aide-…" pointer. This file
-  is updated on every merged item and outlives every step, so a next-step line
-  is stale almost immediately (it would still advertise "the first batch" at
-  queue 7). The header blockquote carries the durable orientation; the
-  transient hand-off is spoken once, by the skill that wrote the file.
 -->
 # {{project-name}} — Progress Tracker
 

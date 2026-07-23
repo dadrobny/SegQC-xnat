@@ -43,17 +43,9 @@ from the template **`.aide/templates/roadmap.md`**.
 Save to `docs/aide/roadmap.md`. Roadmap changes are framework-level: reviewed PR,
 never a direct merge.
 
-**Write no "Next:" line into the document.** The roadmap is re-read at every
-queue boundary for the rest of the project; a next-step pointer inside it is
-stale after step 3 and cannot be distinguished from a current one (see
-`.aide/conventions.md` §1, "No next-step pointers inside a living document").
-The template's header blockquote already carries the durable orientation — what
-this derives from and what mirrors it. End the file at the last stage section.
+## Hand-off
 
-## Hand-off (say this, don't save it)
-
-Close your turn by telling the user the typical next step — in chat, not in the
-file:
+Close your turn by telling the user, in chat:
 
 > Review `docs/aide/roadmap.md`, then start a **fresh chat session** and run
 > `/aide-create-progress`.

@@ -45,17 +45,9 @@ Run `python .aide/scripts/aide.py check` after writing — it must pass.
 
 Save to `docs/aide/progress.md`.
 
-**Write no "Next:" line into the document.** `progress.md` is edited on every
-merged item and is the most-read file in the loop — a pointer saying "run
-`/aide-create-queue` to generate the first batch" would still be sitting there
-at queue 7 (see `.aide/conventions.md` §1, "No next-step pointers inside a
-living document"). The template's header blockquote carries the durable
-orientation instead. End the file after the last stage section.
+## Hand-off
 
-## Hand-off (say this, don't save it)
-
-Close your turn by telling the user the typical next step — in chat, not in the
-file:
+Close your turn by telling the user, in chat:
 
 > Review `docs/aide/progress.md`, then start a **fresh chat session** and run
 > `/aide-create-queue` to generate the first batch of work items.

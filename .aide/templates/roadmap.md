@@ -11,11 +11,6 @@
 
   Fill-in conventions: `{{slot}}` = literal value; _italic line_ = guidance to
   read then replace. Delete this comment in the generated file.
-
-  Do NOT end the generated file with a "Next: run /aide-…" pointer — it is
-  stale as soon as the loop moves past step 2. The header blockquote carries
-  the durable orientation instead; the transient hand-off is spoken once, by
-  the skill that wrote the file.
 -->
 # {{project-name}} — Development Roadmap
 

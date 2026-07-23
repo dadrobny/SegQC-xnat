@@ -99,9 +99,7 @@ run the `/aide-status-report` skill (or the generator directly):
 - This loop is for **systemic issues** needing process/document/framework change.
 - **Be minimal** — the smallest set of changes that prevents recurrence.
 
-## Hand-off (say this, don't save it)
+## Hand-off
 
 Close your turn by telling the user, in chat, to resume the workflow where they
-left off in a fresh chat session. Never write that pointer into a `docs/aide/`
-document — see `.aide/conventions.md` §1, "No next-step pointers inside a living
-document".
+left off, in a fresh chat session.

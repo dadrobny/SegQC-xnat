@@ -79,17 +79,8 @@ Follow the `aide-create-queue` skill in full. In brief:
 7. **Return** a tight summary: queue number, the item-number range and one-line
    titles, and confirmation the previous queue was tidied and every item wired
    into `progress.md`. Name the two ways to proceed (`/aide-spec-queue NNN` up
-   front, or per-item during `/aide-run-queue NNN`) **here, in the summary** —
-   the orchestrator carries it into the queue-PR body. It does **not** go into
-   the queue file.
-
-**No next-step pointer inside any document you write.** A `docs/aide/` file is
-read long after the moment it was authored, so a "Next: run `/aide-…`" line is
-stale while the file is still in active use — see
-[`.aide/conventions.md` §1](../../.aide/conventions.md), "No next-step pointers
-inside a living document". The queue template's header blockquote already
-carries the durable orientation; end the queue file after its last
-`### Item NNN` section.
+   front, or per-item during `/aide-run-queue NNN`) in the summary — the
+   orchestrator carries it into the queue-PR body.
 
 ## Hard limits
 

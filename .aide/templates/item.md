@@ -24,12 +24,6 @@
 
   Fill-in conventions: `{{slot}}` = literal value; _italic line_ = guidance to
   read then replace. Delete this comment in the generated file.
-
-  Do NOT end the generated file with a "Next: run /aide-…" pointer — see
-  conventions.md §1 "No next-step pointers inside a living document". The
-  header block below already carries the durable orientation (stage, queue,
-  objectives, where status lives); the transient hand-off belongs in the
-  authoring skill's closing message.
 -->
 # Item {{nnn}} — {{title}}
 
