@@ -229,7 +229,50 @@ def test_parse_item_status_prose_icon_not_status():
     ).splitlines()
     _, _, status = aide._parse_item_status(lines)
     assert status[50] == "planned"
-    assert status[51] == "planned"  # decoy ✅ in prose must not mark it complete
+    # A prose mention carries no status at all — not even a decoy "planned"
+    # (issue #15: only a deliverable bullet is a structural declaration).
+    assert 51 not in status
+
+
+def test_parse_item_status_ignores_table_notes_and_checkboxes():
+    """conventions.md §1: only a deliverable bullet's leading icon is a status
+    declaration. A verification-table Notes cell that narrates several item
+    numbers, and an acceptance checkbox that merely cites its item, must not
+    attribute any status to those items (issue #15) — each item's status comes
+    only from its own deliverable bullet, if any.
+    """
+    lines = (
+        "## Stage 14 — X — 🚧\n"
+        "**Deliverables.**\n"
+        "- ✅ Thing. *(Item 060)*\n"
+        "\n"
+        "| Check | Notes | Status |\n"
+        "|---|---|---|\n"
+        "| Env | Post-mortem mentions item 047, Item 084 at length | 🚧 |\n"
+        "| Env2 | See Item 060 too | 📋 |\n"
+        "\n"
+        "**Acceptance.**\n"
+        "- [x] Container runs the pipeline. *(Item 070; docker verified)*\n"
+    ).splitlines()
+    _, _, status = aide._parse_item_status(lines)
+    assert status == {60: "complete"}  # only the deliverable bullet counts
+    assert 47 not in status
+    assert 84 not in status
+    assert 70 not in status
+
+
+def test_parse_item_status_wrapped_bullet_still_attributes():
+    """A deliverable bullet that wraps onto a continuation line must still
+    credit the reference to the bullet's own status — the reference belongs
+    to the bullet it is part of, not to the physical line carrying the icon."""
+    lines = (
+        "## Stage 2 — X — 🚧\n"
+        "**Deliverables.**\n"
+        "- 📋 A long deliverable that wraps onto a\n"
+        "  second line. *(Item 042)*\n"
+    ).splitlines()
+    _, _, status = aide._parse_item_status(lines)
+    assert status[42] == "planned"
 
 
 def test_parse_item_status_reads_every_number_in_a_multi_item_reference():

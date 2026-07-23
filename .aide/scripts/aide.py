@@ -940,23 +940,31 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
 
 
 def _parse_item_status(lines: List[str]) -> Tuple[List[str], List[str], Dict[int, str]]:
-    """Map item number -> most-advanced status found on its progress lines."""
+    """Map item number -> most-advanced status found on its deliverable bullets.
+
+    The only structural status declaration (conventions.md §1) is a deliverable
+    bullet's leading icon — a line matching ``_BULLET_RE`` — together with any
+    of its wrapped continuation lines (indented text carrying no bullet marker
+    of its own). A reference anywhere else — a table cell, an acceptance
+    checkbox, an ordinary paragraph — is free text and is never read as status,
+    however many item numbers it happens to name (issue #15): a verification
+    table's Notes column narrating what went wrong with several items, or a
+    checkbox that merely cites the item that satisfies it, must not pull that
+    item's tracked status backwards.
+    """
     item_status: Dict[int, str] = {}
     bullet_status: Optional[str] = None
-    current_stage: Optional[str] = None
     for line in lines:
-        hm = _STAGE_HEADER_RE.match(line)
-        if hm:
-            current_stage = hm.group(1)
-            bullet_status = None
+        m = _BULLET_RE.match(line)
+        if m:
+            bullet_status = ICON_TO_STATUS[m.group("icon")]
+        elif not line.strip() or re.match(r"^\s*[-*]\s", line) or not re.match(r"^\s+\S", line):
+            bullet_status = None  # blank line, a non-deliverable bullet, or an unindented new block
+        if bullet_status is None:
             continue
-        line_icon = _structural_status(line)
-        if re.match(r"^\s*[-*]\s", line):
-            bullet_status = line_icon
         for num in _referenced_item_numbers(line):
-            status = line_icon or bullet_status or "planned"
-            if num not in item_status or RANK[status] > RANK[item_status[num]]:
-                item_status[num] = status
+            if num not in item_status or RANK[bullet_status] > RANK[item_status[num]]:
+                item_status[num] = bullet_status
     return [], [], item_status
 
 
