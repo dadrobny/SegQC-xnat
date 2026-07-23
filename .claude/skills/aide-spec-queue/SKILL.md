@@ -17,7 +17,8 @@ pre-authored specs make the execution loop composable as-is.
 
 ## User Input
 
-$ARGUMENTS — a queue number (optional; defaults to the Live queue).
+$ARGUMENTS — a queue number (optional; defaults to the live queue — the
+lowest-numbered one with open items).
 
 ## Instructions
 

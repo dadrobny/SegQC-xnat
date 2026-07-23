@@ -66,8 +66,12 @@ violating shape is blocked and bounced back with the fix.
 ## Determine current state first (resumable)
 
 This loop spans sessions (it pauses for a human queue-PR merge), so always start
-by working out where things stand. `git fetch --all --prune`, then read
-`docs/aide/roadmap.md`, `docs/aide/progress.md`, and the queue files. The loop runs
+by working out where things stand — in **one call**, not a series of improvised
+git/gh probes: `python .aide/scripts/aide.py status` (fetches, then reports
+branch + divergence, derived queue states, claim branches, and open PRs). Then
+read `docs/aide/roadmap.md`, `docs/aide/progress.md`, and the queue files as
+needed. Run `python .aide/scripts/aide.py sync` before touching anything (clean-
+tree gate). The loop runs
 **in-place in the primary checkout** (see *Working in parallel* below if you need
 isolation).
 
@@ -88,9 +92,14 @@ writes + commits `queue-NNN.md` **and** tidies the superseded `queue-(NNN-1).md`
 on whatever branch it's on, then returns a one-line summary. **You** (orchestrator)
 prepare the branch and handle push/PR around it.
 
+- **Triage the insight inbox first** — if `docs/aide/insights.md` has unchecked
+  entries, run `/aide-feedback-loop` §0 (triage) before planning: `defect`/`gap`/
+  `automation` entries become candidate items the queue-planner must see, and the
+  queue PR is where the human reviews them.
 - `git switch -c aide/queue-NNN` off an up-to-date `main` (`git pull --rebase`).
 - **Spawn `queue-planner`**: "Generate queue NNN on branch `aide/queue-NNN`;
-  tidy the previous queue; commit both; do not push or PR." Wait for its summary.
+  tidy the previous queue; commit both; consider the triaged insight candidates;
+  do not push or PR." Wait for its summary.
 - `git push -u origin aide/queue-NNN`, then open a **PR**:
   `gh pr create` titled `docs(aide): work queue NNN`, body summarising the batch.
 - **STOP and tell the user**: review/edit/merge the queue PR, then re-invoke
@@ -114,7 +123,9 @@ queue history stays legible and it's obvious which batch is live:
   carried/dropped) so a stale 📋 list isn't left implying open work.
 - Commit that tidy-up alongside the new queue, on the `aide/queue-NNN` branch.
 
-This keeps exactly one **live** queue and a clean trail of closed ones.
+Queue state itself is **derived** (a queue is open while any of its items is
+📋/🚧 in `progress.md`), so the tidy stamp is decorative — it keeps the queue
+history legible to humans; nothing parses it.
 
 ## Working in parallel (optional worktree isolation)
 

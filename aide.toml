@@ -24,3 +24,25 @@ branch_prefix = "aide/"      # claim branches are <branch_prefix>NNN-short-name
 queue_cap = 10               # ~max items a queue-planner batch may hold
 validation_rounds = 3        # build<->validate cap before escalating/pausing
 clarify = "assume"           # interactive | assume — see .aide/conventions.md > Clarify mode
+claim_scope = "live-queue"   # live-queue | all-open — one queue at a time keeps the human checkpoint
+
+[framework]
+# Where `framework`-typed insights are handed over (gh issue target). The AIDE
+# framework is developed standalone and materialised here by its installer.
+repo = "dadrobny/aide-loop"
+
+[validation]
+# Named environment profiles for stage-validation items: `<name> = "<python expr>"`,
+# true iff this environment provides the capability. Evaluated in the project venv by
+# `python .aide/scripts/aide.py env --profile <name>` (exit 0 iff satisfied). A stage
+# validation gated on an unsatisfied profile records ❓ Unverified, never a silent pass.
+# These mirror the environment-gated capabilities described in CLAUDE.md.
+#
+# These are DEFINITIONS, not observations — the same on every machine and in CI, which
+# is why they are committed. The per-machine *answer* is computed at runtime by
+# `env --profile` and is deliberately never stored. Keep it that way: nothing here may
+# encode a local path, mount, device index, or host name. Machine-varying inputs go in
+# the environment instead (as the real VerSe19 cohort does, via SEGQC_VERSE_COHORT).
+pyradiomics = "__import__('radiomics') is not None"
+docker = "__import__('subprocess').run(['docker', 'info'], capture_output=True).returncode == 0"
+gpu = "__import__('cupy').cuda.runtime.getDeviceCount() > 0"

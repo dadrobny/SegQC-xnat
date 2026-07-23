@@ -184,6 +184,71 @@ def test_set_item_unknown_number_no_change():
 
 
 # --------------------------------------------------------------------------- #
+# structural icon positions (WI-1: prose is free, parsers are positionally strict)
+# --------------------------------------------------------------------------- #
+def test_structural_status_positions():
+    assert aide._structural_status("- ✅ Core. *(Item 002)*") == "complete"
+    assert aide._structural_status("| G1 Setup | Stage 0 | ✅ |") == "complete"
+    assert aide._structural_status("## Stage 1 — Rules — 🚧") == "in-progress"
+    # Icons in prose, mid-bullet, or a header title are plain text.
+    assert aide._structural_status("The ✅ marks above are historical.") is None
+    assert aide._structural_status("- Improve ✅ handling notes. *(Item 003)*") is None
+    assert aide._structural_status("## Stage 2 — Polish ✅ handling") is None
+
+
+def test_set_item_ignores_decoy_icon_in_prose():
+    decoy = PROGRESS.replace(
+        "**Acceptance.**\n- [ ] Rules fire.",
+        "Note: the ✅ prose mark must not complete Item 003.\n\n"
+        "**Acceptance.**\n- [ ] Rules fire.",
+    )
+    out = aide.set_item_status(decoy, 3, "in-progress")
+    assert "- 🚧 Bounds. *(Item 003)*" in out
+    assert "## Stage 1 — Rule Engine — 🚧" in out
+
+
+def test_set_item_preserves_icons_in_title_cells_and_headers():
+    decorated = (
+        PROGRESS
+        .replace("| 1 | Rule Engine | G2 | 🚧 |", "| 1 | Rule ✅ Engine | G2 | 🚧 |")
+        .replace("## Stage 1 — Rule Engine — 🚧", "## Stage 1 — Rule ✅ Engine — 🚧")
+    )
+    out = aide.set_item_status(decorated, 3, "complete")
+    # Only the Status cell / trailing header icon flip; the title icons survive.
+    assert "| 1 | Rule ✅ Engine | G2 | ✅ |" in out
+    assert "## Stage 1 — Rule ✅ Engine — ✅" in out
+
+
+def test_parse_item_status_prose_icon_not_status():
+    lines = (
+        "## Stage 3 — X — 🚧\n"
+        "**Deliverables.**\n"
+        "- 📋 Thing. *(Item 050)*\n"
+        "\n"
+        "A prose note with ✅ that also mentions Item 051.\n"
+    ).splitlines()
+    _, _, status = aide._parse_item_status(lines)
+    assert status[50] == "planned"
+    assert status[51] == "planned"  # decoy ✅ in prose must not mark it complete
+
+
+def test_check_warns_on_stray_prose_icon(tmp_path: Path):
+    decoy = PROGRESS + "\nA stray ✅ in prose.\n"
+    root = _docs(tmp_path, progress=decoy)
+    cfg = aide.load_config(root)
+    errors, warnings = aide.run_checks(root, cfg, branches=[])
+    assert errors == []
+    assert any("stray" not in w and "status icon ✅ outside" in w for w in warnings)
+
+
+def test_check_no_stray_warning_on_clean_docs(tmp_path: Path):
+    root = _docs(tmp_path)
+    cfg = aide.load_config(root)
+    _, warnings = aide.run_checks(root, cfg, branches=[])
+    assert not any("outside a structural status position" in w for w in warnings)
+
+
+# --------------------------------------------------------------------------- #
 # queue helpers
 # --------------------------------------------------------------------------- #
 def test_is_live_queue():
@@ -240,11 +305,58 @@ def test_check_flags_summary_complete_but_deliverable_not(tmp_path: Path):
     assert any("marked ✅ but has non-complete" in e for e in errors)
 
 
-def test_check_flags_two_live_queues(tmp_path: Path):
-    root = _docs(tmp_path, old=QUEUE_LIVE.replace("Queue 002", "Queue 001"))
+def test_check_two_declared_live_queues_is_not_an_error(tmp_path: Path):
+    """Queue state is derived (WI-2): declared Status lines are decorative and
+    can no longer produce the old 'more than one Live queue' error."""
+    both_live = QUEUE_OLD.replace(
+        "> **Status:** ✅ Completed — superseded by queue-002 (2026-06-01).",
+        "> **Status:** Live · **Created:** 2026-06-01",
+    )
+    root = _docs(tmp_path, old=both_live)
     cfg = aide.load_config(root)
     errors, _ = aide.run_checks(root, cfg, branches=[])
-    assert any("more than one Live queue" in e for e in errors)
+    assert errors == []
+
+
+def test_check_warns_declared_live_but_derived_done(tmp_path: Path):
+    # queue-001's only item (001) is ✅ in progress.md; declaring Live lies.
+    stale = QUEUE_OLD.replace(
+        "> **Status:** ✅ Completed — superseded by queue-002 (2026-06-01).",
+        "> **Status:** Live · **Created:** 2026-06-01",
+    )
+    root = _docs(tmp_path, old=stale)
+    cfg = aide.load_config(root)
+    errors, warnings = aide.run_checks(root, cfg, branches=[])
+    assert errors == []
+    assert any("declares 'Live' but every item is finished" in w for w in warnings)
+
+
+def test_check_warns_declared_completed_but_derived_open(tmp_path: Path):
+    # queue-002 still has 📋 item 003 but declares itself completed.
+    lying = QUEUE_LIVE.replace(
+        "> **Status:** Live · **Created:** 2026-07-01",
+        "> **Status:** ✅ Completed — superseded by queue-003 (2026-07-02).",
+    )
+    root = _docs(tmp_path, live=lying)
+    cfg = aide.load_config(root)
+    _, warnings = aide.run_checks(root, cfg, branches=[])
+    assert any("marked completed but still has open items" in w for w in warnings)
+
+
+def test_live_queue_text_is_lowest_open_regardless_of_declared_status(tmp_path: Path):
+    # Neither queue declares anything; derived state alone must find queue-002
+    # (item 003 is 📋) and skip queue-001 (item 001 is ✅).
+    root = _docs(
+        tmp_path,
+        live=QUEUE_LIVE.replace("> **Status:** Live · **Created:** 2026-07-01",
+                                "> **Created:** 2026-07-01"),
+        old=QUEUE_OLD.replace(
+            "> **Status:** ✅ Completed — superseded by queue-002 (2026-06-01).",
+            "> **Created:** 2026-06-01"),
+    )
+    cfg = aide.load_config(root)
+    text = aide._live_queue_text(root, cfg, None)
+    assert text is not None and "Work Queue 002" in text
 
 
 def test_check_flags_duplicate_item_across_queues(tmp_path: Path):
@@ -290,6 +402,36 @@ def test_template_residue_scans_items_dir(tmp_path: Path):
 
 
 # --------------------------------------------------------------------------- #
+# insight inbox (WI-4)
+# --------------------------------------------------------------------------- #
+def test_insight_entries_well_formed(tmp_path: Path):
+    root = _docs(tmp_path)
+    (root / "docs" / "aide" / "insights.md").write_text(
+        "# Insight Inbox\n\n"
+        "- [ ] automation — venv rebuild is manual every time. *(item 003, 2026-07-18)*\n"
+        "- [x] knowledge — pytest needs -p no:cacheprovider on CI. *(2026-07-01)* → CLAUDE.md\n"
+        "- [ ] framework — aide merge misreports branch deletion. *(item 002, 2026-07-18)*\n",
+        encoding="utf-8",
+    )
+    cfg = aide.load_config(root)
+    _, warnings = aide.run_checks(root, cfg, branches=[])
+    assert not any("insights.md" in w for w in warnings)
+
+
+def test_insight_malformed_entry_warns(tmp_path: Path):
+    root = _docs(tmp_path)
+    (root / "docs" / "aide" / "insights.md").write_text(
+        "# Insight Inbox\n\n"
+        "- [ ] misc — unknown type. *(2026-07-18)*\n"
+        "- [ ] defect no separator or provenance\n",
+        encoding="utf-8",
+    )
+    cfg = aide.load_config(root)
+    _, warnings = aide.run_checks(root, cfg, branches=[])
+    assert sum("insights.md" in w for w in warnings) == 2
+
+
+# --------------------------------------------------------------------------- #
 # CLI end-to-end
 # --------------------------------------------------------------------------- #
 def test_cli_check_ok(tmp_path: Path, capsys):
@@ -318,6 +460,37 @@ def test_cli_progress_set_untracked_item_errors(tmp_path: Path, capsys):
     # progress.md is left untouched.
     text = (root / "docs" / "aide" / "progress.md").read_text(encoding="utf-8")
     assert text == PROGRESS
+
+
+def test_cli_progress_set_backfills_reference_from_spec(tmp_path: Path, capsys):
+    """A missed queue back-fill self-heals: the reference is inserted from the
+    item spec's Stage header instead of hard-erroring (WI-7)."""
+    root = _docs(tmp_path)
+    (root / "docs" / "aide" / "items" / "004-extra-thing.md").write_text(
+        "# Item 004 — Extra thing\n\n"
+        "> **Created:** 2026-07-18 · status tracked in progress.md\n"
+        "> **Stage:** 1 — Rule Engine\n",
+        encoding="utf-8",
+    )
+    rc = aide.main(["--repo", str(root), "progress", "set", "4", "in-progress", "--no-commit"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "back-filled missing deliverable reference under Stage 1" in out
+    text = (root / "docs" / "aide" / "progress.md").read_text(encoding="utf-8")
+    assert "- 🚧 Extra thing. *(Item 004)*" in text
+    # Existing deliverables untouched; stage still in progress.
+    assert "- 📋 Bounds. *(Item 003)*" in text
+    assert "## Stage 1 — Rule Engine — 🚧" in text
+
+
+def test_cli_status_reports_queues_and_claims(tmp_path: Path, capsys):
+    root = _docs(tmp_path)
+    rc = aide.main(["--repo", str(root), "status", "--no-fetch"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "queue-001.md: done" in out
+    assert "queue-002.md: open (live)" in out
+    assert "003" in out  # the open item is listed
 
 
 def test_cli_queue_tidy_edits_file(tmp_path: Path):

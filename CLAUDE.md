@@ -22,7 +22,20 @@ CPU-only, cross-platform (Windows/macOS/Linux), Python 3.9+.
 All framework↔project settings live in **[`aide.toml`](aide.toml)**: source/test
 paths (`src/segqc`, `tests`), the venv layout and bootstrap, the test command,
 the git merge mode, and loop knobs. Agents and scripts read it; edit `aide.toml`
-(not the framework) to change project facts.
+(not the framework) to change project facts. It also carries `[framework] repo`
+(where `framework`-typed insights are handed over) and `[validation]` — named
+environment profiles (`pyradiomics`, `docker`, `gpu`) that
+`aide env --profile <name>` evaluates so a stage validation gated on an absent
+capability records **❓ Unverified** instead of silently passing.
+
+**`.claude/settings.json` is a generated artifact.** This repo has adopted
+[`.claude/settings.overlay.json`](.claude/settings.overlay.json), so every
+`install.py --update` regenerates `settings.json` as a deterministic deep-merge
+of the framework default and that overlay. Edit the **overlay**, never
+`settings.json` — including permission rules promoted by
+`/aide-review-permissions`, which belong in the overlay's
+`permissions.allow.add` list. The `src/segqc/**` and `tests/**` write-scope
+globs are templated from `aide.toml` and need no override.
 
 ## Virtual environment
 
@@ -159,19 +172,41 @@ already written down there rather than in `docs/aide/`.
   [`.aide/conventions.md`](.aide/conventions.md). Follow the command-hygiene rules
   there or unattended runs stall on permission prompts.
 - **Document templates** — [`.aide/templates/`](.aide/templates/).
-- **CLI** — `python .aide/scripts/aide.py {check,progress,queue,claim,merge,env}`.
+- **CLI** — `python .aide/scripts/aide.py
+  {check,progress,queue,claim,merge,env,sync,gc,status}`. If a verb covers it,
+  the raw git form is wrong: session preflight is `sync`, branch clean-up is
+  `gc`, the state report is `status`.
+- **Insight inbox** — [`docs/aide/insights.md`](docs/aide/insights.md): append a
+  one-line `- [ ] <type> — …` when you learn something out of scope, then return
+  to your task. Triaged at the queue boundary by `/aide-feedback-loop`.
 - **Skills / commands** — `/aide-*` (create-vision … feedback-loop, spec-queue)
   and the `/aide-run-{item,queue,roadmap}` orchestrators.
 
 ## Updating the framework (the `aide-loop` repo)
 
 The framework is **not maintained in-tree here** — it is developed in the
-standalone **`aide-loop`** repo (locally `C:\Users\david\aide-loop`) and
-*materialised* into this repo by its installer. In `aide-loop`, `core/` is the
+standalone **`aide-loop`** repo — `github.com/dadrobny/aide-loop`, recorded as
+`[framework] repo` in [`aide.toml`](aide.toml) — and *materialised* here by its
+installer. Where *your* checkout lives is per-machine and deliberately not
+recorded in any shared file; the commands below write it as `$AIDE_LOOP`
+(Windows: `$env:AIDE_LOOP`). Set it once per shell, or substitute your own path
+inline. In `aide-loop`, `core/` is the
 provider-agnostic engine (→ `.aide/`) and `adapters/claude/` is the Claude
 adapter (→ `.claude/`). **Never hand-edit `.aide/**` or the `aide-*` files under
 `.claude/**` in this repo** — they are generated, and a manual edit is silently
 overwritten on the next update.
+
+To find out whether this repo is behind the framework, compare versions — it
+writes nothing and exits non-zero when behind:
+
+```bash
+python "$AIDE_LOOP/install.py" --into . --check
+```
+
+`.aide/VERSION` records the installed engine; `aide-loop`'s `CHANGELOG.md` says
+what each version changed. The framework bumps its version on every commit that
+touches what a consumer installs, so a matching version now genuinely means
+up to date.
 
 Clean workflow to change the framework (no push required — the installer copies
 from the local working tree):
@@ -181,11 +216,14 @@ from the local working tree):
    an engine change. Commit on a branch there.
 2. **Reinstall into this repo** from the local checkout:
    ```bash
-   python C:/Users/david/aide-loop/install.py --adapter claude --into . --update
+   python "$AIDE_LOOP/install.py" --adapter claude --into . --update
    ```
    `--update` re-copies the engine + adapter but **never touches `aide.toml` or
-   `docs/aide/`** (project-owned); `settings.json` is non-clobbering (an existing
-   one is kept and a `.aide-merge` diff is emitted for you to reconcile by hand).
+   `docs/aide/`** (project-owned). Because this repo has adopted
+   `.claude/settings.overlay.json`, `settings.json` is **regenerated** from
+   framework-base + overlay on every run — so it needs no reconciliation and no
+   `.aide-merge` is emitted; put project-specific permission rules in the
+   overlay.
 3. **Review the `git diff`** — it should be exactly the intended change (most
    copied files are byte-identical no-ops git shows nothing for). Run the suite.
 4. **Land via a reviewed PR** (framework/process files are PR-gated — see the last

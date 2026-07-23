@@ -21,7 +21,8 @@ If `$ARGUMENTS` is provided, treat it as an item number: look it up in the queue
 files under `docs/aide/queue/`.
 
 If empty, automatically pick the next item:
-1. Read the Live queue (highest-numbered `docs/aide/queue/queue-NNN.md`).
+1. Read the live queue — the lowest-numbered `docs/aide/queue/queue-NNN.md`
+   that still has open (📋/🚧) items per `progress.md`.
 2. Cross-reference `docs/aide/items/` and `docs/aide/progress.md`.
 3. Select the first queue item with **no existing work-item file**. A ✅/🚧 mark in
    progress.md alone is NOT sufficient to skip — the file must exist. If

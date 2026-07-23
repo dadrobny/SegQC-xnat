@@ -52,7 +52,9 @@ in the **Assumptions** block (the builder/validator hand back if reality diverge
 
 ## What you do
 
-1. **Check out the claim branch:** `git switch aide/NNN-short-name`.
+1. **Land on the claim branch:** `python .aide/scripts/aide.py sync --item NNN`
+   (the deterministic preflight — fetches, verifies a clean tree, switches, and
+   pulls the branch up to date).
 2. **Read** the item's one-line queue description, the relevant `roadmap.md`
    stage, the matching `progress.md` rows, and `vision.md`. Skim `source_dir` /
    `tests_dir` only enough to know the conventions the item must fit.
@@ -64,11 +66,21 @@ in the **Assumptions** block (the builder/validator hand back if reality diverge
    **Assumptions** block; Implementation Steps (the code path in `source_dir`);
    Testing Strategy (incl. adversarial/edge cases); Dependencies (item numbers,
    must be ✅/🚧); and a Decisions & Trade-offs section initialised to "To be
-   updated during implementation."
-4. **Commit** the spec on the branch (plain single-line message):
+   updated during implementation." Add the optional **Validation** section
+   whenever meaningful observation goes beyond the unit suite: the command to
+   run / output to inspect / use case to replay, and — if it needs a special
+   environment — the `[validation]` profile name plus the honest downgrade
+   when absent (see the item template).
+4. **Sweep for stale test assumptions.** If the spec (or an Assumption)
+   changes an existing default or behaviour, grep `tests_dir` for tests
+   pinning the OLD behaviour and list every hit in the Testing Strategy as
+   "existing tests to reconcile" — otherwise the first validation round fails
+   on stale assertions instead of on the new code, costing a guaranteed extra
+   round.
+5. **Commit** the spec on the branch (plain single-line message):
    `git add docs/aide/items/NNN-*.md` then
    `git commit -m "docs(NNN): work item spec for <short title>"`.
-5. **Return** a tight summary: item number, spec file path, the list of Acceptance
+6. **Return** a tight summary: item number, spec file path, the list of Acceptance
    Criteria, and any Assumptions recorded (so the orchestrator can pass them on).
 
 ## Hard limits
@@ -85,6 +97,21 @@ edit to a **framework/process** file (`CLAUDE.md`, `aide.toml`, `.aide/**`,
 `vision.md`, `roadmap.md`, `.claude/**`). If the queued item is contradictory (not
 merely under-specified — those you resolve via clarify mode), document it and hand
 back.
+
+## Out-of-scope insights (compound engineering)
+
+When you learn something true but OUT OF SCOPE for this task — a doc gap, a
+latent defect, a missing capability, a recurring manual step that
+deterministic code could replace, or an AIDE-framework issue — append ONE
+line to `docs/aide/insights.md` (create it from
+`.aide/templates/insights.md`, copied verbatim, if missing) and carry on.
+Never act on it here. Entry shape:
+
+    - [ ] <knowledge|defect|gap|automation|framework> — <one line> *(item NNN, YYYY-MM-DD)*
+
+The feedback loop triages the inbox at the queue boundary. Capturing is cheap
+and always in scope; acting out of scope is forbidden. This append is the one
+write allowed outside your edit scope.
 
 ## Command hygiene
 

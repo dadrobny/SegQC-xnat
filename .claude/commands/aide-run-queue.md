@@ -1,6 +1,6 @@
 ---
 description: Iterate one AIDE queue to completion — `aide claim` claims each item, then /aide-run-item drives it (spec → tests → build → validate → merge) — looping until that queue is empty, then stops. Does NOT create the next queue. Pauses only for PRs and major structural changes.
-argument-hint: "[queue number, e.g. 001 — optional; defaults to the highest-numbered queue]"
+argument-hint: "[queue number, e.g. 001 — optional; defaults to the lowest-numbered queue with open items]"
 ---
 
 # Run one AIDE queue (iterator over /aide-run-item)
@@ -13,8 +13,8 @@ tests, or run tests yourself in the main thread. You **delegate each item to
 `/aide-run-item`** and only handle claiming (via the `aide claim` CLI) and
 approval gates between items.
 
-Arguments: **$ARGUMENTS** — a queue number (if empty, the highest-numbered
-`docs/aide/queue/queue-*.md`).
+Arguments: **$ARGUMENTS** — a queue number (if empty, the live queue: the
+lowest-numbered `docs/aide/queue/queue-*.md` with open items).
 
 **Orchestration model.** This dispatch-and-gate role is light — run it on
 **Sonnet** (the heavy work is in the Opus/Sonnet subagents). A slash command can't
@@ -58,6 +58,8 @@ stranded otherwise.
 
 **Orchestrator steps (run these yourself, not via a sub-agent):**
 
+0. `python .aide/scripts/aide.py sync` — the deterministic preflight (fetch,
+   clean-tree check). Do not improvise `git fetch`/`git status` instead.
 1. `git branch | grep aide/` — list local `aide/*` branches.
 2. If none, skip to the loop.
 3. For each `aide/NNN-*` branch, read `docs/aide/progress.md`: if the item is
@@ -96,8 +98,11 @@ Repeat until `aide claim` reports no remaining unclaimed 📋 item **in this que
 
 ## On queue exhaustion
 
-When `aide claim` reports no 📋 items remain in this queue, **stop** and report:
-items completed, branches merged, and final test status. Then point the user at
+When `aide claim` reports no 📋 items remain in this queue, first sweep up any
+leftover claim branches (merged work leaves none in `auto-merge` mode, but `pr`
+merges and abandoned claims do): `python .aide/scripts/aide.py gc` to preview,
+then re-run with `--yes` if the list is right. Then **stop** and report: items
+completed, branches merged/cleaned, and final test status. Point the user at
 the next move (do **not** generate the next queue yourself):
 
 - **Driving the whole roadmap?** Run **`/aide-run-roadmap`** — it generates the

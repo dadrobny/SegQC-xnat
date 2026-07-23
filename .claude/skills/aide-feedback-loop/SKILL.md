@@ -13,6 +13,30 @@ needed, unclear requirements, process breakdown.
 
 Analyze the current state of the project documents and recent work.
 
+### 0. Triage the insight inbox (`docs/aide/insights.md`)
+
+The roles capture out-of-scope insights as one-line inbox entries during
+execution (see `.aide/conventions.md` §1 → `insights.md`); this step routes
+them. For each **unchecked** entry, by type:
+
+- **knowledge** → fold the fact into its owning document (`docs/`, `CLAUDE.md`,
+  a living document, code comments) — smallest edit that preserves it.
+- **defect / gap** → make it a **candidate item for the queue being authored**
+  (or note it for the next `/aide-create-queue` run) so the queue PR reviews
+  it. Do not fix it inline here.
+- **automation** → a candidate item that (a) implements the deterministic
+  script/CLI verb and (b) edits the skill/agent prose to *mandate* it — both
+  halves, or agents keep improvising. (Worked example: the `aide sync`/`aide
+  gc` verbs replacing improvised git recon.)
+- **framework** → belongs to AIDE itself, not this project. If
+  `[framework] repo` is set in `aide.toml` and `gh` is available, hand it
+  over: `gh issue create --repo <owner/repo>` with a body naming the project,
+  the observation, and a proposal (this stays `ask`-gated — a human confirms).
+  Otherwise leave the entry unchecked with a `(pending handover)` note.
+
+Tick each routed entry **in place**, appending where it landed:
+`- [x] <type> — … → <doc/item/issue>`. The file is append-only otherwise.
+
 ### 1. Document gaps
 
 - What should have been in `docs/aide/vision.md` but wasn't?

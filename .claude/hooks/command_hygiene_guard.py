@@ -56,6 +56,62 @@ def _blank_quoted(cmd):
     return "".join(out)
 
 
+def _blank_single_quoted(cmd):
+    """Blank only single-quoted spans (where bash treats ``$(``/backticks as
+    literal text). Inside double quotes they still substitute, so those spans
+    must stay visible to rule 4."""
+    out = []
+    quoted = False
+    for ch in cmd:
+        if quoted:
+            out.append(" ")
+            if ch == "'":
+                quoted = False
+        elif ch == "'":
+            quoted = True
+            out.append(" ")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+def _framework_local_path():
+    """``[framework] local_path`` from aide.toml (cwd = repo root), or None.
+
+    The documented framework-update workflow operates on a second repo (the
+    framework clone), which structurally needs ``git -C`` — the one legitimate
+    use. Declaring that clone's path here gives it a narrow carve-out from
+    rule 1 instead of leaving the workflow a dead end.
+    """
+    try:
+        with open("aide.toml", encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        return None
+    in_framework = False
+    for line in text.splitlines():
+        s = line.strip()
+        if s.startswith("["):
+            in_framework = s == "[framework]"
+        elif in_framework and s.split("=", 1)[0].strip() == "local_path":
+            value = s.split("=", 1)[1].split("#", 1)[0].strip().strip("\"'")
+            return value or None
+    return None
+
+
+def _git_c_is_declared_framework_repo(cmd):
+    m = re.search(r"\bgit\s+-C\s+(\"[^\"]*\"|'[^']*'|\S+)", cmd)
+    if not m:
+        return False
+    declared = _framework_local_path()
+    if not declared:
+        return False
+    import os
+    target = m.group(1).strip("\"'")
+    norm = lambda p: os.path.normcase(os.path.normpath(os.path.abspath(p)))
+    return norm(target) == norm(declared)
+
+
 def violations(cmd):
     """Return a list of (title, fix) for each hygiene rule ``cmd`` breaks."""
     bare = _blank_quoted(cmd)
@@ -63,11 +119,16 @@ def violations(cmd):
 
     # 1. No `cd` prefix / `git -C <path>` — cwd is already the repo root and the
     #    prefix breaks allow-list prefix matching (this repo's path has spaces).
-    if re.match(r"\s*cd\s", cmd) or re.search(r"\bgit\s+-C\b", bare):
+    #    Exception: `git -C <[framework] local_path>` — the documented
+    #    framework-update workflow legitimately targets that second repo.
+    if re.match(r"\s*cd\s", cmd) or (
+        re.search(r"\bgit\s+-C\b", bare) and not _git_c_is_declared_framework_repo(cmd)
+    ):
         found.append(
             "Drop the `cd`/`git -C` prefix: the Bash tool's cwd is already the "
             "repo root, and the prefix breaks allow-list matching. Run the bare "
-            "command."
+            "command. (Exception: `git -C` targeting the [framework] local_path "
+            "declared in aide.toml.)"
         )
 
     # 2. One command per Bash call — `&&`, `||`, `;` sequencing isn't
@@ -88,7 +149,11 @@ def violations(cmd):
         )
 
     # 4. No command substitution in a commit message — never auto-approved.
-    if re.search(r"\bgit\s+commit\b", bare) and ("$(" in cmd or "`" in cmd):
+    #    Checked on a blanked command like the other rules, but blanking only
+    #    single-quoted spans: there bash keeps "$(...)"/backticks literal
+    #    (prose), while inside double quotes they still substitute for real.
+    no_single = _blank_single_quoted(cmd)
+    if re.search(r"\bgit\s+commit\b", bare) and ("$(" in no_single or "`" in no_single):
         found.append(
             "No `$(...)`/backtick command substitution in a commit: it's never "
             'auto-approved. Use `-m "msg"` (repeat `-m` for paragraphs) or '

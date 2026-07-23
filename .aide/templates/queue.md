@@ -4,9 +4,11 @@
   loop.queue_cap items, whichever is smaller. Parsed by aide.py (check, queue
   tidy), aide claim, and the status report.
   Mandatory shapes:
-    - "> **Status:** Live" header line (exactly one queue is Live; superseded
-      queues read "> **Status:** ✅ Completed — superseded by queue-NNN (date).")
     - Each item: "### Item NNN: Short Title" + a description paragraph.
+  Queue state (open/done) is DERIVED from progress.md — no status field is
+  needed; "the live queue" is simply the lowest-numbered queue with open items.
+  A "> **Status:**" note (e.g. the one `aide queue tidy` stamps on completion)
+  is decorative, for human readers only.
   Item numbers are GLOBALLY SEQUENTIAL across all queues — never restart.
 
   Fill-in conventions: `{{slot}}` = literal value; _italic line_ = guidance to
@@ -14,7 +16,7 @@
 -->
 # {{project-name}} — Work Queue {{nnn}}
 
-> **Status:** Live · **Created:** {{yyyy-mm-dd}}
+> **Created:** {{yyyy-mm-dd}}
 > Step 4 of the AIDE loop. Derived from [`../vision.md`](../vision.md),
 > [`../roadmap.md`](../roadmap.md), and [`../progress.md`](../progress.md).
 

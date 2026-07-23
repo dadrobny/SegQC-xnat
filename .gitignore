@@ -219,7 +219,8 @@ __marimo__/
 
 # Claude Code / AIDE framework
 #   Share the framework (.aide/, .claude/skills, .claude/commands,
-#   .claude/settings.json) but keep per-machine settings and credentials out of git.
+#   .claude/settings.overlay.json and the settings.json generated from it) but
+#   keep per-machine settings and credentials out of git.
 .claude/settings.local.json
 .claude/*.local.json
 .claude/.credentials.json
@@ -238,6 +239,9 @@ docs/aide/status/*.jpg
 docs/aide/status/*.jpeg
 docs/aide/status/*.xml
 docs/aide/status/results.xml
+
+# Editor workspace files (per-machine, not shared)
+*.code-workspace
 
 # Local datasets (large, not versioned)
 dataset-verse19training/

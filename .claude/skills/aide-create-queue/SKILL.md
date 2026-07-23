@@ -37,14 +37,25 @@ Read vision, roadmap, and progress, then write the queue from the template
 3. **Sequential numbering** — item numbers are sequential across **all** queues;
    find the highest existing number and continue from it. Never restart.
 4. **Testable items** — each item must be testable locally.
-5. **Consistent format** (parsed by `aide claim` / `aide check`):
+5. **A stage-closing queue ends with a stage-validation item** — when this
+   queue completes a roadmap stage, its final item must be
+   `Validate stage N: <stage title>`: replay the stage's use cases end-to-end
+   (not just the unit suite), and flip any Environment-Gated Capability
+   Verification rows the stage introduced to `✅ Verified` where the
+   environment allows (`aide env --profile <name>`), else record why they stay
+   `❓ Unverified`. Validation is planned, numbered work — never an implicit
+   hope.
+6. **Consistent format** (parsed by `aide claim` / `aide check`):
    ```
    ### Item NNN: Short Title
    Brief description of the scope and deliverables for this item.
    ```
-6. **Exactly one Live queue** — the new file carries `> **Status:** Live`;
-   `python .aide/scripts/aide.py check` enforces uniqueness.
-7. **Wire every item into `progress.md`** — this is where item numbers are born,
+7. **No status field** — queue state (open/done) is **derived** from
+   `progress.md` (a queue is open while any of its items is 📋/🚧), and
+   `aide claim` picks the lowest-numbered open queue by default. Do not write a
+   `> **Status:** Live` line; the only decorative status note is the completion
+   stamp `aide queue tidy` adds to superseded queues.
+8. **Wire every item into `progress.md`** — this is where item numbers are born,
    so it is also where they must be recorded in the progress tracker. For each
    `### Item NNN` you add, ensure the number appears as an `*(Item NNN)*`
    reference on the matching **deliverable bullet** under that item's roadmap
@@ -80,7 +91,7 @@ Save to `docs/aide/queue/queue-NNN.md` (next sequential number).
 ### Commit the queue immediately (do not leave it untracked)
 
 The queue is a shared project document; `aide claim` reads the committed file.
-Commit the new queue, the `progress.md` item-reference back-fill (requirement 7),
+Commit the new queue, the `progress.md` item-reference back-fill (requirement 8),
 and the tidy-up on the current branch, each a separate Bash call:
 
 ```

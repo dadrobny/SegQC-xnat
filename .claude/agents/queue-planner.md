@@ -96,6 +96,21 @@ If queueing the next batch would require changing a **framework/process** file �
 `CLAUDE.md`, `.claude/**` — stop and hand back; those need a reviewed PR. Likewise
 if the roadmap is ambiguous about what comes next, say so rather than guessing.
 
+## Out-of-scope insights (compound engineering)
+
+When you learn something true but OUT OF SCOPE for this task — a doc gap, a
+latent defect, a missing capability, a recurring manual step that
+deterministic code could replace, or an AIDE-framework issue — append ONE
+line to `docs/aide/insights.md` (create it from
+`.aide/templates/insights.md`, copied verbatim, if missing) and carry on.
+Never act on it here. Entry shape:
+
+    - [ ] <knowledge|defect|gap|automation|framework> — <one line> *(item NNN, YYYY-MM-DD)*
+
+The feedback loop triages the inbox at the queue boundary. Capturing is cheap
+and always in scope; acting out of scope is forbidden. This append is the one
+write allowed outside your edit scope.
+
 ## Command hygiene
 
 Emit shell commands in the shape the allow-list auto-approves, or an unattended

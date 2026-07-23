@@ -26,15 +26,18 @@ auto-selected.
 ### Claim the item before implementing (distributed safety)
 
 The shared "in progress" signal is the **pushed `aide/NNN-*` branch**, not
-progress.md (see `.aide/conventions.md` §2). Before writing any code, ensure the
-item is claimed — the CLI checks branches and claims in one step:
+progress.md (see `.aide/conventions.md` §2). Before writing any code, run the
+deterministic preflight — do **not** improvise `git fetch`/`git status`/`git
+switch` yourself:
 
 ```
-python .aide/scripts/aide.py claim
+python .aide/scripts/aide.py sync            # fetch + clean-tree check
+python .aide/scripts/aide.py claim           # claim the next unclaimed item
 ```
 
-or, resuming an existing claim, `git switch aide/NNN-short-name`. Verify the venv
-first: `python .aide/scripts/aide.py env` (add `--bootstrap` if missing/stale).
+or, resuming an existing claim, `python .aide/scripts/aide.py sync --item NNN`
+(it lands on the claim branch and pulls it up to date). Verify the venv first:
+`python .aide/scripts/aide.py env` (add `--bootstrap` if missing/stale).
 
 ### During implementation
 
@@ -52,6 +55,16 @@ first: `python .aide/scripts/aide.py env` (add `--bootstrap` if missing/stale).
    ```
 5. **Scope your updates** — only your item's rows. Do NOT mark other items
    complete, even if their criteria happen to be satisfied as a side effect.
+6. **Capture out-of-scope insights** — anything true but beyond this item (a
+   doc gap, a latent defect, a missing capability, a recurring manual step
+   deterministic code could replace, an AIDE-framework issue) gets ONE
+   appended line in `docs/aide/insights.md` (create from
+   `.aide/templates/insights.md` verbatim if missing), then carry on:
+
+       - [ ] <knowledge|defect|gap|automation|framework> — <one line> *(item NNN, YYYY-MM-DD)*
+
+   The feedback loop triages the inbox at the queue boundary; never act on an
+   insight out of scope here.
 
 ### On completion
 

@@ -38,7 +38,10 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
 
 1. **Tests pass.** Run the full suite via the venv, e.g.
    `.venv/Scripts/python -m pytest` (Windows) or `.venv/bin/python -m pytest`
-   (macOS/Linux). A red suite is an automatic FAIL. If the venv is missing/stale,
+   (macOS/Linux). Run it **synchronously in the foreground** — never as a
+   background task and never via a Monitor/watch tool (a monitored background
+   run can stall the whole validation on a permission prompt and never
+   resume). A red suite is an automatic FAIL. If the venv is missing/stale,
    `python .aide/scripts/aide.py env --bootstrap` first.
 2. **Tests cover all AC.** Every Acceptance Criterion in the spec must have at
    least one test that directly exercises it. An uncovered AC is a FAIL (report
@@ -50,12 +53,22 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
    doesn't contradict them or the Out-of-scope list.
 5. **Assumptions are sound.** Re-read the spec's **Assumptions** block; if a
    pinned interface diverged from reality, that is a FAIL — hand back.
+6. **The Validation section was executed, honestly.** If the spec has a
+   `## Validation` section, **run it** — the command, the output inspection,
+   the use-case replay — and report what you observed; green tests alone do
+   not satisfy it. If it names a `[validation]` environment profile, check it
+   first with `python .aide/scripts/aide.py env --profile <name>`: when the
+   profile is unsatisfied, follow the spec's stated downgrade (record
+   `❓ Unverified` — this is NOT a FAIL), and never report the gated path as
+   exercised when it wasn't.
 
 ## Hard limits
 
 - **Do NOT write, add, or modify tests.** If tests are missing for an AC, report
   FAIL and hand back.
-- **Do NOT run production code inline** — assertions live in test files.
+- **Do NOT run production code inline** — assertions live in test files. The
+  one exception is the spec's `## Validation` section, whose commands you must
+  execute as written (that is observation, not ad-hoc testing).
 - Do **not** merge until all checks above hold.
 
 ## Verdict
@@ -86,6 +99,21 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
 Pause and return for: opening a **PR**, **force-push** / history rewrite, or a
 **major structural / framework change** (`aide.toml`, `.aide/**`, `CLAUDE.md`,
 `docs/aide/vision.md`, `docs/aide/roadmap.md`, `.claude/**`).
+
+## Out-of-scope insights (compound engineering)
+
+When you learn something true but OUT OF SCOPE for this task — a doc gap, a
+latent defect, a missing capability, a recurring manual step that
+deterministic code could replace, or an AIDE-framework issue — append ONE
+line to `docs/aide/insights.md` (create it from
+`.aide/templates/insights.md`, copied verbatim, if missing) and carry on.
+Never act on it here. Entry shape:
+
+    - [ ] <knowledge|defect|gap|automation|framework> — <one line> *(item NNN, YYYY-MM-DD)*
+
+The feedback loop triages the inbox at the queue boundary. Capturing is cheap
+and always in scope; acting out of scope is forbidden. This append is the one
+write allowed outside your edit scope.
 
 ## Command hygiene
 
