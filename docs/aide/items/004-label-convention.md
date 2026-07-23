@@ -442,23 +442,3 @@ REPL feature/data check: `LabelConvention.default().name_of(1) == "C1"`,
 `summarise_inventory({1:64,2:64,3:64,999:5})` → `recognised == [(1,'C1',64),
 (2,'C2',64),(3,'C3',64)]`, `unknown == [(999,5)]`, `present_levels ==
 ['C1','C2','C3']`.
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 0 **"Label-convention module: integer label ↔ anatomical
-  vertebra, configurable, with a default TotalSegmentator/VerSe mapping"**
-  deliverable from 📋 → ✅ (mark it 🚧 while in progress).
-- Do **not** tick the Stage 0 *Acceptance* checkboxes that also depend on Items
-  006 (the `segqc run` end-to-end inventory print + stub JSON) — that closes with
-  item 006. The "Unit tests for loader and label mapping pass" acceptance line is
-  partially advanced here (label-mapping half); leave the box for whoever closes
-  both halves, or tick only when both loader and label tests are on `main`.
-- Per `CLAUDE.md`: work on branch `aide/004-label-convention` (push it **before**
-  real work to claim the item), `git pull --rebase` before editing
-  `progress.md`, and keep the edit scoped to this item's row. A work item may
-  merge **straight to `main` once green — no PR required** (here, a separate
-  validator performs the merge).

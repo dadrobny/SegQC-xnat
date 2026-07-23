@@ -303,15 +303,3 @@ def compute_neighbourhood_features(
 
 - `pytest tests/test_024_neighbourhood_comparison.py` reports 0 failures.
 - `pytest` (full suite) reports 0 failures — no regressions in items 001–023.
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 3 **"Local neighbourhood comparison"** deliverable from
-  📋 → ✅.
-- Per `CLAUDE.md`: work on branch `aide/024-neighbourhood-comparison`,
-  `git pull --rebase` before editing `progress.md`, keep edits scoped to this
-  item's rows, and direct-merge (no PR required) once green.

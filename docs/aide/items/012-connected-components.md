@@ -172,14 +172,3 @@ connectivity was used.
 
 - `pytest tests/test_012_connected_components.py` reports 0 failures.
 - `pytest` (full suite) reports 0 failures — no regressions in items 001–011.
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 2 **"Connected-components"** deliverable from 🚧 → ✅.
-- Per `CLAUDE.md`: work on branch `aide/012-connected-components`, `git pull
-  --rebase` before editing `progress.md`, keep edits scoped to this item's
-  rows, and direct-merge (no PR required) once green.

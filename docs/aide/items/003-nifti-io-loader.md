@@ -319,20 +319,3 @@ REPL feature/data check (anisotropic case): `load_case` on inline `(0.5, 0.5,
 3.0)`-spaced volumes returned `scan.spacing == seg.spacing == (0.5, 0.5, 3.0)`,
 `affine` round-tripped (`np.allclose` True), `seg` dtype integer,
 `label_inventory == {1: 3, 7: 2}`, `foreground_voxels == 5`.
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 0 **"NIfTI loader for scan + label map, preserving
-  spacing/affine, handling anisotropy"** deliverable from 📋 → ✅ (mark it 🚧
-  while in progress).
-- Do **not** tick the Stage 0 *Acceptance* checkboxes that also depend on Items
-  004/006 (label inventory with anatomical names, stub JSON) — those close with
-  their own items.
-- Per `CLAUDE.md`: work on branch `aide/003-nifti-io-loader` (push it **before**
-  real work to claim the item), `git pull --rebase` before editing
-  `progress.md`, and keep the edit scoped to this item's row. A work item may
-  merge **straight to `main` once green — no PR required**.

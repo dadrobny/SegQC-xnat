@@ -372,19 +372,3 @@ final sign-off and merge performed by a separate validator per `CLAUDE.md`).
 - [x] Verified on OS: **Windows 11**, Python 3.9. Pure-Python (stdlib `logging`,
       `json`, `pathlib`, `dataclasses` + `PyYAML`); no platform-specific code —
       macOS/Linux behaviour is identical.
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 0 **"Structured logging + versioned heuristic-config scaffold
-  (YAML/JSON)"** deliverable from 📋 → ✅ (mark it 🚧 while in progress).
-- Do **not** tick the Stage 0 *Acceptance* checkboxes that depend on Item 006
-  (the `segqc run` end-to-end test).
-- Per `CLAUDE.md`: work on branch `aide/005-structured-logging` (push it
-  **before** real work to claim the item), `git pull --rebase` before editing
-  `progress.md`, and keep the edit scoped to this item's row. A work item may
-  merge **straight to `main` once green — no PR required** (here, a separate
-  validator performs the merge).

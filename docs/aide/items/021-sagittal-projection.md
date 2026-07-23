@@ -250,14 +250,3 @@ no network, no display.
 
 - `pytest tests/test_021_sagittal_projection.py` reports 0 failures.
 - `pytest` (full suite) reports 0 failures — no regressions in items 001–020.
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 3 **"Sagittal projection"** deliverable from 📋 → ✅.
-- Per `CLAUDE.md`: work on branch `aide/021-sagittal-projection`,
-  `git pull --rebase` before editing `progress.md`, keep edits scoped to this
-  item's rows, and direct-merge (no PR required) once green.

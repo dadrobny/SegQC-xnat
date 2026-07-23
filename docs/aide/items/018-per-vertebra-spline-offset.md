@@ -291,15 +291,3 @@ def compute_spline_offsets(
 
 - `pytest tests/test_018_per_vertebra_spline_offset.py` reports 0 failures.
 - `pytest` (full suite) reports 0 failures — no regressions in items 001–017.
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 3 **"Per-vertebra offset from the spline"** deliverable from
-  📋 → ✅.
-- Per `CLAUDE.md`: work on branch `aide/018-per-vertebra-spline-offset`,
-  `git pull --rebase` before editing `progress.md`, keep edits scoped to this
-  item's rows, and direct-merge (no PR required) once green.

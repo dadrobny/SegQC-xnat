@@ -323,14 +323,3 @@ raises `ValueError` with a non-empty, human-readable message.
 
 - `pytest tests/test_020_neighbour_consistency.py` reports 0 failures.
 - `pytest` (full suite) reports 0 failures — no regressions in items 001–019.
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 3 **"Neighbour-consistency metrics"** deliverable from 📋 → ✅.
-- Per `CLAUDE.md`: work on branch `aide/020-neighbour-consistency`,
-  `git pull --rebase` before editing `progress.md`, keep edits scoped to this
-  item's rows, and direct-merge (no PR required) once green.

@@ -161,14 +161,3 @@ Expose all properties via a `LabelGeometry` frozen dataclass and a
 
 - `pytest tests/test_011_geometry.py` reports 0 failures.
 - `pytest` (full suite) reports 0 failures — no regressions in items 001–010.
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 2 **"Per-label features"** deliverable from 🚧 → ✅.
-- Per `CLAUDE.md`: work on branch `aide/011-per-label-geometry`, `git pull
-  --rebase` before editing `progress.md`, keep edits scoped to this item's rows,
-  and direct-merge (no PR required) once green.

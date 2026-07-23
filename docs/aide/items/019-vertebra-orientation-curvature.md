@@ -328,15 +328,3 @@ def compute_spine_curvature(
 
 - `pytest tests/test_019_vertebra_orientation_curvature.py` reports 0 failures.
 - `pytest` (full suite) reports 0 failures — no regressions in items 001–018.
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 3 **"Orientation / rotation estimate per vertebra + global
-  curvature descriptors"** deliverable from 📋 → ✅.
-- Per `CLAUDE.md`: work on branch `aide/019-vertebra-orientation-curvature`,
-  `git pull --rebase` before editing `progress.md`, keep edits scoped to this
-  item's rows, and direct-merge (no PR required) once green.

@@ -283,18 +283,3 @@ Concrete, verifiable results:
 - [ ] `pytest` green: <N passed> (incl. item 001 smoke tests)
 - [ ] Verified on OS: <OS + Python version>
 ```
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 0 **"`pytest` harness + tiny synthetic NIfTI fixtures"**
-  deliverable from 📋 → ✅ (mark 🚧 while in progress).
-- Do **not** mark Stage 0 *Acceptance* checkboxes that depend on later items
-  (loader, label inventory, stub JSON) — those close with Items 003/004/006.
-- Per `CLAUDE.md`: work on branch `aide/002-test-harness-fixtures`, push it
-  **before** real work to claim the item, `git pull --rebase` before editing
-  `progress.md`, and keep the edit scoped to this item's row. A work item may
-  merge **straight to `main` (no PR)** once green.

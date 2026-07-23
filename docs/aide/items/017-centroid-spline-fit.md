@@ -233,15 +233,3 @@ of (x, y, z) mm-coordinates.
 
 - `pytest tests/test_017_centroid_spline_fit.py` reports 0 failures.
 - `pytest` (full suite) reports 0 failures — no regressions in items 001–016.
-
----
-
-## Completion Reminder
-
-When this item is complete, update [`../progress.md`](../progress.md):
-
-- Flip the Stage 3 **"Spline fit through ordered vertebra centroids"** deliverable
-  from 📋 → ✅.
-- Per `CLAUDE.md`: work on branch `aide/017-centroid-spline-fit`,
-  `git pull --rebase` before editing `progress.md`, keep edits scoped to this
-  item's rows, and direct-merge (no PR required) once green.
