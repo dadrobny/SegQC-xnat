@@ -32,7 +32,11 @@ from the template **`.aide/templates/roadmap.md`**.
 1. **Staged delivery** — incremental stages that build on each other, numbered
    from 0.
 2. **Each stage is demonstrable and testable** — a runnable deliverable plus
-   clear validation/acceptance criteria per stage.
+   clear validation/acceptance criteria per stage. Acceptance bullets are
+   observable checks *of the built thing*; a measured outcome the work cannot
+   guarantee (an error-rate target, a benchmark result) is written as a
+   `Target:` bullet instead, which progress.md tracks in its Outcome targets
+   table (gating the objective, not the stage).
 3. **Objective → stage coverage table is mandatory** — every vision G-code maps
    to at least one stage (progress mirrors this table).
 4. **Prescriptive detail** — most work is done by AI; be specific.

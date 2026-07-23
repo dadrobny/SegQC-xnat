@@ -29,7 +29,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, NamedTuple, Optional, Tuple
 
 # --------------------------------------------------------------------------- #
 # Status icons (the format contract — see .aide/conventions.md)
@@ -405,6 +405,55 @@ def rollup_status(statuses: List[str]) -> Optional[str]:
 
 
 # --------------------------------------------------------------------------- #
+# Outcome targets (optional table — see conventions.md §1)
+# --------------------------------------------------------------------------- #
+_TARGETS_HEADING_RE = re.compile(r"^#{1,2}\s+Outcome targets\b", re.IGNORECASE)
+#: Table-local status vocabulary (like the env-gated verification table's):
+#: the cell's LEADING mark decides, the rest is evidence/notes for humans.
+_TARGET_STATUS_KIND = {"✅": "met", "❌": "not-met", "❓": "unverified"}
+
+
+class OutcomeTarget(NamedTuple):
+    lineno: int              # 1-based line number in progress.md
+    text: str                # the Target cell
+    objectives: List[str]    # G-codes named in the Objective cell
+    kind: Optional[str]      # "met" | "not-met" | "unverified" | None (unrecognised)
+
+
+def outcome_targets(lines: List[str]) -> List[OutcomeTarget]:
+    """Rows of the optional ``## Outcome targets`` table in progress.md.
+
+    An outcome target is a MEASURED result the roadmap commits to (an error
+    rate, a benchmark) — something shipped work can enable but never guarantee,
+    so it is deliberately outside the stage rollup: a stage's ✅ keeps meaning
+    "the planned work shipped", and goal truth lives here, gating the
+    OBJECTIVE rows instead (an objective linked to a target that is not
+    ``✅ Met`` cannot roll up to ✅).
+    """
+    out: List[OutcomeTarget] = []
+    in_section = False
+    for i, line in enumerate(lines):
+        if _TARGETS_HEADING_RE.match(line):
+            in_section = True
+            continue
+        if not in_section:
+            continue
+        if _ANY_HEADER_RE.match(line):
+            break  # next section — the table is over
+        if not line.strip().startswith("|"):
+            continue
+        cells = _split_row(line)
+        # Skip anything but a data row: wrong arity, the header row, the
+        # separator row (only -/:), or an empty Target cell.
+        if len(cells) != 5 or cells[0].lower() == "target" or set(cells[0]) <= set("-: "):
+            continue
+        kind = next((k for icon, k in _TARGET_STATUS_KIND.items()
+                     if cells[3].startswith(icon)), None)
+        out.append(OutcomeTarget(i + 1, cells[0], re.findall(r"G\d+", cells[1]), kind))
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # progress.md — editing
 # --------------------------------------------------------------------------- #
 def _replace_first_icon(line: str, status: str) -> str:
@@ -462,11 +511,16 @@ def _objective_stages(delivered_by: str) -> List[str]:
 
 
 def _apply_objective_rollup(lines: List[str], stage_status: Dict[str, str]) -> None:
+    # An objective linked to an outcome target that is not ✅ Met can never
+    # roll up to ✅: its stages shipping is necessary but not sufficient.
+    blocked = {g for t in outcome_targets(lines) if t.kind != "met"
+               for g in t.objectives}
     for i, line in enumerate(lines):
         if not line.strip().startswith("|"):
             continue
         cells = _split_row(line)
-        if len(cells) == 3 and re.match(r"G\d+", cells[0]) and _icon_status(cells[2]):
+        gm = re.match(r"G\d+", cells[0]) if len(cells) == 3 else None
+        if gm and _icon_status(cells[2]):
             nums: List[str] = []
             for chunk in re.findall(r"\d+", cells[1]):
                 nums.append(chunk)
@@ -482,6 +536,8 @@ def _apply_objective_rollup(lines: List[str], stage_status: Dict[str, str]) -> N
                 derived = "in-progress"
             else:
                 derived = current
+            if derived == "complete" and gm.group(0) in blocked:
+                derived = "in-progress"
             if RANK[derived] >= RANK[current]:
                 lines[i] = _sub_status_cell(line, derived)
 
@@ -681,7 +737,20 @@ def insight_warnings(ddir: Path) -> List[str]:
 
 
 def _stray_icons_in_line(line: str) -> List[str]:
-    """Status icons on this line that sit OUTSIDE any structural position."""
+    """Status icons on this line that sit where one could plausibly be
+    mistaken for a structural status declaration.
+
+    conventions.md §1 is explicit that icons are read *only* at structural
+    positions — a deliverable bullet's leading icon, a table row's last cell,
+    a stage header's trailing icon — and that "an icon anywhere else […] is
+    plain text and is never read as status, so authors need not avoid the
+    icon vocabulary in free text." A bullet with no leading icon, or an
+    ordinary paragraph, therefore has *no* structural position at all, and
+    any icon it contains is exactly that free text — never stray. Only a
+    heading, whose sole structural slot is the trailing icon, can still carry
+    a status-shaped icon somewhere a reader would misread as the header's
+    status.
+    """
     icons = list(_ICON_RE.finditer(line))
     if not icons:
         return []
@@ -689,15 +758,13 @@ def _stray_icons_in_line(line: str) -> List[str]:
         return []  # "> **Status:** …" lines legitimately carry an icon
     if line.strip().startswith("|"):
         return []  # table rows: parsers read specific cells only, never prose
-    allowed: Optional[Tuple[int, int]] = None
-    m = _BULLET_RE.match(line)
-    if m:
-        allowed = m.span("icon")
-    elif re.match(r"^#{1,6}\s", line):  # any heading level may carry a trailing icon
+    if _BULLET_RE.match(line):
+        return []  # bullets: only the leading icon is structural; the rest is free prose
+    if re.match(r"^#{1,6}\s", line):  # any heading level may carry a trailing icon
         t = _TRAILING_ICON_RE.search(line)
-        if t:
-            allowed = t.span(1)
-    return [i.group(0) for i in icons if i.span() != allowed]
+        allowed = t.span(1) if t else None
+        return [i.group(0) for i in icons if i.span() != allowed]
+    return []  # ordinary paragraph text: no structural position exists here at all
 
 
 def stray_icon_warnings(ddir: Path) -> List[str]:
@@ -777,7 +844,11 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
         if summ in ("deferred", "excluded"):
             continue
         if derived == "complete" and summ and summ != "complete":
-            warnings.append(f"stage {num}: all deliverables ✅ but summary shows {summ}")
+            warnings.append(
+                f"stage {num}: all deliverables ✅ but summary shows {summ} — "
+                f"if the work shipped but the stage's goal is unmet, record the "
+                f"goal as an Outcome target (❌ Not met) and close the stage; "
+                f"stages track shipped work, targets track measured outcomes")
         if summ == "complete" and derived and derived != "complete":
             errors.append(f"stage {num}: summary marked ✅ but has non-complete deliverables")
         if header_status and summ and header_status != summ:
@@ -786,6 +857,33 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
     for num in summary_status:
         if num not in section_nums:
             warnings.append(f"stage {num}: in summary table but has no '## Stage {num}' section")
+
+    # Outcome targets: goal truth gates the OBJECTIVE rows. Claiming an
+    # objective ✅ over an unmet target is the goal-level over-claim this
+    # table exists to prevent (issue #14) — the mirror of the deliverable-level
+    # error above.
+    obj_status: Dict[str, str] = {}
+    for l in lines:
+        cells = _split_row(l) if l.strip().startswith("|") else []
+        if len(cells) == 3 and re.match(r"G\d+", cells[0]) and _icon_status(cells[2]):
+            obj_status[re.match(r"G\d+", cells[0]).group(0)] = _icon_status(cells[2])
+    for t in outcome_targets(lines):
+        if t.kind is None:
+            warnings.append(
+                f"progress.md:{t.lineno}: outcome target '{t.text}' has an "
+                f"unrecognised Status (expected '✅ Met', '❌ Not met' or "
+                f"'❓ Unverified')")
+        for g in t.objectives:
+            if obj_status.get(g) != "complete":
+                continue
+            if t.kind == "not-met":
+                errors.append(
+                    f"objective {g} marked ✅ but outcome target '{t.text}' "
+                    f"is ❌ Not met")
+            elif t.kind != "met":
+                warnings.append(
+                    f"objective {g} marked ✅ but outcome target '{t.text}' "
+                    f"is not ✅ Met")
 
     # Queues: state is DERIVED from progress.md (open = any 📋/🚧 item); a
     # declared "> **Status:**" line is decorative — warn only when it lies.
@@ -1398,6 +1496,19 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"  {path.name}: done")
     else:
         print("  queues: none")
+
+    # Outcome targets not yet ✅ Met — the goal-level state a summary table's
+    # stage icons deliberately do not carry (conventions.md §1).
+    ppath = docs_dir(repo_root, config) / "progress.md"
+    if ppath.is_file():
+        plines = ppath.read_text(encoding=_ENCODING).splitlines()
+        for t in outcome_targets(plines):
+            if t.kind == "met":
+                continue
+            label = {"not-met": "❌ not met", "unverified": "❓ unverified"}.get(
+                t.kind, "⚠ unrecognised status")
+            objs = f" [{', '.join(t.objectives)}]" if t.objectives else ""
+            print(f"  target: {t.text}{objs} — {label}")
 
     branches = _list_claim_branches(repo_root, prefix)
     if branches:

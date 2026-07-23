@@ -38,7 +38,7 @@
 | 11 | Extensibility & Abnormality Classification Arm | G8 | ⏸️ |
 | 12 | Real-VerSe Grounding & Reference Feature Expansion | G3, G7 | ✅ |
 | 13 | Dataset Ingestion Adapters & Harmonization Schema | (G3/G7 enabler) | ✅ |
-| 14 | Real-Data Grounding & Heuristic Recalibration | G3, G7 | 🚧 |
+| 14 | Real-Data Grounding & Heuristic Recalibration | G3, G7 | ✅ |
 | 15 | Real-XNAT Deployment Validation | G5 | 📋 |
 | 16 | Real Failure Corpus & Sensitivity Validation | G2, G7 | 📋 |
 
@@ -61,8 +61,13 @@ the code is missing, only that the real-world outcome is not yet demonstrated.
 Real-data and real-environment evidence lives in the verification table below.
 
 *Mechanism:* `.aide/conventions.md`'s rollup derives an objective from the stages
-named in its **Delivered by** cell, so each 🚧 objective names the planned stage
-that will validate it — keeping the derived status 🚧 rather than ✅.
+named in its **Delivered by** cell, so each 🚧 objective names the stage that
+will validate it. Where that validating stage has **shipped but its measured
+goal is not met** (Stage 14 for G3/G7), the stage is ✅ yet the objective is held
+🚧 by an unmet row in the [Outcome targets](#outcome-targets) table — the rollup
+caps an objective below ✅ while a linked target is not `✅ Met`. So an objective
+stays 🚧 for either reason: a planned validating stage, or a shipped one whose
+outcome target is still open.
 
 ## Objective coverage
 
@@ -108,9 +113,11 @@ shipped"). See "Two kinds of done" above._
   anti-gaming sensitivity guard **fails** — the same loosened thresholds drop
   real-GT-perturbation sensitivity for `fragment` (0.90) and `sequence_break`
   (0.8125) below the 1.0 floor, confirming the loosening bought FPR at
-  sensitivity's expense. → Stage 14 remains open; a threshold-only fix cannot
-  clear the bar — the `reference_delta` rule's z-score mechanism itself needs
-  reworking (deferred, see Stage 14 below).
+  sensitivity's expense. → Stage 14 **shipped** (all deliverables ✅) but its G3
+  FPR target is **❌ Not met** (see [Outcome targets](#outcome-targets)), which
+  holds G3 at 🚧; a threshold-only fix cannot clear the bar — the
+  `reference_delta` rule's z-score mechanism itself needs reworking (now a `gap`
+  in [`insights.md`](insights.md)).
 - **G5** — *"Runs as an XNAT Container Service command on real session data."*
   The container builds and runs, verified for real in CI (see the verification
   table). It has **never been installed on an XNAT server or run on a real XNAT
@@ -120,7 +127,9 @@ shipped"). See "Two kinds of done" above._
   VerSe GT (Stages 12/13). **No curated challenging-case corpus exists** (real
   pathology / post-op / atypical anatomy — [`vision.md`](vision.md)
   §8), and the DICE-vs-flag correlation backing Success Criterion 6 was measured
-  only on a synthetic graded-quality cohort. → Stages 14, 16.
+  only on a synthetic graded-quality cohort. Stage 14 shipped but its sensitivity
+  target is **❌ Not met** (see [Outcome targets](#outcome-targets)); the curated
+  corpus is still → Stage 16.
 
 ## Environment-Gated Capability Verification
 
@@ -149,6 +158,25 @@ row is not verification._
 | XNAT Container Service command on a real server | XNAT server + Container Service (external environment) | Stage 9 *(Items 067, 068, 070)*; to be closed by Stage 15 | ❓ Unverified | What *is* verified is the container itself (see the Docker row): `docker build` + `docker run` on a mounted case, in CI. What has **never** happened: installing `command.json` on an XNAT server, resolving real XNAT session/scan inputs, and writing report resources back to a real session. G5's measurable outcome is *"Runs as an XNAT Container Service command on **real session data**"*, so Stage 9's ✅ (docs + a validating `command.json` + a smoke-tested image) does not close G5. Needs an XNAT instance with the Container Service enabled. |
 | Real automatic-segmentation failure corpus | TotalSegmentator / SPINEPS outputs on real CT (external tool + data) | Stages 5, 7 *(Items 041, 053, 057)*; to be closed by Stage 16 | ❓ Unverified | Every failure mode in §6 is detected only on **synthetically perturbed** GT (Stage 5's generators). Stage 7's deliverable "runs on VerSe GT, **TotalSegmentator outputs**, synthetic failures" shipped the harness's *capability* to consume such a cohort — item 053 explicitly scoped itself to require "no VerSe/TotalSegmentator download", and no TotalSegmentator output has ever been run through the pipeline. Consequently the recorded per-mode sensitivities (item 057: 1.0 for 5 modes, 0.0 for 3 structurally-invisible ones) describe **the synthetic corpus only**; real-world sensitivity is unmeasured. Also unbuilt: [`vision.md`](vision.md) §8's **curated challenging cases** (real pathology / post-op / atypical anatomy). |
 | GPU-accelerated feature extraction | `cupy` (extra: `segqc[gpu]`) | Stage 10 *(Items 071–075)*; closed by *(Item 085)* | ✅ Verified (2026-07-16, Quadro P6000 sm_61, CuPy `cupy-cuda12x` 14.1.1, driver 580.159.04) | First real GPU host (Pascal sm_61 workstation: P400 / GTX 1080 Ti / 2× P6000). CuPy reaches the P6000 (`compute_capability == 61`, a real kernel returns `55`). The first CuPy-present run exposed — and **item 085 fixed** — a genuine NEP-50 regression: `compute_edt_centroids` passed a Python `int` to `cupy.unravel_index`, which `numpy.can_cast` now rejects (`centroids.py:339`, `int()` wrap dropped). With that fixed the Stage-10 GPU-gated suite runs **green on the P6000** with the CPU/GPU equivalence tests **executing** (incl. `test_075_stage10_acceptance.py::test_ac10_gpu_vs_cpu_verdict_identical`): 155 passed, 16 skipped, 0 failed, all skips the allow-listed inverse-condition tests (`assert_no_skips.py --allow "CuPy-absent host"` clean). Install the CUDA-12 wheel (`cupy-cuda12x`) — **not** `cupy-cuda13x`, which drops Pascal (sm_61). No CI coverage (GitHub-hosted runners have no GPU) — see [`docs/gpu-verification.md`](../gpu-verification.md). |
+
+## Outcome targets
+
+_One row per **measured outcome** the roadmap commits to — an empirical result
+(an error rate, a sensitivity floor) that shipped work *enables* but cannot
+*guarantee* by construction. Distinct from the Environment-Gated table above,
+which asks "did the real path ever run?"; this asks "did the number meet the
+bar?" The two are orthogonal: the "Real VerSe GT" row there is `✅ Verified`
+(it ran and returned a number) while the G3 target here is `❌ Not met` (that
+number missed the bar). Per `.aide/conventions.md` §1, a target **never blocks
+its stage** — a stage's ✅ means its planned work shipped — it gates the
+**Objective coverage** rows: an objective linked to a target that is not
+`✅ Met` cannot roll up to ✅, and `aide check` errors on an objective claimed ✅
+over a `❌ Not met` target. `aide status` prints every target not yet Met._
+
+| Target | Objective | Attempted by | Status | Evidence / follow-up |
+|--------|-----------|--------------|--------|----------------------|
+| Held-out real VerSe19 GT (validation + test, disjoint from calibration) yields **FPR ≤ 0.10** | G3 | Stage 14 *(Items 089–092)* | ❌ Not met | Once item 092's harness fix let the reference-derived rules actually engage, held-out FPR measures **0.90** (validation) / **0.95** (test) even after a training-fitted `reference_delta` calibration — nowhere near ≤ 0.10. Threshold-loosening alone cannot clear it without breaking the sensitivity target below; the `reference_delta` z-score-vs-fixed-constant mechanism needs reworking (derive the threshold from the training cohort's own percentiles, as `bounds`/`fragmentation` do). Follow-on tracked in [`insights.md`](insights.md) (gap). |
+| No real-GT sensitivity regression vs item 057's synthetic baseline (5/8 pipeline-detectable modes at 1.0) | G7 | Stage 14 *(Item 091)* | ❌ Not met | The synthetic corpus shows **no regression** under the calibrated config, but Stage-5 perturbations applied to **real** VerSe19 training GT drop `fragment` to **0.90** and `sequence_break` to **0.8125** — below the 1.0 floor. The anti-gaming guard fails: the calibration that narrowed FPR bought it at real sensitivity's expense. Closes together with the FPR target once the rule mechanism is reworked. |
 
 ---
 
@@ -501,13 +529,18 @@ through a clean interface. Scoped + built 2026-07-16 (queue-011, items 086–088
 
 ---
 
-## Stage 14 — Real-Data Grounding & Heuristic Recalibration (G3, G7) — 🚧
+## Stage 14 — Real-Data Grounding & Heuristic Recalibration (G3, G7) — ✅
 
 **Goal.** Close the G3 gap the first real-data run exposed: recalibrate and
 reshape the heuristics against **real** VerSe-derived distributions so real GT
 passes at a high rate, **without** buying that specificity by blinding the rules.
-Scoped 2026-07-17. Target: **held-out real-GT FPR ≤ 0.10 with no sensitivity
-regression** against item 057's recorded synthetic baseline.
+Scoped 2026-07-17. The stage's **measured goal** — **held-out real-GT FPR ≤ 0.10
+with no sensitivity regression** against item 057's recorded synthetic baseline —
+is an outcome the shipped work aims at but cannot guarantee; it is tracked as two
+rows in the [Outcome targets](#outcome-targets) table (both **❌ Not met**), not
+as this stage's acceptance. The stage is ✅ because **its planned work shipped and
+is verified**; the objectives it feeds (G3, G7) stay 🚧, held there by those unmet
+targets. See "Why the goal is not met" below.
 
 **Deliverables.**
 - ✅ Default config switches from hand-set to **reference-derived bounds** grounded
@@ -543,33 +576,29 @@ regression** against item 057's recorded synthetic baseline.
 - ✅ Recorded metrics + the G3 target: **target NOT met** (see below); recorded
   honestly rather than committed as achieved.
 
-**Acceptance.**
-- [ ] Held-out real VerSe19 GT (validation + test, adapter-resolved, disjoint from
-  the calibration subset) yields **FPR ≤ 0.10** (**G3**). **NOT MET** — once the
-  item-092 harness fix let the reference-derived rules actually engage, held-out
-  FPR measures **0.90** (validation) / **0.95** (test) even after a
-  training-fitted calibration of the `reference_delta` thresholds (item 091);
-  the pre-calibration reference-aware number was **0.975/1.0**, worse than item
-  084's original 0.925/0.975 — see the "Real VerSe GT" verification row for the
-  full diagnosis.
-- [ ] Per-mode sensitivity on the synthetic corpus is **no worse** than item 057's
-  baseline (5/8 pipeline-detectable modes at 1.0), and the same modes are detected
-  on perturbed **real** GT (**G7**). **Half met, half failed**: the synthetic
-  corpus shows **no regression** under the calibrated config (`{2,3,5,6,7}` all
-  at 1.0), but Stage-5 perturbations applied to **real** VerSe19 training GT
-  drop `fragment` (mode 2) to sensitivity **0.90** and `sequence_break` (mode 7)
-  to **0.8125** — both below the 1.0 floor. The anti-gaming guard **fails**:
-  the calibration that narrowed FPR bought it at real sensitivity's expense.
-- [ ] Every flag on a real case still carries a reason + offending labels
-  (explainability is not traded away for specificity). Structurally still true
-  (every rule still emits a reason + labels) — left unchecked because it is
-  **moot pending the two bars above**, not because it is itself false.
-- [x] The "Real VerSe GT" verification row is updated with the post-recalibration
-  number (2026-07-19); G3 flips to ✅ **only** if both bars above are met —
-  **neither is, so G3 stays 🚧.**
+**Acceptance.** _(Checks of the built thing — all met. The two **measured
+outcomes** this stage aimed at, FPR ≤ 0.10 and no sensitivity regression, are
+not acceptance boxes; they live in the [Outcome targets](#outcome-targets)
+table, both ❌ Not met, and gate G3/G7 rather than this stage.)_
+- [x] The recalibration + held-out measurement pipeline runs end-to-end
+  (training-fitted grid search on the VerSe19 training subset, measured on the
+  disjoint held-out validation/test subsets through the Stage-13 adapter) and
+  records held-out FPR + per-mode sensitivity **honestly**, rather than
+  committing a target as achieved.
+- [x] The item-092 harness fix (opt-in `reference=`) is in place, so the
+  reference-derived rules and `reference_delta` actually engage under `segqc
+  evaluate`/`calibrate_thresholds` — every earlier "Real VerSe GT" FPR had been
+  measured against the wrong, reference-less config.
+- [x] Every flag on a real case still carries a reason + offending labels
+  (explainability is not traded away for specificity — every rule still emits a
+  reason + labels).
+- [x] The "Real VerSe GT" verification row is updated with the
+  post-recalibration number (2026-07-19).
 
-**Why Stage 14 is not closed, and what would close it.** Threshold-loosening
-alone cannot clear the FPR bar without breaking the sensitivity guard: the
+**Why the goal is not met, and what would close the targets.** The stage's
+deliverables all shipped (so it is ✅), but its measured G3/G7 targets are not
+met and are deliberately held open. Threshold-loosening alone cannot clear the
+FPR bar without breaking the sensitivity target: the
 `reference_delta` rule compares a per-feature z-score (`robust_z`, computed
 against the reference's median/IQR) to a single fixed constant across all
 levels/features; real per-level distributions have a heavy tail (median
@@ -581,9 +610,12 @@ approach `bounds`/`fragmentation` already use (item 090: read the threshold
 directly off the training distribution's own percentile grid). Deriving
 `reference_delta`'s threshold the same way — directly from the training
 cohort's own `robust_z`/`distribution_distance` distribution, rather than
-grid-searching guessed constants — is the natural next step, but was explicitly
-**deferred** ("keep it simple for now" — a more elaborate rule-making scheme is
-follow-on work, not part of this closure).
+grid-searching guessed constants — is the natural next step. It is **not one of
+this stage's deliverables** (it is newly-identified follow-on work), so it is
+captured as a `gap` in [`insights.md`](insights.md) for the feedback loop to
+plan into a future queue, rather than retro-added to a closed stage's
+deliverable list. The two Outcome targets close when that rework lands and the
+held-out FPR/sensitivity are re-measured against the bar.
 
 ---
 
