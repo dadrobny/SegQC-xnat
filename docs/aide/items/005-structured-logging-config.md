@@ -388,10 +388,3 @@ When this item is complete, update [`../progress.md`](../progress.md):
   `progress.md`, and keep the edit scoped to this item's row. A work item may
   merge **straight to `main` once green — no PR required** (here, a separate
   validator performs the merge).
-
----
-
-## Next Step
-
-Start a **new chat session** and run `/speckit-aide-execute-item 005` to
-implement this work item.

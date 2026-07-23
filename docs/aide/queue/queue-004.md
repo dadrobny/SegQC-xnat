@@ -205,10 +205,3 @@ the regression suite asserts is detected, while the clean-GT positive control
 passes, and golden JSON is stable across repeated runs. Superseded by
 [`queue-005.md`](queue-005.md), which delivers Stage 6 (VerSe reference
 distributions & delta-to-reference rules) on top of this corpus.
-
-## Next Step
-
-Per `CLAUDE.md`: `git fetch --all --prune` and check `aide/*` branches first, then
-branch per item (`aide/NNN-short-name`) and push immediately to claim it;
-`git pull --rebase` before any `progress.md` edit. Stage 5 is complete — proceed
-to [`queue-005.md`](queue-005.md).

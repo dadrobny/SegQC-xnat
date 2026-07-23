@@ -298,10 +298,3 @@ When this item is complete, update [`../progress.md`](../progress.md):
 - Per `CLAUDE.md`: work on a branch (`aide/001-package-scaffolding`),
   `git pull --rebase` before editing `progress.md`, keep the edit scoped to this
   item's rows, and open a PR rather than committing to `main`.
-
----
-
-## Next Step
-
-Start a **new chat session** and run `/speckit-aide-execute-item 001` to
-implement this work item.

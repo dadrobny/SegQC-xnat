@@ -392,12 +392,3 @@ When this item is complete, update [`../progress.md`](../progress.md):
 - Per `CLAUDE.md`: work on branch `aide/016-features-json-serialization`,
   `git pull --rebase` before editing `progress.md`, keep edits scoped to this
   item's rows, and direct-merge (no PR required) once green.
-
----
-
-## Next Step
-
-Item 014 has merged to `main` (its `SpineRelationships` API is available). Start
-a **new chat session**, rebase this branch onto the latest `main`
-(`git rebase main`), then run `/speckit-aide-execute-item 016` to implement this
-work item.

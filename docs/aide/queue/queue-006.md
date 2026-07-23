@@ -256,12 +256,3 @@ headline metrics (FPR 0.0 on GT, per-mode sensitivities, DICE-vs-flag correlatio
 -0.943) are recorded in `progress.md`'s Stage-7 "Calibrated metrics" block.
 Superseded by [`queue-007.md`](queue-007.md), which opens **Phase 2 (Stage 8 —
 Image-Based / Radiomics Features)** behind a human-reviewed queue PR.
-
-## Next Step
-
-Per `CLAUDE.md`: `git fetch --all --prune` and check `aide/*` branches first, then
-branch per item (`aide/NNN-short-name`) and push immediately to claim it;
-`git pull --rebase` before any `progress.md` edit. Start with the primitives
-**050–052** (parallelisable), then **053**. Two ways to proceed: spec the whole
-queue now with `/aide-spec-queue 006` in one interactive sitting, or spec per-item
-during execution via `/aide-run-queue 006`.

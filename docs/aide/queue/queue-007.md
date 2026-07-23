@@ -275,12 +275,3 @@ Service Command).
 | 063 Extend reference distributions with intensity | ✅ done |
 | 064 Level-aware delta-to-reference intensity rule | ✅ done |
 | 065 Stage 8 integration & acceptance suite | ✅ done |
-
-## Next Step
-
-Per `CLAUDE.md`: `git fetch --all --prune` and check `aide/*` branches first, then
-branch per item (`aide/NNN-short-name`) and push immediately to claim it;
-`git pull --rebase` before any `progress.md` edit. Start with **058**, then
-**059**. Two ways to proceed: spec the whole queue now with `/aide-spec-queue 007`
-in one interactive sitting, or spec per-item during execution via
-`/aide-run-queue 007`.

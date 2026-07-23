@@ -235,10 +235,3 @@ When this item is complete, update [`../progress.md`](../progress.md):
 - Per `CLAUDE.md`: work on branch `aide/010-human-readable-report`, `git pull
   --rebase` before editing `progress.md`, keep edits scoped to this item's rows,
   and direct-merge (no PR required) once green.
-
----
-
-## Next Step
-
-Start a **new chat session** and run `/speckit-aide-execute-item 010` to
-implement this work item.

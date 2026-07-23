@@ -155,10 +155,3 @@ with the Container Service enabled; **Stage 16** (real failure corpus, G2/G7)
 needs TotalSegmentator/SPINEPS outputs over real CT and depends on Stage 14
 landing first — sensitivity is only meaningful against the rules we intend to
 ship. Queue them when the prerequisite exists.
-
-## Next Step
-
-Spec the whole queue now with `/aide-spec-queue 012` in one interactive sitting,
-or spec per-item during execution via `/aide-run-queue 012`. Start with **089**
-(FOV-aware rules — no real data needed; the mis-specification must be fixed before
-anything is tuned to fit it).

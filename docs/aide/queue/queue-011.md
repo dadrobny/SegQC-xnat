@@ -137,9 +137,3 @@ is `SEGQC_VERSE_COHORT`-gated but was **exercised for real** (resolved VerSe19
 train 80 / val 40 / test 40, split-subjects handled, no manual staging). Lands
 together with the Stage-13 roadmap/vision addition as a **single human-reviewed
 PR** (roadmap is PR-gated).
-
-## Next Step
-
-Spec the whole queue now with `/aide-spec-queue 011` in one interactive sitting,
-or spec per-item during execution via `/aide-run-queue 011`. Start with **086**
-(interface + resolver — no dataset data needed).

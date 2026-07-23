@@ -298,10 +298,3 @@ When this item is complete, update [`../progress.md`](../progress.md):
   **before** real work to claim the item, `git pull --rebase` before editing
   `progress.md`, and keep the edit scoped to this item's row. A work item may
   merge **straight to `main` (no PR)** once green.
-
----
-
-## Next Step
-
-Start a **new chat session** and run `/speckit-aide-execute-item 002` to
-implement this work item.

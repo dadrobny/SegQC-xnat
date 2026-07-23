@@ -123,14 +123,3 @@ check; JSON validates and a human report is produced (**G4**).
 *Testable:* end-to-end CLI tests assert correct verdict + both report artifacts
 for empty, near-empty, and populated fixtures; empty-detection thresholds are
 covered.
-
----
-
-## Next Step
-
-Pick an item from this queue (start with **Item 001**), then open a **new chat
-session** and run `/speckit-aide-create-item` with that item's description to
-produce a detailed work-item specification under `docs/aide/items/NNN-*.md`.
-Per the team workflow in `CLAUDE.md`, branch per item
-(`git switch -c aide/001-package-scaffolding`) and `git pull --rebase` before
-starting.

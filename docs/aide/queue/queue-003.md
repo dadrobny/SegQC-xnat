@@ -209,9 +209,3 @@ integration and per-failure-mode tests (035) are all merged. Each of the eight Â
 failure modes has â‰¥1 heuristic firing on a crafted example while a ground-truth
 fixture passes. Superseded by [`queue-004.md`](queue-004.md), which delivers
 Stage 5 (synthetic failure corpus & regression suite) on top of this engine.
-
-## Next Step
-
-Per `CLAUDE.md`: `git fetch --all --prune` and check `aide/*` branches first,
-then branch per item (`aide/NNN-short-name`) and push immediately to claim it;
-`git pull --rebase` before any `progress.md` edit. Start with **item 026**.
