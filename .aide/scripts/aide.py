@@ -71,9 +71,51 @@ _TRAILING_ICON_RE = re.compile(r"(" + _ICON_ALT + r")\s*$")
 _ENCODING = "utf-8-sig"
 
 
-def _item_ref_re(num: int) -> re.Pattern:
-    """Match ``*(Item NNN)*`` / ``*(Items 006, NNN)*`` for a specific number."""
-    return re.compile(r"\bItems?\b[^)]*\b0*" + str(num) + r"\b")
+#: The accepted item-reference forms, as ONE definition (see conventions.md §1):
+#:   *(Item 006)*            a single item
+#:   *(Items 006, 044)*      a list — what create-queue tells authors to write
+#:   *(Items 089/090)*       a list, slash-separated
+#:   *(Items 071–075)*       an inclusive range, hyphen or en-dash
+#: Everything that asks "does this line reference item NNN" goes through
+#: _referenced_item_numbers, so the answer cannot differ between callers. It did
+#: once: the status parse read only the FIRST number of a list, while the
+#: progress-set matcher read any number literally present. Items after the first
+#: were then orphaned — planned forever on a ✅ bullet, holding their queue open
+#: and (since the live queue is the lowest-numbered open one) stranding
+#: `aide claim` on a finished queue, while `aide progress set` acted on them
+#: happily.
+_ITEM_REF_GROUP_RE = re.compile(r"[Ii]tems?\s+(0*\d+(?:\s*[,/–-]\s*0*\d+)*)")
+_ITEM_REF_SPLIT_RE = re.compile(r"\s*[,/]\s*")
+_ITEM_REF_RANGE_RE = re.compile(r"^0*(\d+)\s*[–-]\s*0*(\d+)$")
+
+#: An inclusive range wider than this is treated as a typo and contributes only
+#: its endpoints, so a stray "Items 6-9999" cannot invent thousands of items.
+_ITEM_RANGE_MAX_SPAN = 50
+
+
+def _referenced_item_numbers(text: str) -> List[int]:
+    """Every item number referenced in ``text``, ranges expanded inclusively."""
+    nums: List[int] = []
+    for group in _ITEM_REF_GROUP_RE.finditer(text):
+        for part in _ITEM_REF_SPLIT_RE.split(group.group(1)):
+            part = part.strip()
+            if not part:
+                continue
+            rng = _ITEM_REF_RANGE_RE.match(part)
+            if rng is None:
+                nums.append(int(part))
+                continue
+            lo, hi = int(rng.group(1)), int(rng.group(2))
+            if lo <= hi <= lo + _ITEM_RANGE_MAX_SPAN:
+                nums.extend(range(lo, hi + 1))
+            else:
+                nums.extend((lo, hi))
+    return nums
+
+
+def _references_item(text: str, num: int) -> bool:
+    """Does ``text`` reference item ``num`` in any accepted form?"""
+    return num in _referenced_item_numbers(text)
 
 
 # --------------------------------------------------------------------------- #
@@ -487,14 +529,13 @@ def set_item_status(text: str, num: int, status: str) -> str:
     Never downgrades an existing status (additive log).
     """
     lines = text.splitlines()
-    ref = _item_ref_re(num)
     # Flip the owning bullet's icon for every line that references this item.
     bullet_line: Optional[int] = None
     for i, line in enumerate(lines):
         if _BULLET_RE.match(line) or re.match(r"^\s*[-*]\s", line):
             if _BULLET_RE.match(line):
                 bullet_line = i
-        if ref.search(line):
+        if _references_item(line, num):
             target = bullet_line if bullet_line is not None and _BULLET_RE.match(lines[bullet_line]) else i
             tm = _BULLET_RE.match(lines[target])
             if tm:
@@ -805,7 +846,6 @@ def _parse_item_status(lines: List[str]) -> Tuple[List[str], List[str], Dict[int
     item_status: Dict[int, str] = {}
     bullet_status: Optional[str] = None
     current_stage: Optional[str] = None
-    ref_re = re.compile(r"[Ii]tem[s]?\s+0*(\d+)")
     for line in lines:
         hm = _STAGE_HEADER_RE.match(line)
         if hm:
@@ -815,8 +855,7 @@ def _parse_item_status(lines: List[str]) -> Tuple[List[str], List[str], Dict[int
         line_icon = _structural_status(line)
         if re.match(r"^\s*[-*]\s", line):
             bullet_status = line_icon
-        for m in ref_re.finditer(line):
-            num = int(m.group(1))
+        for num in _referenced_item_numbers(line):
             status = line_icon or bullet_status or "planned"
             if num not in item_status or RANK[status] > RANK[item_status[num]]:
                 item_status[num] = status
@@ -889,7 +928,7 @@ def cmd_progress(args: argparse.Namespace) -> int:
     # the queue back-fill was missed, self-heal deterministically from the item
     # spec's own Stage/title header; only when that context is missing too does
     # this stay a loud, blocking error.
-    if not _item_ref_re(args.number).search(text):
+    if not _references_item(text, args.number):
         stage, title = _spec_stage_and_title(repo_root, config, args.number)
         healed = insert_item_reference(text, args.number, stage, title) if stage and title else None
         if healed is None:

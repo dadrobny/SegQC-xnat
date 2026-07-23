@@ -232,6 +232,80 @@ def test_parse_item_status_prose_icon_not_status():
     assert status[51] == "planned"  # decoy ✅ in prose must not mark it complete
 
 
+def test_parse_item_status_reads_every_number_in_a_multi_item_reference():
+    """``*(Items A, B)*`` must credit B as well as A.
+
+    The create-queue step tells authors to write exactly this form when one
+    deliverable is delivered by several items. Reading only the first number
+    orphaned the rest: they stayed "planned" on a ✅ bullet forever, which held
+    their queue open and — since the live queue is the lowest-numbered open one
+    — stranded ``aide claim`` on a finished queue.
+    """
+    lines = (
+        "## Stage 6 — Reference — ✅\n"
+        "**Deliverables.**\n"
+        "- ✅ Ingestion and aggregation. *(Items 043, 044)*\n"
+        "- ✅ Delta rules. *(Items 046, 047)*\n"
+        "- ✅ Solo deliverable. *(Item 045)*\n"
+    ).splitlines()
+    _, _, status = aide._parse_item_status(lines)
+    for num in (43, 44, 45, 46, 47):
+        assert status[num] == "complete", f"item {num:03d} not credited"
+
+
+def test_referenced_item_numbers_accepts_every_documented_form():
+    """Single, comma list, slash list, hyphen range, en-dash range."""
+    assert aide._referenced_item_numbers("*(Item 006)*") == [6]
+    assert aide._referenced_item_numbers("*(Items 006, 044)*") == [6, 44]
+    assert aide._referenced_item_numbers("Items 089/090 shipped") == [89, 90]
+    assert aide._referenced_item_numbers("*(Items 089-092)*") == [89, 90, 91, 92]
+    assert aide._referenced_item_numbers("*(Items 071–075)*") == [71, 72, 73, 74, 75]
+    assert aide._referenced_item_numbers("no reference here") == []
+
+
+def test_referenced_item_numbers_ignores_an_implausible_range():
+    """A typo must not invent thousands of items — endpoints only."""
+    assert aide._referenced_item_numbers("*(Items 6-9999)*") == [6, 9999]
+    assert aide._referenced_item_numbers("*(Items 9-4)*") == [9, 4]
+
+
+def test_status_parse_and_progress_set_agree_on_what_is_referenced():
+    """One definition, so no caller can see a reference another cannot.
+
+    They disagreed once: the status parse behind check/status/claim read only
+    the first number of a list, while progress set matched any number literally
+    present — so `progress set` acted on items `claim` believed untracked.
+    """
+    for line in ("- ✅ Thing. *(Items 055, 056)*",
+                 "- ✅ Thing. *(Items 071–075)*",
+                 "- ✅ Thing. *(Item 045)*"):
+        for num in aide._referenced_item_numbers(line):
+            assert aide._references_item(line, num)
+        _, _, status = aide._parse_item_status(
+            ["## Stage 6 — X — ✅", "**Deliverables.**", line])
+        assert set(status) == set(aide._referenced_item_numbers(line))
+
+
+def test_progress_set_flips_a_range_referenced_item(tmp_path: Path):
+    """`aide progress set` must find an item named only inside a range."""
+    progress = (
+        "# P — Progress Tracker\n\n"
+        "| Stage | Title | Objectives | Status |\n"
+        "|-------|-------|-----------|--------|\n"
+        "| 10 | Backend | G1 | 📋 |\n\n"
+        "| Objective | Delivered by | Status |\n"
+        "|-----------|--------------|--------|\n"
+        "| G1 Backend | Stage 10 | 📋 |\n\n"
+        "## Stage 10 — Backend — 📋\n\n"
+        "**Deliverables.**\n\n"
+        "- 📋 Backend port. *(Items 071–075)*\n\n"
+        "**Acceptance.**\n\n"
+        "- [ ] Backend works.\n"
+    )
+    out = aide.set_item_status(progress, 73, "complete")
+    assert "- ✅ Backend port. *(Items 071–075)*" in out
+
+
 def test_check_warns_on_stray_prose_icon(tmp_path: Path):
     decoy = PROGRESS + "\nA stray ✅ in prose.\n"
     root = _docs(tmp_path, progress=decoy)

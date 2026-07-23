@@ -70,6 +70,23 @@ Mandatory, in order (consumer in brackets):
    - an **Acceptance** block of `- [ ]` / `- [x]` checkboxes. *(validator, aide
      check rollup)*
 
+**Item references on a deliverable bullet.** The `*(Item NNN)*` suffix is what
+ties an item to the bullet whose status it moves — `aide progress set NNN` finds
+the bullet by it, and `check`/`status`/`claim` derive queue state from it, so an
+item no bullet references is untracked. Four forms are accepted, and all four
+mean the same thing to every command:
+
+| Form | Reads as |
+|---|---|
+| `*(Item 006)*` | 6 |
+| `*(Items 006, 044)*` | 6, 44 — one deliverable, several items |
+| `*(Items 089/090)*` | 89, 90 |
+| `*(Items 071–075)*` | 71, 72, 73, 74, 75 — inclusive, hyphen or en-dash |
+
+A range spanning more than 50 is read as a typo and contributes only its
+endpoints. Prefer the explicit list when the items are not contiguous; a range
+is only shorthand for one.
+
 **Rollup rule (deterministic — `aide progress` and `aide check` both apply it):**
 a stage is ✅ if *every* Deliverables bullet in it is ✅; then all its Acceptance
 boxes are `[x]`, and its summary-table row, section header, and any Objective row
