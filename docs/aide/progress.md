@@ -55,19 +55,13 @@ This tracker separates two claims that are easy to conflate:
    not the same as having measured it, and measuring it is not the same as
    *achieving* it.
 
-**Objective status is therefore not derived from stage status.** An objective
-stays 🚧 until a stage that validates it on real data is complete; 🚧 never means
-the code is missing, only that the real-world outcome is not yet demonstrated.
-Real-data and real-environment evidence lives in the verification table below.
-
-*Mechanism:* `.aide/conventions.md`'s rollup derives an objective from the stages
-named in its **Delivered by** cell, so each 🚧 objective names the stage that
-will validate it. Where that validating stage has **shipped but its measured
-goal is not met** (Stage 14 for G3/G7), the stage is ✅ yet the objective is held
-🚧 by an unmet row in the [Outcome targets](#outcome-targets) table — the rollup
-caps an objective below ✅ while a linked target is not `✅ Met`. So an objective
-stays 🚧 for either reason: a planned validating stage, or a shipped one whose
-outcome target is still open.
+**Objective status is therefore not derived from stage status.** 🚧 never means
+the code is missing — only that the real-world outcome is not yet *demonstrated*.
+An objective stays 🚧 for either reason: a **planned** validating stage still
+open, or a **shipped** one whose measured goal is not met. Both are captured in
+the two tables below — real-run evidence in **Environment-Gated Capability
+Verification**, measured-outcome bars in **Outcome targets** — and the `aide`
+rollup caps an objective below ✅ while any linked outcome target is not `✅ Met`.
 
 ## Objective coverage
 
@@ -85,51 +79,19 @@ shipped"). See "Two kinds of done" above._
 | G7 Evaluable & regression-testable | Stages 5, 7 *(real data: Stages 14, 16)* | 🚧 |
 | G8 Extensible / classification *(deferred)* | Stage 11 | 📋 |
 
-**What each 🚧 means, precisely:**
+**Why each 🚧 objective is not yet ✅** _(one line each — the detail lives in the
+linked row/stage, not here):_
 
-- **G2** — *"Each failure mode has ≥1 heuristic with documented detection on the
-  test corpus."* Met on the **synthetic** corpus (Stage 5), which is what the
-  measurable outcome literally asks for. It is 🚧 because no failure mode has
-  ever been detected on a **real** failed segmentation: the corpus is
-  perturbation-generated, and Stage 7's "runs on TotalSegmentator outputs"
-  deliverable shipped the *harness capability*, never an actual TotalSegmentator
-  run (item 053 explicitly required "no VerSe/TotalSegmentator download"). Real
-  sensitivity is **unknown**. → Stage 16.
-- **G3** — *"GT passes QC at a high rate (low FPR)."* **Still falsified on real
-  data after Stage 14's recalibration attempt.** Items 089/090 shipped FOV-aware
-  coverage/border rules and reference-derived bounds/fragmentation, but item 091's
-  own held-out measurement discovered (via the evaluation harness, not
-  `segqc run`) never actually exercised them: `eval.harness.evaluate_case` called
-  plain `run_qc`, which never attaches a reference, so the reference-derived
-  rules and the `reference_delta` rule stayed silently inert under every
-  `segqc evaluate`/`calibrate_thresholds` call — item 092 fixed that. Once
-  correctly measured, held-out real VerSe19 GT is flagged at **0.90** (validation,
-  40 cases) / **0.95** (test, 40 cases) even after a training-fitted calibration
-  of the `reference_delta` thresholds — *worse* than the pre-Stage-14 baseline
-  (0.925/0.975), because the previously-inert `reference_delta` rule's hand-set
-  z-score thresholds (`max_robust_z=3.5`) turn out to be far too tight for real
-  per-level variability, and loosening them (to 15/8, the loosest setting a grid
-  search found without regressing the synthetic corpus) barely helps. Worse: the
-  anti-gaming sensitivity guard **fails** — the same loosened thresholds drop
-  real-GT-perturbation sensitivity for `fragment` (0.90) and `sequence_break`
-  (0.8125) below the 1.0 floor, confirming the loosening bought FPR at
-  sensitivity's expense. → Stage 14 **shipped** (all deliverables ✅) but its G3
-  FPR target is **❌ Not met** (see [Outcome targets](#outcome-targets)), which
-  holds G3 at 🚧; a threshold-only fix cannot clear the bar — the
-  `reference_delta` rule's z-score mechanism itself needs reworking (now a `gap`
-  in [`insights.md`](insights.md)).
-- **G5** — *"Runs as an XNAT Container Service command on real session data."*
-  The container builds and runs, verified for real in CI (see the verification
-  table). It has **never been installed on an XNAT server or run on a real XNAT
-  session** — the words "on real session data" are unmet. → Stage 15.
-- **G7** — *"Automated test suite over VerSe GT + synthetic failures + curated
-  cases."* Two of three corpora exist: synthetic failures (Stage 5) and real
-  VerSe GT (Stages 12/13). **No curated challenging-case corpus exists** (real
-  pathology / post-op / atypical anatomy — [`vision.md`](vision.md)
-  §8), and the DICE-vs-flag correlation backing Success Criterion 6 was measured
-  only on a synthetic graded-quality cohort. Stage 14 shipped but its sensitivity
-  target is **❌ Not met** (see [Outcome targets](#outcome-targets)); the curated
-  corpus is still → Stage 16.
+- **G2** — real-world per-mode sensitivity is unmeasured; no real failure corpus
+  has ever run. → [Outcome targets](#outcome-targets) (❓) · Stage 16.
+- **G3** — the held-out real-GT **FPR ≤ 0.10** target is **❌ Not met**. →
+  [Outcome targets](#outcome-targets) · Stage 14.
+- **G5** — never installed/run on a real XNAT server (a binary check, not a
+  measured bar, so it is verification rather than an outcome target). → the
+  "XNAT … real server" verification row · Stage 15.
+- **G7** — the real-GT **sensitivity** target is **❌ Not met**, *and* the curated
+  challenging-case corpus is unbuilt. → [Outcome targets](#outcome-targets) ·
+  Stages 14 (sensitivity) / 16 (corpus).
 
 ## Environment-Gated Capability Verification
 
@@ -174,8 +136,9 @@ over a `❌ Not met` target. `aide status` prints every target not yet Met._
 
 | Target | Objective | Attempted by | Status | Evidence / follow-up |
 |--------|-----------|--------------|--------|----------------------|
-| Held-out real VerSe19 GT (validation + test, disjoint from calibration) yields **FPR ≤ 0.10** | G3 | Stage 14 *(Items 089–092)* | ❌ Not met | Once item 092's harness fix let the reference-derived rules actually engage, held-out FPR measures **0.90** (validation) / **0.95** (test) even after a training-fitted `reference_delta` calibration — nowhere near ≤ 0.10. Threshold-loosening alone cannot clear it without breaking the sensitivity target below; the `reference_delta` z-score-vs-fixed-constant mechanism needs reworking (derive the threshold from the training cohort's own percentiles, as `bounds`/`fragmentation` do). Follow-on tracked in [`insights.md`](insights.md) (gap). |
-| No real-GT sensitivity regression vs item 057's synthetic baseline (5/8 pipeline-detectable modes at 1.0) | G7 | Stage 14 *(Item 091)* | ❌ Not met | The synthetic corpus shows **no regression** under the calibrated config, but Stage-5 perturbations applied to **real** VerSe19 training GT drop `fragment` to **0.90** and `sequence_break` to **0.8125** — below the 1.0 floor. The anti-gaming guard fails: the calibration that narrowed FPR bought it at real sensitivity's expense. Closes together with the FPR target once the rule mechanism is reworked. |
+| ≥1 heuristic detects each §6 failure mode on a **real** automatic-segmentation failure corpus (no per-mode sensitivity regression vs synthetic) | G2 | Stage 16 | ❓ Unverified | No real failure corpus has ever run, so real per-mode sensitivity is unmeasured (item 057's numbers are synthetic-only). Measured when Stage 16 builds/runs the corpus — see the "Real failure corpus" verification row. |
+| Held-out real VerSe19 GT (validation + test, disjoint from calibration) yields **FPR ≤ 0.10** | G3 | Stage 14 *(Items 089–092)* | ❌ Not met | **0.90** (validation) / **0.95** (test) after a training-fitted `reference_delta` calibration — far from ≤ 0.10, and a threshold-only fix breaks the G7 target below. Full diagnosis + the deferred `reference_delta` rework: the Stage 14 section (a `gap` in [`insights.md`](insights.md)). |
+| No real-GT sensitivity regression vs item 057's synthetic baseline (5/8 pipeline-detectable modes at 1.0) | G7 | Stage 14 *(Item 091)* | ❌ Not met | Synthetic corpus: no regression; but real-GT perturbations drop `fragment` to **0.90** and `sequence_break` to **0.8125** (below the 1.0 floor). Closes with the FPR target once the rule mechanism is reworked — see the Stage 14 section. |
 
 ---
 
