@@ -11,6 +11,10 @@
   Deliverables bullet is ✅ -> then its Acceptance boxes are [x] and its summary
   row / header / delivered objectives read ✅. Mixed -> 🚧. None started -> 📋.
   Update INCREMENTALLY; never reset a non-planned status back to 📋.
+  Stage ✅ means "the planned work shipped", nothing more; a MEASURED goal the
+  work cannot guarantee (an error-rate target, a benchmark) belongs in the
+  optional "Outcome targets" table, which gates the Objective rows instead
+  (an objective linked to a target that is not ✅ Met cannot roll up to ✅).
 
   Optional "Environment-Gated Capability Verification" section: include it
   ONLY if the project has ANY stage introducing a capability gated behind an
@@ -68,6 +72,21 @@ pytest run), then `✅ Verified ({{yyyy-mm-dd}}, {{host/CI description}})`._
 | Capability | Package / Tool | Introduced by | Status | Notes |
 |------------|-----------------|----------------|--------|-------|
 | {{capability}} | {{package or tool name}} | Stage {{n}} *(Item {{nnn}})* | ❓ Unverified | {{notes}} |
+
+## Outcome targets  <!-- OPTIONAL: delete if no roadmap stage commits to a measured result -->
+
+_One row per measured outcome the roadmap commits to (an empirical result —
+an error rate, a benchmark — that shipped work enables but cannot guarantee).
+Status is `❓ Unverified` until measured, then `✅ Met ({{yyyy-mm-dd}},
+{{evidence}})` or `❌ Not met ({{measured result}} → {{follow-up}})`. A target
+never holds its stage open — stages track shipped work — but an objective
+linked to a target that is not ✅ Met cannot roll up to ✅. When marking a
+target ❌ Not met, append a `- [ ] gap — …` insight in the same edit so the
+feedback loop plans the follow-on work._
+
+| Target | Objective | Attempted by | Status | Evidence / follow-up |
+|--------|-----------|--------------|--------|----------------------|
+| {{measurable target}} | G{{n}} | Stage {{n}} | ❓ Unverified | {{notes}} |
 
 ---
 

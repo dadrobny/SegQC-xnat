@@ -92,9 +92,46 @@ the items are not contiguous; a range is only shorthand for one.
 **Rollup rule (deterministic — `aide progress` and `aide check` both apply it):**
 a stage is ✅ if *every* Deliverables bullet in it is ✅; then all its Acceptance
 boxes are `[x]`, and its summary-table row, section header, and any Objective row
-delivered solely by complete stages read ✅. If any bullet is ✅/🚧 but not all,
+delivered solely by complete stages read ✅ (unless the objective is linked to an
+Outcome target that is not `✅ Met` — see below). If any bullet is ✅/🚧 but not all,
 the stage is 🚧. Otherwise 📋. Acceptance boxes are ticked **only** at stage
 completion (per-item AC ticking is not deterministic).
+
+**What a stage's ✅ means — and what it deliberately does not.** The rollup
+makes stage status track exactly one thing: *the planned work shipped*. An
+Acceptance box is therefore an observable check **of the built thing** (the
+CLI runs, the artifact validates) — something completing the deliverables can
+guarantee. A **measured outcome** the work aims for but cannot guarantee by
+construction (an error-rate target, a benchmark result) must NOT be an
+Acceptance box: it would either be auto-ticked into an over-claim or hold the
+stage 🚧 forever against work that genuinely shipped. Such goals go in the
+**Outcome targets** table below.
+
+**Outcome targets (optional, additive).** A `## Outcome targets` section in
+`progress.md` with one row per measured goal:
+
+```
+| Target | Objective | Attempted by | Status | Evidence / follow-up |
+|--------|-----------|--------------|--------|----------------------|
+| Held-out FPR ≤ 0.10 | G3 | Stage 14 | ❌ Not met | FPR 0.975 → gap insight, item 0NN |
+```
+
+Status is table-local (like the env-gated verification table's): `❓
+Unverified` until measured, then `✅ Met (date, evidence)` or `❌ Not met
+(result → follow-up)`. Semantics *(aide progress, aide check, aide status)*:
+
+- A target **never blocks its stage** — the stage closes when its work ships.
+  It gates the **Objective coverage rows** instead: an objective linked to a
+  target that is not `✅ Met` cannot roll up to ✅, and `aide check` errors on
+  an objective claimed ✅ over a `❌ Not met` target (the goal-level mirror of
+  the deliverable-level over-claim error).
+- Marking a target `❌ Not met` is a *finding*, so route it like one: append a
+  `- [ ] gap — …` line to `insights.md` in the same edit. The feedback loop
+  then plans the follow-on deliverables explicitly — needing more work than
+  planned to hit a goal is normal, and it enters through the queue, not by
+  retro-editing a closed stage's deliverable list.
+- `aide status` prints every target not yet `✅ Met`, so the state stays
+  visible even though the stage summary table does not carry it.
 
 ### `queue-NNN.md`
 

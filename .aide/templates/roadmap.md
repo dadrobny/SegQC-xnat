@@ -57,10 +57,15 @@ _One bullet per concrete artifact or capability._
 
 **Validation / acceptance.**
 
-_One bullet per observable check — these become the progress.md acceptance
-boxes for this stage._
+_One bullet per observable check **of the built thing** — these become the
+progress.md acceptance boxes for this stage, ticked when the work ships. A
+measured OUTCOME the stage aims for but cannot guarantee by construction (an
+error-rate target, a benchmark result) is not an acceptance bullet: prefix it
+`Target:` and mirror it into progress.md's "Outcome targets" table, where it
+gates the objective rather than the stage._
 
 - {{observable check that the stage is done}}
+- Target: {{measured result the stage aims for}}  <!-- optional -->
 
 ---
 

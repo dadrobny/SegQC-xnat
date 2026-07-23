@@ -29,7 +29,12 @@ from the template **`.aide/templates/progress.md`**.
 - one `## Stage N — <title> — <icon>` section per stage, with **flat**
   deliverable bullets `- <icon> <text>. *(Item NNN)*` and `- [ ]` acceptance
   checkboxes;
-- status icons only from the five-icon legend (📋 🚧 ✅ ⏸️ ❌).
+- status icons only from the five-icon legend (📋 🚧 ✅ ⏸️ ❌);
+- if any roadmap stage carries a `Target:` bullet (a measured outcome the work
+  cannot guarantee — an error rate, a benchmark), mirror it as a row of the
+  optional `## Outcome targets` table (template shows the shape), NOT as an
+  acceptance checkbox — targets gate objectives, never stages
+  (`.aide/conventions.md` §1 "Outcome targets").
 
 Run `python .aide/scripts/aide.py check` after writing — it must pass.
 

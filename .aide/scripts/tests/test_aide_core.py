@@ -229,7 +229,50 @@ def test_parse_item_status_prose_icon_not_status():
     ).splitlines()
     _, _, status = aide._parse_item_status(lines)
     assert status[50] == "planned"
-    assert status[51] == "planned"  # decoy ✅ in prose must not mark it complete
+    # A prose mention carries no status at all — not even a decoy "planned"
+    # (issue #15: only a deliverable bullet is a structural declaration).
+    assert 51 not in status
+
+
+def test_parse_item_status_ignores_table_notes_and_checkboxes():
+    """conventions.md §1: only a deliverable bullet's leading icon is a status
+    declaration. A verification-table Notes cell that narrates several item
+    numbers, and an acceptance checkbox that merely cites its item, must not
+    attribute any status to those items (issue #15) — each item's status comes
+    only from its own deliverable bullet, if any.
+    """
+    lines = (
+        "## Stage 14 — X — 🚧\n"
+        "**Deliverables.**\n"
+        "- ✅ Thing. *(Item 060)*\n"
+        "\n"
+        "| Check | Notes | Status |\n"
+        "|---|---|---|\n"
+        "| Env | Post-mortem mentions item 047, Item 084 at length | 🚧 |\n"
+        "| Env2 | See Item 060 too | 📋 |\n"
+        "\n"
+        "**Acceptance.**\n"
+        "- [x] Container runs the pipeline. *(Item 070; docker verified)*\n"
+    ).splitlines()
+    _, _, status = aide._parse_item_status(lines)
+    assert status == {60: "complete"}  # only the deliverable bullet counts
+    assert 47 not in status
+    assert 84 not in status
+    assert 70 not in status
+
+
+def test_parse_item_status_wrapped_bullet_still_attributes():
+    """A deliverable bullet that wraps onto a continuation line must still
+    credit the reference to the bullet's own status — the reference belongs
+    to the bullet it is part of, not to the physical line carrying the icon."""
+    lines = (
+        "## Stage 2 — X — 🚧\n"
+        "**Deliverables.**\n"
+        "- 📋 A long deliverable that wraps onto a\n"
+        "  second line. *(Item 042)*\n"
+    ).splitlines()
+    _, _, status = aide._parse_item_status(lines)
+    assert status[42] == "planned"
 
 
 def test_parse_item_status_reads_every_number_in_a_multi_item_reference():
@@ -333,13 +376,31 @@ def test_progress_set_flips_a_range_referenced_item(tmp_path: Path):
     assert "- ✅ Backend port. *(Items 071–075)*" in out
 
 
-def test_check_warns_on_stray_prose_icon(tmp_path: Path):
-    decoy = PROGRESS + "\nA stray ✅ in prose.\n"
+def test_check_warns_on_stray_heading_icon(tmp_path: Path):
+    """A heading's only structural slot is its trailing icon — one parked
+    elsewhere on the same heading is a plausible misreading, so it still
+    warns."""
+    decoy = PROGRESS + "\n## 🚧 Notes — ✅\n"
     root = _docs(tmp_path, progress=decoy)
     cfg = aide.load_config(root)
     errors, warnings = aide.run_checks(root, cfg, branches=[])
     assert errors == []
-    assert any("stray" not in w and "status icon ✅ outside" in w for w in warnings)
+    assert any("status icon 🚧 outside" in w for w in warnings)
+
+
+def test_check_silent_on_icons_in_prose(tmp_path: Path):
+    """conventions.md §1 explicitly permits the icon vocabulary in prose, a
+    non-leading bullet, and mid-bullet asides — none of those are structural
+    positions, so none should trip the stray-icon lint (issue #13)."""
+    decoy = PROGRESS + (
+        "\nA stray ✅ in prose.\n\n"
+        "- Flip the Stage 0 deliverable from 📋 to ✅ (mark it 🚧 while in progress).\n"
+    )
+    root = _docs(tmp_path, progress=decoy)
+    cfg = aide.load_config(root)
+    errors, warnings = aide.run_checks(root, cfg, branches=[])
+    assert errors == []
+    assert not any("outside a structural status position" in w for w in warnings)
 
 
 def test_check_no_stray_warning_on_clean_docs(tmp_path: Path):
@@ -474,6 +535,94 @@ def test_check_warns_stale_claim_branch(tmp_path: Path):
     # Item 002 is complete; a claim branch for it is stale.
     _, warnings = aide.run_checks(root, cfg, branches=["aide/002-core"])
     assert any("stale claim branch" in w for w in warnings)
+
+
+# --------------------------------------------------------------------------- #
+# outcome targets (issue #14: shipped work vs. achieved goal are orthogonal)
+# --------------------------------------------------------------------------- #
+TARGETS = """\
+
+## Outcome targets
+
+| Target | Objective | Attempted by | Status | Evidence / follow-up |
+|--------|-----------|--------------|--------|----------------------|
+| Held-out FPR <= 0.10 | G2 | Stage 1 | ❌ Not met | FPR 0.975 → gap insight |
+| Runtime < 60 s | G1 | Stage 0 | ✅ Met (2026-07-01, CI) | timing job |
+"""
+
+
+def test_outcome_targets_parse():
+    ts = aide.outcome_targets((PROGRESS + TARGETS).splitlines())
+    assert [(t.text, t.objectives, t.kind) for t in ts] == [
+        ("Held-out FPR <= 0.10", ["G2"], "not-met"),
+        ("Runtime < 60 s", ["G1"], "met"),
+    ]
+
+
+def test_outcome_targets_absent_table_is_empty():
+    assert aide.outcome_targets(PROGRESS.splitlines()) == []
+
+
+def test_outcome_targets_multi_objective_and_unverified():
+    ts = aide.outcome_targets(
+        "## Outcome targets\n"
+        "| Target | Objective | Attempted by | Status | Notes |\n"
+        "|---|---|---|---|---|\n"
+        "| Dice >= 0.9 | G1, G3 | Stage 2 | ❓ Unverified | pending cohort |\n"
+        .splitlines())
+    assert ts[0].objectives == ["G1", "G3"]
+    assert ts[0].kind == "unverified"
+
+
+def test_unmet_target_blocks_objective_rollup_not_stage():
+    out = aide.set_item_status(PROGRESS + TARGETS, 3, "complete")
+    # The stage closes: its planned work shipped.
+    assert "## Stage 1 — Rule Engine — ✅" in out
+    assert "| 1 | Rule Engine | G2 | ✅ |" in out
+    assert "- [x] Rules fire." in out
+    # The objective does not: its outcome target is ❌ Not met.
+    assert "| G2 Rules | Stage 1 | 🚧 |" in out
+
+
+def test_met_target_does_not_block_objective():
+    met = (PROGRESS + TARGETS).replace("❌ Not met", "✅ Met (2026-07-02, eval run)")
+    out = aide.set_item_status(met, 3, "complete")
+    assert "| G2 Rules | Stage 1 | ✅ |" in out
+
+
+def test_check_clean_with_targets_table(tmp_path: Path):
+    root = _docs(tmp_path, progress=PROGRESS + TARGETS)
+    cfg = aide.load_config(root)
+    errors, warnings = aide.run_checks(root, cfg, branches=[])
+    assert errors == [], errors
+    assert not any("outcome target" in w for w in warnings), warnings
+
+
+def test_check_flags_objective_complete_over_unmet_target(tmp_path: Path):
+    lying = (PROGRESS + TARGETS).replace(
+        "| G2 Rules | Stage 1 | 🚧 |", "| G2 Rules | Stage 1 | ✅ |")
+    root = _docs(tmp_path, progress=lying)
+    cfg = aide.load_config(root)
+    errors, _ = aide.run_checks(root, cfg, branches=[])
+    assert any("objective G2 marked ✅ but outcome target" in e for e in errors)
+
+
+def test_check_warns_objective_complete_over_unverified_target(tmp_path: Path):
+    doc = (PROGRESS + TARGETS).replace("❌ Not met", "❓ Unverified").replace(
+        "| G2 Rules | Stage 1 | 🚧 |", "| G2 Rules | Stage 1 | ✅ |")
+    root = _docs(tmp_path, progress=doc)
+    cfg = aide.load_config(root)
+    errors, warnings = aide.run_checks(root, cfg, branches=[])
+    assert not any("outcome target" in e for e in errors)
+    assert any("is not ✅ Met" in w for w in warnings)
+
+
+def test_check_warns_unrecognised_target_status(tmp_path: Path):
+    doc = (PROGRESS + TARGETS).replace("❌ Not met", "TBD")
+    root = _docs(tmp_path, progress=doc)
+    cfg = aide.load_config(root)
+    _, warnings = aide.run_checks(root, cfg, branches=[])
+    assert any("unrecognised Status" in w for w in warnings)
 
 
 # --------------------------------------------------------------------------- #
