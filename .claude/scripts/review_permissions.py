@@ -41,6 +41,11 @@ TRUST_HINT = (
     "  Fix: re-open the folder and accept the trust prompt, or set that flag true.\n"
 )
 
+# Both the settings this reads and the log it parses live in a consumer repo and
+# may be opened in a Windows editor, which prepends a BOM. "utf-8-sig" strips one
+# when present and is identical to "utf-8" when absent.
+_ENCODING = "utf-8-sig"
+
 _ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_LOG = _ROOT / "docs" / "aide" / "permissions" / "log.jsonl"
 DEFAULT_REVIEWED = _ROOT / "docs" / "aide" / "permissions" / "log.reviewed.jsonl"
@@ -234,7 +239,7 @@ def load_records(log_path):
     path = Path(log_path)
     if not path.exists():
         return records
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in path.read_text(encoding=_ENCODING).splitlines():
         line = line.strip()
         if not line:
             continue
@@ -257,7 +262,7 @@ def rotate_log(log_path, reviewed_path):
     log = Path(log_path)
     if not log.exists():
         return 0
-    lines = [ln for ln in log.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    lines = [ln for ln in log.read_text(encoding=_ENCODING).splitlines() if ln.strip()]
     if not lines:
         # Nothing to rotate; still normalise the file to empty.
         log.write_text("", encoding="utf-8")
@@ -274,7 +279,7 @@ def load_rules(settings_path):
     path = Path(settings_path)
     if not path.exists():
         return [], []
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding=_ENCODING))
     perms = data.get("permissions", {})
     return perms.get("allow", []), perms.get("ask", [])
 

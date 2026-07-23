@@ -95,7 +95,9 @@ def load_loop_config(path: Optional[Path] = None) -> Dict[str, object]:
     cfg = dict(DEFAULTS)
     path = path or (Path(__file__).resolve().parent / "loop.local.toml")
     if path.is_file():
-        cfg.update(_parse_toml(path.read_text(encoding="utf-8")))
+        # utf-8-sig: loop.local.toml is hand-written per machine, and a BOM from a
+        # Windows editor would make the first [table] header unparseable.
+        cfg.update(_parse_toml(path.read_text(encoding="utf-8-sig")))
     return cfg
 
 

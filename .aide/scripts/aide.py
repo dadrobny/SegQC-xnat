@@ -58,6 +58,19 @@ _ANY_HEADER_RE = re.compile(r"^#{1,2}\s+")
 _TRAILING_ICON_RE = re.compile(r"(" + _ICON_ALT + r")\s*$")
 
 
+# Every file this CLI reads is project-owned and hand-editable — aide.toml and the
+# docs/aide/ living documents. Windows editors (Notepad, PowerShell's Out-File,
+# "Save as UTF-8" in several IDEs) prepend a BOM, and a leading U+FEFF breaks
+# first-line parsing *silently*: on the 3.9 fallback parser a BOM'd aide.toml loses
+# only its FIRST table, because "^\[table\]$" fails on that one line while every
+# later table still matches. [project] vanishes (source_dir back to its default)
+# while [git] is honoured — a half-correct config, no error, every command
+# reporting success. On 3.11 the same file raises an uncaught TOMLDecodeError.
+# "utf-8-sig" strips a BOM when present and is byte-identical to "utf-8" when
+# absent, so it is the correct default for anything a human may have touched.
+_ENCODING = "utf-8-sig"
+
+
 def _item_ref_re(num: int) -> re.Pattern:
     """Match ``*(Item NNN)*`` / ``*(Items 006, NNN)*`` for a specific number."""
     return re.compile(r"\bItems?\b[^)]*\b0*" + str(num) + r"\b")
@@ -81,16 +94,91 @@ DEFAULT_CONFIG: Dict[str, Dict[str, object]] = {
 }
 
 
+# Escape sequences this reader decodes inside a basic (double-quoted) string. TOML
+# also defines \b \t \n \f \r \uXXXX \UXXXXXXXX; rather than half-implement them and
+# quietly disagree with tomllib, an unlisted escape is a ConfigError (see below).
+_BASIC_ESCAPES = {'"': '"', "\\": "\\"}
+
+
+def _read_quoted_value(key: str, stripped: str, lineno: int) -> str:
+    """Decode the quoted string at the start of ``stripped``, or raise ``ConfigError``.
+
+    Finding where a string ENDS and extracting what it CONTAINS are the same scan, so
+    they live in one function. Splitting them is what produced the bug this replaces:
+    the validator walked the value escape-aware while the extractor used a naive
+    ``split(quote, 1)[0]``, so ``msg = "he said \\"hi\\""`` passed validation and was
+    then silently truncated to ``he said \\``.
+
+    Single-quoted strings are TOML *literal* strings: no escapes, backslash is itself.
+    Double-quoted are *basic* strings, where a backslash escapes the next character.
+    """
+    quote = stripped[0]
+    out: List[str] = []
+    i = 1
+    while i < len(stripped):
+        ch = stripped[i]
+        if quote == '"' and ch == "\\":
+            nxt = stripped[i + 1] if i + 1 < len(stripped) else ""
+            if not nxt:
+                raise ConfigError(
+                    f"line {lineno}: unterminated escape in the value for key {key!r} — "
+                    "a backslash at the end of a basic string escapes nothing"
+                )
+            if nxt not in _BASIC_ESCAPES:
+                raise ConfigError(
+                    f"line {lineno}: unsupported escape '\\{nxt}' in the value for "
+                    f"key {key!r} — this minimal reader decodes only \\\\ and \\\"; "
+                    f"use a single-quoted 'literal string' (backslashes are literal "
+                    f"there) or forward slashes"
+                )
+            out.append(_BASIC_ESCAPES[nxt])
+            i += 2
+            continue
+        if ch == quote:
+            tail = stripped[i + 1:].lstrip()
+            if tail and not tail.startswith("#"):
+                raise ConfigError(
+                    f"line {lineno}: trailing characters after the quoted value for "
+                    f"key {key!r}: {tail!r}"
+                )
+            return "".join(out)
+        out.append(ch)
+        i += 1
+
+    raise ConfigError(
+        f"line {lineno}: unterminated string for key {key!r} — "
+        f"the value opens with {quote} but never closes it"
+    )
+
+
+class ConfigError(Exception):
+    """``aide.toml`` cannot be trusted — malformed, so its facts are unknowable.
+
+    Raised instead of guessing. Every project fact the framework acts on comes from
+    that file, so silently falling back to defaults would scope the builder at the
+    wrong directory, pick the wrong git mode, or run the wrong test command while
+    reporting success. ``main`` catches this and prints it as a plain error.
+    """
+
+
 def _parse_toml(text: str) -> Dict[str, Dict[str, object]]:
     """Minimal TOML reader for the flat ``[table] key = value`` shape of aide.toml.
 
     Supports string/int/float/bool scalars and ``#`` comments. Used only when the
     stdlib ``tomllib`` (Python 3.11+) is unavailable, so the CLI and its tests run
     on the project's 3.9 venv too.
+
+    Deliberately lenient about what it *ignores* (unknown lines, blank tables) but
+    strict about what it would otherwise *misread*, because a wrong-but-plausible
+    value is worse than a refusal: an unterminated quoted string used to yield the
+    truncated text, so a typo became a believable answer on 3.9 while 3.11's tomllib
+    rejected the same file. Quoted values are decoded by ``_read_quoted_value``,
+    which raises ``ConfigError`` rather than guess — so both parser paths agree on
+    which files are readable.
     """
     data: Dict[str, Dict[str, object]] = {}
     table: Optional[Dict[str, object]] = None
-    for raw in text.splitlines():
+    for lineno, raw in enumerate(text.splitlines(), start=1):
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
@@ -102,14 +190,19 @@ def _parse_toml(text: str) -> Dict[str, Dict[str, object]]:
             continue
         key, _, value = line.partition("=")
         key = key.strip()
-        value = value.split("#", 1)[0].strip() if not value.lstrip().startswith('"') else value.strip()
-        # strip trailing comment for unquoted values only (quoted may contain #)
+        value = value.strip()
+        # A quoted value owns everything up to its closing quote — a '#' inside it is
+        # data, not a comment — so it is scanned before any comment stripping. Only
+        # an UNquoted value is truncated at '#'.
         if value and value[0] in "\"'":
-            table[key] = value[1:].split(value[0], 1)[0]
-        elif value.lower() in ("true", "false"):
-            table[key] = value.lower() == "true"
+            table[key] = _read_quoted_value(key, value, lineno)
+            continue
+        token = value.split("#", 1)[0].strip()
+        if not token:
+            raise ConfigError(f"line {lineno}: missing value for key {key!r}")
+        if token.lower() in ("true", "false"):
+            table[key] = token.lower() == "true"
         else:
-            token = value.split("#", 1)[0].strip()
             try:
                 table[key] = int(token)
             except ValueError:
@@ -120,17 +213,55 @@ def _parse_toml(text: str) -> Dict[str, Dict[str, object]]:
     return data
 
 
+def _config_error(path: Path, what: str, exc: object) -> "ConfigError":
+    """One phrasing for every way ``aide.toml`` can fail, so they cannot drift.
+
+    ``what`` distinguishes the causes a reader would act on differently: a file that
+    ``is malformed`` needs an edit, one that ``cannot be read`` needs permissions or
+    disk attention. The rest — naming the path, and why defaults are not an
+    acceptable fallback — is identical in every case.
+    """
+    return ConfigError(
+        f"{path} {what}: {exc}\n"
+        f"  aide.toml states this project's facts (source_dir, git mode, test "
+        f"command); refusing to continue with defaults that would be silently wrong."
+    )
+
+
 def load_config(repo_root: Path) -> Dict[str, Dict[str, object]]:
-    """Load ``aide.toml`` merged over defaults. Missing file -> defaults."""
+    """Load ``aide.toml`` merged over defaults.
+
+    A *missing* file is fine — defaults apply, which is what an unconfigured repo
+    means. A *malformed* file is not: it states project facts that cannot be read,
+    so this raises ``ConfigError`` naming the file rather than falling back to
+    defaults that would silently be wrong.
+    """
     merged = {k: dict(v) for k, v in DEFAULT_CONFIG.items()}
     path = repo_root / "aide.toml"
     if path.is_file():
-        text = path.read_text(encoding="utf-8")
+        try:
+            text = path.read_text(encoding=_ENCODING)
+        except UnicodeDecodeError as exc:
+            raise _config_error(path, "is malformed", exc) from exc
+        except OSError as exc:
+            # Present but unreadable (permissions, a device error, a dangling
+            # link). The file may be perfectly well-formed — say so accurately
+            # rather than sending the reader to hunt for a syntax mistake.
+            raise _config_error(path, "cannot be read", exc) from exc
         try:
             import tomllib  # type: ignore
-            parsed = tomllib.loads(text)
         except ModuleNotFoundError:
-            parsed = _parse_toml(text)
+            detail_source = _parse_toml
+        else:
+            # tomllib.TOMLDecodeError subclasses ValueError; catching ValueError
+            # keeps this working if that relationship ever changes.
+            detail_source = tomllib.loads
+        try:
+            parsed = detail_source(text)
+        except (ConfigError, ValueError) as exc:
+            # Both parsers report line/column but neither knows the path, and the
+            # path is the one thing a reader needs to go fix it.
+            raise _config_error(path, "is malformed", exc) from exc
         for section, values in parsed.items():
             merged.setdefault(section, {})
             if isinstance(values, dict):
@@ -319,7 +450,7 @@ def _spec_stage_and_title(repo_root: Path, config, number: int) -> Tuple[Optiona
     specs = sorted(idir.glob(f"{number:03d}-*.md")) if idir.is_dir() else []
     if not specs:
         return None, None
-    text = specs[0].read_text(encoding="utf-8")
+    text = specs[0].read_text(encoding=_ENCODING)
     tm = re.search(r"^#\s+Item\s+0*" + str(number) + r"\s*[—–-]\s*(.+?)\s*$", text, re.MULTILINE)
     sm = re.search(r"\*\*Stage:\*\*\s*(\d+)", text)
     return (sm.group(1) if sm else None), (tm.group(1) if tm else None)
@@ -427,7 +558,7 @@ def _progress_item_status(repo_root: Path, config) -> Dict[int, str]:
     path = docs_dir(repo_root, config) / "progress.md"
     if not path.is_file():
         return {}
-    _, _, item_status = _parse_item_status(path.read_text(encoding="utf-8").splitlines())
+    _, _, item_status = _parse_item_status(path.read_text(encoding=_ENCODING).splitlines())
     return item_status
 
 
@@ -469,7 +600,7 @@ def template_residue_errors(ddir: Path) -> List[str]:
     if not ddir.is_dir():
         return errors
     for path in sorted(ddir.rglob("*.md")):
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding=_ENCODING)
         for lineno, line in enumerate(text.splitlines(), start=1):
             for m in _TEMPLATE_SLOT_RE.finditer(line):
                 errors.append(
@@ -496,7 +627,7 @@ def insight_warnings(ddir: Path) -> List[str]:
     if not path.is_file():
         return []
     out: List[str] = []
-    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for lineno, line in enumerate(path.read_text(encoding=_ENCODING).splitlines(), start=1):
         if not line.startswith("- "):
             continue
         if not _INSIGHT_RE.match(line):
@@ -547,7 +678,7 @@ def stray_icon_warnings(ddir: Path) -> List[str]:
     if qdir.is_dir():
         paths.extend(sorted(qdir.glob("queue-*.md")))
     for path in paths:
-        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        for lineno, line in enumerate(path.read_text(encoding=_ENCODING).splitlines(), start=1):
             for icon in _stray_icons_in_line(line):
                 out.append(
                     f"{path.relative_to(ddir)}:{lineno}: status icon {icon} outside a "
@@ -571,7 +702,7 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
 
     if not progress_path.is_file():
         return [f"missing {progress_path}"], warnings
-    text = progress_path.read_text(encoding="utf-8")
+    text = progress_path.read_text(encoding=_ENCODING)
     lines = text.splitlines()
 
     # Mandatory sections.
@@ -622,7 +753,7 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
     if qdir.is_dir():
         _, _, istat = _parse_item_status(lines)
         for qpath in _queue_paths(qdir):
-            qtext = qpath.read_text(encoding="utf-8")
+            qtext = qpath.read_text(encoding=_ENCODING)
             derived_open = queue_is_open(qtext, istat)
             declared = queue_status(qtext)
             if declared:
@@ -751,7 +882,7 @@ def cmd_progress(args: argparse.Namespace) -> int:
     if not progress_path.is_file():
         print(f"error: {progress_path} not found", file=sys.stderr)
         return 1
-    text = progress_path.read_text(encoding="utf-8")
+    text = progress_path.read_text(encoding=_ENCODING)
     original = text
     # An item is only trackable if some deliverable bullet references it (a
     # missing "*(Item NNN)*" would make set_item_status a silent no-op). When
@@ -815,7 +946,7 @@ def cmd_queue(args: argparse.Namespace) -> int:
     )
     superseded_by = later[-1] if later else args.number + 1
     date = args.date or _dt.date.today().isoformat()
-    text = target.read_text(encoding="utf-8")
+    text = target.read_text(encoding=_ENCODING)
     target.write_text(tidy_queue_text(text, superseded_by, date), encoding="utf-8")
     print(f"queue-{args.number:03d}: marked completed (superseded by queue-{superseded_by:03d})")
     return 0
@@ -922,7 +1053,7 @@ def _item_dependencies(repo_root: Path, config, number: int) -> List[int]:
     specs = list(idir.glob(f"{number:03d}-*.md"))
     if not specs:
         return []
-    text = specs[0].read_text(encoding="utf-8")
+    text = specs[0].read_text(encoding=_ENCODING)
     m = re.search(r"^##\s+Dependencies\s*$(.*?)(^##\s|\Z)", text, re.MULTILINE | re.DOTALL)
     section = m.group(1) if m else ""
     deps = {int(x) for x in re.findall(r"\bItem[s]?\s+0*(\d+)", section)}
@@ -934,7 +1065,7 @@ def _pick_item(repo_root: Path, config, queue_text: str,
                claim_branches: List[str]) -> Optional[Tuple[int, str]]:
     """First queue item that is planned, unclaimed, and unblocked. (number, title)."""
     _, _, item_status = _parse_item_status(
-        (docs_dir(repo_root, config) / "progress.md").read_text(encoding="utf-8").splitlines()
+        (docs_dir(repo_root, config) / "progress.md").read_text(encoding=_ENCODING).splitlines()
     ) if (docs_dir(repo_root, config) / "progress.md").is_file() else ([], [], {})
     claimed_nums = set()
     for br in claim_branches:
@@ -962,7 +1093,7 @@ def _open_queue_texts(repo_root: Path, config) -> List[str]:
     item_status = _progress_item_status(repo_root, config)
     out: List[str] = []
     for path in _queue_paths(qdir):
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding=_ENCODING)
         if queue_is_open(text, item_status):
             out.append(text)
     return out
@@ -975,14 +1106,14 @@ def _live_queue_text(repo_root: Path, config, queue_number: Optional[int]) -> Op
     qdir = docs_dir(repo_root, config) / "queue"
     if queue_number is not None:
         path = qdir / f"queue-{queue_number:03d}.md"
-        return path.read_text(encoding="utf-8") if path.is_file() else None
+        return path.read_text(encoding=_ENCODING) if path.is_file() else None
     if not qdir.is_dir():
         return None
     if (docs_dir(repo_root, config) / "progress.md").is_file():
         open_texts = _open_queue_texts(repo_root, config)
         return open_texts[0] if open_texts else None
     for path in sorted(_queue_paths(qdir), reverse=True):
-        text = path.read_text(encoding="utf-8")
+        text = path.read_text(encoding=_ENCODING)
         if is_live_queue(text):
             return text
     return None
@@ -1216,7 +1347,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     live_seen = False
     if qdir.is_dir() and _queue_paths(qdir):
         for path in _queue_paths(qdir):
-            nums = queue_item_numbers(path.read_text(encoding="utf-8"))
+            nums = queue_item_numbers(path.read_text(encoding=_ENCODING))
             open_nums = [n for n in nums
                          if item_status.get(n, "planned") in ("planned", "in-progress")]
             if open_nums:
@@ -1276,7 +1407,7 @@ def cmd_gc(args: argparse.Namespace) -> int:
     item_status: Dict[int, str] = {}
     if progress_path.is_file():
         _, _, item_status = _parse_item_status(
-            progress_path.read_text(encoding="utf-8").splitlines())
+            progress_path.read_text(encoding=_ENCODING).splitlines())
 
     local = [b for b in _local_branches(repo_root) if b.startswith(prefix)]
     remote = [b for b in _remote_branches(repo_root) if b.startswith(prefix)]
@@ -1400,7 +1531,14 @@ def main(argv: Optional[List[str]] = None) -> int:
             pass
     parser = build_parser()
     args = parser.parse_args(argv)
-    return args.func(args)
+    try:
+        return args.func(args)
+    except ConfigError as exc:
+        # A broken aide.toml is a user-fixable state, not a crash. Every
+        # subcommand loads the config, so catching it once here keeps the
+        # traceback off the screen for all of them.
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
