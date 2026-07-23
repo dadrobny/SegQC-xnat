@@ -80,12 +80,14 @@ mean the same thing to every command:
 |---|---|
 | `*(Item 006)*` | 6 |
 | `*(Items 006, 044)*` | 6, 44 — one deliverable, several items |
+| `*(Items 041, 053, 057)*` | 41, 53, 57 — a list is any length |
 | `*(Items 089/090)*` | 89, 90 |
 | `*(Items 071–075)*` | 71, 72, 73, 74, 75 — inclusive, hyphen or en-dash |
+| `*(Items 006, 044–046)*` | 6, 44, 45, 46 — an element may be a range |
 
-A range spanning more than 50 is read as a typo and contributes only its
-endpoints. Prefer the explicit list when the items are not contiguous; a range
-is only shorthand for one.
+Spacing around a separator does not matter. A range spanning more than 50 is
+read as a typo and contributes only its endpoints. Prefer the explicit list when
+the items are not contiguous; a range is only shorthand for one.
 
 **Rollup rule (deterministic — `aide progress` and `aide check` both apply it):**
 a stage is ✅ if *every* Deliverables bullet in it is ✅; then all its Acceptance

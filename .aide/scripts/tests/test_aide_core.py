@@ -263,6 +263,33 @@ def test_referenced_item_numbers_accepts_every_documented_form():
     assert aide._referenced_item_numbers("no reference here") == []
 
 
+def test_referenced_item_numbers_reads_lists_of_any_length():
+    """A list is not capped at two — real documents enumerate three and more.
+
+    SegQC-xnat's progress.md carries `*(Items 041, 053, 057)*` and
+    `*(Items 066, 069, 070)*` on single deliverable bullets. Reading only the
+    first two would orphan the tail exactly as reading only the first orphaned
+    the rest.
+    """
+    assert aide._referenced_item_numbers("*(Items 006, 044, 045)*") == [6, 44, 45]
+    assert aide._referenced_item_numbers("*(Items 041, 053, 057)*") == [41, 53, 57]
+    assert aide._referenced_item_numbers(
+        "*(Items 006, 044, 045, 046, 047)*") == [6, 44, 45, 46, 47]
+    assert aide._referenced_item_numbers("*(Items 006/044/045)*") == [6, 44, 45]
+
+
+def test_referenced_item_numbers_mixes_lists_and_ranges():
+    """A list element may itself be a range."""
+    assert aide._referenced_item_numbers("*(Items 006, 044-046)*") == [6, 44, 45, 46]
+    assert aide._referenced_item_numbers("*(Items 071-073, 085)*") == [71, 72, 73, 85]
+
+
+def test_referenced_item_numbers_tolerates_separator_spacing():
+    """Authors write these by hand; spacing around separators must not matter."""
+    for text in ("*(Items 006,044)*", "*(Items 006 , 044)*", "*(Items 006,  044)*"):
+        assert aide._referenced_item_numbers(text) == [6, 44], text
+
+
 def test_referenced_item_numbers_ignores_an_implausible_range():
     """A typo must not invent thousands of items — endpoints only."""
     assert aide._referenced_item_numbers("*(Items 6-9999)*") == [6, 9999]
