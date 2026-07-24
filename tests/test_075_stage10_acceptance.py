@@ -27,11 +27,11 @@ import os
 
 import pytest
 
-from segqc.backend import ENV_VAR, cupy_available
-from segqc.config import bundled_default_config
-from segqc.synth.corpus import load_manifest
-from segqc.synth.regression import loaded_seg_image
-from segqc.verdict import Severity
+from segfacet.backend import ENV_VAR, cupy_available
+from segfacet.config import bundled_default_config
+from segfacet.synth.corpus import load_manifest
+from segfacet.synth.regression import loaded_seg_image
+from segfacet.verdict import Severity
 
 from test_073_verdict_equivalence import run_under_backend, verdict_signature
 
@@ -167,7 +167,7 @@ def test_adv_evidence_record_mismatched_gpu_ran_is_detectable():
 
 
 def test_adv_env_hermeticity_around_cpu_clause_run():
-    """Env hygiene: the SEGQC_BACKEND selection made via run_under_backend's
+    """Env hygiene: the SEGFACET_BACKEND selection made via run_under_backend's
     monkeypatch parameter does not leak past that monkeypatch context's
     teardown."""
     original_present = ENV_VAR in os.environ

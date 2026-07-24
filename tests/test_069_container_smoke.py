@@ -4,7 +4,7 @@ Docker-gated: exercises the real item-066 image via ``docker run`` through the
 item-068 entry script (``/app/docker/entrypoint.py``), at the exact bind-mount
 paths item-067's ``command.json`` declares, against small committed corpus
 fixtures. This is the first test in the stage that drives the whole packaged
-path -- image -> mount convention -> entry script -> ``segqc run`` -> output
+path -- image -> mount convention -> entry script -> ``segfacet run`` -> output
 resources -- as a single unit, standing in for what the XNAT Container Service
 does, but with ``docker run -v`` instead of XNAT's own mount machinery.
 
@@ -12,7 +12,7 @@ Docker availability, the shared ``requires_docker`` skip marker, and the
 session-scoped ``docker_image_tag`` build fixture all live in
 ``tests/conftest.py`` (promoted there from ``tests/test_066_dockerfile.py`` by
 this item) so this module and ``test_066_dockerfile.py`` build the
-``segqc:test-066`` image **at most once** per test session.
+``segfacet:test-066`` image **at most once** per test session.
 
 All Docker-gated tests degrade to a clean ``pytest.skip`` (never a failure)
 when Docker itself is unavailable or a mount/build cannot run for
@@ -33,7 +33,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 SCAN_FIXTURE = REPO_ROOT / "tests" / "corpus" / "fixtures" / "base_scan.nii.gz"
 SEG_FIXTURE = REPO_ROOT / "tests" / "corpus" / "fixtures" / "clean_control_seg.nii.gz"
-REFERENCE_FIXTURE = REPO_ROOT / "src" / "segqc" / "reference" / "reference_default.json"
+REFERENCE_FIXTURE = REPO_ROOT / "src" / "segfacet" / "reference" / "reference_default.json"
 
 ENTRYPOINT_ARGV_PREFIX = ["python", "/app/docker/entrypoint.py"]
 
@@ -49,9 +49,9 @@ def _load_report_schema() -> dict:
     """Load the live v0 report schema (not a copy) so this smoke test fails
     if the container's report shape and the schema diverge."""
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     return json.loads(ref.read_text(encoding="utf-8"))
 
 
@@ -65,7 +65,7 @@ def _stage_role_dir(tmp_path: Path, role: str, fixture: Path, filename: str) -> 
 
 def _stage_output_dir(tmp_path: Path) -> Path:
     """Create a writable output dir. The item-066 image runs as the non-root
-    ``segqc`` user, so the host directory is made world-writable to allow the
+    ``segfacet`` user, so the host directory is made world-writable to allow the
     container to write reports into the bind mount."""
     out_dir = tmp_path / "out"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -170,7 +170,7 @@ def test_ac5_happy_path_produces_report_json(docker_image_tag, tmp_path):
         ],
     )
     assert result.returncode == 0, result.stderr
-    assert (out_dir / "segqc_report.json").is_file()
+    assert (out_dir / "segfacet_report.json").is_file()
 
 
 @requires_docker
@@ -191,7 +191,7 @@ def test_ac6_happy_path_produces_report_txt(docker_image_tag, tmp_path):
         ],
     )
     assert result.returncode == 0, result.stderr
-    assert (out_dir / "segqc_report.txt").is_file()
+    assert (out_dir / "segfacet_report.txt").is_file()
 
 
 @requires_docker
@@ -216,7 +216,7 @@ def test_ac7_happy_path_report_json_validates_against_schema(docker_image_tag, t
     import jsonschema
 
     schema = _load_report_schema()
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     jsonschema.validate(report, schema)
 
 
@@ -239,7 +239,7 @@ def test_ac8_happy_path_report_has_deterministic_content(docker_image_tag, tmp_p
     )
     assert result.returncode == 0, result.stderr
 
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert report["schema_version"] == "0.1"
     assert report["case_id"]
     assert report["verdict"] in ("pass", "flagged-for-review", "fail")
@@ -277,13 +277,13 @@ def test_ac9_optional_reference_mount_produces_reference_delta(docker_image_tag,
         f"reference-mount docker run failed:\n"
         f"--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}"
     )
-    assert (out_dir / "segqc_report.json").is_file()
-    assert (out_dir / "segqc_report.txt").is_file()
+    assert (out_dir / "segfacet_report.json").is_file()
+    assert (out_dir / "segfacet_report.txt").is_file()
 
     import jsonschema
 
     schema = _load_report_schema()
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     jsonschema.validate(report, schema)
     assert "reference_delta" in report
 
@@ -386,5 +386,5 @@ def test_ac12_failure_path_leaves_no_partial_output(docker_image_tag, tmp_path):
         ],
     )
     assert result.returncode != 0
-    assert not (out_dir / "segqc_report.json").exists()
-    assert not (out_dir / "segqc_report.txt").exists()
+    assert not (out_dir / "segfacet_report.json").exists()
+    assert not (out_dir / "segfacet_report.txt").exists()

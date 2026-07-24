@@ -5,10 +5,10 @@ calibrate_thresholds``).
 
 Context. Items 089/090 (Stage 14) shipped reference-derived ``bounds`` /
 ``fragmentation`` defaults and a ``reference_delta`` rule that only fire once
-a :class:`~segqc.reference.schema.ReferenceDistribution` is attached to the
+a :class:`~segfacet.reference.schema.ReferenceDistribution` is attached to the
 record fed to the rule engine -- which only ever happened via
 ``pipeline.run_qc_with_reference``. ``eval.harness.evaluate_case`` called
-plain ``run_qc`` unconditionally, so every FPR measured through ``segqc
+plain ``run_qc`` unconditionally, so every FPR measured through ``segfacet
 evaluate`` (Stage 7/12/14's "Real VerSe GT" metric, and every
 ``calibrate_thresholds`` grid point) silently degraded to the hand-set
 fallback -- item 090's shipped recalibration was never actually exercised by
@@ -27,12 +27,12 @@ import shutil
 
 import pytest
 
-from segqc.config import bundled_default_config
-from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
-from segqc.eval.harness import EvaluationCase, evaluate_case, evaluate_cohort
-from segqc.reference import bundled_default_reference, write_artifact
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.corpus import CORPUS_DIR
+from segfacet.config import bundled_default_config
+from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
+from segfacet.eval.harness import EvaluationCase, evaluate_case, evaluate_cohort
+from segfacet.reference import bundled_default_reference, write_artifact
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.corpus import CORPUS_DIR
 
 
 def _clean_case(case_id="c-clean"):
@@ -138,13 +138,13 @@ def test_evaluate_case_stratum_and_percentiles_are_threaded_through(monkeypatch)
     unchanged (mirrors test_049's AC1 custom-percentile assertion)."""
     captured = {}
 
-    from segqc.pipeline import run_qc_with_reference as _real
+    from segfacet.pipeline import run_qc_with_reference as _real
 
     def _spy(seg_img, config, reference, **kwargs):
         captured.update(kwargs)
         return _real(seg_img, config, reference, **kwargs)
 
-    monkeypatch.setattr("segqc.pipeline.run_qc_with_reference", _spy)
+    monkeypatch.setattr("segfacet.pipeline.run_qc_with_reference", _spy)
 
     case = _clean_case()
     cfg = bundled_default_config()
@@ -212,7 +212,7 @@ def test_calibrate_thresholds_reference_none_matches_omitted_kwarg():
 
 
 # --------------------------------------------------------------------------- #
-# ``segqc evaluate --reference`` / ``--reference-artifact`` (CLI)
+# ``segfacet evaluate --reference`` / ``--reference-artifact`` (CLI)
 # --------------------------------------------------------------------------- #
 
 
@@ -245,7 +245,7 @@ _CLEAN_ONLY_COHORT = [
 def test_cli_evaluate_without_reference_flag_defaults_off(tmp_path):
     """No --reference given: behaviour is unchanged from pre-092 (the flag
     is opt-in, not inherited from config's reference.enabled)."""
-    from segqc import cli
+    from segfacet import cli
 
     manifest_path = _write_manifest(tmp_path, _CLEAN_ONLY_COHORT, name="off.json")
     out_dir = tmp_path / "out"
@@ -260,7 +260,7 @@ def test_cli_evaluate_without_reference_flag_defaults_off(tmp_path):
 
 
 def test_cli_evaluate_reference_artifact_flag_is_accepted_and_runs(tmp_path):
-    from segqc import cli
+    from segfacet import cli
 
     manifest_path = _write_manifest(tmp_path, _CLEAN_ONLY_COHORT, name="ref.json")
     artifact_path = _write_reference_artifact(tmp_path)
@@ -286,7 +286,7 @@ def test_cli_evaluate_reference_artifact_flag_is_accepted_and_runs(tmp_path):
 def test_cli_evaluate_reference_artifact_without_reference_flag_is_a_no_op(tmp_path):
     """--reference-artifact alone (no --reference) does not enable reference
     mode -- mirrors --reference-artifact's documented gating."""
-    from segqc import cli
+    from segfacet import cli
 
     manifest_path = _write_manifest(tmp_path, _CLEAN_ONLY_COHORT, name="noop.json")
     artifact_path = _write_reference_artifact(tmp_path)
@@ -319,7 +319,7 @@ def test_cli_evaluate_reference_artifact_without_reference_flag_is_a_no_op(tmp_p
 def test_cli_evaluate_nonexistent_reference_artifact_exits_1_with_no_traceback(
     tmp_path, capsys
 ):
-    from segqc import cli
+    from segfacet import cli
 
     manifest_path = _write_manifest(tmp_path, _CLEAN_ONLY_COHORT, name="bad_ref.json")
     out_dir = tmp_path / "out"

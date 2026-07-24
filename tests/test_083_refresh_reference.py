@@ -39,9 +39,9 @@ from pathlib import Path
 import nibabel as nib
 import pytest
 
-from segqc.reference import default_artifact_path, load_artifact
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.intensity import paint_clean_scan
+from segfacet.reference import default_artifact_path, load_artifact
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.intensity import paint_clean_scan
 
 # --------------------------------------------------------------------------- #
 # Module loader (mirrors tests/test_aide_status_report.py's by-path pattern)

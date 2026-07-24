@@ -12,26 +12,26 @@ import logging
 
 import pytest
 
-from segqc._logging import JsonFormatter, setup_logging
+from segfacet._logging import JsonFormatter, setup_logging
 
 
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
 
-def _segqc_logger() -> logging.Logger:
-    """Return the package-level 'segqc' logger."""
-    return logging.getLogger("segqc")
+def _segfacet_logger() -> logging.Logger:
+    """Return the package-level 'segfacet' logger."""
+    return logging.getLogger("segfacet")
 
 
 def _child_logger() -> logging.Logger:
-    """Return a child logger that propagates to the segqc root."""
-    return logging.getLogger("segqc.test_logging")
+    """Return a child logger that propagates to the segfacet root."""
+    return logging.getLogger("segfacet.test_logging")
 
 
-def _reset_segqc_logger() -> None:
-    """Remove all handlers from the 'segqc' logger (for test isolation)."""
-    root = _segqc_logger()
+def _reset_segfacet_logger() -> None:
+    """Remove all handlers from the 'segfacet' logger (for test isolation)."""
+    root = _segfacet_logger()
     for h in list(root.handlers):
         root.removeHandler(h)
         h.close()
@@ -43,16 +43,16 @@ def _reset_segqc_logger() -> None:
 # --------------------------------------------------------------------------- #
 
 def test_import_has_no_side_effects():
-    """Importing segqc._logging must not install any handlers on the root logger."""
-    # We already imported it at module load; the segqc logger should have
+    """Importing segfacet._logging must not install any handlers on the root logger."""
+    # We already imported it at module load; the segfacet logger should have
     # zero handlers added by the mere import (setup_logging was not called).
     # This test runs before any call to setup_logging from within this module,
     # so if the import silently installed handlers, this would fail.
     import importlib
-    import segqc._logging as mod
+    import segfacet._logging as mod
     # Force a reload to simulate a fresh import in isolation.
     importlib.reload(mod)
-    root = logging.getLogger("segqc")
+    root = logging.getLogger("segfacet")
     # After reload the handlers count might reflect prior test calls.
     # The key assertion: import itself should not raise.
     assert mod.setup_logging is not None  # module loaded successfully
@@ -67,7 +67,7 @@ def test_setup_logging_debug_does_not_raise():
     try:
         setup_logging("DEBUG")
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 def test_setup_logging_warning_does_not_raise():
@@ -75,7 +75,7 @@ def test_setup_logging_warning_does_not_raise():
     try:
         setup_logging("WARNING")
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 def test_setup_logging_int_level_does_not_raise():
@@ -83,7 +83,7 @@ def test_setup_logging_int_level_does_not_raise():
     try:
         setup_logging(logging.INFO)
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 # --------------------------------------------------------------------------- #
@@ -94,10 +94,10 @@ def test_setup_logging_installs_exactly_one_handler():
     """A single call installs exactly one StreamHandler."""
     try:
         setup_logging("DEBUG")
-        root = _segqc_logger()
+        root = _segfacet_logger()
         assert len(root.handlers) == 1
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 def test_setup_logging_idempotent(capfd):
@@ -105,10 +105,10 @@ def test_setup_logging_idempotent(capfd):
     try:
         setup_logging("DEBUG")
         setup_logging("DEBUG")
-        root = _segqc_logger()
+        root = _segfacet_logger()
         assert len(root.handlers) == 1
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 def test_setup_logging_idempotent_no_duplicate_output(capfd):
@@ -122,7 +122,7 @@ def test_setup_logging_idempotent_no_duplicate_output(capfd):
         count = captured.err.count("unique-idempotency-marker")
         assert count == 1, f"Expected 1 occurrence, got {count}"
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 # --------------------------------------------------------------------------- #
@@ -137,7 +137,7 @@ def test_setup_logging_plain_emits_text(capfd):
         captured = capfd.readouterr()
         assert "plain-text-test-message" in captured.err
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 def test_setup_logging_plain_text_is_not_json(capfd):
@@ -146,14 +146,14 @@ def test_setup_logging_plain_text_is_not_json(capfd):
         setup_logging("DEBUG", json_format=False)
         _child_logger().warning("some warning text")
         captured = capfd.readouterr()
-        # The plain-text formatter produces lines like "WARNING   segqc.test — …"
+        # The plain-text formatter produces lines like "WARNING   segfacet.test — …"
         # which are NOT valid JSON objects.
         lines = [ln for ln in captured.err.splitlines() if ln.strip()]
         for line in lines:
             with pytest.raises(json.JSONDecodeError):
                 json.loads(line)
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 def test_setup_logging_plain_format_contains_level_and_name(capfd):
@@ -163,9 +163,9 @@ def test_setup_logging_plain_format_contains_level_and_name(capfd):
         _child_logger().debug("level-and-name-check")
         captured = capfd.readouterr()
         assert "DEBUG" in captured.err
-        assert "segqc.test_logging" in captured.err
+        assert "segfacet.test_logging" in captured.err
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 def test_level_filter_respected(capfd):
@@ -179,7 +179,7 @@ def test_level_filter_respected(capfd):
         assert "this-should-not-appear" not in captured.err
         assert "this-should-appear" in captured.err
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 # --------------------------------------------------------------------------- #
@@ -198,7 +198,7 @@ def test_setup_logging_json_emits_valid_json(capfd):
             parsed = json.loads(line)   # must not raise
             assert isinstance(parsed, dict)
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 def test_setup_logging_json_required_fields(capfd):
@@ -215,7 +215,7 @@ def test_setup_logging_json_required_fields(capfd):
         assert "logger" in record
         assert "message" in record
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 def test_setup_logging_json_message_content(capfd):
@@ -228,9 +228,9 @@ def test_setup_logging_json_message_content(capfd):
         record = json.loads(lines[-1])
         assert "json-message-content-check" in record["message"]
         assert record["level"] == "WARNING"
-        assert "segqc" in record["logger"]
+        assert "segfacet" in record["logger"]
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 def test_setup_logging_json_level_field_matches(capfd):
@@ -244,7 +244,7 @@ def test_setup_logging_json_level_field_matches(capfd):
         record = json.loads(lines[-1])
         assert record["level"] == "ERROR"
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 # --------------------------------------------------------------------------- #
@@ -255,7 +255,7 @@ def test_json_formatter_produces_dict():
     """JsonFormatter.format returns a string parseable as a dict."""
     formatter = JsonFormatter()
     record = logging.LogRecord(
-        name="segqc.test",
+        name="segfacet.test",
         level=logging.INFO,
         pathname="",
         lineno=0,
@@ -267,7 +267,7 @@ def test_json_formatter_produces_dict():
     parsed = json.loads(result)
     assert parsed["message"] == "hello world"
     assert parsed["level"] == "INFO"
-    assert parsed["logger"] == "segqc.test"
+    assert parsed["logger"] == "segfacet.test"
     assert "time" in parsed
 
 
@@ -275,7 +275,7 @@ def test_json_formatter_handles_format_args():
     """JsonFormatter interpolates args into the message (getMessage behaviour)."""
     formatter = JsonFormatter()
     record = logging.LogRecord(
-        name="segqc.test",
+        name="segfacet.test",
         level=logging.DEBUG,
         pathname="",
         lineno=0,

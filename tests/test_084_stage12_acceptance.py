@@ -1,7 +1,7 @@
 """Stage-12 G3 acceptance module (item 084) -- closes Stage 12.
 
 Quantifies objective G3 (GT segmentations pass QC at a high rate / low
-false-positive rate) via the Stage-7 ``segqc evaluate`` path, and supplies
+false-positive rate) via the Stage-7 ``segfacet evaluate`` path, and supplies
 the machine-checkable evidence + guard that gate flipping the "Real VerSe
 GT" row in ``progress.md``'s Environment-Gated Capability Verification
 table from Unverified to Verified.
@@ -21,21 +21,21 @@ Covers Acceptance Criteria AC1-AC11:
   well-formed ``eval_report.json`` whose FPR is ``0.0`` for the clean
   self-vs-self cohort.
 - AC5/AC6: the real-VerSe clause is a GENUINE skip (never xfail, never a
-  vacuous pass) when ``SEGQC_VERSE_COHORT`` is unset or points nowhere.
+  vacuous pass) when ``SEGFACET_VERSE_COHORT`` is unset or points nowhere.
 - AC7-AC10: the G3 verification-evidence record shape, the
   ``may_mark_verified`` guard truth-table, the synthetic-only run's
   self-reported non-verified record, and FPR consistency with the report.
 - AC11: no production code / new dependency is introduced by this item.
 
 Adversarial / edge cases:
-- Nonexistent / empty ``SEGQC_VERSE_COHORT`` values.
+- Nonexistent / empty ``SEGFACET_VERSE_COHORT`` values.
 - ``build_gt_pass_manifest`` over an empty cohort dir yields an empty
   ``cases`` list, no traceback.
 - ``may_mark_verified`` non-vacuity: a real cohort with a missing
   ``build_date`` (and vice-versa) still refuses to verify.
 - FPR is never ``None`` for the deliberately non-empty stand-in cohort.
 - Determinism across two evaluate runs of the same stand-in manifest.
-- ``SEGQC_VERSE_COHORT`` env hygiene after monkeypatch teardown.
+- ``SEGFACET_VERSE_COHORT`` env hygiene after monkeypatch teardown.
 """
 
 from __future__ import annotations
@@ -48,21 +48,21 @@ from typing import Optional
 import nibabel as nib
 import pytest
 
-from segqc.cli import main as segqc_main
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.intensity import paint_clean_scan
+from segfacet.cli import main as segfacet_main
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.intensity import paint_clean_scan
 
 # =========================================================================== #
-# Public helpers (test-side only -- no src/segqc/** change, item 084 A1)
+# Public helpers (test-side only -- no src/segfacet/** change, item 084 A1)
 # =========================================================================== #
 
 
 def real_verse_cohort_dir() -> Optional[pathlib.Path]:
-    """Return the real VerSe GT cohort dir from ``SEGQC_VERSE_COHORT`` iff the
+    """Return the real VerSe GT cohort dir from ``SEGFACET_VERSE_COHORT`` iff the
     env var is set AND the directory exists; else ``None``. The single
     runtime gate for the real-VerSe clause (analogue of ``cupy_available()``/
     ``_docker_available()``)."""
-    raw = os.environ.get("SEGQC_VERSE_COHORT")
+    raw = os.environ.get("SEGFACET_VERSE_COHORT")
     if not raw:
         return None
     candidate = pathlib.Path(raw)
@@ -141,7 +141,7 @@ def may_mark_verified(record: dict) -> bool:
 
 requires_verse = pytest.mark.skipif(
     real_verse_cohort_dir() is None,
-    reason="real VerSe GT cohort not mounted (set SEGQC_VERSE_COHORT)",
+    reason="real VerSe GT cohort not mounted (set SEGFACET_VERSE_COHORT)",
 )
 
 
@@ -172,7 +172,7 @@ def _build_standin_cohort(dest_dir: pathlib.Path, n: int = 2) -> pathlib.Path:
 
 
 def _run_evaluate(manifest_path, out_dir, *, cohort_id="verse-standin", build_date="2026-07-15"):
-    return segqc_main(
+    return segfacet_main(
         [
             "evaluate",
             "--cohort",
@@ -276,7 +276,7 @@ def test_ac5_requires_verse_marker_is_a_genuine_skipif():
     assert requires_verse.mark.name == "skipif"
     condition = requires_verse.mark.args[0]
     assert isinstance(condition, bool)
-    # On this data-absent host (no SEGQC_VERSE_COHORT mounted in CI/dev) the
+    # On this data-absent host (no SEGFACET_VERSE_COHORT mounted in CI/dev) the
     # condition must be True so the gated test actually skips -- never xfail,
     # never an unconditional pass.
     assert condition is True
@@ -317,20 +317,20 @@ def test_ac5_real_cohort_evaluation_runs_only_when_mounted(tmp_path):
 
 
 def test_ac6_returns_none_when_env_var_unset(monkeypatch):
-    monkeypatch.delenv("SEGQC_VERSE_COHORT", raising=False)
+    monkeypatch.delenv("SEGFACET_VERSE_COHORT", raising=False)
     assert real_verse_cohort_dir() is None
 
 
 def test_ac6_returns_none_when_env_var_points_to_nonexistent_path(monkeypatch, tmp_path):
     nonexistent = tmp_path / "no-such-verse-dir"
-    monkeypatch.setenv("SEGQC_VERSE_COHORT", str(nonexistent))
+    monkeypatch.setenv("SEGFACET_VERSE_COHORT", str(nonexistent))
     assert real_verse_cohort_dir() is None
 
 
 def test_ac6_returns_path_when_env_var_points_to_existing_dir(monkeypatch, tmp_path):
     existing = tmp_path / "verse-cohort"
     existing.mkdir()
-    monkeypatch.setenv("SEGQC_VERSE_COHORT", str(existing))
+    monkeypatch.setenv("SEGFACET_VERSE_COHORT", str(existing))
     result = real_verse_cohort_dir()
     assert result is not None
     assert pathlib.Path(result).resolve() == existing.resolve()
@@ -482,10 +482,10 @@ def test_ac11_no_new_dependency():
     """No new core dependency was introduced by item 084.
 
     The original AC11 also diffed this branch against ``main`` to prove item
-    084 added no ``src/segqc/**``/``scripts/**`` file -- a one-time proof that
+    084 added no ``src/segfacet/**``/``scripts/**`` file -- a one-time proof that
     was true at merge time and reviewed then. Left as a permanent check it is
     unsound: any *later* item that legitimately adds source under
-    ``src/segqc/`` (e.g. item 071's ``backend.py``) makes this branch's diff
+    ``src/segfacet/`` (e.g. item 071's ``backend.py``) makes this branch's diff
     against a moving ``main`` include that path, failing a guard about item
     084's own historical scope rather than the current branch's. Narrowed to
     the timeless part -- the dependency set -- which item 084 also never
@@ -550,9 +550,9 @@ def test_adv_determinism_two_evaluate_runs_produce_equal_fpr(tmp_path):
 def test_adv_env_var_hygiene_after_monkeypatch_teardown(monkeypatch, tmp_path):
     existing = tmp_path / "verse-cohort"
     existing.mkdir()
-    monkeypatch.setenv("SEGQC_VERSE_COHORT", str(existing))
+    monkeypatch.setenv("SEGFACET_VERSE_COHORT", str(existing))
     assert real_verse_cohort_dir() is not None
     monkeypatch.undo()
-    assert "SEGQC_VERSE_COHORT" not in os.environ or os.environ.get(
-        "SEGQC_VERSE_COHORT"
+    assert "SEGFACET_VERSE_COHORT" not in os.environ or os.environ.get(
+        "SEGFACET_VERSE_COHORT"
     ) != str(existing)

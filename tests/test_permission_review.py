@@ -2,7 +2,7 @@
 
 The module under test lives outside the package, at
 ``.claude/scripts/review_permissions.py`` (it is tooling for the AIDE workflow,
-not part of ``segqc``), so it is loaded by path rather than imported normally.
+not part of ``segfacet``), so it is loaded by path rather than imported normally.
 We cover the three pure helpers: ``normalize_command``, ``correlate`` and
 ``is_covered`` — the logic the human review depends on.
 """
@@ -39,7 +39,7 @@ _spec.loader.exec_module(review)
         ("Bash", "", "Bash"),
         ("Edit", "docs/aide/vision.md", "Edit(docs/aide/**)"),
         ("Write", "CLAUDE.md", "Write(CLAUDE.md)"),
-        ("MultiEdit", "src/segqc/io.py", "Edit(src/segqc/**)"),
+        ("MultiEdit", "src/segfacet/io.py", "Edit(src/segfacet/**)"),
         ("Edit", r"docs\aide\roadmap.md", "Edit(docs/aide/**)"),
         ("WebFetch", "https://example.com/a/b", "WebFetch(domain:example.com)"),
         ("WebSearch", "how to do x", "WebSearch"),
@@ -101,7 +101,7 @@ def test_correlate_isolates_sessions():
         ("Bash", "git statusx", ["Bash(git status:*)"], False),  # prefix boundary
         ("Read", "anything.py", ["Read", "Grep"], True),  # bare tool rule
         ("Edit", ".claude/skills/x/SKILL.md", ["Edit(.claude/skills/**)"], True),
-        ("Edit", "src/segqc/io.py", ["Edit(.claude/skills/**)"], False),
+        ("Edit", "src/segfacet/io.py", ["Edit(.claude/skills/**)"], False),
         ("Bash", "gh pr create", ["Bash(git status:*)", "Read"], False),
     ],
 )

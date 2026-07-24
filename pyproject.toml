@@ -3,15 +3,15 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "segqc"
-description = "Automated quality-control for vertebra instance segmentations of spine imaging."
+name = "segfacet"
+description = "FACET - Failure Analysis, Characterisation & Evaluation Toolkit for instance segmentations of spine imaging."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
     { name = "David Drobny", email = "david.drobny@kcl.ac.uk" },
 ]
-keywords = ["segmentation", "quality-control", "spine", "vertebra", "xnat", "medical-imaging"]
+keywords = ["segmentation", "quality-control", "failure-analysis", "spine", "vertebra", "medical-imaging"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Science/Research",
@@ -43,14 +43,14 @@ dev = [
     "matplotlib>=3.5",
 ]
 # Optional Stage-8 extra (item 060): PyRadiomics (GLCM + shape features) behind
-# an optional-import adapter (segqc.features.radiomics). Kept out of core
+# an optional-import adapter (segfacet.features.radiomics). Kept out of core
 # `dependencies` because it has historically had install friction across
 # platforms/Python versions (it transitively pulls SimpleITK); the default
 # feature set and test suite run fine without it. Install with
-# `pip install segqc[radiomics]`.
+# `pip install segfacet[radiomics]`.
 # Confirmed friction (2026-07-14, CI): pyradiomics's legacy setup.py does
 # `import numpy` at build time without declaring numpy as a build-system
-# requirement, so a plain `pip install segqc[radiomics]` fails in pip's
+# requirement, so a plain `pip install segfacet[radiomics]` fails in pip's
 # isolated build env with `ModuleNotFoundError: No module named 'numpy'`.
 # Install core deps first, then pyradiomics with `--no-build-isolation`:
 #   pip install -e .[dev]
@@ -60,30 +60,30 @@ radiomics = [
     "pyradiomics>=3.0",
 ]
 # Optional Stage-10 extra (item 071): CuPy, the CUDA-accelerated NumPy-alike
-# consumed by segqc.backend's GPU path (segqc.backend.get_backend). Kept out
+# consumed by segfacet.backend's GPU path (segfacet.backend.get_backend). Kept out
 # of core `dependencies` -- the default backend is CPU/NumPy and the full
 # test suite runs with zero required GPU dependencies; auto-detect silently
 # falls back to CPU when cupy is absent. The requirement below is a loose
 # lower bound only: CuPy ships CUDA-version-specific wheels
 # (`cupy-cuda11x` / `cupy-cuda12x`) or a source build, so the user must pick
-# the wheel matching their installed CUDA toolkit -- `pip install segqc[gpu]`
+# the wheel matching their installed CUDA toolkit -- `pip install segfacet[gpu]`
 # documents the dependency but does not, by itself, choose a working wheel.
 gpu = [
     "cupy>=12",
 ]
 
 [project.urls]
-Homepage = "https://github.com/dadrobny/SegQC-xnat"
-Repository = "https://github.com/dadrobny/SegQC-xnat"
+Homepage = "https://github.com/dadrobny/segfacet"
+Repository = "https://github.com/dadrobny/segfacet"
 
 [project.scripts]
-segqc = "segqc.cli:main"
+segfacet = "segfacet.cli:main"
 
 [tool.hatch.version]
-path = "src/segqc/__init__.py"
+path = "src/segfacet/__init__.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/segqc"]
+packages = ["src/segfacet"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

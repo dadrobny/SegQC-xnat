@@ -26,7 +26,7 @@ Covers Acceptance Criteria AC1-AC28:
 
 Adversarial / edge-case scenarios included:
 - ``remove_level`` / ``crop_at_border`` / ``force_overlap`` with an explicit
-  target not present in the map raise SegQCInputError.
+  target not present in the map raise FacetInputError.
 - ``crop_at_border`` against each of the four in-plane faces sets the
   matching ``touches_*`` flag and fires ``border``.
 - ``crop_at_border`` retains a physical volume above the level group's
@@ -42,23 +42,23 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-import segqc.synth  # noqa: F401 -- triggers self-registration of the three operators
-from segqc.config import bundled_default_config
-from segqc.feature_report import overlap_to_dict
-from segqc.features.geometry import compute_label_geometry
-from segqc.features.overlap import detect_overlaps
-from segqc.heuristics.bounds import DEFAULT_BOUNDS
-from segqc.heuristics.overlap import OverlapRule
-from segqc.io import SegQCInputError
-from segqc.pipeline import run_qc
-from segqc.synth import (
+import segfacet.synth  # noqa: F401 -- triggers self-registration of the three operators
+from segfacet.config import bundled_default_config
+from segfacet.feature_report import overlap_to_dict
+from segfacet.features.geometry import compute_label_geometry
+from segfacet.features.overlap import detect_overlaps
+from segfacet.heuristics.bounds import DEFAULT_BOUNDS
+from segfacet.heuristics.overlap import OverlapRule
+from segfacet.io import FacetInputError
+from segfacet.pipeline import run_qc
+from segfacet.synth import (
     FAILURE_MODE_NAMES,
     build_clean_spine,
     get_perturbation,
     iter_perturbations,
     perturbation_names,
 )
-from segqc.synth.coverage_border_overlap import (
+from segfacet.synth.coverage_border_overlap import (
     CropAtBorderPerturbation,
     ForceOverlapPerturbation,
     RemoveLevelPerturbation,
@@ -229,17 +229,17 @@ def test_ac7_remove_level_unspecified_target_removes_interior_level():
 
 def test_ac8_remove_level_rejects_span_with_no_interior_level():
     """AC8: applying RemoveLevelPerturbation() to a two-label map (no
-    interior level) raises SegQCInputError."""
+    interior level) raises FacetInputError."""
     two_label = build_clean_spine(levels=["L1", "L2"]).seg_img
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         RemoveLevelPerturbation().apply(two_label, seed=0)
 
 
 def test_ac9_remove_level_rejects_explicit_terminal_target():
     """AC9: an explicit terminal target (label 20, superior span end) raises
-    SegQCInputError."""
+    FacetInputError."""
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         RemoveLevelPerturbation(target_label=20).apply(clean.seg_img, seed=0)
 
 
@@ -336,9 +336,9 @@ def test_ac16_crop_at_border_default_face_flags_terminal_target():
 
 
 def test_ac17_crop_at_border_rejects_unknown_face_string():
-    """AC17: an unknown face string raises SegQCInputError."""
+    """AC17: an unknown face string raises FacetInputError."""
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         CropAtBorderPerturbation(target_label=22, face="diagonal").apply(
             clean.seg_img, seed=0
         )
@@ -425,14 +425,14 @@ def test_ac22_force_overlap_run_qc_shows_no_overlap_finding():
 
 
 def test_ac23_force_overlap_rejects_too_small_or_non_adjacent_input():
-    """AC23: a single-label map raises SegQCInputError; a non-adjacent
-    explicit pair (20, 23) raises SegQCInputError."""
+    """AC23: a single-label map raises FacetInputError; a non-adjacent
+    explicit pair (20, 23) raises FacetInputError."""
     single = build_clean_spine(levels=["L3"]).seg_img
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         ForceOverlapPerturbation().apply(single, seed=0)
 
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         ForceOverlapPerturbation(target_label=20, neighbour_label=23).apply(
             clean.seg_img, seed=0
         )
@@ -526,25 +526,25 @@ def test_ac28_spacing_aware_under_anisotropic_spacing(make_operator, name):
 
 def test_adv_remove_level_explicit_target_absent_raises_clear_error():
     """Adversarial: an explicit target_label not present in the map raises
-    SegQCInputError rather than silently no-op-ing."""
+    FacetInputError rather than silently no-op-ing."""
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         RemoveLevelPerturbation(target_label=999).apply(clean.seg_img, seed=0)
 
 
 def test_adv_crop_at_border_explicit_target_absent_raises_clear_error():
     """Adversarial: an explicit target_label not present in the map raises
-    SegQCInputError."""
+    FacetInputError."""
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         CropAtBorderPerturbation(target_label=999).apply(clean.seg_img, seed=0)
 
 
 def test_adv_force_overlap_explicit_target_absent_raises_clear_error():
     """Adversarial: an explicit target_label not present in the map raises
-    SegQCInputError."""
+    FacetInputError."""
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         ForceOverlapPerturbation(target_label=999, neighbour_label=21).apply(
             clean.seg_img, seed=0
         )
@@ -552,9 +552,9 @@ def test_adv_force_overlap_explicit_target_absent_raises_clear_error():
 
 def test_adv_force_overlap_explicit_neighbour_absent_raises_clear_error():
     """Adversarial: an explicit neighbour_label not present in the map
-    raises SegQCInputError."""
+    raises FacetInputError."""
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         ForceOverlapPerturbation(target_label=20, neighbour_label=999).apply(
             clean.seg_img, seed=0
         )

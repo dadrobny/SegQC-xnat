@@ -4,8 +4,8 @@
 # project-specific. Parsed with the stdlib `tomllib` by .aide/scripts/aide.py.
 
 [project]
-name = "SegQC-xnat"
-source_dir = "src/segqc"     # where production code lives (builder scope)
+name = "FACET"
+source_dir = "src/segfacet"     # where production code lives (builder scope)
 tests_dir = "tests"          # where tests live (test-writer scope)
 docs_dir = "docs/aide"       # living documents; scripts derive queue/ items/ from it
 
@@ -13,7 +13,7 @@ docs_dir = "docs/aide"       # living documents; scripts derive queue/ items/ fr
 venv = ".venv"                                   # venv directory name (per-machine, gitignored)
 bootstrap = "pip install -e .[dev]"              # command to populate a fresh venv
 test_command = "python -m pytest"                # run relative to the resolved venv (aide.py prefixes .venv/Scripts or .venv/bin)
-import_check = "segqc"                            # module `aide env` imports to prove the venv is live
+import_check = "segfacet"                            # module `aide env` imports to prove the venv is live
 
 [git]
 mode = "auto-merge"          # auto-merge | pr | local  — see .aide/conventions.md > Git modes
@@ -42,7 +42,7 @@ repo = "dadrobny/aide-loop"
 # is why they are committed. The per-machine *answer* is computed at runtime by
 # `env --profile` and is deliberately never stored. Keep it that way: nothing here may
 # encode a local path, mount, device index, or host name. Machine-varying inputs go in
-# the environment instead (as the real VerSe19 cohort does, via SEGQC_VERSE_COHORT).
+# the environment instead (as the real VerSe19 cohort does, via SEGFACET_VERSE_COHORT).
 pyradiomics = "__import__('radiomics') is not None"
 docker = "__import__('subprocess').run(['docker', 'info'], capture_output=True).returncode == 0"
 gpu = "__import__('cupy').cuda.runtime.getDeviceCount() > 0"

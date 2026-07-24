@@ -1,6 +1,6 @@
 """Tests for the AIDE project-status report generator (scripts/aide_status_report.py).
 
-This is a dev/process tool, not part of the shipped ``segqc`` package, but its
+This is a dev/process tool, not part of the shipped ``segfacet`` package, but its
 parsing and rendering functions are pure and worth locking down so the living
 status page stays trustworthy as the AIDE documents evolve.
 """
@@ -83,7 +83,7 @@ def test_parse_progress_item_ref_on_wrapped_continuation_line():
     # "planned". (Regression: items 001/004 wrongly shown as planned.)
     text = (
         "## Stage 0 — Scaffolding — ✅\n"
-        "- ✅ Python package `segqc/` targeting Python 3.9+; with pinned\n"
+        "- ✅ Python package `segfacet/` targeting Python 3.9+; with pinned\n"
         "  core deps (NumPy, SciPy, scikit-image). *(Item 001)*\n"
         "- ✅ CLI entry point. *(Item 006)*\n"
     )

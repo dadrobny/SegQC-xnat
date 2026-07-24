@@ -13,8 +13,8 @@
     "removing from `allow` when tightening — deny is explicit and update-proof.",
     "Keys starting with // are comments and never appear in the output.",
     "",
-    "SegQC-xnat notes: the src/tests write-scope globs are NOT set here — the",
-    "installer templates them from aide.toml source_dir/tests_dir (src/segqc,",
+    "FACET notes: the src/tests write-scope globs are NOT set here — the",
+    "installer templates them from aide.toml source_dir/tests_dir (src/segfacet,",
     "tests). Permission rules promoted by /aide-review-permissions belong in the",
     "`allow.add` list below, not in the generated settings.json."
   ],

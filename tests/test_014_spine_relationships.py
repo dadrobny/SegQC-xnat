@@ -15,9 +15,9 @@ from __future__ import annotations
 import math
 import pytest
 
-from segqc.features.relationships import SpineRelationships, compute_spine_relationships
-from segqc.features.centroids import LabelCentroid
-from segqc.labels import UNKNOWN
+from segfacet.features.relationships import SpineRelationships, compute_spine_relationships
+from segfacet.features.centroids import LabelCentroid
+from segfacet.labels import UNKNOWN
 
 
 # =========================================================================== #
@@ -45,21 +45,21 @@ def _dist(a: tuple[float, float, float], b: tuple[float, float, float]) -> float
 
 
 def test_import_spine_relationships():
-    """SpineRelationships is importable from segqc.features.relationships."""
-    from segqc.features.relationships import SpineRelationships as SR  # noqa: F401
+    """SpineRelationships is importable from segfacet.features.relationships."""
+    from segfacet.features.relationships import SpineRelationships as SR  # noqa: F401
     assert SR is SpineRelationships
 
 
 def test_import_compute_spine_relationships():
-    """compute_spine_relationships is importable from segqc.features.relationships."""
-    from segqc.features.relationships import compute_spine_relationships as csr  # noqa: F401
+    """compute_spine_relationships is importable from segfacet.features.relationships."""
+    from segfacet.features.relationships import compute_spine_relationships as csr  # noqa: F401
     assert callable(csr)
 
 
 def test_no_import_error():
-    """Importing segqc.features.relationships raises no error."""
+    """Importing segfacet.features.relationships raises no error."""
     import importlib
-    mod = importlib.import_module("segqc.features.relationships")
+    mod = importlib.import_module("segfacet.features.relationships")
     assert hasattr(mod, "SpineRelationships")
     assert hasattr(mod, "compute_spine_relationships")
 
@@ -640,7 +640,7 @@ def test_input_list_not_mutated():
 
 def test_custom_convention_accepted():
     """compute_spine_relationships accepts an explicit LabelConvention without error."""
-    from segqc.labels import LabelConvention
+    from segfacet.labels import LabelConvention
     convention = LabelConvention.default()
     centroids = [_centroid("T1", (0.0, 0.0, 0.0))]
     result = compute_spine_relationships(centroids, convention=convention)

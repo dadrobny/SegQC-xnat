@@ -146,7 +146,7 @@ def test_ac3_constraints_pins_core_package(package):
 
 
 # =========================================================================== #
-# AC4  Build installs segqc against the pinned constraints
+# AC4  Build installs segfacet against the pinned constraints
 # =========================================================================== #
 
 
@@ -361,49 +361,49 @@ def test_ac9_docker_build_succeeds(docker_image_tag):
 
 
 @requires_docker
-def test_ac10_segqc_version_matches_package_version(docker_image_tag):
-    from segqc import __version__
+def test_ac10_segfacet_version_matches_package_version(docker_image_tag):
+    from segfacet import __version__
 
-    result = _docker_run(docker_image_tag, "segqc", "--version")
+    result = _docker_run(docker_image_tag, "segfacet", "--version")
     assert result.returncode == 0, result.stderr
     combined = (result.stdout + result.stderr).strip()
-    assert combined, "segqc --version produced no output"
+    assert combined, "segfacet --version produced no output"
     assert __version__ in combined, (
         f"expected version {__version__!r} in output: {combined!r}"
     )
 
 
 @requires_docker
-def test_ac11_segqc_run_help_names_scan_seg_out(docker_image_tag):
-    result = _docker_run(docker_image_tag, "segqc", "run", "--help")
+def test_ac11_segfacet_run_help_names_scan_seg_out(docker_image_tag):
+    result = _docker_run(docker_image_tag, "segfacet", "run", "--help")
     assert result.returncode == 0, result.stderr
     output = result.stdout + result.stderr
     for option in ("--scan", "--seg", "--out"):
-        assert option in output, f"{option} missing from `segqc run --help` output"
+        assert option in output, f"{option} missing from `segfacet run --help` output"
 
 
 @requires_docker
-def test_ac12_segqc_build_reference_help_names_cohort_out(docker_image_tag):
-    result = _docker_run(docker_image_tag, "segqc", "build-reference", "--help")
+def test_ac12_segfacet_build_reference_help_names_cohort_out(docker_image_tag):
+    result = _docker_run(docker_image_tag, "segfacet", "build-reference", "--help")
     assert result.returncode == 0, result.stderr
     output = result.stdout + result.stderr
     for option in ("--cohort", "--out"):
-        assert option in output, f"{option} missing from `segqc build-reference --help` output"
+        assert option in output, f"{option} missing from `segfacet build-reference --help` output"
 
 
 @requires_docker
-def test_ac13_segqc_evaluate_help_names_cohort_out(docker_image_tag):
-    result = _docker_run(docker_image_tag, "segqc", "evaluate", "--help")
+def test_ac13_segfacet_evaluate_help_names_cohort_out(docker_image_tag):
+    result = _docker_run(docker_image_tag, "segfacet", "evaluate", "--help")
     assert result.returncode == 0, result.stderr
     output = result.stdout + result.stderr
     for option in ("--cohort", "--out"):
-        assert option in output, f"{option} missing from `segqc evaluate --help` output"
+        assert option in output, f"{option} missing from `segfacet evaluate --help` output"
 
 
 @requires_docker
 def test_ac14_bundled_reference_loads_inside_container(docker_image_tag):
     snippet = (
-        "from segqc.reference.artifact import bundled_default_reference; "
+        "from segfacet.reference.artifact import bundled_default_reference; "
         "bundled_default_reference()"
     )
     result = _docker_run(docker_image_tag, "python", "-c", snippet)
@@ -445,10 +445,10 @@ def test_ac15_core_stack_remains_importable(docker_image_tag):
 
 
 @requires_docker
-def test_adv_segqc_bad_subcommand_does_not_crash_uncontrollably(docker_image_tag):
+def test_adv_segfacet_bad_subcommand_does_not_crash_uncontrollably(docker_image_tag):
     """A malformed/unknown subcommand should exit non-zero (argparse error),
     not hang or crash the container in some uncontrolled way."""
-    result = _docker_run(docker_image_tag, "segqc", "not-a-real-subcommand")
+    result = _docker_run(docker_image_tag, "segfacet", "not-a-real-subcommand")
     assert result.returncode != 0
 
 

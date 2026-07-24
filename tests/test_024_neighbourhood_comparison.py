@@ -47,10 +47,10 @@ from typing import Dict, List, Tuple
 
 import pytest
 
-from segqc.features.centroids import LabelCentroid
-from segqc.features.geometry import BBox, LabelGeometry
-from segqc.features.spline_offset import VertebralSplineOffset
-from segqc.features.neighbourhood import (
+from segfacet.features.centroids import LabelCentroid
+from segfacet.features.geometry import BBox, LabelGeometry
+from segfacet.features.spline_offset import VertebralSplineOffset
+from segfacet.features.neighbourhood import (
     VertebralNeighbourhood,
     compute_neighbourhood_features,
 )
@@ -145,21 +145,21 @@ def _uniform_spine(
 
 
 def test_import_vertebral_neighbourhood():
-    """VertebralNeighbourhood is importable from segqc.features.neighbourhood."""
-    from segqc.features.neighbourhood import VertebralNeighbourhood as VN  # noqa: F401
+    """VertebralNeighbourhood is importable from segfacet.features.neighbourhood."""
+    from segfacet.features.neighbourhood import VertebralNeighbourhood as VN  # noqa: F401
     assert VN is VertebralNeighbourhood
 
 
 def test_import_compute_neighbourhood_features():
-    """compute_neighbourhood_features is importable from segqc.features.neighbourhood."""
-    from segqc.features.neighbourhood import compute_neighbourhood_features as cnf  # noqa: F401
+    """compute_neighbourhood_features is importable from segfacet.features.neighbourhood."""
+    from segfacet.features.neighbourhood import compute_neighbourhood_features as cnf  # noqa: F401
     assert callable(cnf)
 
 
 def test_no_import_error():
-    """Importing segqc.features.neighbourhood raises no error."""
+    """Importing segfacet.features.neighbourhood raises no error."""
     import importlib
-    mod = importlib.import_module("segqc.features.neighbourhood")
+    mod = importlib.import_module("segfacet.features.neighbourhood")
     assert hasattr(mod, "VertebralNeighbourhood")
     assert hasattr(mod, "compute_neighbourhood_features")
 

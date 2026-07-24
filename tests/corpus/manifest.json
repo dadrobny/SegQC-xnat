@@ -329,6 +329,6 @@
       "seg_fixture": "fixtures/mode8_force_overlap_seg.nii.gz"
     }
   ],
-  "generator": "segqc.synth.corpus",
+  "generator": "segfacet.synth.corpus",
   "manifest_version": 1
 }

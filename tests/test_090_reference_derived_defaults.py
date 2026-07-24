@@ -41,7 +41,7 @@ Adversarial / edge cases included:
   both raise ValueError from fragmentation.evaluate before per-label work.
 - A real verse-v1 label at its exact p1/p99 bound does not fire (inclusive).
 - --no-reference wins over reference.enabled: true in a YAML config.
-- Determinism of the CLI default run (two segqc_report.json byte-identical).
+- Determinism of the CLI default run (two segfacet_report.json byte-identical).
 """
 
 from __future__ import annotations
@@ -53,27 +53,27 @@ import pathlib
 import jsonschema
 import pytest
 
-import segqc.heuristics.bounds  # noqa: F401 -- triggers BoundsRule registration
-import segqc.heuristics.fragmentation  # noqa: F401 -- triggers FragmentationRule registration
-import segqc.synth  # noqa: F401 -- triggers self-registration of every operator
-from segqc.config import (
+import segfacet.heuristics.bounds  # noqa: F401 -- triggers BoundsRule registration
+import segfacet.heuristics.fragmentation  # noqa: F401 -- triggers FragmentationRule registration
+import segfacet.synth  # noqa: F401 -- triggers self-registration of every operator
+from segfacet.config import (
     SUPPORTED_SCHEMA_VERSION,
     bundled_default_config,
     default_config,
     default_config_path,
     load_config,
 )
-from segqc.heuristics import run_rules
-from segqc.heuristics.fragmentation import (
+from segfacet.heuristics import run_rules
+from segfacet.heuristics.fragmentation import (
     DEFAULT_FRAGMENTATION_INDEX_THRESHOLD,
     DEFAULT_ISLAND_MIN_VOXELS,
     FragmentationRule,
     reference_fragmentation_for_level,
 )
-from segqc.heuristics.rule import _RULES
-from segqc.pipeline import run_qc, run_qc_with_reference
-from segqc.reference import ALL_STRATUM
-from segqc.reference.artifact import (
+from segfacet.heuristics.rule import _RULES
+from segfacet.pipeline import run_qc, run_qc_with_reference
+from segfacet.reference import ALL_STRATUM
+from segfacet.reference.artifact import (
     DEFAULT_ARTIFACT_NAME,
     bundled_default_reference,
     bundled_production_reference,
@@ -81,15 +81,15 @@ from segqc.reference.artifact import (
     config_hash,
     default_artifact_path,
 )
-from segqc.reference.schema import (
+from segfacet.reference.schema import (
     FeatureStats,
     LevelDistribution,
     Provenance,
     ReferenceDistribution,
 )
-from segqc.synth.corpus import load_manifest
-from segqc.synth.golden import GOLDEN_DIR, check_case_golden
-from segqc.synth.regression import loaded_seg_image
+from segfacet.synth.corpus import load_manifest
+from segfacet.synth.golden import GOLDEN_DIR, check_case_golden
+from segfacet.synth.regression import loaded_seg_image
 
 _VERSE_V1_LEVELS = (
     "C1", "C2", "C3", "C4", "C5", "C6", "C7",
@@ -268,7 +268,7 @@ def test_ac1_bundled_production_reference_is_verse_v1():
 
 
 def test_ac1_bundled_production_reference_path_loads_via_load_artifact():
-    from segqc.reference.artifact import load_artifact
+    from segfacet.reference.artifact import load_artifact
 
     path = bundled_production_reference_path()
     assert path.exists()
@@ -357,7 +357,7 @@ def test_ac3_fragmentation_default_differs_from_explicit_hand_set(tmp_path):
 def _write_case_inputs(tmp_path, spacing=(1.0, 1.0, 1.0)):
     import nibabel as nib
 
-    from segqc.synth.clean_gt import build_clean_spine
+    from segfacet.synth.clean_gt import build_clean_spine
 
     spine = build_clean_spine(levels=("L1", "L2", "L3"), spacing=spacing)
     scan_path = tmp_path / "scan.nii.gz"
@@ -370,9 +370,9 @@ def _write_case_inputs(tmp_path, spacing=(1.0, 1.0, 1.0)):
 def _report_schema():
     import importlib.resources
 
-    import segqc as _segqc_pkg
+    import segfacet as _segfacet_pkg
 
-    ref = importlib.resources.files(_segqc_pkg).joinpath("report_schema_v0.json")
+    ref = importlib.resources.files(_segfacet_pkg).joinpath("report_schema_v0.json")
     return json.loads(ref.read_text(encoding="utf-8"))
 
 
@@ -380,21 +380,21 @@ _REPORT_SCHEMA = _report_schema()
 
 
 def test_ac4_default_run_attaches_verse_v1_reference_delta(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _write_case_inputs(tmp_path)
     out_dir = tmp_path / "out"
     code = main(["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)])
     assert code in (0, 1)
 
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert "reference_delta" in report
     jsonschema.validate(report, _REPORT_SCHEMA)
     assert report["reference_delta"]["reference_source"] == "verse-v1"
 
 
 def test_ac4_no_reference_flag_restores_reference_less_shape(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _write_case_inputs(tmp_path)
     out_dir = tmp_path / "out"
@@ -404,7 +404,7 @@ def test_ac4_no_reference_flag_restores_reference_less_shape(tmp_path):
     ])
     assert code in (0, 1)
 
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert "reference_delta" not in report
     expected_keys = {
         "schema_version", "config_version", "case_id", "verdict",
@@ -634,7 +634,7 @@ def test_ac9_helper_reads_no_file_or_clock(monkeypatch):
 
 
 def test_ac10_uncovered_level_falls_back_to_hand_set_and_fires(tmp_path):
-    from segqc.heuristics.bounds import DEFAULT_BOUNDS
+    from segfacet.heuristics.bounds import DEFAULT_BOUNDS
 
     reference = bundled_production_reference()
     assert "T13" not in reference.levels  # transitional level, uncovered
@@ -996,7 +996,7 @@ def test_adv_real_verse_v1_label_at_exact_p99_component_count_does_not_fire(tmp_
 
 
 def test_adv_no_reference_flag_wins_over_config_reference_enabled_true(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _write_case_inputs(tmp_path)
     out_dir = tmp_path / "out"
@@ -1010,12 +1010,12 @@ def test_adv_no_reference_flag_wins_over_config_reference_enabled_true(tmp_path)
         "run", "--scan", str(scan_path), "--seg", str(seg_path),
         "--out", str(out_dir), "--config", str(cfg_path), "--no-reference",
     ])
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert "reference_delta" not in report
 
 
 def test_adv_cli_default_run_is_deterministic(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _write_case_inputs(tmp_path)
     out_dir_1 = tmp_path / "out1"
@@ -1024,6 +1024,6 @@ def test_adv_cli_default_run_is_deterministic(tmp_path):
     main(["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir_1)])
     main(["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir_2)])
 
-    bytes_1 = (out_dir_1 / "segqc_report.json").read_bytes()
-    bytes_2 = (out_dir_2 / "segqc_report.json").read_bytes()
+    bytes_1 = (out_dir_1 / "segfacet_report.json").read_bytes()
+    bytes_2 = (out_dir_2 / "segfacet_report.json").read_bytes()
     assert bytes_1 == bytes_2

@@ -2,10 +2,10 @@
 
 Docker-free: the script is loaded via ``importlib.util.spec_from_file_location``
 because ``docker/`` is a repo-root deployment directory, not part of the
-installed ``segqc`` package (see item 068's Assumptions). Mock XNAT mount
-directories are built under pytest's ``tmp_path``; real ``segqc.cli.main``
+installed ``segfacet`` package (see item 068's Assumptions). Mock XNAT mount
+directories are built under pytest's ``tmp_path``; real ``segfacet.cli.main``
 calls are only exercised for the true happy-path / malformed-input tests --
-everywhere else ``segqc.cli.main`` is monkeypatched to a spy so these tests
+everywhere else ``segfacet.cli.main`` is monkeypatched to a spy so these tests
 stay fast and isolate the entry script's own resolution/argv-assembly logic.
 
 One focused test per Acceptance Criterion (AC1-AC22), plus adversarial/edge
@@ -30,7 +30,7 @@ DOCKERFILE_PATH = REPO_ROOT / "Dockerfile"
 
 def _load_entrypoint_module():
     """Load ``docker/entrypoint.py`` as a standalone module (not a package)."""
-    spec = importlib.util.spec_from_file_location("_segqc_entrypoint_068", ENTRYPOINT_PATH)
+    spec = importlib.util.spec_from_file_location("_segfacet_entrypoint_068", ENTRYPOINT_PATH)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -154,7 +154,7 @@ def test_ac3_build_run_argv_places_seg_after_seg_flag(entrypoint):
 
 
 # =========================================================================== #
-# AC4  --out-dir maps verbatim to segqc run --out
+# AC4  --out-dir maps verbatim to segfacet run --out
 # =========================================================================== #
 
 
@@ -191,8 +191,8 @@ def test_ac5_happy_path_returns_zero_and_writes_both_reports(tmp_path, labelled_
     )
 
     assert rc == 0
-    assert (out_dir / "segqc_report.json").is_file()
-    assert (out_dir / "segqc_report.txt").is_file()
+    assert (out_dir / "segfacet_report.json").is_file()
+    assert (out_dir / "segfacet_report.txt").is_file()
 
 
 def test_ac5_happy_path_json_report_parses(tmp_path, labelled_blocks, entrypoint):
@@ -210,7 +210,7 @@ def test_ac5_happy_path_json_report_parses(tmp_path, labelled_blocks, entrypoint
         ]
     )
 
-    parsed = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    parsed = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert isinstance(parsed, dict)
 
 
@@ -264,7 +264,7 @@ def test_ac7_run_succeeds_with_missing_config_dir(tmp_path, labelled_blocks, ent
         ]
     )
     assert rc == 0
-    assert (out_dir / "segqc_report.json").is_file()
+    assert (out_dir / "segfacet_report.json").is_file()
 
 
 # =========================================================================== #
@@ -374,17 +374,17 @@ def test_ac12_reference_toggle_plus_file_yields_single_reference_flag(entrypoint
 
 
 # =========================================================================== #
-# AC13  Invokes segqc run via segqc.cli.main
+# AC13  Invokes segfacet run via segfacet.cli.main
 # =========================================================================== #
 
 
-def test_ac13_main_calls_segqc_cli_main_with_assembled_argv(tmp_path, labelled_blocks, entrypoint, monkeypatch):
+def test_ac13_main_calls_segfacet_cli_main_with_assembled_argv(tmp_path, labelled_blocks, entrypoint, monkeypatch):
     scan_dir = _make_scan_dir(tmp_path, labelled_blocks)
     seg_dir = _make_seg_dir(tmp_path, labelled_blocks)
     out_dir = tmp_path / "output"
 
     spy = _SpyMain(return_code=0)
-    monkeypatch.setattr("segqc.cli.main", spy)
+    monkeypatch.setattr("segfacet.cli.main", spy)
 
     rc = entrypoint.main(
         [
@@ -405,13 +405,13 @@ def test_ac13_main_calls_segqc_cli_main_with_assembled_argv(tmp_path, labelled_b
     assert "--intensity" in called_argv
 
 
-def test_ac13_main_propagates_segqc_cli_main_exit_code(tmp_path, labelled_blocks, entrypoint, monkeypatch):
+def test_ac13_main_propagates_segfacet_cli_main_exit_code(tmp_path, labelled_blocks, entrypoint, monkeypatch):
     scan_dir = _make_scan_dir(tmp_path, labelled_blocks)
     seg_dir = _make_seg_dir(tmp_path, labelled_blocks)
     out_dir = tmp_path / "output"
 
     spy = _SpyMain(return_code=17)
-    monkeypatch.setattr("segqc.cli.main", spy)
+    monkeypatch.setattr("segfacet.cli.main", spy)
 
     rc = entrypoint.main(
         [
@@ -702,8 +702,8 @@ def test_ac21_no_report_written_on_input_error(tmp_path, labelled_blocks, entryp
 
     rc = entrypoint.main(args)
     assert rc != 0
-    assert not (out_dir / "segqc_report.json").exists()
-    assert not (out_dir / "segqc_report.txt").exists()
+    assert not (out_dir / "segfacet_report.json").exists()
+    assert not (out_dir / "segfacet_report.txt").exists()
 
 
 # =========================================================================== #
@@ -749,7 +749,7 @@ def test_adv_nifti_file_alongside_hidden_dotfile_is_unambiguous(entrypoint, tmp_
     assert Path(resolved).name == "scan.nii.gz"
 
 
-def test_adv_out_dir_that_does_not_exist_yet_is_created_by_segqc_run(tmp_path, labelled_blocks, entrypoint):
+def test_adv_out_dir_that_does_not_exist_yet_is_created_by_segfacet_run(tmp_path, labelled_blocks, entrypoint):
     scan_dir = _make_scan_dir(tmp_path, labelled_blocks)
     seg_dir = _make_seg_dir(tmp_path, labelled_blocks)
     out_dir = tmp_path / "brand_new_output_dir"
@@ -764,7 +764,7 @@ def test_adv_out_dir_that_does_not_exist_yet_is_created_by_segqc_run(tmp_path, l
     )
     assert rc == 0
     assert out_dir.is_dir()
-    assert (out_dir / "segqc_report.json").is_file()
+    assert (out_dir / "segfacet_report.json").is_file()
 
 
 def test_adv_scan_dir_that_is_a_file_errors_cleanly(entrypoint, tmp_path, labelled_blocks, capsys):
@@ -818,7 +818,7 @@ def test_adv_extra_unknown_argument_is_a_usage_error(entrypoint, capsys):
         entrypoint.main(["--not-a-real-flag", "value"])
 
 
-def test_adv_unexpected_exception_from_segqc_cli_main_becomes_clean_error(
+def test_adv_unexpected_exception_from_segfacet_cli_main_becomes_clean_error(
     tmp_path, labelled_blocks, entrypoint, monkeypatch, capsys
 ):
     scan_dir = _make_scan_dir(tmp_path, labelled_blocks)
@@ -828,7 +828,7 @@ def test_adv_unexpected_exception_from_segqc_cli_main_becomes_clean_error(
     def _boom(argv):
         raise RuntimeError("unexpected boom")
 
-    monkeypatch.setattr("segqc.cli.main", _boom)
+    monkeypatch.setattr("segfacet.cli.main", _boom)
 
     rc = entrypoint.main(
         [

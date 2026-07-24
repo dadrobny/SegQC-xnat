@@ -40,8 +40,8 @@ OUTPUT_MOUNT_PATH = "/output"
 CONFIG_MOUNT_PATH = "/input/config"
 REFERENCE_MOUNT_PATH = "/input/reference"
 
-REPORT_JSON_NAME = "segqc_report.json"
-REPORT_TXT_NAME = "segqc_report.txt"
+REPORT_JSON_NAME = "segfacet_report.json"
+REPORT_TXT_NAME = "segfacet_report.txt"
 
 # Matches a mount-path-shaped token (``/input/<segment>`` or ``/output``) as a
 # whole path component -- deliberately NOT a bare substring search, so
@@ -86,8 +86,8 @@ def _mounts_by_name(command: dict) -> dict:
 
 def _image_repository(image: str) -> str:
     """Strip any registry/namespace prefix and trailing ``:tag``, returning
-    the bare repository component (e.g. ``ghcr.io/org/segqc:1.0`` ->
-    ``segqc``)."""
+    the bare repository component (e.g. ``ghcr.io/org/segfacet:1.0`` ->
+    ``segfacet``)."""
     last_segment = image.rsplit("/", 1)[-1]
     return last_segment.split(":", 1)[0]
 
@@ -180,7 +180,7 @@ def test_ac3_type_is_docker(command):
 
 
 # =========================================================================== #
-# AC4  image repository component is segqc
+# AC4  image repository component is segfacet
 # =========================================================================== #
 
 
@@ -189,8 +189,8 @@ def test_ac4_image_is_nonempty_string(command):
     assert command["image"].strip()
 
 
-def test_ac4_image_repository_is_segqc(command):
-    assert _image_repository(command["image"]) == "segqc"
+def test_ac4_image_repository_is_segfacet(command):
+    assert _image_repository(command["image"]) == "segfacet"
 
 
 # =========================================================================== #
@@ -497,14 +497,14 @@ def test_adv_extra_top_level_keys_do_not_break_required_key_check():
     environment-variables) alongside the required seven must not defeat the
     required-key check."""
     fake_command = {
-        "name": "segqc",
-        "image": "segqc:latest",
+        "name": "segfacet",
+        "image": "segfacet:latest",
         "type": "docker",
         "command-line": "python /app/docker/entrypoint.py",
         "mounts": [],
         "inputs": [],
         "outputs": [],
-        "label": "SegQC",
+        "label": "FACET",
         "description": "Vertebra segmentation QC",
         "version": "1.0.0",
         "schema-version": "1.0",
@@ -530,14 +530,14 @@ def test_adv_normalize_path_handles_trailing_slash():
 
 
 def test_adv_image_repository_parse_handles_registry_prefix():
-    assert _image_repository("ghcr.io/org/segqc:1.0") == "segqc"
-    assert _image_repository("segqc:latest") == "segqc"
-    assert _image_repository("segqc") == "segqc"
-    assert _image_repository("registry:5000/segqc:2.0") == "segqc"
+    assert _image_repository("ghcr.io/org/segfacet:1.0") == "segfacet"
+    assert _image_repository("segfacet:latest") == "segfacet"
+    assert _image_repository("segfacet") == "segfacet"
+    assert _image_repository("registry:5000/segfacet:2.0") == "segfacet"
 
 
 def test_adv_image_repository_rejects_unrelated_image():
-    assert _image_repository("some-other-tool:latest") != "segqc"
+    assert _image_repository("some-other-tool:latest") != "segfacet"
 
 
 def test_adv_malformed_json_raises_clear_parse_error(tmp_path):

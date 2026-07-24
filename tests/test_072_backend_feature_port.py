@@ -27,19 +27,19 @@ import types
 import numpy as np
 import pytest
 
-import segqc.backend as backend_mod
-from segqc.backend import ENV_VAR, get_backend, cupy_available
-from segqc.config import HeuristicConfig
-from segqc.features.centroids import (
+import segfacet.backend as backend_mod
+from segfacet.backend import ENV_VAR, get_backend, cupy_available
+from segfacet.config import HeuristicConfig
+from segfacet.features.centroids import (
     LabelCentroid,
     compute_centroid,
     compute_edt_centroids,
 )
-from segqc.features.components import compute_components
-from segqc.features.fragmentation import compute_fragmentation_index
-from segqc.features.geometry import compute_label_geometry
-from segqc.features.spline import evaluate_spline, fit_centroid_spline
-from segqc.features.spline_offset import compute_spline_offsets
+from segfacet.features.components import compute_components
+from segfacet.features.fragmentation import compute_fragmentation_index
+from segfacet.features.geometry import compute_label_geometry
+from segfacet.features.spline import evaluate_spline, fit_centroid_spline
+from segfacet.features.spline_offset import compute_spline_offsets
 
 from synthetic import labelled_blocks_case
 
@@ -55,7 +55,7 @@ _REAL_GET_BACKEND = backend_mod.get_backend
 
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch):
-    """Hermetic default: SEGQC_BACKEND unset unless a test sets it."""
+    """Hermetic default: SEGFACET_BACKEND unset unless a test sets it."""
     monkeypatch.delenv(ENV_VAR, raising=False)
 
 
@@ -87,7 +87,7 @@ def _make_centroids(n: int = 5):
 
 
 def _install_get_backend_spy(monkeypatch):
-    """Patch segqc.backend.get_backend with a call-counting spy that still
+    """Patch segfacet.backend.get_backend with a call-counting spy that still
     delegates to the real implementation, per AC3's testing-strategy bullet."""
     calls = {"count": 0}
 
@@ -449,7 +449,7 @@ def test_ac8_spline_functions_stay_on_cpu_under_gpu_backend():
 
 
 def test_ac9_spline_module_docstring_documents_cpu_fallback():
-    import segqc.features.spline as spline_mod
+    import segfacet.features.spline as spline_mod
 
     doc = (spline_mod.__doc__ or "").lower()
     assert "cpu" in doc, "spline.py module docstring does not mention CPU"
@@ -457,7 +457,7 @@ def test_ac9_spline_module_docstring_documents_cpu_fallback():
 
 
 def test_ac9_spline_offset_module_docstring_documents_cpu_fallback():
-    import segqc.features.spline_offset as spline_offset_mod
+    import segfacet.features.spline_offset as spline_offset_mod
 
     doc = (spline_offset_mod.__doc__ or "").lower()
     assert "cpu" in doc, "spline_offset.py module docstring does not mention CPU"
@@ -470,7 +470,7 @@ def test_ac9_spline_offset_module_docstring_documents_cpu_fallback():
 
 
 def test_ac10_fragmentation_index_forwards_backend_to_compute_components(monkeypatch):
-    import segqc.features.components as components_mod
+    import segfacet.features.components as components_mod
 
     real_compute_components = components_mod.compute_components
     received = {}
@@ -490,7 +490,7 @@ def test_ac10_fragmentation_index_forwards_backend_to_compute_components(monkeyp
 
 
 def test_ac10_spline_offsets_forwards_backend_to_evaluate_spline(monkeypatch):
-    import segqc.features.spline_offset as spline_offset_mod
+    import segfacet.features.spline_offset as spline_offset_mod
 
     real_evaluate_spline = spline_offset_mod.evaluate_spline
     received = []
@@ -693,7 +693,7 @@ def test_adv_two_centroid_spline_degree_clamp_under_gpu_backend():
 
 
 def test_adv_env_var_cpu_used_when_backend_none(monkeypatch):
-    """SEGQC_BACKEND=cpu set in the environment while calling backend=None
+    """SEGFACET_BACKEND=cpu set in the environment while calling backend=None
     (the default) resolves to CPU, matching an explicit CPU backend call."""
     monkeypatch.setenv(ENV_VAR, "cpu")
     case = labelled_blocks_case()

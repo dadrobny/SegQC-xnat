@@ -1,4 +1,4 @@
-"""End-to-end pipeline tests for the fully-wired ``segqc run`` (item 010).
+"""End-to-end pipeline tests for the fully-wired ``segfacet run`` (item 010).
 
 Covers Acceptance Criteria AC-9 through AC-16: both report artifacts written,
 empty fixture → fail verdict, populated fixture → pass verdict, near-empty
@@ -20,7 +20,7 @@ import nibabel as nib
 import numpy as np
 import pytest
 
-from segqc.cli import main
+from segfacet.cli import main
 
 
 # =========================================================================== #
@@ -49,11 +49,11 @@ def _make_scan(tmp_path: pathlib.Path, shape, name: str = "scan.nii.gz") -> path
 
 
 # =========================================================================== #
-# AC-9  segqc run writes segqc_report.txt
+# AC-9  segfacet run writes segfacet_report.txt
 # =========================================================================== #
 
 def test_ac9_run_writes_human_report_file(labelled_blocks_files, tmp_path, capsys):
-    """``segqc run`` writes ``segqc_report.txt`` to the output directory."""
+    """``segfacet run`` writes ``segfacet_report.txt`` to the output directory."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     code, _stdout, _stderr = _run(
@@ -61,41 +61,41 @@ def test_ac9_run_writes_human_report_file(labelled_blocks_files, tmp_path, capsy
         capsys,
     )
     assert code == 0, f"Expected exit 0; stderr: {_stderr!r}"
-    assert (out_dir / "segqc_report.txt").exists(), "segqc_report.txt not found in output dir"
+    assert (out_dir / "segfacet_report.txt").exists(), "segfacet_report.txt not found in output dir"
 
 
 def test_ac9_human_report_file_nonempty(labelled_blocks_files, tmp_path, capsys):
-    """``segqc_report.txt`` produced by ``segqc run`` is non-empty (> 0 bytes)."""
+    """``segfacet_report.txt`` produced by ``segfacet run`` is non-empty (> 0 bytes)."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     _run(
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    txt_path = out_dir / "segqc_report.txt"
+    txt_path = out_dir / "segfacet_report.txt"
     assert txt_path.exists()
     assert txt_path.stat().st_size > 0
 
 
 def test_ac9_human_report_is_readable_text(labelled_blocks_files, tmp_path, capsys):
-    """``segqc_report.txt`` contains valid UTF-8 text (no binary garbage)."""
+    """``segfacet_report.txt`` contains valid UTF-8 text (no binary garbage)."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     _run(
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    content = (out_dir / "segqc_report.txt").read_text(encoding="utf-8")
+    content = (out_dir / "segfacet_report.txt").read_text(encoding="utf-8")
     assert isinstance(content, str)
     assert len(content) > 0
 
 
 # =========================================================================== #
-# AC-10  segqc run writes a v0-schema-valid segqc_report.json
+# AC-10  segfacet run writes a v0-schema-valid segfacet_report.json
 # =========================================================================== #
 
 def test_ac10_run_writes_json_report(labelled_blocks_files, tmp_path, capsys):
-    """``segqc run`` writes ``segqc_report.json`` to the output directory."""
+    """``segfacet run`` writes ``segfacet_report.json`` to the output directory."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     code, _stdout, _stderr = _run(
@@ -103,52 +103,52 @@ def test_ac10_run_writes_json_report(labelled_blocks_files, tmp_path, capsys):
         capsys,
     )
     assert code == 0
-    assert (out_dir / "segqc_report.json").exists()
+    assert (out_dir / "segfacet_report.json").exists()
 
 
 def test_ac10_json_report_is_valid_json(labelled_blocks_files, tmp_path, capsys):
-    """``segqc_report.json`` is parseable JSON."""
+    """``segfacet_report.json`` is parseable JSON."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     _run(
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    content = (out_dir / "segqc_report.json").read_text(encoding="utf-8")
+    content = (out_dir / "segfacet_report.json").read_text(encoding="utf-8")
     data = json.loads(content)
     assert isinstance(data, dict)
 
 
 def test_ac10_json_report_has_v0_schema_version(labelled_blocks_files, tmp_path, capsys):
-    """``segqc_report.json`` has ``schema_version`` = ``"0.1"`` (v0 schema marker)."""
+    """``segfacet_report.json`` has ``schema_version`` = ``"0.1"`` (v0 schema marker)."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     _run(
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    data = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert data.get("schema_version") == "0.1"
 
 
 def test_ac10_json_report_has_required_v0_fields(labelled_blocks_files, tmp_path, capsys):
-    """``segqc_report.json`` contains all six required v0 top-level fields."""
+    """``segfacet_report.json`` contains all six required v0 top-level fields."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     _run(
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    data = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     for field in ("schema_version", "config_version", "case_id", "verdict", "reasons", "per_label"):
         assert field in data, f"Required field {field!r} missing from JSON report"
 
 
 def test_ac10_json_report_validates_against_v0_schema(labelled_blocks_files, tmp_path, capsys):
-    """``segqc_report.json`` validates against the JSON Schema v0."""
+    """``segfacet_report.json`` validates against the JSON Schema v0."""
     import jsonschema
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
@@ -156,9 +156,9 @@ def test_ac10_json_report_validates_against_v0_schema(labelled_blocks_files, tmp
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
-    data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    data = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     jsonschema.validate(data, schema)
 
 
@@ -174,7 +174,7 @@ def test_ac11_empty_fixture_json_verdict_is_fail(empty_labelmap_files, tmp_path,
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    data = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert data["verdict"] == "fail", (
         f"Expected verdict='fail' for empty segmentation, got {data['verdict']!r}"
     )
@@ -188,7 +188,7 @@ def test_ac11_empty_fixture_json_has_reasons(empty_labelmap_files, tmp_path, cap
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    data = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert len(data["reasons"]) >= 1
 
 
@@ -200,7 +200,7 @@ def test_ac11_empty_fixture_json_reason_no_python_internals(empty_labelmap_files
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    data = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     for r in data["reasons"]:
         assert "Traceback" not in r["message"]
         assert "ValueError" not in r["message"]
@@ -219,7 +219,7 @@ def test_ac12_empty_fixture_human_report_contains_fail(empty_labelmap_files, tmp
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    content = (out_dir / "segqc_report.txt").read_text(encoding="utf-8")
+    content = (out_dir / "segfacet_report.txt").read_text(encoding="utf-8")
     assert "fail" in content.lower(), (
         f"Expected 'fail' in human report for empty segmentation; got: {content[:200]!r}"
     )
@@ -233,7 +233,7 @@ def test_ac12_empty_fixture_human_report_nonempty(empty_labelmap_files, tmp_path
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    content = (out_dir / "segqc_report.txt").read_text(encoding="utf-8")
+    content = (out_dir / "segfacet_report.txt").read_text(encoding="utf-8")
     assert len(content) > 0
 
 
@@ -244,7 +244,7 @@ def test_ac12_empty_fixture_human_report_nonempty(empty_labelmap_files, tmp_path
 def test_ac13_populated_fixture_json_verdict_is_pass(labelled_blocks_files, tmp_path, capsys):
     """JSON report for the labelled-blocks fixture wires through to a real verdict.
 
-    Item 035 wired the ``bounds``/``border`` heuristic rules into ``segqc run``.
+    Item 035 wired the ``bounds``/``border`` heuristic rules into ``segfacet run``.
     The labelled-blocks fixture's 4x4x4 mm cubes are item-002 geometric
     placeholders, not tuned to the anatomical ``bounds`` thresholds (e.g. lumbar
     ``min_volume_mm3``), so they now legitimately fire ``bounds`` findings and the
@@ -263,7 +263,7 @@ def test_ac13_populated_fixture_json_verdict_is_pass(labelled_blocks_files, tmp_
         capsys,
     )
     assert code == 0
-    data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    data = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert data["verdict"] == "flagged-for-review", (
         f"Expected verdict='flagged-for-review' (bounds fires on the item-002 "
         f"placeholder cubes), got {data['verdict']!r}"
@@ -273,7 +273,7 @@ def test_ac13_populated_fixture_json_verdict_is_pass(labelled_blocks_files, tmp_
 
 
 def test_ac13_populated_fixture_exits_zero(labelled_blocks_files, tmp_path, capsys):
-    """``segqc run`` exits 0 on a well-formed (passing) segmentation."""
+    """``segfacet run`` exits 0 on a well-formed (passing) segmentation."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     code, _stdout, _stderr = _run(
@@ -284,15 +284,15 @@ def test_ac13_populated_fixture_exits_zero(labelled_blocks_files, tmp_path, caps
 
 
 def test_ac13_populated_fixture_both_reports_written(labelled_blocks_files, tmp_path, capsys):
-    """Both report files exist after a passing ``segqc run``."""
+    """Both report files exist after a passing ``segfacet run``."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     _run(
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    assert (out_dir / "segqc_report.json").exists()
-    assert (out_dir / "segqc_report.txt").exists()
+    assert (out_dir / "segfacet_report.json").exists()
+    assert (out_dir / "segfacet_report.txt").exists()
 
 
 # =========================================================================== #
@@ -319,8 +319,8 @@ def test_ac14_near_empty_single_voxel_with_threshold(tmp_path, capsys):
     # using the direct verdict check instead.
     import sys
     sys.path.insert(0, str(pathlib.Path(__file__).parent))
-    from segqc.config import HeuristicConfig
-    from segqc.empty import check_empty
+    from segfacet.config import HeuristicConfig
+    from segfacet.empty import check_empty
 
     seg_img = nib.load(str(seg_path))
     cfg = HeuristicConfig(schema_version="0.1", min_foreground_voxels=10, min_label_count=0)
@@ -330,8 +330,8 @@ def test_ac14_near_empty_single_voxel_with_threshold(tmp_path, capsys):
 
 def test_ac14_near_empty_boundary_exactly_at_threshold_passes(tmp_path, capsys):
     """Exactly min_foreground_voxels voxels is not near-empty (boundary is inclusive)."""
-    from segqc.config import HeuristicConfig
-    from segqc.empty import check_empty
+    from segfacet.config import HeuristicConfig
+    from segfacet.empty import check_empty
 
     data = np.zeros((8, 8, 8), dtype=np.uint16)
     data[:5, :1, :1] = 1  # exactly 5 foreground voxels
@@ -343,8 +343,8 @@ def test_ac14_near_empty_boundary_exactly_at_threshold_passes(tmp_path, capsys):
 
 def test_ac14_near_empty_one_below_boundary_fails(tmp_path, capsys):
     """One fewer than min_foreground_voxels → detected as near-empty."""
-    from segqc.config import HeuristicConfig
-    from segqc.empty import check_empty
+    from segfacet.config import HeuristicConfig
+    from segfacet.empty import check_empty
 
     data = np.zeros((8, 8, 8), dtype=np.uint16)
     data[:4, :1, :1] = 1  # 4 foreground voxels, threshold = 5
@@ -359,7 +359,7 @@ def test_ac14_near_empty_one_below_boundary_fails(tmp_path, capsys):
 # =========================================================================== #
 
 def test_ac15_missing_out_dir_is_created(labelled_blocks_files, tmp_path, capsys):
-    """``segqc run`` creates the output directory when it does not exist."""
+    """``segfacet run`` creates the output directory when it does not exist."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "nonexistent_dir"
     assert not out_dir.exists()
@@ -373,7 +373,7 @@ def test_ac15_missing_out_dir_is_created(labelled_blocks_files, tmp_path, capsys
 
 
 def test_ac15_deeply_nested_out_dir_is_created(labelled_blocks_files, tmp_path, capsys):
-    """``segqc run`` creates a deeply nested output directory."""
+    """``segfacet run`` creates a deeply nested output directory."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "a" / "b" / "c" / "qc_out"
     assert not out_dir.exists()
@@ -382,8 +382,8 @@ def test_ac15_deeply_nested_out_dir_is_created(labelled_blocks_files, tmp_path, 
         capsys,
     )
     assert code == 0
-    assert (out_dir / "segqc_report.json").exists()
-    assert (out_dir / "segqc_report.txt").exists()
+    assert (out_dir / "segfacet_report.json").exists()
+    assert (out_dir / "segfacet_report.txt").exists()
 
 
 # =========================================================================== #
@@ -391,36 +391,36 @@ def test_ac15_deeply_nested_out_dir_is_created(labelled_blocks_files, tmp_path, 
 # =========================================================================== #
 
 def test_ac16_human_report_nonempty_for_empty_fixture(empty_labelmap_files, tmp_path, capsys):
-    """``segqc_report.txt`` is non-empty for the all-zero (empty) fixture."""
+    """``segfacet_report.txt`` is non-empty for the all-zero (empty) fixture."""
     scan_path, seg_path = empty_labelmap_files
     out_dir = tmp_path / "out"
     _run(
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    assert (out_dir / "segqc_report.txt").stat().st_size > 0
+    assert (out_dir / "segfacet_report.txt").stat().st_size > 0
 
 
 def test_ac16_human_report_nonempty_for_populated_fixture(labelled_blocks_files, tmp_path, capsys):
-    """``segqc_report.txt`` is non-empty for the labelled-blocks (populated) fixture."""
+    """``segfacet_report.txt`` is non-empty for the labelled-blocks (populated) fixture."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     _run(
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    assert (out_dir / "segqc_report.txt").stat().st_size > 0
+    assert (out_dir / "segfacet_report.txt").stat().st_size > 0
 
 
 def test_ac16_human_report_nonempty_for_anisotropic_fixture(anisotropic_files, tmp_path, capsys):
-    """``segqc_report.txt`` is non-empty for the anisotropic fixture."""
+    """``segfacet_report.txt`` is non-empty for the anisotropic fixture."""
     scan_path, seg_path = anisotropic_files
     out_dir = tmp_path / "out"
     _run(
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    assert (out_dir / "segqc_report.txt").stat().st_size > 0
+    assert (out_dir / "segfacet_report.txt").stat().st_size > 0
 
 
 # =========================================================================== #
@@ -438,8 +438,8 @@ def test_e2e_single_voxel_volume_both_reports(tmp_path, capsys):
         capsys,
     )
     assert code == 0
-    assert (out_dir / "segqc_report.json").exists()
-    assert (out_dir / "segqc_report.txt").exists()
+    assert (out_dir / "segfacet_report.json").exists()
+    assert (out_dir / "segfacet_report.txt").exists()
 
 
 def test_e2e_single_label_map_both_reports(tmp_path, capsys):
@@ -454,8 +454,8 @@ def test_e2e_single_label_map_both_reports(tmp_path, capsys):
         capsys,
     )
     assert code == 0
-    assert (out_dir / "segqc_report.json").exists()
-    assert (out_dir / "segqc_report.txt").exists()
+    assert (out_dir / "segfacet_report.json").exists()
+    assert (out_dir / "segfacet_report.txt").exists()
 
 
 # =========================================================================== #
@@ -470,7 +470,7 @@ def test_adv_empty_fixture_human_report_has_reason_text(empty_labelmap_files, tm
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    content = (out_dir / "segqc_report.txt").read_text(encoding="utf-8")
+    content = (out_dir / "segfacet_report.txt").read_text(encoding="utf-8")
     # Must contain some explanation — not just the verdict label
     assert len(content.strip()) > len("fail"), (
         "Human report for empty seg should contain more than just the verdict label"
@@ -482,7 +482,7 @@ def test_adv_populated_fixture_human_report_contains_flagged(labelled_blocks_fil
 
     As in ``test_ac13_populated_fixture_json_verdict_is_pass`` above, the
     labelled-blocks fixture's placeholder cubes now legitimately fire ``bounds``
-    findings once the rule engine is wired into ``segqc run`` (item 035), so the
+    findings once the rule engine is wired into ``segfacet run`` (item 035), so the
     rendered verdict is ``flagged-for-review``, not ``pass``.
     """
     scan_path, seg_path = labelled_blocks_files
@@ -491,7 +491,7 @@ def test_adv_populated_fixture_human_report_contains_flagged(labelled_blocks_fil
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    content = (out_dir / "segqc_report.txt").read_text(encoding="utf-8")
+    content = (out_dir / "segfacet_report.txt").read_text(encoding="utf-8")
     assert "flagged-for-review" in content.lower()
 
 
@@ -503,7 +503,7 @@ def test_adv_json_report_verdict_field_is_string(labelled_blocks_files, tmp_path
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    data = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert isinstance(data["verdict"], str)
 
 
@@ -515,7 +515,7 @@ def test_adv_json_report_reasons_is_list(labelled_blocks_files, tmp_path, capsys
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    data = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert isinstance(data["reasons"], list)
 
 
@@ -527,7 +527,7 @@ def test_adv_json_report_per_label_is_object(labelled_blocks_files, tmp_path, ca
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    data = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert isinstance(data["per_label"], dict)
 
 
@@ -540,8 +540,8 @@ def test_adv_both_reports_written_even_when_verdict_is_fail(empty_labelmap_files
         capsys,
     )
     # Both reports must exist regardless of exit code
-    assert (out_dir / "segqc_report.json").exists(), "JSON report missing after fail verdict"
-    assert (out_dir / "segqc_report.txt").exists(), "Human report missing after fail verdict"
+    assert (out_dir / "segfacet_report.json").exists(), "JSON report missing after fail verdict"
+    assert (out_dir / "segfacet_report.txt").exists(), "Human report missing after fail verdict"
 
 
 def test_adv_no_labels_at_all_both_reports(tmp_path, capsys):
@@ -554,8 +554,8 @@ def test_adv_no_labels_at_all_both_reports(tmp_path, capsys):
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    assert (out_dir / "segqc_report.json").exists()
-    assert (out_dir / "segqc_report.txt").exists()
+    assert (out_dir / "segfacet_report.json").exists()
+    assert (out_dir / "segfacet_report.txt").exists()
 
 
 def test_adv_json_report_case_id_is_string(labelled_blocks_files, tmp_path, capsys):
@@ -566,13 +566,13 @@ def test_adv_json_report_case_id_is_string(labelled_blocks_files, tmp_path, caps
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    data = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert isinstance(data["case_id"], str)
     assert len(data["case_id"]) > 0
 
 
 def test_adv_existing_out_dir_is_reused(labelled_blocks_files, tmp_path, capsys):
-    """``segqc run`` succeeds and writes reports when the output directory already exists."""
+    """``segfacet run`` succeeds and writes reports when the output directory already exists."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "existing_out"
     out_dir.mkdir()
@@ -581,8 +581,8 @@ def test_adv_existing_out_dir_is_reused(labelled_blocks_files, tmp_path, capsys)
         capsys,
     )
     assert code == 0
-    assert (out_dir / "segqc_report.json").exists()
-    assert (out_dir / "segqc_report.txt").exists()
+    assert (out_dir / "segfacet_report.json").exists()
+    assert (out_dir / "segfacet_report.txt").exists()
 
 
 def test_adv_human_report_contains_no_python_class_names(labelled_blocks_files, tmp_path, capsys):
@@ -593,7 +593,7 @@ def test_adv_human_report_contains_no_python_class_names(labelled_blocks_files, 
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    content = (out_dir / "segqc_report.txt").read_text(encoding="utf-8")
+    content = (out_dir / "segfacet_report.txt").read_text(encoding="utf-8")
     for forbidden in ("Severity", "Reason(", "Verdict(", "NoneType", "frozenset", "Traceback"):
         assert forbidden not in content, (
             f"Forbidden string {forbidden!r} found in human report"
@@ -608,7 +608,7 @@ def test_adv_json_report_written_before_exit(empty_labelmap_files, tmp_path, cap
         ["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir)],
         capsys,
     )
-    json_path = out_dir / "segqc_report.json"
+    json_path = out_dir / "segfacet_report.json"
     if json_path.exists():
         content = json_path.read_text(encoding="utf-8")
         data = json.loads(content)

@@ -34,7 +34,7 @@ Adversarial scenarios:
 - n_spline_points=500 (many samples) → no crash.
 - dpi=72 and dpi=300 variants → no crash.
 - Import contract: render_sagittal_projection importable from
-  segqc.features.sagittal_projection.
+  segfacet.features.sagittal_projection.
 
 All tests are deterministic, CPU-only, and portable (no network, no absolute
 paths, no services).
@@ -50,9 +50,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from segqc.features.centroids import LabelCentroid
-from segqc.features.sagittal_projection import render_sagittal_projection
-from segqc.features.spline import SplineFit, fit_centroid_spline
+from segfacet.features.centroids import LabelCentroid
+from segfacet.features.sagittal_projection import render_sagittal_projection
+from segfacet.features.spline import SplineFit, fit_centroid_spline
 
 
 # =========================================================================== #
@@ -111,26 +111,26 @@ def _is_png(path: Path) -> bool:
 
 
 def test_import_render_sagittal_projection():
-    """render_sagittal_projection is importable from segqc.features.sagittal_projection."""
-    from segqc.features.sagittal_projection import render_sagittal_projection as rsp  # noqa: F401
+    """render_sagittal_projection is importable from segfacet.features.sagittal_projection."""
+    from segfacet.features.sagittal_projection import render_sagittal_projection as rsp  # noqa: F401
     assert callable(rsp)
 
 
 def test_no_import_error():
-    """Importing segqc.features.sagittal_projection raises no error."""
-    mod = importlib.import_module("segqc.features.sagittal_projection")
+    """Importing segfacet.features.sagittal_projection raises no error."""
+    mod = importlib.import_module("segfacet.features.sagittal_projection")
     assert hasattr(mod, "render_sagittal_projection")
 
 
 def test_module_import_does_not_require_matplotlib():
-    """Importing segqc.features.sagittal_projection works even when matplotlib
+    """Importing segfacet.features.sagittal_projection works even when matplotlib
     is absent (the guard must be inside the function, not at module level)."""
     with patch.dict("sys.modules", {"matplotlib": None}):
         try:
             importlib.invalidate_caches()
             # The module may already be cached — we can at least confirm the
             # function exists and is callable without triggering the import path.
-            from segqc.features.sagittal_projection import render_sagittal_projection as rsp
+            from segfacet.features.sagittal_projection import render_sagittal_projection as rsp
             assert callable(rsp)
         except ImportError:
             pytest.fail(

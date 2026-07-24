@@ -25,7 +25,7 @@ from synthetic import (
     make_labelmap,
 )
 
-from segqc.features.geometry import LabelGeometry, compute_label_geometry
+from segfacet.features.geometry import LabelGeometry, compute_label_geometry
 
 
 # =========================================================================== #
@@ -46,21 +46,21 @@ def _seg_img(
 # =========================================================================== #
 
 def test_import_label_geometry():
-    """LabelGeometry is importable from segqc.features.geometry."""
-    from segqc.features.geometry import LabelGeometry as LG  # noqa: F401
+    """LabelGeometry is importable from segfacet.features.geometry."""
+    from segfacet.features.geometry import LabelGeometry as LG  # noqa: F401
     assert LG is LabelGeometry
 
 
 def test_import_compute_label_geometry():
-    """compute_label_geometry is importable from segqc.features.geometry."""
-    from segqc.features.geometry import compute_label_geometry as clg  # noqa: F401
+    """compute_label_geometry is importable from segfacet.features.geometry."""
+    from segfacet.features.geometry import compute_label_geometry as clg  # noqa: F401
     assert callable(clg)
 
 
 def test_no_import_error():
-    """Importing segqc.features.geometry raises no error."""
+    """Importing segfacet.features.geometry raises no error."""
     import importlib
-    mod = importlib.import_module("segqc.features.geometry")
+    mod = importlib.import_module("segfacet.features.geometry")
     assert hasattr(mod, "LabelGeometry")
     assert hasattr(mod, "compute_label_geometry")
 

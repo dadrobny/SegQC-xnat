@@ -1,5 +1,5 @@
 """Tests for item 044 -- VerSe GT ingestion: cohort loader & feature-extraction
-driver (``src/segqc/reference/ingest.py``).
+driver (``src/segfacet/reference/ingest.py``).
 
 Covers Acceptance Criteria AC1-AC14:
 
@@ -58,11 +58,11 @@ import nibabel as nib
 import numpy as np
 import pytest
 
-from segqc.config import bundled_default_config
-from segqc.labels import CANONICAL_ORDER, LabelConvention
-from segqc.pipeline import extract_feature_record
-from segqc.reference import Provenance, aggregate_reference
-from segqc.reference.ingest import (
+from segfacet.config import bundled_default_config
+from segfacet.labels import CANONICAL_ORDER, LabelConvention
+from segfacet.pipeline import extract_feature_record
+from segfacet.reference import Provenance, aggregate_reference
+from segfacet.reference.ingest import (
     DEFAULT_SEG_SUFFIX,
     INGESTED_FEATURES,
     SIZE_PROXY_NAME,
@@ -71,7 +71,7 @@ from segqc.reference.ingest import (
     ingest_cohort,
     ingest_subject,
 )
-from segqc.synth.clean_gt import build_clean_spine
+from segfacet.synth.clean_gt import build_clean_spine
 
 PROV = Provenance(
     source="test-cohort", config_hash="cfg-hash", build_date="2000-01-01"

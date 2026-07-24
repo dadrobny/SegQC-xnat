@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import pytest
 
-from segqc.config import HeuristicConfig
-from segqc.human_report import render_human_report
-from segqc.verdict import Reason, Severity, Verdict
+from segfacet.config import HeuristicConfig
+from segfacet.human_report import render_human_report
+from segfacet.verdict import Reason, Severity, Verdict
 
 
 # =========================================================================== #
@@ -64,15 +64,15 @@ def _fail_verdict_with_per_label() -> Verdict:
 # =========================================================================== #
 
 def test_ac1_render_human_report_importable():
-    """render_human_report is importable from segqc.human_report with no errors."""
-    from segqc.human_report import render_human_report as rhr
+    """render_human_report is importable from segfacet.human_report with no errors."""
+    from segfacet.human_report import render_human_report as rhr
     assert callable(rhr)
 
 
 def test_ac1_no_import_error():
-    """Importing segqc.human_report raises no ImportError or AttributeError."""
+    """Importing segfacet.human_report raises no ImportError or AttributeError."""
     import importlib
-    mod = importlib.import_module("segqc.human_report")
+    mod = importlib.import_module("segfacet.human_report")
     assert hasattr(mod, "render_human_report")
 
 
@@ -304,21 +304,21 @@ def test_ac8_no_none_type_in_output():
 # =========================================================================== #
 
 def test_ac17_no_numpy_at_module_level():
-    """segqc.human_report must not import numpy at module level."""
-    import segqc.human_report as hr_mod
+    """segfacet.human_report must not import numpy at module level."""
+    import segfacet.human_report as hr_mod
     assert "numpy" not in vars(hr_mod)
 
 
 def test_ac17_no_nibabel_at_module_level():
-    """segqc.human_report must not import nibabel at module level."""
-    import segqc.human_report as hr_mod
+    """segfacet.human_report must not import nibabel at module level."""
+    import segfacet.human_report as hr_mod
     assert "nibabel" not in vars(hr_mod)
     assert "nib" not in vars(hr_mod)
 
 
 def test_ac17_no_scipy_at_module_level():
-    """segqc.human_report must not import scipy at module level."""
-    import segqc.human_report as hr_mod
+    """segfacet.human_report must not import scipy at module level."""
+    import segfacet.human_report as hr_mod
     assert "scipy" not in vars(hr_mod)
 
 

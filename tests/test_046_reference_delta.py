@@ -1,5 +1,5 @@
 """Tests for item 046 -- delta-to-reference feature computation
-(``src/segqc/reference/delta.py``).
+(``src/segfacet/reference/delta.py``).
 
 Covers Acceptance Criteria AC1-AC15:
 
@@ -49,8 +49,8 @@ import math
 
 import pytest
 
-from segqc.config import bundled_default_config
-from segqc.reference import (
+from segfacet.config import bundled_default_config
+from segfacet.reference import (
     ALL_STRATUM,
     DEFAULT_PERCENTILES,
     SCHEMA_VERSION,
@@ -66,10 +66,10 @@ from segqc.reference import (
     IQR_TO_SIGMA,
     REFERENCE_DELTA_VERSION,
 )
-from segqc.pipeline import extract_feature_record
-from segqc.report import serialize_report
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.verdict import Verdict
+from segfacet.pipeline import extract_feature_record
+from segfacet.report import serialize_report
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.verdict import Verdict
 
 
 # =========================================================================== #

@@ -2,8 +2,8 @@
 
 Covers all sixteen Acceptance Criteria plus adversarial and edge-case inputs.
 The cohort under test is assembled **entirely in memory** from the Stage-5
-synthetic generator (``segqc.synth.clean_gt.build_clean_spine`` /
-``segqc.synth.corpus.build_corpus``) -- per the item's Assumptions, no disk
+synthetic generator (``segfacet.synth.clean_gt.build_clean_spine`` /
+``segfacet.synth.corpus.build_corpus``) -- per the item's Assumptions, no disk
 I/O and no VerSe/TotalSegmentator download are exercised here; the harness's
 own path-source resolution is documented but not tested. ``candidate=None``
 means "score the GT against itself" (the clean positive control); a present
@@ -24,14 +24,14 @@ import json
 import numpy as np
 import pytest
 
-from segqc.config import bundled_default_config
-from segqc.eval.feature_match import compute_feature_match
-from segqc.eval.outcome import Outcome, classify_outcome
-from segqc.eval.overlap import compute_overlap
-from segqc.io import SegQCInputError
-from segqc.pipeline import extract_feature_record, run_qc
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.corpus import build_corpus
+from segfacet.config import bundled_default_config
+from segfacet.eval.feature_match import compute_feature_match
+from segfacet.eval.outcome import Outcome, classify_outcome
+from segfacet.eval.overlap import compute_overlap
+from segfacet.io import FacetInputError
+from segfacet.pipeline import extract_feature_record, run_qc
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.corpus import build_corpus
 
 
 # =========================================================================== #
@@ -66,8 +66,8 @@ def _verdict_label(seg_img, config=None):
 
 
 def test_ac1_import_from_harness_module():
-    """AC1: all five names import from segqc.eval.harness."""
-    from segqc.eval.harness import (  # noqa: F401
+    """AC1: all five names import from segfacet.eval.harness."""
+    from segfacet.eval.harness import (  # noqa: F401
         CaseEvaluation,
         CohortEvaluation,
         EvaluationCase,
@@ -80,8 +80,8 @@ def test_ac1_import_from_harness_module():
 
 
 def test_ac1_reexported_from_eval_package():
-    """AC1: all five names are re-exported from segqc.eval."""
-    from segqc.eval import (
+    """AC1: all five names are re-exported from segfacet.eval."""
+    from segfacet.eval import (
         CaseEvaluation,
         CohortEvaluation,
         EvaluationCase,
@@ -94,8 +94,8 @@ def test_ac1_reexported_from_eval_package():
 
 
 def test_ac1_module_dunder_all():
-    """AC1: segqc.eval.harness.__all__ lists all five public names."""
-    import segqc.eval.harness as harness_mod
+    """AC1: segfacet.eval.harness.__all__ lists all five public names."""
+    import segfacet.eval.harness as harness_mod
 
     assert set(harness_mod.__all__) >= {
         "EvaluationCase",
@@ -113,7 +113,7 @@ def test_ac1_module_dunder_all():
 
 def test_ac2_construction_and_field_values():
     """AC2: EvaluationCase carries required + optional fields with defaults."""
-    from segqc.eval.harness import EvaluationCase
+    from segfacet.eval.harness import EvaluationCase
 
     clean = build_clean_spine(levels=["L1", "L2"])
     expected = {"expected_verdict": "pass"}
@@ -129,7 +129,7 @@ def test_ac2_construction_and_field_values():
 
 def test_ac2_optional_fields_populated():
     """AC2: candidate/spacing/metadata are stored when given."""
-    from segqc.eval.harness import EvaluationCase
+    from segfacet.eval.harness import EvaluationCase
 
     clean = build_clean_spine(levels=["L1", "L2"])
     case = EvaluationCase(
@@ -147,7 +147,7 @@ def test_ac2_optional_fields_populated():
 
 def test_ac2_is_frozen_dataclass():
     """AC2: EvaluationCase is a frozen dataclass -- attribute assignment raises."""
-    from segqc.eval.harness import EvaluationCase
+    from segfacet.eval.harness import EvaluationCase
 
     clean = build_clean_spine(levels=["L1", "L2"])
     case = EvaluationCase(
@@ -161,7 +161,7 @@ def test_ac2_is_frozen_dataclass():
 
 def test_ac2_does_not_mutate_passed_arguments():
     """AC2: the expected mapping and gt array passed in are unchanged after use."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     clean = build_clean_spine(levels=["L1", "L2"])
     gt_array = np.asanyarray(clean.seg_img.dataobj).copy()
@@ -185,7 +185,7 @@ def test_ac2_does_not_mutate_passed_arguments():
 
 def test_ac3_nifti1image_sources_yield_well_formed_evaluation():
     """AC3: gt/candidate given as Nifti1Image both resolve and produce a record."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     clean = build_clean_spine(levels=["L1", "L2"])
     case = EvaluationCase(
@@ -202,7 +202,7 @@ def test_ac3_nifti1image_sources_yield_well_formed_evaluation():
 
 def test_ac3_ndarray_sources_yield_well_formed_evaluation():
     """AC3: gt/candidate given as ndarray (spacing-derived affine) resolve too."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     clean = build_clean_spine(levels=["L1", "L2"])
     gt_array = np.asanyarray(clean.seg_img.dataobj)
@@ -221,7 +221,7 @@ def test_ac3_ndarray_sources_yield_well_formed_evaluation():
 
 def test_ac3_ndarray_source_defaults_to_isotropic_spacing():
     """AC3: an ndarray source with no spacing given still resolves (default isotropic)."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     clean = build_clean_spine(levels=["L1", "L2"])
     gt_array = np.asanyarray(clean.seg_img.dataobj)
@@ -241,7 +241,7 @@ def test_ac3_ndarray_source_defaults_to_isotropic_spacing():
 
 def test_ac4_outcome_matches_direct_classify_outcome_call_no_candidate():
     """AC4: outcome equals classify_outcome(expected, run_qc(gt, config)[0]) when no candidate."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     clean = build_clean_spine(levels=["L1", "L2", "L3"])
     expected = {"expected_verdict": "pass"}
@@ -255,7 +255,7 @@ def test_ac4_outcome_matches_direct_classify_outcome_call_no_candidate():
 
 def test_ac4_outcome_matches_direct_classify_outcome_call_with_candidate():
     """AC4: outcome equals classify_outcome(expected, run_qc(candidate, config)[0]) when present."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     corpus_case = _corpus_by_id()["mode2_fragment"]
     gt = _gt_for(corpus_case)
@@ -281,7 +281,7 @@ def test_ac4_outcome_matches_direct_classify_outcome_call_with_candidate():
 
 def test_ac5_actual_verdict_follows_candidate_not_gt():
     """AC5: when candidate/GT verdicts differ, recorded actual_verdict matches the candidate's."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     corpus_case = _corpus_by_id()["mode2_fragment"]
     gt = _gt_for(corpus_case)
@@ -311,7 +311,7 @@ def test_ac5_actual_verdict_follows_candidate_not_gt():
 
 def test_ac6_overlap_equals_direct_compute_overlap_call():
     """AC6: overlap equals compute_overlap(candidate_array, gt_array, gt_spacing)."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     corpus_case = _corpus_by_id()["mode5_remove_level"]
     gt = _gt_for(corpus_case)
@@ -340,7 +340,7 @@ def test_ac6_overlap_equals_direct_compute_overlap_call():
 
 def test_ac7_feature_match_equals_direct_compute_feature_match_call():
     """AC7: feature_match equals compute_feature_match(candidate_block, extract_feature_record(gt))."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     corpus_case = _corpus_by_id()["mode5_remove_level"]
     gt = _gt_for(corpus_case)
@@ -368,7 +368,7 @@ def test_ac7_feature_match_equals_direct_compute_feature_match_call():
 
 def test_ac8_no_candidate_leaves_overlap_and_feature_match_none():
     """AC8: candidate=None -> overlap/feature_match None, candidate_present False, outcome populated."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     clean = build_clean_spine(levels=["L1", "L2", "L3"])
     case = EvaluationCase(
@@ -389,7 +389,7 @@ def test_ac8_no_candidate_leaves_overlap_and_feature_match_none():
 
 def test_ac9_cohort_count_order_and_case_ids():
     """AC9: evaluate_cohort returns len(cases) records, in order, with matching case_ids."""
-    from segqc.eval.harness import EvaluationCase, evaluate_cohort
+    from segfacet.eval.harness import EvaluationCase, evaluate_cohort
 
     clean_a = build_clean_spine(levels=["L1", "L2"])
     clean_b = build_clean_spine(levels=["L3", "L4", "L5"])
@@ -429,7 +429,7 @@ def test_ac10_pipeline_detectable_perturbation_is_caught_and_dice_below_one():
     DICE rather than an excluded unmatched entry (as remove_level's full-label
     deletion would give).
     """
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     corpus_case = _corpus_by_id()["mode2_fragment"]
     assert corpus_case.detection == "pipeline"
@@ -456,7 +456,7 @@ def test_ac10_pipeline_detectable_perturbation_is_caught_and_dice_below_one():
 
 def test_ac11_identical_candidate_is_perfect_dice_and_true_negative():
     """AC11: candidate array == GT array, clean expectation -> mean_dice 1.0, TRUE_NEGATIVE."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     corpus_case = _corpus_by_id()["clean_control"]
     assert corpus_case.expectation.to_dict()["expected_verdict"] == "pass"
@@ -481,7 +481,7 @@ def test_ac11_identical_candidate_is_perfect_dice_and_true_negative():
 
 def test_ac12_to_dict_is_json_serialisable_and_deterministic():
     """AC12: cohort.to_dict() JSON-dumps byte-identically across two runs, keys present."""
-    from segqc.eval.harness import EvaluationCase, evaluate_cohort
+    from segfacet.eval.harness import EvaluationCase, evaluate_cohort
 
     corpus_case = _corpus_by_id()["mode2_fragment"]
     gt = _gt_for(corpus_case)
@@ -527,7 +527,7 @@ def test_ac12_to_dict_is_json_serialisable_and_deterministic():
 
 def test_ac12_outcome_enum_reduced_to_string():
     """AC12: the Outcome enum is reduced to a plain string in to_dict()."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     clean = build_clean_spine(levels=["L1", "L2"])
     case = EvaluationCase(
@@ -545,7 +545,7 @@ def test_ac12_outcome_enum_reduced_to_string():
 
 def test_ac13_evaluate_case_does_not_mutate_inputs():
     """AC13: evaluate_case leaves the case, config, and gt/candidate arrays unchanged."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     corpus_case = _corpus_by_id()["mode2_fragment"]
     gt = _gt_for(corpus_case)
@@ -576,7 +576,7 @@ def test_ac13_evaluate_case_does_not_mutate_inputs():
 
 def test_ac13_evaluate_cohort_does_not_mutate_inputs():
     """AC13: evaluate_cohort leaves every case's arrays/mapping unchanged."""
-    from segqc.eval.harness import EvaluationCase, evaluate_cohort
+    from segfacet.eval.harness import EvaluationCase, evaluate_cohort
 
     clean = build_clean_spine(levels=["L1", "L2"])
     gt_array = np.asanyarray(clean.seg_img.dataobj).copy()
@@ -597,9 +597,9 @@ def test_ac13_evaluate_cohort_does_not_mutate_inputs():
 # =========================================================================== #
 
 
-def test_ac14_shape_mismatched_candidate_and_gt_raises_segqc_input_error():
-    """AC14: candidate/gt arrays of different shape raise SegQCInputError."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+def test_ac14_shape_mismatched_candidate_and_gt_raises_segfacet_input_error():
+    """AC14: candidate/gt arrays of different shape raise FacetInputError."""
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     gt_array = np.zeros((10, 10, 10), dtype=np.int64)
     candidate_array = np.zeros((12, 10, 10), dtype=np.int64)
@@ -613,13 +613,13 @@ def test_ac14_shape_mismatched_candidate_and_gt_raises_segqc_input_error():
         expected={"expected_verdict": "pass"},
         spacing=(1.0, 1.0, 1.0),
     )
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         evaluate_case(case, _config())
 
 
 def test_ac14_shape_mismatch_not_raw_value_error():
-    """AC14: the shape mismatch is a SegQCInputError, not a bare numpy ValueError."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    """AC14: the shape mismatch is a FacetInputError, not a bare numpy ValueError."""
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     gt_array = np.zeros((8, 8, 8), dtype=np.int64)
     candidate_array = np.zeros((8, 8, 9), dtype=np.int64)
@@ -635,10 +635,10 @@ def test_ac14_shape_mismatch_not_raw_value_error():
     )
     try:
         evaluate_case(case, _config())
-    except SegQCInputError:
+    except FacetInputError:
         pass
     else:
-        pytest.fail("expected SegQCInputError")
+        pytest.fail("expected FacetInputError")
 
 
 # =========================================================================== #
@@ -648,7 +648,7 @@ def test_ac14_shape_mismatch_not_raw_value_error():
 
 def test_ac15_empty_cohort_returns_zero_records():
     """AC15: evaluate_cohort([], config) -> zero records, no raise."""
-    from segqc.eval.harness import evaluate_cohort
+    from segfacet.eval.harness import evaluate_cohort
 
     cohort = evaluate_cohort([], _config())  # must not raise
     assert cohort.n_cases == 0
@@ -657,7 +657,7 @@ def test_ac15_empty_cohort_returns_zero_records():
 
 def test_ac15_empty_cohort_to_dict_is_json_serialisable():
     """AC15: an empty cohort's to_dict() is JSON-serialisable with zero cases."""
-    from segqc.eval.harness import evaluate_cohort
+    from segfacet.eval.harness import evaluate_cohort
 
     cohort = evaluate_cohort([], _config())
     d = cohort.to_dict()
@@ -670,9 +670,9 @@ def test_ac15_empty_cohort_to_dict_is_json_serialisable():
 # =========================================================================== #
 
 
-def test_ac16_duplicate_case_ids_raise_segqc_input_error():
-    """AC16: two cases sharing a case_id raise SegQCInputError."""
-    from segqc.eval.harness import EvaluationCase, evaluate_cohort
+def test_ac16_duplicate_case_ids_raise_segfacet_input_error():
+    """AC16: two cases sharing a case_id raise FacetInputError."""
+    from segfacet.eval.harness import EvaluationCase, evaluate_cohort
 
     clean = build_clean_spine(levels=["L1", "L2"])
     cases = [
@@ -683,13 +683,13 @@ def test_ac16_duplicate_case_ids_raise_segqc_input_error():
             case_id="dup", gt=clean.seg_img, expected={"expected_verdict": "pass"}
         ),
     ]
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         evaluate_cohort(cases, _config())
 
 
 def test_ac16_duplicate_case_ids_not_raw_key_error():
-    """AC16: the duplicate case_id rejection is SegQCInputError, not a bare KeyError."""
-    from segqc.eval.harness import EvaluationCase, evaluate_cohort
+    """AC16: the duplicate case_id rejection is FacetInputError, not a bare KeyError."""
+    from segfacet.eval.harness import EvaluationCase, evaluate_cohort
 
     clean = build_clean_spine(levels=["L1", "L2"])
     cases = [
@@ -702,10 +702,10 @@ def test_ac16_duplicate_case_ids_not_raw_key_error():
     ]
     try:
         evaluate_cohort(cases, _config())
-    except SegQCInputError:
+    except FacetInputError:
         pass
     else:
-        pytest.fail("expected SegQCInputError")
+        pytest.fail("expected FacetInputError")
 
 
 # =========================================================================== #
@@ -714,10 +714,10 @@ def test_ac16_duplicate_case_ids_not_raw_key_error():
 
 
 def test_adv_malformed_expected_verdict_propagates_from_outcome_module():
-    """A malformed expected mapping (bad verdict label) raises SegQCInputError,
+    """A malformed expected mapping (bad verdict label) raises FacetInputError,
     propagated unmodified from item 052's classify_outcome -- evaluate_case does
     not swallow or degrade it into a malformed record."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     clean = build_clean_spine(levels=["L1", "L2"])
     case = EvaluationCase(
@@ -725,17 +725,17 @@ def test_adv_malformed_expected_verdict_propagates_from_outcome_module():
         gt=clean.seg_img,
         expected={"expected_verdict": "bogus-not-a-real-verdict"},
     )
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         evaluate_case(case, _config())
 
 
 def test_adv_missing_expected_verdict_key_propagates():
-    """An expected mapping missing 'expected_verdict' entirely raises SegQCInputError."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    """An expected mapping missing 'expected_verdict' entirely raises FacetInputError."""
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     clean = build_clean_spine(levels=["L1", "L2"])
     case = EvaluationCase(case_id="no-verdict-key", gt=clean.seg_img, expected={})
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         evaluate_case(case, _config())
 
 
@@ -746,7 +746,7 @@ def test_adv_zero_spacing_component_no_raise_and_zeroes_physical_volume():
     A single-level GT is used to keep the pipeline on the Stage-2-only path
     (no spline/orientation Stage-3 extractors that could divide by a
     zero-derived spacing component)."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     clean = build_clean_spine(levels=["L1"])
     gt_array = np.asanyarray(clean.seg_img.dataobj)
@@ -769,7 +769,7 @@ def test_adv_single_label_gt_no_stage3_handled_without_raising():
     """A single-label GT (features block has no stage3) still evaluates cleanly
     against a candidate, and the unavailable spline_offset_mm feature does not
     crash the feature-match primitive."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     clean = build_clean_spine(levels=["L1"])
 
@@ -793,7 +793,7 @@ def test_adv_single_label_gt_no_stage3_handled_without_raising():
 def test_adv_candidate_only_label_surfaces_as_unmatched_in_overlap_and_features():
     """A candidate label absent from GT (and vice versa) surfaces as an unmatched
     entry in both overlap and feature_match, rather than raising."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     clean = build_clean_spine(levels=["L1", "L2", "L3"])
     gt_array = np.asanyarray(clean.seg_img.dataobj)
@@ -826,7 +826,7 @@ def test_adv_candidate_only_label_surfaces_as_unmatched_in_overlap_and_features(
 def test_adv_mixed_nifti1image_and_ndarray_sources_in_one_cohort():
     """A cohort mixing Nifti1Image-sourced and ndarray-sourced cases evaluates
     both without error, source-agnostically."""
-    from segqc.eval.harness import EvaluationCase, evaluate_cohort
+    from segfacet.eval.harness import EvaluationCase, evaluate_cohort
 
     clean_a = build_clean_spine(levels=["L1", "L2"])
     clean_b = build_clean_spine(levels=["L3", "L4", "L5"])
@@ -861,7 +861,7 @@ def test_adv_negative_spacing_component_does_not_raise():
     A single-level GT keeps the pipeline on the Stage-2-only path, avoiding
     Stage-3 spline/orientation extractors that a negative-determinant affine
     could otherwise upset."""
-    from segqc.eval.harness import EvaluationCase, evaluate_case
+    from segfacet.eval.harness import EvaluationCase, evaluate_case
 
     clean = build_clean_spine(levels=["L1"])
     gt_array = np.asanyarray(clean.seg_img.dataobj)

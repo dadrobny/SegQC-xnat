@@ -59,26 +59,26 @@ from typing import List, Optional, Tuple
 
 import pytest
 
-from segqc.config import default_config
-from segqc.feature_report import build_features_block
-from segqc.features.centroids import LabelCentroid, compute_centroid
-from segqc.features.components import compute_components
-from segqc.features.consistency import (
+from segfacet.config import default_config
+from segfacet.feature_report import build_features_block
+from segfacet.features.centroids import LabelCentroid, compute_centroid
+from segfacet.features.components import compute_components
+from segfacet.features.consistency import (
     compute_monotonic_consistency,
     compute_spacing_consistency,
 )
-from segqc.features.geometry import compute_label_geometry
-from segqc.features.orientation import (
+from segfacet.features.geometry import compute_label_geometry
+from segfacet.features.orientation import (
     VertebralOrientation,
     compute_spine_curvature,
     compute_vertebra_orientations,
 )
-from segqc.features.overlap import detect_overlaps
-from segqc.features.relationships import compute_spine_relationships
-from segqc.features.spline import fit_centroid_spline
-from segqc.features.spline_offset import VertebralSplineOffset, compute_spline_offsets
-from segqc.report import serialize_report, serialize_report_json
-from segqc.verdict import Verdict
+from segfacet.features.overlap import detect_overlaps
+from segfacet.features.relationships import compute_spine_relationships
+from segfacet.features.spline import fit_centroid_spline
+from segfacet.features.spline_offset import VertebralSplineOffset, compute_spline_offsets
+from segfacet.report import serialize_report, serialize_report_json
+from segfacet.verdict import Verdict
 
 import numpy as np
 
@@ -228,7 +228,7 @@ def test_ac1_stage3_key_present_when_stage3_supplied():
 def test_ac1_stage3_report_passes_schema_validation():
     """AC1: A report containing the Stage 3 block validates against the extended schema."""
     import jsonschema
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     centroids = _straight_spine(5)
     block = _full_block_for_spine(centroids)
@@ -698,7 +698,7 @@ def test_ac7_stage3_absent_when_not_supplied():
 def test_ac7_stage2_only_block_validates_against_schema():
     """AC7: A Stage-2-only block (no Stage 3) still validates against the extended schema."""
     import jsonschema
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     case = labelled_blocks_case()
     geometry, components, centroids_map, centroid_seq, relationships, overlaps = \
@@ -717,7 +717,7 @@ def test_ac7_stage2_only_block_validates_against_schema():
 def test_ac7_feature_free_report_still_validates():
     """AC7: A completely feature-free report (no 'features' key) still validates."""
     import jsonschema
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     report = serialize_report(_empty_verdict(), "no-features", _config())
     assert "features" not in report
@@ -1056,7 +1056,7 @@ def test_adv_two_centroid_spine_full_pipeline():
 def test_adv_schema_rejects_missing_offset_mm():
     """A Stage 3 block missing offset_mm in a per_label_offsets entry is rejected."""
     import jsonschema
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     centroids = _straight_spine(5)
     block = _full_block_for_spine(centroids)
@@ -1072,7 +1072,7 @@ def test_adv_schema_rejects_missing_offset_mm():
 def test_adv_schema_rejects_missing_is_monotonic():
     """A Stage 3 block missing is_monotonic in monotonic_consistency is rejected."""
     import jsonschema
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     centroids = _straight_spine(5)
     block = _full_block_for_spine(centroids)
@@ -1216,38 +1216,38 @@ def test_adv_swapped_spine_is_non_monotonic_in_serialised_block():
 
 
 def test_adv_import_spline_offset_to_dict():
-    """spline_offset_to_dict is importable from segqc.feature_report."""
-    from segqc.feature_report import spline_offset_to_dict
+    """spline_offset_to_dict is importable from segfacet.feature_report."""
+    from segfacet.feature_report import spline_offset_to_dict
     assert callable(spline_offset_to_dict)
 
 
 def test_adv_import_orientation_to_dict():
-    """orientation_to_dict is importable from segqc.feature_report."""
-    from segqc.feature_report import orientation_to_dict
+    """orientation_to_dict is importable from segfacet.feature_report."""
+    from segfacet.feature_report import orientation_to_dict
     assert callable(orientation_to_dict)
 
 
 def test_adv_import_curvature_to_dict():
-    """curvature_to_dict is importable from segqc.feature_report."""
-    from segqc.feature_report import curvature_to_dict
+    """curvature_to_dict is importable from segfacet.feature_report."""
+    from segfacet.feature_report import curvature_to_dict
     assert callable(curvature_to_dict)
 
 
 def test_adv_import_spacing_consistency_to_dict():
-    """spacing_consistency_to_dict is importable from segqc.feature_report."""
-    from segqc.feature_report import spacing_consistency_to_dict
+    """spacing_consistency_to_dict is importable from segfacet.feature_report."""
+    from segfacet.feature_report import spacing_consistency_to_dict
     assert callable(spacing_consistency_to_dict)
 
 
 def test_adv_import_monotonic_consistency_to_dict():
-    """monotonic_consistency_to_dict is importable from segqc.feature_report."""
-    from segqc.feature_report import monotonic_consistency_to_dict
+    """monotonic_consistency_to_dict is importable from segfacet.feature_report."""
+    from segfacet.feature_report import monotonic_consistency_to_dict
     assert callable(monotonic_consistency_to_dict)
 
 
 def test_adv_spline_offset_to_dict_output_shape():
     """spline_offset_to_dict returns a dict with all required keys."""
-    from segqc.feature_report import spline_offset_to_dict
+    from segfacet.feature_report import spline_offset_to_dict
 
     centroids = _straight_spine(3)
     fit = fit_centroid_spline(centroids)
@@ -1261,7 +1261,7 @@ def test_adv_spline_offset_to_dict_output_shape():
 def test_adv_orientation_to_dict_output_shape():
     """orientation_to_dict returns a dict with label, level_name, principal_axis,
     eigenvalue_ratio; principal_axis is a list."""
-    from segqc.feature_report import orientation_to_dict
+    from segfacet.feature_report import orientation_to_dict
 
     o = VertebralOrientation(
         label=1, level_name="L3",
@@ -1276,7 +1276,7 @@ def test_adv_orientation_to_dict_output_shape():
 
 def test_adv_curvature_to_dict_tuples_become_lists():
     """curvature_to_dict converts tuple fields to lists for JSON compatibility."""
-    from segqc.feature_report import curvature_to_dict
+    from segfacet.feature_report import curvature_to_dict
 
     centroids = _straight_spine(4)
     fit = fit_centroid_spline(centroids)
@@ -1289,7 +1289,7 @@ def test_adv_curvature_to_dict_tuples_become_lists():
 
 def test_adv_spacing_consistency_to_dict_outlier_pairs_as_lists():
     """spacing_consistency_to_dict converts outlier_pairs tuples to lists of lists."""
-    from segqc.feature_report import spacing_consistency_to_dict
+    from segfacet.feature_report import spacing_consistency_to_dict
 
     # Build a case with an outlier pair
     centroids = _straight_spine(6, spacing_mm=10.0)
@@ -1309,7 +1309,7 @@ def test_adv_spacing_consistency_to_dict_outlier_pairs_as_lists():
 
 def test_adv_monotonic_consistency_to_dict_lists():
     """monotonic_consistency_to_dict converts tuple fields to lists."""
-    from segqc.feature_report import monotonic_consistency_to_dict
+    from segfacet.feature_report import monotonic_consistency_to_dict
 
     centroids = _straight_spine(5)
     fit = fit_centroid_spline(centroids)

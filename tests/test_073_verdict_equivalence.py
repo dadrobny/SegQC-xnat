@@ -4,10 +4,10 @@
 through the Stage-2/3 feature functions (``compute_label_geometry``,
 ``compute_components``, ``compute_centroid``, ``compute_edt_centroids``, the
 fragmentation/spline/spline_offset ports). ``None`` auto-resolves via
-``segqc.backend.get_backend()`` **at call time**, honouring the
-``SEGQC_BACKEND`` environment variable (item 071). ``run_qc ->
+``segfacet.backend.get_backend()`` **at call time**, honouring the
+``SEGFACET_BACKEND`` environment variable (item 071). ``run_qc ->
 extract_feature_record`` calls those functions with **no** ``backend``
-argument, so setting ``SEGQC_BACKEND=cpu`` / ``SEGQC_BACKEND=gpu`` in the
+argument, so setting ``SEGFACET_BACKEND=cpu`` / ``SEGFACET_BACKEND=gpu`` in the
 environment (via ``monkeypatch.setenv``/``delenv``) selects the backend for a
 whole ``run_qc`` call with **no change to ``pipeline.py`` or ``cli.py``**.
 There is no CLI ``--backend`` flag or ``run_qc`` parameter here (that is item
@@ -50,15 +50,15 @@ from pathlib import Path
 import numpy
 import pytest
 
-from segqc.aggregate import CaseResult
-from segqc.backend import ENV_VAR, SegQCBackendError, cupy_available
-from segqc.config import bundled_default_config
-from segqc.heuristics import Finding
-from segqc.pipeline import extract_feature_record, run_qc
-from segqc.synth.corpus import load_manifest
-from segqc.synth.golden import canonical_json
-from segqc.synth.regression import loaded_seg_image
-from segqc.verdict import Reason, Severity, Verdict
+from segfacet.aggregate import CaseResult
+from segfacet.backend import ENV_VAR, FacetBackendError, cupy_available
+from segfacet.config import bundled_default_config
+from segfacet.heuristics import Finding
+from segfacet.pipeline import extract_feature_record, run_qc
+from segfacet.synth.corpus import load_manifest
+from segfacet.synth.golden import canonical_json
+from segfacet.synth.regression import loaded_seg_image
+from segfacet.verdict import Reason, Severity, Verdict
 
 from synthetic import anisotropic_case, empty_case, labelled_blocks_case, make_labelmap
 
@@ -147,7 +147,7 @@ def feature_leaves_close(cpu_block, gpu_block, *, rtol: float, atol: float) -> b
 
 
 def run_under_backend(seg_img, cfg, token, monkeypatch):
-    """Select *token* via ``SEGQC_BACKEND`` and run the full pipeline.
+    """Select *token* via ``SEGFACET_BACKEND`` and run the full pipeline.
 
     ``token=None`` clears the env var (auto-resolution); otherwise it is set
     verbatim (``"cpu"``/``"gpu"``). Returns ``run_qc``'s
@@ -174,9 +174,9 @@ def test_ac1_module_present_and_collectable_gpu_free():
     module_path = Path(__file__).resolve()
     assert module_path.is_file(), "tests/test_073_verdict_equivalence.py must exist"
 
-    import segqc.backend  # noqa: F401 -- must import cleanly with no cupy installed
+    import segfacet.backend  # noqa: F401 -- must import cleanly with no cupy installed
 
-    assert hasattr(segqc.backend, "cupy_available")
+    assert hasattr(segfacet.backend, "cupy_available")
 
 
 # =========================================================================== #
@@ -372,7 +372,7 @@ def test_edge_empty_and_single_label_maps_equal_verdict_signature_under_cpu(
 
 
 def test_edge_env_hermeticity_after_backend_selection():
-    """After a ``SEGQC_BACKEND`` selection made via a monkeypatch context
+    """After a ``SEGFACET_BACKEND`` selection made via a monkeypatch context
     exits, the ambient ``os.environ`` state is restored -- no backend
     selection leaks into another test or the wider suite (A7)."""
     original_present = ENV_VAR in os.environ
@@ -390,10 +390,10 @@ def test_edge_env_hermeticity_after_backend_selection():
 
 def test_edge_gpu_selection_without_cupy_raises_backend_error(monkeypatch):
     """Sanity check underpinning A5: on this CuPy-absent host, actually
-    setting ``SEGQC_BACKEND=gpu`` and calling ``run_qc`` raises
-    ``SegQCBackendError`` rather than silently running -- exactly why
+    setting ``SEGFACET_BACKEND=gpu`` and calling ``run_qc`` raises
+    ``FacetBackendError`` rather than silently running -- exactly why
     AC7-AC9 must be gated by ``@requires_cupy`` *before* ever setting
-    ``SEGQC_BACKEND=gpu``, so a CuPy-absent host skips instead of erroring."""
+    ``SEGFACET_BACKEND=gpu``, so a CuPy-absent host skips instead of erroring."""
     if cupy_available():
         pytest.skip("This sanity check targets a CuPy-absent host only.")
 
@@ -401,5 +401,5 @@ def test_edge_gpu_selection_without_cupy_raises_backend_error(monkeypatch):
     seg_img = labelled_blocks_case().seg_img
 
     monkeypatch.setenv(ENV_VAR, "gpu")
-    with pytest.raises(SegQCBackendError):
+    with pytest.raises(FacetBackendError):
         run_qc(seg_img, cfg)

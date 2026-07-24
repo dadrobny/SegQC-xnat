@@ -26,8 +26,8 @@ Adversarial / edge-case scenarios:
 - Schema rejection: a components block with fragmentation_index missing fails
   jsonschema.validate against the updated schema.
 - Immutability: caller's data array is not changed by compute_fragmentation_index.
-- Import is clean: segqc.features.fragmentation importable without error.
-- Public name accessible from segqc top-level __init__.
+- Import is clean: segfacet.features.fragmentation importable without error.
+- Public name accessible from segfacet top-level __init__.
 
 All tests are deterministic, CPU-only, and portable (no network, no absolute
 paths, no external services).
@@ -48,17 +48,17 @@ from synthetic import (
     make_labelmap,
 )
 
-from segqc.config import HeuristicConfig, default_config
-from segqc.feature_report import (
+from segfacet.config import HeuristicConfig, default_config
+from segfacet.feature_report import (
     build_features_block,
     components_to_dict,
 )
-from segqc.features.components import ComponentsInfo, compute_components
-from segqc.features.centroids import compute_centroid
-from segqc.features.geometry import compute_label_geometry
-from segqc.features.overlap import detect_overlaps
-from segqc.features.relationships import compute_spine_relationships
-from segqc.human_report import render_feature_table
+from segfacet.features.components import ComponentsInfo, compute_components
+from segfacet.features.centroids import compute_centroid
+from segfacet.features.geometry import compute_label_geometry
+from segfacet.features.overlap import detect_overlaps
+from segfacet.features.relationships import compute_spine_relationships
+from segfacet.human_report import render_feature_table
 
 
 # =========================================================================== #
@@ -116,7 +116,7 @@ def _single_voxel_img():
 
 def _compute_frag_index(seg_img, label=1) -> float:
     """Call compute_fragmentation_index from the implementation module."""
-    from segqc.features.fragmentation import compute_fragmentation_index
+    from segfacet.features.fragmentation import compute_fragmentation_index
     return compute_fragmentation_index(seg_img, label, _config())
 
 
@@ -151,25 +151,25 @@ def _features_for_labels(seg_img, labels):
 
 
 def test_import_fragmentation_module():
-    """segqc.features.fragmentation is importable without error."""
+    """segfacet.features.fragmentation is importable without error."""
     import importlib
-    mod = importlib.import_module("segqc.features.fragmentation")
+    mod = importlib.import_module("segfacet.features.fragmentation")
     assert mod is not None
 
 
 def test_import_compute_fragmentation_index():
-    """compute_fragmentation_index is callable from segqc.features.fragmentation."""
-    from segqc.features.fragmentation import compute_fragmentation_index
+    """compute_fragmentation_index is callable from segfacet.features.fragmentation."""
+    from segfacet.features.fragmentation import compute_fragmentation_index
     assert callable(compute_fragmentation_index)
 
 
-def test_import_from_segqc_top_level():
-    """compute_fragmentation_index is accessible from the segqc top-level namespace."""
-    import segqc
-    assert hasattr(segqc, "compute_fragmentation_index"), (
-        "compute_fragmentation_index must be exported in segqc.__all__"
+def test_import_from_segfacet_top_level():
+    """compute_fragmentation_index is accessible from the segfacet top-level namespace."""
+    import segfacet
+    assert hasattr(segfacet, "compute_fragmentation_index"), (
+        "compute_fragmentation_index must be exported in segfacet.__all__"
     )
-    assert callable(segqc.compute_fragmentation_index)
+    assert callable(segfacet.compute_fragmentation_index)
 
 
 # =========================================================================== #
@@ -375,9 +375,9 @@ def test_ac4_features_block_fragmentation_index_value_correct():
 def test_ac5_schema_validates_report_with_fragmentation_index():
     """AC5: A serialised report with fragmentation_index passes jsonschema validation."""
     import jsonschema
-    from segqc.report import _SCHEMA, serialize_report
-    from segqc.config import default_config
-    from segqc.verdict import Verdict
+    from segfacet.report import _SCHEMA, serialize_report
+    from segfacet.config import default_config
+    from segfacet.verdict import Verdict
 
     case = labelled_blocks_case()
     block = _features_for_labels(case.seg_img, list(case.expected_labels))
@@ -391,13 +391,13 @@ def test_ac5_schema_validates_report_with_fragmentation_index():
 def test_ac5_schema_rejects_components_missing_fragmentation_index():
     """AC5: A components sub-block lacking fragmentation_index fails schema validation."""
     import jsonschema
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     # Build a minimal valid report then strip fragmentation_index from one label
     import copy
-    from segqc.report import serialize_report
-    from segqc.config import default_config
-    from segqc.verdict import Verdict
+    from segfacet.report import serialize_report
+    from segfacet.config import default_config
+    from segfacet.verdict import Verdict
 
     case = labelled_blocks_case()
     block = _features_for_labels(case.seg_img, list(case.expected_labels))
@@ -415,7 +415,7 @@ def test_ac5_schema_rejects_components_missing_fragmentation_index():
 
 def test_ac5_fragmentation_index_in_schema_components_definition():
     """AC5: The report_schema_v0.json components definition lists fragmentation_index."""
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
     components_def = _SCHEMA.get("definitions", {}).get("components", {})
     assert "fragmentation_index" in components_def.get("properties", {}), (
         "fragmentation_index not found in schema components properties"

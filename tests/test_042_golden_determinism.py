@@ -3,7 +3,7 @@ harness over the committed synthetic corpus (item 040).
 
 Covers Acceptance Criteria AC1-AC16:
 
-- AC1-AC3 (Group A, report construction mirrors ``segqc run``): every case's
+- AC1-AC3 (Group A, report construction mirrors ``segfacet run``): every case's
   freshly-built report validates against the v0 schema; the pinned/fixed
   fields (``case_id``, ``schema_version``, ``config_version``) are correct;
   the report carries the full ``features``/``findings`` shape matching a
@@ -63,11 +63,11 @@ import json
 import jsonschema
 import pytest
 
-import segqc.synth  # noqa: F401 -- triggers self-registration of every operator
-from segqc.config import bundled_default_config
-from segqc.pipeline import run_qc
-from segqc.synth.corpus import load_manifest
-from segqc.synth.golden import (
+import segfacet.synth  # noqa: F401 -- triggers self-registration of every operator
+from segfacet.config import bundled_default_config
+from segfacet.pipeline import run_qc
+from segfacet.synth.corpus import load_manifest
+from segfacet.synth.golden import (
     GOLDEN_DIR,
     VOLATILE_POINTERS,
     VOLATILE_SENTINEL,
@@ -81,7 +81,7 @@ from segqc.synth.golden import (
     reports_close,
     write_goldens,
 )
-from segqc.synth.regression import loaded_seg_image
+from segfacet.synth.regression import loaded_seg_image
 
 # =========================================================================== #
 # Manifest-driven fixtures
@@ -118,9 +118,9 @@ def _case_id(case):
 
 
 def _report_schema():
-    import segqc as _segqc_pkg
+    import segfacet as _segfacet_pkg
 
-    ref = importlib.resources.files(_segqc_pkg).joinpath("report_schema_v0.json")
+    ref = importlib.resources.files(_segfacet_pkg).joinpath("report_schema_v0.json")
     return json.loads(ref.read_text(encoding="utf-8"))
 
 
@@ -139,7 +139,7 @@ def _walk_keys(obj):
 
 
 # =========================================================================== #
-# A. Report construction mirrors segqc run (AC1-AC3)
+# A. Report construction mirrors segfacet run (AC1-AC3)
 # =========================================================================== #
 
 

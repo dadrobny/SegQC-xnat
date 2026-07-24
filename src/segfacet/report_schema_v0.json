@@ -1,0 +1,672 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FACET JSON Report v0",
+  "description": "Machine-readable QC report schema v0 for segfacet. Extended by Stage 2 with a 'features' block.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "config_version",
+    "case_id",
+    "verdict",
+    "reasons",
+    "per_label"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Version discriminator for this report schema. Always '0.1' for v0 reports.",
+      "const": "0.1"
+    },
+    "config_version": {
+      "type": "string",
+      "description": "The schema_version from the HeuristicConfig that produced this report, for reproducibility.",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "description": "Identifier for the case (scan). Non-empty.",
+      "minLength": 1
+    },
+    "verdict": {
+      "type": "string",
+      "description": "Overall QC verdict for the case.",
+      "enum": ["pass", "flagged-for-review", "fail"]
+    },
+    "reasons": {
+      "type": "array",
+      "description": "Case-level QC findings (not tied to a specific label).",
+      "items": {
+        "$ref": "#/definitions/reason"
+      }
+    },
+    "per_label": {
+      "type": "object",
+      "description": "Per-label QC findings, keyed by the string representation of the integer label value.",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/reason"
+        }
+      }
+    },
+    "features": {
+      "description": "Optional Stage 2 geometric/topological feature block. Absent for verdict-only (item 009) reports; present when the pipeline serialises computed features.",
+      "$ref": "#/definitions/features"
+    },
+    "findings": {
+      "type": "array",
+      "description": "Optional Stage 4 rule-engine findings (item 035), embedded verbatim from Finding.to_dict(). Absent for reports that did not run the rule engine.",
+      "items": {
+        "$ref": "#/definitions/finding"
+      }
+    },
+    "reference_delta": {
+      "description": "Optional Stage 6 delta-to-reference block (item 046): per-label distribution-relative metrics scored against a loaded reference distribution. Absent for reports that did not run the delta-to-reference computation.",
+      "$ref": "#/definitions/referenceDelta"
+    },
+    "image_features": {
+      "description": "Optional Stage 8 image-based feature block (item 061): per-label first-order intensity statistics and optional radiomics extended features. Absent for reports that did not run the intensity extraction.",
+      "$ref": "#/definitions/imageFeatures"
+    }
+  },
+  "definitions": {
+    "reason": {
+      "type": "object",
+      "description": "A single QC finding with a human-readable message, severity, and optional label attribution.",
+      "additionalProperties": false,
+      "required": ["message", "severity", "labels"],
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "Human-readable description of the finding."
+        },
+        "severity": {
+          "type": "string",
+          "description": "Severity level of this finding.",
+          "enum": ["pass", "flagged-for-review", "fail"]
+        },
+        "labels": {
+          "type": "array",
+          "description": "Integer label values that contributed to this finding. Empty for case-level findings.",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "description": "A single heuristic rule-engine finding (item 026), embedded verbatim from Finding.to_dict().",
+      "additionalProperties": false,
+      "required": ["rule_id", "severity", "reason", "labels"],
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "description": "Identifier of the rule that produced this finding (e.g. 'bounds').",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "description": "Severity level of this finding.",
+          "enum": ["pass", "flagged-for-review", "fail"]
+        },
+        "reason": {
+          "type": "string",
+          "description": "Human-readable explanation of why this finding was raised."
+        },
+        "labels": {
+          "type": "array",
+          "description": "Offending vertebra integer label values. Empty for a case-level finding.",
+          "items": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "features": {
+      "type": "object",
+      "description": "Consolidated Stage 2 features for a case: per-label geometry/components/centroid, inter-vertebra relationships, and overlap pairs. Stage 3 adds an optional 'stage3' sub-block.",
+      "additionalProperties": false,
+      "required": ["features_version", "per_label", "overlaps", "relationships"],
+      "properties": {
+        "features_version": {
+          "type": "string",
+          "description": "Version discriminator for the features block, independent of the top-level schema_version. Stage 3 bumps this to '0.2'.",
+          "minLength": 1
+        },
+        "per_label": {
+          "type": "object",
+          "description": "Per-label feature records, keyed by the string representation of the integer label value.",
+          "additionalProperties": {
+            "$ref": "#/definitions/labelFeatures"
+          }
+        },
+        "overlaps": {
+          "type": "array",
+          "description": "Voxel-level overlap between label pairs. Empty when no labels overlap.",
+          "items": {
+            "$ref": "#/definitions/overlapPair"
+          }
+        },
+        "relationships": {
+          "description": "Inter-vertebra relationships, or null when not computed (e.g. zero labels).",
+          "oneOf": [
+            {"$ref": "#/definitions/relationships"},
+            {"type": "null"}
+          ]
+        },
+        "stage3": {
+          "description": "Optional Stage 3 deviation features (spline offset, orientation/curvature, neighbour-consistency). Absent for Stage-2-only reports.",
+          "$ref": "#/definitions/stage3"
+        }
+      }
+    },
+    "labelFeatures": {
+      "type": "object",
+      "description": "All Stage 2 features for a single integer label.",
+      "additionalProperties": false,
+      "required": ["label", "level_name", "geometry", "components", "centroid"],
+      "properties": {
+        "label": {
+          "type": "integer",
+          "description": "The integer label value."
+        },
+        "level_name": {
+          "type": "string",
+          "description": "Anatomical vertebra name (e.g. 'L3'), or the convention's UNKNOWN sentinel for unmapped labels."
+        },
+        "geometry": {"$ref": "#/definitions/geometry"},
+        "components": {"$ref": "#/definitions/components"},
+        "centroid": {"$ref": "#/definitions/centroid"}
+      }
+    },
+    "bbox": {
+      "type": "object",
+      "description": "Axis-aligned bounding box with named per-axis min/max coordinates.",
+      "additionalProperties": false,
+      "required": ["x_min", "x_max", "y_min", "y_max", "z_min", "z_max"],
+      "properties": {
+        "x_min": {"type": "number"},
+        "x_max": {"type": "number"},
+        "y_min": {"type": "number"},
+        "y_max": {"type": "number"},
+        "z_min": {"type": "number"},
+        "z_max": {"type": "number"}
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "description": "Per-label geometric features (item 011).",
+      "additionalProperties": false,
+      "required": [
+        "voxel_count",
+        "physical_volume_mm3",
+        "extent_x_mm",
+        "extent_y_mm",
+        "extent_z_mm",
+        "bbox_voxel",
+        "bbox_physical",
+        "touches_inferior",
+        "touches_superior",
+        "touches_left",
+        "touches_right",
+        "touches_anterior",
+        "touches_posterior"
+      ],
+      "properties": {
+        "voxel_count": {"type": "integer", "minimum": 0},
+        "physical_volume_mm3": {"type": "number"},
+        "extent_x_mm": {"type": "number"},
+        "extent_y_mm": {"type": "number"},
+        "extent_z_mm": {"type": "number"},
+        "bbox_voxel": {"$ref": "#/definitions/bbox"},
+        "bbox_physical": {"$ref": "#/definitions/bbox"},
+        "touches_inferior": {"type": "boolean"},
+        "touches_superior": {"type": "boolean"},
+        "touches_left": {"type": "boolean"},
+        "touches_right": {"type": "boolean"},
+        "touches_anterior": {"type": "boolean"},
+        "touches_posterior": {"type": "boolean"}
+      }
+    },
+    "components": {
+      "type": "object",
+      "description": "Per-label connected-components features (items 012, 025).",
+      "additionalProperties": false,
+      "required": [
+        "component_count",
+        "component_sizes",
+        "component_volumes_mm3",
+        "largest_component_fraction",
+        "small_fragments",
+        "fragmentation_index"
+      ],
+      "properties": {
+        "component_count": {"type": "integer", "minimum": 0},
+        "component_sizes": {
+          "type": "array",
+          "items": {"type": "integer"}
+        },
+        "component_volumes_mm3": {
+          "type": "array",
+          "items": {"type": "number"}
+        },
+        "largest_component_fraction": {"type": "number"},
+        "small_fragments": {
+          "type": "array",
+          "items": {"type": "integer"}
+        },
+        "fragmentation_index": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Fraction of label voxels in the largest connected component (item 025). Range (0, 1]: 1.0 = intact, <1.0 = fragmented."
+        }
+      }
+    },
+    "centroid": {
+      "type": "object",
+      "description": "Per-label centre-of-mass in voxel and physical (mm) coordinates (item 013).",
+      "additionalProperties": false,
+      "required": ["centroid_voxel", "centroid_mm"],
+      "properties": {
+        "centroid_voxel": {
+          "type": "array",
+          "description": "(x, y, z) centre of mass in voxel-index space.",
+          "items": {"type": "number"},
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "centroid_mm": {
+          "type": "array",
+          "description": "(x, y, z) centre of mass in mm.",
+          "items": {"type": "number"},
+          "minItems": 3,
+          "maxItems": 3
+        }
+      }
+    },
+    "overlapPair": {
+      "type": "object",
+      "description": "A single pair of overlapping labels (item 015). Ordered so label_a < label_b.",
+      "additionalProperties": false,
+      "required": ["label_a", "label_b", "name_a", "name_b", "overlap_voxels"],
+      "properties": {
+        "label_a": {"type": "integer"},
+        "label_b": {"type": "integer"},
+        "name_a": {"type": "string"},
+        "name_b": {"type": "string"},
+        "overlap_voxels": {"type": "integer", "minimum": 0}
+      }
+    },
+    "relationships": {
+      "type": "object",
+      "description": "Inter-vertebra relationships for the case (item 014).",
+      "additionalProperties": false,
+      "required": [
+        "present_levels",
+        "missing_levels",
+        "neighbour_spacings_mm",
+        "is_continuous",
+        "out_of_order_labels"
+      ],
+      "properties": {
+        "present_levels": {
+          "type": "array",
+          "description": "Recognised level names in canonical head-to-tail order.",
+          "items": {"type": "string"}
+        },
+        "missing_levels": {
+          "type": "array",
+          "description": "Levels absent within the observed [min..max] span, in canonical order.",
+          "items": {"type": "string"}
+        },
+        "neighbour_spacings_mm": {
+          "type": "array",
+          "description": "Euclidean distances (mm) between adjacent centroids in canonical order.",
+          "items": {"type": "number"}
+        },
+        "is_continuous": {"type": "boolean"},
+        "out_of_order_labels": {
+          "type": "array",
+          "description": "Level names (in input order) that broke canonical monotonicity.",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "stage3": {
+      "type": "object",
+      "description": "Stage 3 deviation features (item 022): per-vertebra spline offsets, orientation/curvature, and neighbour-consistency metrics.",
+      "additionalProperties": false,
+      "properties": {
+        "per_label_offsets": {
+          "type": "array",
+          "description": "Per-vertebra perpendicular offset from the fitted spline (item 018). Sorted ascending by label.",
+          "items": {"$ref": "#/definitions/stage3OffsetEntry"}
+        },
+        "per_label_orientations": {
+          "type": "array",
+          "description": "Per-vertebra PCA orientation (item 019). Sorted ascending by label.",
+          "items": {"$ref": "#/definitions/stage3OrientationEntry"}
+        },
+        "curvature": {
+          "description": "Global spinal curvature descriptors (item 019).",
+          "$ref": "#/definitions/stage3Curvature"
+        },
+        "spacing_consistency": {
+          "description": "Inter-centroid spacing regularity metrics (item 020).",
+          "$ref": "#/definitions/stage3SpacingConsistency"
+        },
+        "monotonic_consistency": {
+          "description": "Anatomical-order vs spline-parameter monotonicity metrics (item 020).",
+          "$ref": "#/definitions/stage3MonotonicConsistency"
+        }
+      }
+    },
+    "stage3OffsetEntry": {
+      "type": "object",
+      "description": "Per-vertebra perpendicular offset from the fitted spline.",
+      "additionalProperties": false,
+      "required": ["label", "level_name", "closest_u", "offset_mm", "offset_voxel", "dx_mm", "dy_mm", "dz_mm"],
+      "properties": {
+        "label": {"type": "integer", "description": "Integer label value."},
+        "level_name": {"type": "string", "description": "Anatomical vertebra name."},
+        "closest_u": {"type": "number", "description": "Spline parameter value (0..1) of the closest point on the curve."},
+        "offset_mm": {"type": "number", "minimum": 0, "description": "Euclidean distance (mm) to the closest spline point."},
+        "offset_voxel": {"type": "number", "minimum": 0, "description": "Same distance in voxel units."},
+        "dx_mm": {"type": "number", "description": "x-component of the displacement vector (mm)."},
+        "dy_mm": {"type": "number", "description": "y-component of the displacement vector (mm)."},
+        "dz_mm": {"type": "number", "description": "z-component of the displacement vector (mm)."}
+      }
+    },
+    "stage3OrientationEntry": {
+      "type": "object",
+      "description": "Per-vertebra PCA orientation.",
+      "additionalProperties": false,
+      "required": ["label", "level_name", "principal_axis", "eigenvalue_ratio"],
+      "properties": {
+        "label": {"type": "integer", "description": "Integer label value."},
+        "level_name": {"type": "string", "description": "Anatomical vertebra name."},
+        "principal_axis": {
+          "type": "array",
+          "description": "Unit vector (3 floats) of the first principal component in mm-space.",
+          "items": {"type": "number"},
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "eigenvalue_ratio": {"type": "number", "description": "Ratio of the largest to the second-largest PCA eigenvalue."}
+      }
+    },
+    "stage3Curvature": {
+      "type": "object",
+      "description": "Global spinal curvature descriptors.",
+      "additionalProperties": false,
+      "required": ["tangent_angles_deg", "inter_tangent_angles_deg", "total_curvature_deg"],
+      "properties": {
+        "tangent_angles_deg": {
+          "type": "array",
+          "description": "Spline tangent angle (degrees) at each centroid's u value, relative to the z-axis.",
+          "items": {"type": "number"}
+        },
+        "inter_tangent_angles_deg": {
+          "type": "array",
+          "description": "Angle (degrees) between consecutive tangent vectors. Length is n_centroids - 1.",
+          "items": {"type": "number"}
+        },
+        "total_curvature_deg": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Cobb-like proxy: range (max - min) of tangent angles."
+        }
+      }
+    },
+    "stage3SpacingConsistency": {
+      "type": "object",
+      "description": "Inter-centroid spacing regularity metrics.",
+      "additionalProperties": false,
+      "required": ["mean_spacing_mm", "cv_spacing", "spacings_mm", "deviations_mm", "outlier_pairs"],
+      "properties": {
+        "mean_spacing_mm": {"type": "number", "description": "Mean inter-centroid spacing (mm)."},
+        "cv_spacing": {"type": "number", "minimum": 0, "description": "Coefficient of variation of inter-centroid spacings."},
+        "spacings_mm": {
+          "type": "array",
+          "description": "Per-adjacent-pair spacings in anatomical order (length n_centroids - 1).",
+          "items": {"type": "number"}
+        },
+        "deviations_mm": {
+          "type": "array",
+          "description": "Signed deviation of each spacing from the mean.",
+          "items": {"type": "number"}
+        },
+        "outlier_pairs": {
+          "type": "array",
+          "description": "Level-name pairs whose spacing is flagged as an outlier. Each entry is a 2-element list [level_a, level_b].",
+          "items": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 2,
+            "maxItems": 2
+          }
+        }
+      }
+    },
+    "stage3MonotonicConsistency": {
+      "type": "object",
+      "description": "Anatomical-order vs spline-parameter monotonicity metrics.",
+      "additionalProperties": false,
+      "required": ["is_monotonic", "non_monotonic_pairs", "u_values"],
+      "properties": {
+        "is_monotonic": {"type": "boolean", "description": "True iff spline parameter u increases at every consecutive pair."},
+        "non_monotonic_pairs": {
+          "type": "array",
+          "description": "Level-name pairs where u did not advance. Each entry is a 2-element list [level_a, level_b].",
+          "items": {
+            "type": "array",
+            "items": {"type": "string"},
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "u_values": {
+          "type": "array",
+          "description": "Per-centroid spline parameter values (length n_centroids).",
+          "items": {"type": "number"}
+        }
+      }
+    },
+    "referenceDelta": {
+      "type": "object",
+      "description": "Stage 6 delta-to-reference block (item 046): per-label distribution-relative metrics scored against a loaded reference distribution.",
+      "additionalProperties": false,
+      "required": [
+        "reference_delta_version",
+        "reference_schema_version",
+        "reference_source",
+        "stratum",
+        "lower_pct",
+        "upper_pct",
+        "per_label"
+      ],
+      "properties": {
+        "reference_delta_version": {
+          "type": "string",
+          "description": "Version discriminator for this block, independent of the report and reference schema versions.",
+          "minLength": 1
+        },
+        "reference_schema_version": {
+          "type": "string",
+          "description": "The schema_version of the reference distribution used to compute this block.",
+          "minLength": 1
+        },
+        "reference_source": {
+          "type": "string",
+          "description": "The reference distribution's provenance.source (traceability)."
+        },
+        "stratum": {
+          "type": "string",
+          "description": "The size stratum requested when computing this block (e.g. 'all')."
+        },
+        "lower_pct": {
+          "type": "integer",
+          "description": "Lower out-of-range bound percentile used."
+        },
+        "upper_pct": {
+          "type": "integer",
+          "description": "Upper out-of-range bound percentile used."
+        },
+        "per_label": {
+          "type": "object",
+          "description": "Per-label delta results, keyed by the string representation of the integer label value.",
+          "additionalProperties": {
+            "$ref": "#/definitions/referenceLabelDelta"
+          }
+        }
+      }
+    },
+    "referenceLabelDelta": {
+      "type": "object",
+      "description": "One label's delta-to-reference result.",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "level_name",
+        "available",
+        "distribution_distance",
+        "out_of_range_features",
+        "features"
+      ],
+      "properties": {
+        "label": {"type": "integer", "description": "The integer label value."},
+        "level_name": {"type": "string", "description": "Anatomical vertebra name looked up in the reference."},
+        "available": {
+          "type": "boolean",
+          "description": "False when the (level_name, stratum) pair is absent from the reference; features/distribution_distance are then empty/null, not an error."
+        },
+        "distribution_distance": {
+          "type": ["number", "null"],
+          "description": "RMS of the defined per-feature robust_z values. Null when unavailable or no feature has a defined robust_z."
+        },
+        "out_of_range_features": {
+          "type": "array",
+          "description": "Feature names flagged out_of_range, sorted.",
+          "items": {"type": "string"}
+        },
+        "features": {
+          "type": "object",
+          "description": "Per-feature deltas, keyed by feature name. Only features the reference tracks and the case carries are present.",
+          "additionalProperties": {
+            "$ref": "#/definitions/referenceFeatureDelta"
+          }
+        }
+      }
+    },
+    "imageFeatures": {
+      "type": "object",
+      "description": "Stage 8 image-based feature block (item 061): per-label first-order intensity statistics and optional radiomics extended features, with block-level provenance.",
+      "additionalProperties": false,
+      "required": [
+        "image_features_version",
+        "available",
+        "radiomics_available",
+        "backend",
+        "per_label"
+      ],
+      "properties": {
+        "image_features_version": {
+          "type": "string",
+          "description": "Version discriminator for this block, independent of the report schema_version.",
+          "minLength": 1
+        },
+        "available": {
+          "type": "boolean",
+          "description": "False when intensity was attempted but unavailable (no scan / no backend); per_label is then empty, not an error."
+        },
+        "radiomics_available": {
+          "type": "boolean",
+          "description": "Whether PyRadiomics produced any extended features for this run."
+        },
+        "backend": {
+          "type": "string",
+          "description": "Provenance marker for the intensity/radiomics backend used (e.g. 'builtin', 'pyradiomics')."
+        },
+        "per_label": {
+          "type": "object",
+          "description": "Per-label image feature records, keyed by the string representation of the integer label value. Empty when available is false.",
+          "additionalProperties": {
+            "$ref": "#/definitions/imageLabelFeatures"
+          }
+        }
+      }
+    },
+    "imageLabelFeatures": {
+      "type": "object",
+      "description": "One label's image-based feature record: first-order intensity statistics plus optional radiomics extended features.",
+      "additionalProperties": false,
+      "required": ["label", "first_order", "extended"],
+      "properties": {
+        "label": {"type": "integer", "description": "The integer label value."},
+        "first_order": {"$ref": "#/definitions/firstOrderIntensity"},
+        "extended": {
+          "type": "object",
+          "description": "Flat radiomics feature map (item 060), keyed by feature name. Empty on the builtin (first-order-only) path.",
+          "additionalProperties": {"type": "number"}
+        }
+      }
+    },
+    "firstOrderIntensity": {
+      "type": "object",
+      "description": "First-order intensity statistics for a single label (item 059).",
+      "additionalProperties": false,
+      "required": [
+        "voxel_count", "n_nonfinite_excluded",
+        "mean", "median", "std", "min", "max",
+        "p05", "p25", "p50", "p75", "p95", "range", "iqr", "entropy"
+      ],
+      "properties": {
+        "voxel_count": {"type": "integer", "minimum": 0},
+        "n_nonfinite_excluded": {"type": "integer", "minimum": 0},
+        "mean": {"type": ["number", "null"]},
+        "median": {"type": ["number", "null"]},
+        "std": {"type": ["number", "null"]},
+        "min": {"type": ["number", "null"]},
+        "max": {"type": ["number", "null"]},
+        "p05": {"type": ["number", "null"]},
+        "p25": {"type": ["number", "null"]},
+        "p50": {"type": ["number", "null"]},
+        "p75": {"type": ["number", "null"]},
+        "p95": {"type": ["number", "null"]},
+        "range": {"type": ["number", "null"]},
+        "iqr": {"type": ["number", "null"]},
+        "entropy": {"type": ["number", "null"]}
+      }
+    },
+    "referenceFeatureDelta": {
+      "type": "object",
+      "description": "One tracked feature's delta-to-reference result for one label.",
+      "additionalProperties": false,
+      "required": ["value", "z_score", "robust_z", "percentile_rank", "out_of_range"],
+      "properties": {
+        "value": {"type": "number", "description": "The case's value for this (label, feature)."},
+        "z_score": {
+          "type": ["number", "null"],
+          "description": "(value - mean) / std. Null when the reference std == 0."
+        },
+        "robust_z": {
+          "type": ["number", "null"],
+          "description": "(value - p50) / (IQR / 1.349). Null when the reference IQR == 0."
+        },
+        "percentile_rank": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "0..100, piecewise-linear interpolation over the stored percentile grid."
+        },
+        "out_of_range": {
+          "type": "boolean",
+          "description": "True when value is below the lower_pct bound or above the upper_pct bound."
+        }
+      }
+    }
+  }
+}

@@ -42,12 +42,12 @@ import pathlib
 
 import pytest
 
-import segqc.heuristics.border  # noqa: F401 -- triggers BorderRule registration
-import segqc.heuristics.coverage  # noqa: F401 -- triggers CoverageRule registration
-from segqc.heuristics import run_rules
-from segqc.heuristics.fov import derive_fov_coverage
-from segqc.heuristics.rule import _RULES
-from segqc.config import (
+import segfacet.heuristics.border  # noqa: F401 -- triggers BorderRule registration
+import segfacet.heuristics.coverage  # noqa: F401 -- triggers CoverageRule registration
+from segfacet.heuristics import run_rules
+from segfacet.heuristics.fov import derive_fov_coverage
+from segfacet.heuristics.rule import _RULES
+from segfacet.config import (
     SUPPORTED_SCHEMA_VERSION,
     default_config,
     load_config,
@@ -560,9 +560,9 @@ def test_ac16_committed_corpus_coverage_and_border_findings_unchanged():
     golden's coverage / border findings -- the FOV-restriction does not alter
     output on any existing corpus fixture (default-config goldens don't
     exercise partial-FOV inputs or an active expected_levels)."""
-    import segqc.synth  # noqa: F401 -- triggers self-registration of every operator
-    from segqc.synth.corpus import load_manifest
-    from segqc.synth.golden import build_report_for_case, load_golden
+    import segfacet.synth  # noqa: F401 -- triggers self-registration of every operator
+    from segfacet.synth.corpus import load_manifest
+    from segfacet.synth.golden import build_report_for_case, load_golden
 
     manifest = load_manifest()
     cases = manifest["cases"]
@@ -744,7 +744,7 @@ def test_adv_coverage_severity_override_still_applies(tmp_path):
     record = _record(["L1", "L2", "L4"], ["L3"], entries)
     content = _coverage_yaml_header() + "      severity: fail\n"
     cfg = load_config(_write_yaml(tmp_path, content))
-    from segqc.verdict import Severity
+    from segfacet.verdict import Severity
 
     findings = _cov_findings(run_rules(record, cfg))
     assert findings
@@ -775,7 +775,7 @@ def test_adv_border_severity_override_still_applies(tmp_path):
         "      severity: fail\n"
     )
     cfg = load_config(_write_yaml(tmp_path, content))
-    from segqc.verdict import Severity
+    from segfacet.verdict import Severity
 
     findings = _border_findings(run_rules(record, cfg))
     assert findings

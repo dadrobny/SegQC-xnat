@@ -39,9 +39,9 @@ import json
 import numpy as np
 import pytest
 
-from segqc.config import bundled_default_config
-from segqc.pipeline import run_qc
-from segqc.synth import (
+from segfacet.config import bundled_default_config
+from segfacet.pipeline import run_qc
+from segfacet.synth import (
     CLEAN_CONTROL_MODE,
     FAILURE_MODE_NAMES,
     Expectation,
@@ -68,7 +68,7 @@ def _isolated_registry():
     """Snapshot the perturbation registry before each test and restore it
     afterwards, mirroring the item-026/032 _RULES snapshot idiom, so
     throwaway registrations in one test never leak into another."""
-    from segqc.synth.perturbation import _PERTURBATIONS
+    from segfacet.synth.perturbation import _PERTURBATIONS
 
     snapshot = dict(_PERTURBATIONS)
     yield

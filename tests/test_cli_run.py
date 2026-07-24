@@ -1,4 +1,4 @@
-"""End-to-end CLI tests for ``segqc run`` (items 006, 008-010).
+"""End-to-end CLI tests for ``segfacet run`` (items 006, 008-010).
 
 These tests exercise the fully-wired ``run`` subcommand: loading real NIfTI
 fixtures from disk, printing the label inventory, writing the v0 JSON and
@@ -21,7 +21,7 @@ import sys
 
 import pytest
 
-from segqc.cli import main
+from segfacet.cli import main
 
 
 # ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ def _run(args: list[str], capsys) -> tuple[int, str, str]:
 
 
 def test_run_loads_and_exits_zero(labelled_blocks_files, tmp_path, capsys):
-    """``segqc run`` on a valid fixture exits 0."""
+    """``segfacet run`` on a valid fixture exits 0."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     code, stdout, _stderr = _run(
@@ -53,7 +53,7 @@ def test_run_loads_and_exits_zero(labelled_blocks_files, tmp_path, capsys):
 
 
 def test_run_prints_label_inventory(labelled_blocks_files, tmp_path, capsys):
-    """``segqc run`` prints at least one label line to stdout.
+    """``segfacet run`` prints at least one label line to stdout.
 
     The labelled-blocks fixture has labels 1, 2, 3 which map to C1, C2, C3 in
     the default TotalSegmentator/VerSe convention. At minimum, stdout must
@@ -75,7 +75,7 @@ def test_run_prints_label_inventory(labelled_blocks_files, tmp_path, capsys):
 
 
 def test_run_writes_json_report(labelled_blocks_files, tmp_path, capsys):
-    """``segqc run`` creates ``segqc_report.json`` in the output directory."""
+    """``segfacet run`` creates ``segfacet_report.json`` in the output directory."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     code, _stdout, _stderr = _run(
@@ -83,8 +83,8 @@ def test_run_writes_json_report(labelled_blocks_files, tmp_path, capsys):
         capsys,
     )
     assert code == 0
-    report_path = out_dir / "segqc_report.json"
-    assert report_path.exists(), "segqc_report.json not found in output dir"
+    report_path = out_dir / "segfacet_report.json"
+    assert report_path.exists(), "segfacet_report.json not found in output dir"
 
 
 def test_run_json_fields(labelled_blocks_files, tmp_path, capsys):
@@ -96,7 +96,7 @@ def test_run_json_fields(labelled_blocks_files, tmp_path, capsys):
         capsys,
     )
     assert code == 0
-    report_path = out_dir / "segqc_report.json"
+    report_path = out_dir / "segfacet_report.json"
     with report_path.open(encoding="utf-8") as fh:
         data = json.load(fh)
 
@@ -117,7 +117,7 @@ def test_run_json_inventory_matches_fixture(labelled_blocks_files, tmp_path, cap
     The labelled-blocks fixture has labels 1, 2, 3 (192 foreground voxels total).
     With default config thresholds (min_foreground_voxels=0, min_label_count=0),
     the empty check does not fire. Since item 035 wired the ``bounds``/``border``
-    heuristics into ``segqc run``, the fixture's item-002 placeholder cubes (4x4x4
+    heuristics into ``segfacet run``, the fixture's item-002 placeholder cubes (4x4x4
     mm, far below the anatomical bounds thresholds) now legitimately produce
     ``bounds`` findings, so the overall verdict is 'flagged-for-review' (exit code
     stays 0). The case_id is derived from the scan filename stem ('scan').
@@ -134,7 +134,7 @@ def test_run_json_inventory_matches_fixture(labelled_blocks_files, tmp_path, cap
         capsys,
     )
     assert code == 0
-    with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
+    with (out_dir / "segfacet_report.json").open(encoding="utf-8") as fh:
         data = json.load(fh)
     # labelled-blocks has 3 non-zero labels -> no empty condition fires, but the
     # tiny placeholder cubes fall outside the anatomical bounds -> flagged
@@ -153,7 +153,7 @@ def test_run_json_inventory_matches_fixture(labelled_blocks_files, tmp_path, cap
 
 
 def test_run_missing_scan_exits_one(tmp_path, capsys):
-    """``segqc run`` exits 1 when the scan file does not exist."""
+    """``segfacet run`` exits 1 when the scan file does not exist."""
     seg_path = tmp_path / "seg.nii.gz"
     # Create a dummy seg so the error is definitively about the scan
     import nibabel as nib
@@ -170,11 +170,11 @@ def test_run_missing_scan_exits_one(tmp_path, capsys):
     assert code == 1, f"Expected exit 1, got {code}"
     assert "Error:" in stderr, "No error message printed to stderr"
     # No output dir / report should have been created
-    assert not out_dir.exists() or not (out_dir / "segqc_report.json").exists()
+    assert not out_dir.exists() or not (out_dir / "segfacet_report.json").exists()
 
 
 def test_run_missing_seg_exits_one(tmp_path, capsys):
-    """``segqc run`` exits 1 when the segmentation file does not exist."""
+    """``segfacet run`` exits 1 when the segmentation file does not exist."""
     scan_path = tmp_path / "scan.nii.gz"
     import nibabel as nib
     import numpy as np
@@ -198,7 +198,7 @@ def test_run_missing_seg_exits_one(tmp_path, capsys):
 
 
 def test_run_creates_nested_out_dir(labelled_blocks_files, tmp_path, capsys):
-    """``segqc run`` creates ``--out`` and any missing parent directories."""
+    """``segfacet run`` creates ``--out`` and any missing parent directories."""
     scan_path, seg_path = labelled_blocks_files
     # Use a deeply nested path that doesn't exist yet
     out_dir = tmp_path / "a" / "b" / "c" / "qc_out"
@@ -208,7 +208,7 @@ def test_run_creates_nested_out_dir(labelled_blocks_files, tmp_path, capsys):
         capsys,
     )
     assert code == 0
-    assert (out_dir / "segqc_report.json").exists()
+    assert (out_dir / "segfacet_report.json").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +217,7 @@ def test_run_creates_nested_out_dir(labelled_blocks_files, tmp_path, capsys):
 
 
 def test_run_log_level_default_no_crash(labelled_blocks_files, tmp_path, capsys):
-    """``segqc run`` without ``--log-level`` succeeds (default WARNING)."""
+    """``segfacet run`` without ``--log-level`` succeeds (default WARNING)."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     code, _stdout, _stderr = _run(
@@ -228,7 +228,7 @@ def test_run_log_level_default_no_crash(labelled_blocks_files, tmp_path, capsys)
 
 
 def test_run_log_level_debug(labelled_blocks_files, tmp_path, capsys):
-    """``segqc run --log-level DEBUG`` succeeds and exits 0."""
+    """``segfacet run --log-level DEBUG`` succeeds and exits 0."""
     scan_path, seg_path = labelled_blocks_files
     out_dir = tmp_path / "out"
     code, _stdout, _stderr = _run(
@@ -240,7 +240,7 @@ def test_run_log_level_debug(labelled_blocks_files, tmp_path, capsys):
 
 
 def test_run_help_lists_log_level(capsys):
-    """``segqc run --help`` exits 0 and the help text mentions ``--log-level``."""
+    """``segfacet run --help`` exits 0 and the help text mentions ``--log-level``."""
     with pytest.raises(SystemExit) as exc_info:
         main(["run", "--help"])
     assert exc_info.value.code == 0
@@ -249,14 +249,14 @@ def test_run_help_lists_log_level(capsys):
 
 
 def test_run_help_still_exits_zero(capsys):
-    """``segqc run --help`` still exits 0 after item 006 changes (regression guard)."""
+    """``segfacet run --help`` still exits 0 after item 006 changes (regression guard)."""
     with pytest.raises(SystemExit) as exc_info:
         main(["run", "--help"])
     assert exc_info.value.code == 0
 
 
 def test_top_level_help_still_exits_zero(capsys):
-    """``segqc --help`` still exits 0 (regression guard)."""
+    """``segfacet --help`` still exits 0 (regression guard)."""
     with pytest.raises(SystemExit) as exc_info:
         main(["--help"])
     assert exc_info.value.code == 0
@@ -268,7 +268,7 @@ def test_top_level_help_still_exits_zero(capsys):
 
 
 def test_run_empty_labelmap_inventory(empty_labelmap_files, tmp_path, capsys):
-    """``segqc run`` on an empty label map exits 1 (fail verdict) and writes v0 report.
+    """``segfacet run`` on an empty label map exits 1 (fail verdict) and writes v0 report.
 
     An all-zero segmentation triggers the empty-detection check (condition 1:
     no foreground voxels), which sets is_empty=True and produces a fail verdict.
@@ -284,8 +284,8 @@ def test_run_empty_labelmap_inventory(empty_labelmap_files, tmp_path, capsys):
     assert code == 1, f"Expected exit 1 for empty label map, got {code}"
     assert "no foreground labels found" in stdout
     # JSON is still written even on fail
-    report_path = out_dir / "segqc_report.json"
-    assert report_path.exists(), "segqc_report.json must be written even on fail verdict"
+    report_path = out_dir / "segfacet_report.json"
+    assert report_path.exists(), "segfacet_report.json must be written even on fail verdict"
     with report_path.open(encoding="utf-8") as fh:
         data = json.load(fh)
     # v0 schema fields
@@ -303,7 +303,7 @@ def test_run_empty_labelmap_inventory(empty_labelmap_files, tmp_path, capsys):
 
 
 def test_run_out_is_existing_file_exits_one(labelled_blocks_files, tmp_path, capsys):
-    """``segqc run`` exits 1 and prints an error when ``--out`` is an existing file.
+    """``segfacet run`` exits 1 and prints an error when ``--out`` is an existing file.
 
     If <out> names an existing regular file, ``mkdir`` raises ``FileExistsError``.
     The CLI must catch it cleanly (exit 1 + error to stderr) rather than letting
@@ -326,7 +326,7 @@ def test_run_out_is_existing_file_exits_one(labelled_blocks_files, tmp_path, cap
 
 
 def test_run_directory_as_scan_exits_one(tmp_path, capsys):
-    """``segqc run`` exits 1 when ``--scan`` is a directory."""
+    """``segfacet run`` exits 1 when ``--scan`` is a directory."""
     scan_dir = tmp_path / "scan_dir"
     scan_dir.mkdir()
     import nibabel as nib
@@ -348,7 +348,7 @@ def test_run_directory_as_scan_exits_one(tmp_path, capsys):
 
 
 def test_run_garbage_file_as_seg_exits_one(tmp_path, capsys):
-    """``segqc run`` exits 1 when ``--seg`` is a non-NIfTI (garbage) file."""
+    """``segfacet run`` exits 1 when ``--seg`` is a non-NIfTI (garbage) file."""
     import nibabel as nib
     import numpy as np
 
@@ -370,7 +370,7 @@ def test_run_garbage_file_as_seg_exits_one(tmp_path, capsys):
 
 
 def test_run_shape_mismatch_exits_one(tmp_path, capsys):
-    """``segqc run`` exits 1 when scan and seg have different shapes."""
+    """``segfacet run`` exits 1 when scan and seg have different shapes."""
     import nibabel as nib
     import numpy as np
 
@@ -391,11 +391,11 @@ def test_run_shape_mismatch_exits_one(tmp_path, capsys):
 
 
 def test_run_anisotropic_spacing_pass_verdict(tmp_path, capsys):
-    """``segqc run`` on the anisotropic fixture exits 0 and reports correctly.
+    """``segfacet run`` on the anisotropic fixture exits 0 and reports correctly.
 
     The anisotropic case has 2 labels and 96 foreground voxels. With default
     thresholds the empty check does not fire. Since item 035 wired ``bounds``
-    into ``segqc run``, this fixture's item-002 placeholder cubes are far below
+    into ``segfacet run``, this fixture's item-002 placeholder cubes are far below
     the anatomical bounds thresholds even after the (correct) anisotropic
     physical-volume computation, so the verdict is 'flagged-for-review' with
     ``bounds`` findings (exit code stays 0). This still confirms the CLI handles
@@ -419,7 +419,7 @@ def test_run_anisotropic_spacing_pass_verdict(tmp_path, capsys):
         capsys,
     )
     assert code == 0
-    with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
+    with (out_dir / "segfacet_report.json").open(encoding="utf-8") as fh:
         data = json.load(fh)
     # anisotropic_case has foreground labels -> no empty condition fires, but the
     # tiny placeholder cubes fall outside the anatomical bounds -> flagged
@@ -430,11 +430,11 @@ def test_run_anisotropic_spacing_pass_verdict(tmp_path, capsys):
 
 
 def test_run_unknown_labels_pass_verdict(tmp_path, capsys):
-    """``segqc run`` with unknown labels still exits 0 (empty check does not fire).
+    """``segfacet run`` with unknown labels still exits 0 (empty check does not fire).
 
     Labels 100 and 200 are not in the TotalSegmentator/VerSe convention. The
     Stage 1 empty-check does not trigger a fail here (250 foreground voxels).
-    Since item 035 wired ``border`` into ``segqc run``, these two blocks (each
+    Since item 035 wired ``border`` into ``segfacet run``, these two blocks (each
     occupying a corner octant of the 10x10x10 volume, so each touches multiple
     image faces) now legitimately fire ``border`` findings, so the verdict is
     'flagged-for-review' rather than 'pass' (exit code stays 0). The stdout
@@ -461,7 +461,7 @@ def test_run_unknown_labels_pass_verdict(tmp_path, capsys):
     # Non-empty segmentation -> empty check does not fire -> exit 0, but the
     # corner-touching blocks legitimately fire border findings
     assert code == 0
-    with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
+    with (out_dir / "segfacet_report.json").open(encoding="utf-8") as fh:
         report = json.load(fh)
     assert report["schema_version"] == "0.1"
     assert report["verdict"] == "flagged-for-review"
@@ -474,11 +474,11 @@ def test_run_unknown_labels_pass_verdict(tmp_path, capsys):
 
 
 def test_run_single_voxel_volume(tmp_path, capsys):
-    """``segqc run`` handles a 1x1x1 volume without crashing and writes a v0 report.
+    """``segfacet run`` handles a 1x1x1 volume without crashing and writes a v0 report.
 
     A single non-zero voxel is non-empty by definition, so the Stage 1
     empty-check does not fire. Since item 035 wired ``bounds``/``border`` into
-    ``segqc run``, a single-voxel label is both far below the anatomical bounds
+    ``segfacet run``, a single-voxel label is both far below the anatomical bounds
     thresholds and touches every image face, so it legitimately fires both
     rules and the verdict is 'flagged-for-review' rather than 'pass' (exit code
     stays 0). The v0 report must still contain all required schema fields.
@@ -504,8 +504,8 @@ def test_run_single_voxel_volume(tmp_path, capsys):
         capsys,
     )
     assert code == 0
-    assert (out_dir / "segqc_report.json").exists()
-    with (out_dir / "segqc_report.json").open(encoding="utf-8") as fh:
+    assert (out_dir / "segfacet_report.json").exists()
+    with (out_dir / "segfacet_report.json").open(encoding="utf-8") as fh:
         report = json.load(fh)
     # v0 schema required fields must all be present
     assert report["schema_version"] == "0.1"
@@ -517,7 +517,7 @@ def test_run_single_voxel_volume(tmp_path, capsys):
 
 
 def test_run_affine_mismatch_exits_one(tmp_path, capsys):
-    """``segqc run`` exits 1 when scan and seg have incompatible affines."""
+    """``segfacet run`` exits 1 when scan and seg have incompatible affines."""
     import nibabel as nib
     import numpy as np
 

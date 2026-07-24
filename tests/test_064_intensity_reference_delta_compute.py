@@ -1,5 +1,5 @@
 """Tests for item 064 -- level-aware intensity delta-to-reference computation
-(``segqc.reference.delta.compute_intensity_reference_delta``).
+(``segfacet.reference.delta.compute_intensity_reference_delta``).
 
 Covers Acceptance Criteria AC1-AC11 (Group A -- the compute half):
 
@@ -40,9 +40,9 @@ import json
 
 import pytest
 
-from segqc.feature_report import build_image_features_block
-from segqc.features.intensity import LabelIntensity
-from segqc.reference import (
+from segfacet.feature_report import build_image_features_block
+from segfacet.features.intensity import LabelIntensity
+from segfacet.reference import (
     ALL_STRATUM,
     DEFAULT_PERCENTILES,
     IQR_TO_SIGMA,
@@ -54,7 +54,7 @@ from segqc.reference import (
     compute_reference_delta,
     reference_delta_to_dict,
 )
-from segqc.reference.delta import (
+from segfacet.reference.delta import (
     INTENSITY_FEATURE_PREFIX,
     compute_intensity_reference_delta,
 )
@@ -566,11 +566,11 @@ def test_adv_real_061_shaped_block_composes_over_a_painted_synthetic_scan():
     via build_image_features_block(compute_intensity_features(...)) over a
     real painted scan) is consumed correctly, joined against a real
     geometric features_block from extract_feature_record."""
-    from segqc.config import bundled_default_config
-    from segqc.features.intensity import compute_intensity_features
-    from segqc.pipeline import extract_feature_record
-    from segqc.synth.clean_gt import build_clean_spine
-    from segqc.synth.intensity import paint_clean_scan
+    from segfacet.config import bundled_default_config
+    from segfacet.features.intensity import compute_intensity_features
+    from segfacet.pipeline import extract_feature_record
+    from segfacet.synth.clean_gt import build_clean_spine
+    from segfacet.synth.intensity import paint_clean_scan
 
     spine = build_clean_spine(levels=("L1", "L2", "L3"))
     scan_img = paint_clean_scan(spine.seg_img, seed=0)

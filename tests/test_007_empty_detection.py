@@ -17,8 +17,8 @@ import numpy as np
 import nibabel as nib
 import pytest
 
-from segqc.config import HeuristicConfig, default_config
-from segqc.empty import CheckResult, check_empty
+from segfacet.config import HeuristicConfig, default_config
+from segfacet.empty import CheckResult, check_empty
 
 from synthetic import (
     LABEL_DTYPE,
@@ -429,22 +429,22 @@ def test_ac7_input_image_not_mutated_by_check():
 # AC-8  Module location / importability
 # =========================================================================== #
 
-def test_ac8_check_empty_importable_from_segqc_empty():
-    """check_empty is importable from segqc.empty."""
-    from segqc.empty import check_empty as ce  # noqa: F401
+def test_ac8_check_empty_importable_from_segfacet_empty():
+    """check_empty is importable from segfacet.empty."""
+    from segfacet.empty import check_empty as ce  # noqa: F401
     assert callable(ce)
 
 
-def test_ac8_checkresult_importable_from_segqc_empty():
-    """CheckResult is importable from segqc.empty."""
-    from segqc.empty import CheckResult as CR  # noqa: F401
+def test_ac8_checkresult_importable_from_segfacet_empty():
+    """CheckResult is importable from segfacet.empty."""
+    from segfacet.empty import CheckResult as CR  # noqa: F401
     assert CR is CheckResult
 
 
 def test_ac8_no_import_error():
-    """Importing segqc.empty raises no ImportError."""
+    """Importing segfacet.empty raises no ImportError."""
     import importlib
-    mod = importlib.import_module("segqc.empty")
+    mod = importlib.import_module("segfacet.empty")
     assert hasattr(mod, "check_empty")
     assert hasattr(mod, "CheckResult")
 
@@ -454,25 +454,25 @@ def test_ac8_no_import_error():
 # =========================================================================== #
 
 def test_ac9_empty_module_has_no_scipy():
-    """segqc.empty must not have scipy in its module namespace."""
-    import segqc.empty as empty_mod
+    """segfacet.empty must not have scipy in its module namespace."""
+    import segfacet.empty as empty_mod
     assert "scipy" not in vars(empty_mod)
 
 
 def test_ac9_empty_module_has_no_verdict_import():
-    """segqc.empty must not import segqc.verdict at module level."""
-    import segqc.empty as empty_mod
+    """segfacet.empty must not import segfacet.verdict at module level."""
+    import segfacet.empty as empty_mod
     module_globals = vars(empty_mod)
     for name, val in module_globals.items():
         if hasattr(val, "__module__"):
             assert "verdict" not in getattr(val, "__module__", ""), (
-                f"Found an object from segqc.verdict in segqc.empty namespace: {name}"
+                f"Found an object from segfacet.verdict in segfacet.empty namespace: {name}"
             )
 
 
 def test_ac9_empty_module_has_no_skimage():
-    """segqc.empty must not import skimage."""
-    import segqc.empty as empty_mod
+    """segfacet.empty must not import skimage."""
+    import segfacet.empty as empty_mod
     assert "skimage" not in vars(empty_mod)
 
 

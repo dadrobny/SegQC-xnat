@@ -1,5 +1,5 @@
 """Tests for item 048 — heuristic config switch: reference-derived vs
-hand-set bounds (``src/segqc/heuristics/bounds.py`` extended for item 027's
+hand-set bounds (``src/segfacet/heuristics/bounds.py`` extended for item 027's
 ``BoundsRule``).
 
 Covers Acceptance Criteria AC1-AC13:
@@ -40,18 +40,18 @@ import pathlib
 
 import pytest
 
-import segqc.heuristics.bounds  # noqa: F401 — triggers BoundsRule registration
-from segqc.config import (
+import segfacet.heuristics.bounds  # noqa: F401 — triggers BoundsRule registration
+from segfacet.config import (
     SUPPORTED_SCHEMA_VERSION,
     default_config,
     default_config_path,
     load_config,
 )
-from segqc.heuristics import run_rules
-from segqc.heuristics.bounds import BoundsRule, DEFAULT_BOUNDS, reference_bounds_for_level
-from segqc.heuristics.rule import _RULES
-from segqc.reference.artifact import bundled_default_reference, config_hash
-from segqc.reference.schema import (
+from segfacet.heuristics import run_rules
+from segfacet.heuristics.bounds import BoundsRule, DEFAULT_BOUNDS, reference_bounds_for_level
+from segfacet.heuristics.rule import _RULES
+from segfacet.reference.artifact import bundled_default_reference, config_hash
+from segfacet.reference.schema import (
     ALL_STRATUM,
     FeatureStats,
     LevelDistribution,

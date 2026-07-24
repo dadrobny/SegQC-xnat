@@ -1,7 +1,7 @@
 """Stage-14 G3/G7 recalibration acceptance module (item 091) -- closes Stage 14.
 
 Fits the Stage-7 threshold-calibration loop
-(:mod:`segqc.eval.calibrate`, item 055) on a **calibration** cohort and
+(:mod:`segfacet.eval.calibrate`, item 055) on a **calibration** cohort and
 *measures* the selected setting on a disjoint **held-out** cohort (item 090's
 reference-derived defaults are what the held-out measurement is *of*), then
 supplies an **executable anti-gaming sensitivity guard** that re-runs item
@@ -50,10 +50,10 @@ Adversarial / edge cases:
   dict is a regression, not a vacuous pass).
 - The over-loosened config's FPR-lowering intent is made explicit against a
   would-be-flagging cohort.
-- A nonexistent / empty ``SEGQC_VERSE_COHORT`` behaves as "no cohort", never
+- A nonexistent / empty ``SEGFACET_VERSE_COHORT`` behaves as "no cohort", never
   a crash.
 - Two ``calibrate_then_measure`` runs over the same inputs agree exactly.
-- ``SEGQC_VERSE_COHORT`` env hygiene after monkeypatch teardown.
+- ``SEGFACET_VERSE_COHORT`` env hygiene after monkeypatch teardown.
 """
 
 from __future__ import annotations
@@ -70,20 +70,20 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pytest
 
-from segqc.config import bundled_default_config
-from segqc.eval.calibrate import (
+from segfacet.config import bundled_default_config
+from segfacet.eval.calibrate import (
     CalibrationResult,
     ThresholdAxis,
     apply_assignment,
     calibrate_thresholds,
 )
-from segqc.eval.harness import EvaluationCase, evaluate_cohort
-from segqc.eval.metrics import CohortMetrics, compute_cohort_metrics
-from segqc.io import SegQCInputError
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.corpus import load_manifest
-from segqc.synth.perturbation import FAILURE_MODE_NAMES, get_perturbation
-from segqc.synth.regression import loaded_seg_image
+from segfacet.eval.harness import EvaluationCase, evaluate_cohort
+from segfacet.eval.metrics import CohortMetrics, compute_cohort_metrics
+from segfacet.io import FacetInputError
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.corpus import load_manifest
+from segfacet.synth.perturbation import FAILURE_MODE_NAMES, get_perturbation
+from segfacet.synth.regression import loaded_seg_image
 
 _LEVELS = ("L1", "L2", "L3", "L4", "L5")
 
@@ -92,7 +92,7 @@ _LEVELS = ("L1", "L2", "L3", "L4", "L5")
 _BASELINE_MODES = (2, 3, 5, 6, 7)
 
 #: One representative pipeline-detectable perturbation operator per baseline
-#: mode (see src/segqc/synth/{component_shape,coverage_border_overlap,
+#: mode (see src/segfacet/synth/{component_shape,coverage_border_overlap,
 #: identity_ordering_alignment}.py's ``failure_mode=`` assignments).
 _PIPELINE_DETECTABLE_OPERATORS = (
     ("fragment", 2),
@@ -108,15 +108,15 @@ _SECTION6_DETECTING_RULE_IDS = ("bounds", "fragmentation", "coverage", "border")
 
 
 # =========================================================================== #
-# Public helpers (test-side only -- no src/segqc/** change, item 084 A1/091 A1)
+# Public helpers (test-side only -- no src/segfacet/** change, item 084 A1/091 A1)
 # =========================================================================== #
 
 
 def real_verse_cohort_dir() -> "Optional[pathlib.Path]":
-    """The real VerSe19 root from ``SEGQC_VERSE_COHORT`` iff set AND a
+    """The real VerSe19 root from ``SEGFACET_VERSE_COHORT`` iff set AND a
     directory, else ``None`` -- the single runtime gate for the real-VerSe
     clause (byte-for-byte the items 084/088 contract)."""
-    raw = os.environ.get("SEGQC_VERSE_COHORT")
+    raw = os.environ.get("SEGFACET_VERSE_COHORT")
     if not raw:
         return None
     candidate = pathlib.Path(raw)
@@ -125,7 +125,7 @@ def real_verse_cohort_dir() -> "Optional[pathlib.Path]":
 
 requires_verse = pytest.mark.skipif(
     real_verse_cohort_dir() is None,
-    reason="real VerSe19 cohort not mounted (set SEGQC_VERSE_COHORT to the VerSe19 root)",
+    reason="real VerSe19 cohort not mounted (set SEGFACET_VERSE_COHORT to the VerSe19 root)",
 )
 
 
@@ -185,7 +185,7 @@ def calibrate_then_measure(
     receives ``held_cases`` (the no-circularity flow)."""
     result = calibrate_thresholds(cal_cases, base_config, axes)
     if result.best is None:
-        raise SegQCInputError(
+        raise FacetInputError(
             "calibrate_then_measure: no feasible calibration setting found "
             "over the given axis grid; cannot select a config to measure "
             "held-out."
@@ -586,7 +586,7 @@ def test_ac12_requires_verse_marker_is_a_genuine_skipif():
     assert requires_verse.mark.name == "skipif"
     condition = requires_verse.mark.args[0]
     assert isinstance(condition, bool)
-    # On this data-absent host (no SEGQC_VERSE_COHORT mounted) the condition
+    # On this data-absent host (no SEGFACET_VERSE_COHORT mounted) the condition
     # must be True so the gated test actually skips -- never xfail, never an
     # unconditional pass.
     assert condition is True
@@ -598,7 +598,7 @@ def test_ac12_real_verse_recalibration_and_sensitivity_guard(tmp_path):
     calibrate -> held-out flow plus the perturb-real-GT sensitivity guard and
     asserts the record's g3_met agrees with may_flip_g3. Skips cleanly
     everywhere else (proven structurally above)."""
-    from segqc.datasets import bundled_descriptor_path, load_descriptor, resolve
+    from segfacet.datasets import bundled_descriptor_path, load_descriptor, resolve
 
     root = real_verse_cohort_dir()
     descriptor = load_descriptor(bundled_descriptor_path("verse19.yaml"))
@@ -634,7 +634,7 @@ def test_ac12_real_verse_recalibration_and_sensitivity_guard(tmp_path):
         for op_name, _mode in _PIPELINE_DETECTABLE_OPERATORS:
             try:
                 result = get_perturbation(op_name)().apply(gt_img, seed=0)
-            except SegQCInputError:
+            except FacetInputError:
                 continue
             perturbed_cases.append(
                 EvaluationCase(
@@ -666,20 +666,20 @@ def test_ac12_real_verse_recalibration_and_sensitivity_guard(tmp_path):
 
 
 def test_ac13_returns_none_when_env_var_unset(monkeypatch):
-    monkeypatch.delenv("SEGQC_VERSE_COHORT", raising=False)
+    monkeypatch.delenv("SEGFACET_VERSE_COHORT", raising=False)
     assert real_verse_cohort_dir() is None
 
 
 def test_ac13_returns_none_when_env_var_points_to_nonexistent_path(monkeypatch, tmp_path):
     nonexistent = tmp_path / "no-such-verse-dir"
-    monkeypatch.setenv("SEGQC_VERSE_COHORT", str(nonexistent))
+    monkeypatch.setenv("SEGFACET_VERSE_COHORT", str(nonexistent))
     assert real_verse_cohort_dir() is None
 
 
 def test_ac13_returns_path_when_env_var_points_to_existing_dir(monkeypatch, tmp_path):
     existing = tmp_path / "verse-cohort"
     existing.mkdir()
-    monkeypatch.setenv("SEGQC_VERSE_COHORT", str(existing))
+    monkeypatch.setenv("SEGFACET_VERSE_COHORT", str(existing))
     result = real_verse_cohort_dir()
     assert result is not None
     assert pathlib.Path(result).resolve() == existing.resolve()
@@ -794,7 +794,7 @@ def test_ac16_synthetic_only_record_is_non_flipping_and_self_reported(capsys):
 
 
 def test_ac17_no_new_dependency():
-    """Item 091 adds no ``src/segqc/**`` change and no new dependency
+    """Item 091 adds no ``src/segfacet/**`` change and no new dependency
     (Assumptions A1, scope fence). The dependency set is the one timeless,
     re-checkable part of that claim on any branch (a full source-tree diff
     against a moving ``main`` is a one-time merge-time proof, not a durable
@@ -846,7 +846,7 @@ def test_adv_no_feasible_setting_surfaces_explicitly_not_attributeerror():
         ),
     )
 
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         calibrate_then_measure([failing_case], [failing_case], bundled_default_config(), axes)
 
 
@@ -857,11 +857,11 @@ def test_adv_sensitivity_regressed_empty_achieved_is_regression():
 def test_adv_env_hygiene_after_monkeypatch_teardown(monkeypatch, tmp_path):
     existing = tmp_path / "verse-cohort"
     existing.mkdir()
-    monkeypatch.setenv("SEGQC_VERSE_COHORT", str(existing))
+    monkeypatch.setenv("SEGFACET_VERSE_COHORT", str(existing))
     assert real_verse_cohort_dir() is not None
     monkeypatch.undo()
-    assert "SEGQC_VERSE_COHORT" not in os.environ or os.environ.get(
-        "SEGQC_VERSE_COHORT"
+    assert "SEGFACET_VERSE_COHORT" not in os.environ or os.environ.get(
+        "SEGFACET_VERSE_COHORT"
     ) != str(existing)
 
 

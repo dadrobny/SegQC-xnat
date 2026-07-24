@@ -26,11 +26,11 @@ import json
 
 import pytest
 
-from segqc.config import HeuristicConfig, default_config
-from segqc.heuristics.finding import Finding
-from segqc.human_report import render_human_report
-from segqc.report import serialize_report, serialize_report_json
-from segqc.verdict import Reason, Severity, Verdict
+from segfacet.config import HeuristicConfig, default_config
+from segfacet.heuristics.finding import Finding
+from segfacet.human_report import render_human_report
+from segfacet.report import serialize_report, serialize_report_json
+from segfacet.verdict import Reason, Severity, Verdict
 
 # Default label convention (item 004): the labels used throughout this file.
 _LABEL_T12 = 19
@@ -76,14 +76,14 @@ def _sample_findings() -> list:
 
 def test_ac10_schema_has_findings_property():
     """AC10: the loaded schema's top-level properties include 'findings'."""
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     assert "findings" in _SCHEMA["properties"]
 
 
 def test_ac10_findings_not_in_required():
     """AC10: 'findings' is not a required top-level property."""
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     assert "findings" not in _SCHEMA["required"]
 
@@ -92,7 +92,7 @@ def test_ac10_findings_property_is_array_of_finding_refs():
     """AC10: findings' schema type is array, whose items resolve to a
     definition requiring rule_id/severity/reason/labels with
     additionalProperties false."""
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     findings_schema = _SCHEMA["properties"]["findings"]
     assert findings_schema["type"] == "array"
@@ -105,7 +105,7 @@ def test_ac10_findings_property_is_array_of_finding_refs():
 
 def test_ac10_finding_def_rule_id_requires_non_empty_string():
     """AC10: the finding definition's rule_id has minLength >= 1."""
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     ref = _SCHEMA["properties"]["findings"]["items"]["$ref"]
     def_name = ref.rsplit("/", 1)[-1]
@@ -116,7 +116,7 @@ def test_ac10_finding_def_rule_id_requires_non_empty_string():
 
 def test_ac10_finding_def_severity_is_enum_of_three_labels():
     """AC10: the finding definition's severity is the pass/flagged/fail enum."""
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     ref = _SCHEMA["properties"]["findings"]["items"]["$ref"]
     def_name = ref.rsplit("/", 1)[-1]
@@ -127,7 +127,7 @@ def test_ac10_finding_def_severity_is_enum_of_three_labels():
 
 def test_ac10_schema_version_stays_0_1():
     """AC10: schema_version's const is unchanged at '0.1'."""
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     assert _SCHEMA["properties"]["schema_version"]["const"] == "0.1"
 
@@ -141,7 +141,7 @@ def test_ac11_serialize_report_with_findings_validates():
     """AC11: serialize_report(..., findings=[...]) validates without raising."""
     import jsonschema
 
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     findings_dicts = [f.to_dict() for f in _sample_findings()]
     report = serialize_report(
@@ -248,7 +248,7 @@ def test_ac13_omitted_findings_report_still_validates():
     """AC13: the findings-free report still validates against the extended schema."""
     import jsonschema
 
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     report = serialize_report(_empty_verdict(), "c", _config())
     jsonschema.validate(report, _SCHEMA)
@@ -382,8 +382,8 @@ def test_adv_serialize_report_findings_and_features_together():
     call and both validate."""
     import jsonschema
 
-    from segqc.feature_report import build_features_block
-    from segqc.report import _SCHEMA
+    from segfacet.feature_report import build_features_block
+    from segfacet.report import _SCHEMA
 
     block = build_features_block(
         geometry={}, components={}, centroids={}, relationships=None, overlaps=[]
@@ -401,7 +401,7 @@ def test_adv_malformed_finding_missing_required_key_rejected():
     """Adversarial: a findings entry missing a required key fails validation."""
     import jsonschema
 
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     report = serialize_report(_empty_verdict(), "c", _config())
     report["findings"] = [{"rule_id": "bounds", "severity": "pass", "reason": "x"}]  # missing labels
@@ -414,7 +414,7 @@ def test_adv_malformed_finding_unknown_key_rejected():
     findings entry."""
     import jsonschema
 
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     report = serialize_report(_empty_verdict(), "c", _config())
     report["findings"] = [
@@ -434,7 +434,7 @@ def test_adv_malformed_finding_empty_rule_id_rejected():
     """Adversarial: an empty-string rule_id violates minLength and is rejected."""
     import jsonschema
 
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     report = serialize_report(_empty_verdict(), "c", _config())
     report["findings"] = [{"rule_id": "", "severity": "pass", "reason": "x", "labels": []}]
@@ -446,7 +446,7 @@ def test_adv_malformed_finding_bad_severity_enum_rejected():
     """Adversarial: an unrecognised severity string violates the enum."""
     import jsonschema
 
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     report = serialize_report(_empty_verdict(), "c", _config())
     report["findings"] = [
@@ -460,7 +460,7 @@ def test_adv_empty_findings_list_validates():
     """Adversarial: findings=[] (present but empty) still validates."""
     import jsonschema
 
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     report = serialize_report(_empty_verdict(), "c", _config(), findings=[])
     assert report["findings"] == []

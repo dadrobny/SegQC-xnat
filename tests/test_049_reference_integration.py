@@ -1,7 +1,7 @@
 """Tests for item 049 — Stage 6 integration: the reference-aware pipeline
 entry point, config switch, and CLI wiring
-(``src/segqc/pipeline.py::run_qc_with_reference``, ``src/segqc/config.py``,
-``src/segqc/cli.py``).
+(``src/segfacet/pipeline.py::run_qc_with_reference``, ``src/segfacet/config.py``,
+``src/segfacet/cli.py``).
 
 Covers Acceptance Criteria AC1-AC8 and AC13-AC14 (AC9-AC12 are covered by
 ``tests/test_049_acceptance_stage6.py`` and the unmodified
@@ -15,7 +15,7 @@ Covers Acceptance Criteria AC1-AC8 and AC13-AC14 (AC9-AC12 are covered by
   an independently computed reference_delta_to_dict(compute_reference_delta(...)).
 - AC4: the returned features_block carries no reference/reference_delta keys
   and still validates against the features schema (additionalProperties: false).
-- AC5: segqc run --reference emits the reference_delta block and findings.
+- AC5: segfacet run --reference emits the reference_delta block and findings.
 - AC6: reference mode is OFF by default — no reference_delta key, unchanged
   report shape.
 - AC7: --reference-artifact overrides the loaded artifact; default loads the
@@ -43,21 +43,21 @@ import json
 
 import jsonschema
 
-from segqc.config import (
+from segfacet.config import (
     SUPPORTED_SCHEMA_VERSION,
     bundled_default_config,
     default_config,
     load_config,
 )
-from segqc.pipeline import extract_feature_record, run_qc, run_qc_with_reference
-from segqc.reference import (
+from segfacet.pipeline import extract_feature_record, run_qc, run_qc_with_reference
+from segfacet.reference import (
     ALL_STRATUM,
     bundled_default_reference,
     compute_reference_delta,
     reference_delta_to_dict,
 )
-from segqc.reference.artifact import bundled_production_reference
-from segqc.synth.clean_gt import build_clean_spine
+from segfacet.reference.artifact import bundled_production_reference
+from segfacet.synth.clean_gt import build_clean_spine
 
 
 # =========================================================================== #
@@ -66,9 +66,9 @@ from segqc.synth.clean_gt import build_clean_spine
 
 
 def _report_schema():
-    import segqc as _segqc_pkg
+    import segfacet as _segfacet_pkg
 
-    ref = importlib.resources.files(_segqc_pkg).joinpath("report_schema_v0.json")
+    ref = importlib.resources.files(_segfacet_pkg).joinpath("report_schema_v0.json")
     return json.loads(ref.read_text(encoding="utf-8"))
 
 
@@ -104,7 +104,7 @@ def _write_yaml(tmp_path, content, name="config.yaml"):
 
 
 def test_ac1_returns_case_result_features_block_and_reference_delta():
-    from segqc.aggregate import CaseResult
+    from segfacet.aggregate import CaseResult
 
     seg_img, reference = _clean_seg_and_reference()
     cfg = bundled_default_config()
@@ -246,8 +246,8 @@ def test_ac4_features_block_matches_extract_feature_record_shape():
 
 
 def test_ac4_serialize_report_with_features_block_validates():
-    from segqc.report import serialize_report
-    from segqc.verdict import Verdict
+    from segfacet.report import serialize_report
+    from segfacet.verdict import Verdict
 
     seg_img, reference = _clean_seg_and_reference()
     cfg = bundled_default_config()
@@ -263,7 +263,7 @@ def test_ac4_serialize_report_with_features_block_validates():
 
 
 # =========================================================================== #
-# AC5: segqc run --reference emits the reference_delta block
+# AC5: segfacet run --reference emits the reference_delta block
 # =========================================================================== #
 
 
@@ -279,7 +279,7 @@ def _write_case_inputs(tmp_path, spacing=(1.0, 1.0, 1.0)):
 
 
 def test_ac5_cli_reference_flag_emits_reference_delta_block(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _write_case_inputs(tmp_path)
     out_dir = tmp_path / "out"
@@ -295,13 +295,13 @@ def test_ac5_cli_reference_flag_emits_reference_delta_block(tmp_path):
     )
     assert code in (0, 1)
 
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert "reference_delta" in report
     jsonschema.validate(report, _REPORT_SCHEMA)
 
 
 def test_ac5_cli_reference_flag_reference_delta_findings_in_json_and_txt(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     # Exaggerated spacing to push geometry far outside the bundled reference,
     # so a reference_delta finding is guaranteed to fire.
@@ -318,11 +318,11 @@ def test_ac5_cli_reference_flag_reference_delta_findings_in_json_and_txt(tmp_pat
         ]
     )
 
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     findings = report.get("findings", [])
     assert any(f["rule_id"] == "reference_delta" for f in findings)
 
-    txt = (out_dir / "segqc_report.txt").read_text(encoding="utf-8")
+    txt = (out_dir / "segfacet_report.txt").read_text(encoding="utf-8")
     assert "Reference" in txt
 
 
@@ -335,7 +335,7 @@ def test_ac6_no_reference_flag_omits_reference_delta_key(tmp_path):
     """Item 090 flips reference mode ON by default; this test's whole point
     is proving the reference-LESS shape, so it now must invoke --no-reference
     explicitly rather than rely on default-off."""
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _write_case_inputs(tmp_path)
     out_dir = tmp_path / "out"
@@ -349,7 +349,7 @@ def test_ac6_no_reference_flag_omits_reference_delta_key(tmp_path):
             "--no-reference",
         ]
     )
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert "reference_delta" not in report
 
 
@@ -358,7 +358,7 @@ def test_ac6_default_report_shape_matches_pre_item_shape(tmp_path):
     the only way to reach the pre-item (reference-less) report shape, so
     this test invokes it explicitly to prove --no-reference still restores
     that exact key set."""
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _write_case_inputs(tmp_path)
     out_dir = tmp_path / "out"
@@ -372,7 +372,7 @@ def test_ac6_default_report_shape_matches_pre_item_shape(tmp_path):
             "--no-reference",
         ]
     )
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     expected_keys = {
         "schema_version", "config_version", "case_id", "verdict",
         "reasons", "per_label", "features", "findings",
@@ -390,7 +390,7 @@ def test_ac7_default_reference_artifact_is_bundled_default(tmp_path):
     synthetic bundled_default_reference() to bundled_production_reference()
     (verse-v1) -- this test's intent (no --reference-artifact override loads
     "the" bundled default) now points at that new default artifact."""
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _write_case_inputs(tmp_path)
     out_dir = tmp_path / "out"
@@ -404,16 +404,16 @@ def test_ac7_default_reference_artifact_is_bundled_default(tmp_path):
             "--reference",
         ]
     )
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     bundled = bundled_production_reference()
     assert report["reference_delta"]["reference_schema_version"] == bundled.schema_version
     assert report["reference_delta"]["reference_source"] == bundled.provenance.source
 
 
 def test_ac7_reference_artifact_override_is_used(tmp_path):
-    from segqc.cli import main
-    from segqc.reference import build_reference, write_artifact
-    from segqc.reference.ingest import DEFAULT_SEG_SUFFIX
+    from segfacet.cli import main
+    from segfacet.reference import build_reference, write_artifact
+    from segfacet.reference.ingest import DEFAULT_SEG_SUFFIX
     import nibabel as nib
 
     # Build and write a custom reference artifact distinguishable by its
@@ -439,12 +439,12 @@ def test_ac7_reference_artifact_override_is_used(tmp_path):
             "--reference-artifact", str(artifact_path),
         ]
     )
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert report["reference_delta"]["reference_source"] == "custom-source-049"
 
 
 def test_ac7_bad_reference_artifact_path_is_clean_exit_1_not_traceback(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _write_case_inputs(tmp_path)
     out_dir = tmp_path / "out"
@@ -464,7 +464,7 @@ def test_ac7_bad_reference_artifact_path_is_clean_exit_1_not_traceback(tmp_path)
 
 
 def test_ac7_invalid_json_reference_artifact_is_clean_exit_1(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _write_case_inputs(tmp_path)
     out_dir = tmp_path / "out"
@@ -513,7 +513,7 @@ def test_ac8_reference_param_default_when_section_absent():
 
 
 def test_ac8_config_hash_unaffected_by_reference_section(tmp_path):
-    from segqc.reference import config_hash
+    from segfacet.reference import config_hash
 
     cfg_without = default_config()
     cfg_with = load_config(
@@ -528,7 +528,7 @@ def test_ac8_config_hash_unaffected_by_reference_section(tmp_path):
 
 
 def test_ac8_bundled_default_config_hash_matches_snapshot():
-    from segqc.reference import config_hash
+    from segfacet.reference import config_hash
 
     cfg = bundled_default_config()
     # A pre-item snapshot: config_hash(bundled_default_config()) must be
@@ -596,7 +596,7 @@ def test_ac14_config_and_reference_are_not_mutated():
 
 
 def test_adv_reference_enabled_via_config_without_cli_flag(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _write_case_inputs(tmp_path)
     out_dir = tmp_path / "out"
@@ -616,7 +616,7 @@ def test_adv_reference_enabled_via_config_without_cli_flag(tmp_path):
             "--config", str(cfg_path),
         ]
     )
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert "reference_delta" in report
 
 

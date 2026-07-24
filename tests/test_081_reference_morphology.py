@@ -1,10 +1,10 @@
 """Tests for item 081 -- expanding the reference feature vocabulary with a
-third per-level family, geometric morphology (``src/segqc/reference/*``).
+third per-level family, geometric morphology (``src/segfacet/reference/*``).
 
 Covers Acceptance Criteria AC1-AC20:
 
 - AC1: ``INGESTED_MORPHOLOGY_FEATURES`` equals the pinned 3-name tuple and is
-  exported in ``segqc.reference.ingest.__all__``.
+  exported in ``segfacet.reference.ingest.__all__``.
 - AC2: the geometry/intensity/morphology 3-family split is preserved --
   ``INGESTED_FEATURES``/``INGESTED_INTENSITY_FEATURES`` unchanged, all three
   constants pairwise disjoint.
@@ -38,7 +38,7 @@ Covers Acceptance Criteria AC1-AC20:
 - AC19: (verified by edits updating the "1.1" schema-version literals in
   ``test_063_reference_intensity.py`` and ``test_aide_status_report.py`` to
   "1.2".)
-- AC20: scope guard -- no ``src/segqc/features/**`` or ``aggregate.py`` edit,
+- AC20: scope guard -- no ``src/segfacet/features/**`` or ``aggregate.py`` edit,
   ``.gitattributes`` still pins the committed artifact.
 
 Adversarial / edge-case scenarios included:
@@ -61,10 +61,10 @@ import nibabel as nib
 import numpy as np
 import pytest
 
-from segqc.config import bundled_default_config
-from segqc.labels import LabelConvention
-from segqc.pipeline import extract_feature_record
-from segqc.reference import (
+from segfacet.config import bundled_default_config
+from segfacet.labels import LabelConvention
+from segfacet.pipeline import extract_feature_record
+from segfacet.reference import (
     ALL_STRATUM,
     ARTIFACT_SCHEMA_VERSION,
     DEFAULT_PERCENTILES,
@@ -87,8 +87,8 @@ from segqc.reference import (
     to_dict,
     write_artifact,
 )
-from segqc.reference.delta import compute_morphology_reference_delta
-from segqc.reference.ingest import (
+from segfacet.reference.delta import compute_morphology_reference_delta
+from segfacet.reference.ingest import (
     DEFAULT_SEG_SUFFIX,
     INGESTED_FEATURES,
     INGESTED_INTENSITY_FEATURES,
@@ -96,8 +96,8 @@ from segqc.reference.ingest import (
     ingest_cohort,
     ingest_subject,
 )
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.golden import reports_close
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.golden import reports_close
 
 PROV = Provenance(
     source="test-cohort-081", config_hash="cfg-hash-081", build_date="2000-01-01"
@@ -233,7 +233,7 @@ def _morphology_features_block(entries):
 
 def test_ac1_morphology_vocabulary_constant_and_exported():
     assert INGESTED_MORPHOLOGY_FEATURES == EXPECTED_MORPHOLOGY_FEATURES
-    from segqc.reference import ingest as ingest_module
+    from segfacet.reference import ingest as ingest_module
 
     assert "INGESTED_MORPHOLOGY_FEATURES" in ingest_module.__all__
 
@@ -395,7 +395,7 @@ def test_ac8_aggregate_reference_tracks_morphology_with_no_core_change(tmp_path)
 
     # Guard: aggregate.py stays generic -- no morphology-specific special-
     # casing was introduced (mirrors item 063's AC8 source-text marker).
-    from segqc.reference import aggregate as aggregate_module
+    from segfacet.reference import aggregate as aggregate_module
 
     source = inspect.getsource(aggregate_module)
     assert "morphology" not in source.lower()
@@ -604,9 +604,9 @@ def test_ac15_geometry_delta_stays_inert_on_morphology():
 
 
 def test_ac16_intensity_delta_stays_inert_on_morphology():
-    from segqc.feature_report import build_image_features_block
-    from segqc.features.intensity import compute_intensity_features
-    from segqc.synth.intensity import paint_clean_scan
+    from segfacet.feature_report import build_image_features_block
+    from segfacet.features.intensity import compute_intensity_features
+    from segfacet.synth.intensity import paint_clean_scan
 
     bundled = bundled_default_reference()
     spine = build_clean_spine(levels=("L1", "L2", "L3"))
@@ -651,13 +651,13 @@ def test_ac20_scope_guard_no_features_engine_edit_and_gitattributes_pin():
     import pathlib
 
     repo_root = pathlib.Path(__file__).resolve().parent.parent
-    features_dir = repo_root / "src" / "segqc" / "features"
+    features_dir = repo_root / "src" / "segfacet" / "features"
     for py_file in features_dir.rglob("*.py"):
         text = py_file.read_text(encoding="utf-8")
         assert "INGESTED_MORPHOLOGY_FEATURES" not in text
         assert "compute_morphology_reference_delta" not in text
 
-    from segqc.reference import aggregate as aggregate_module
+    from segfacet.reference import aggregate as aggregate_module
 
     source = inspect.getsource(aggregate_module)
     assert "morphology" not in source.lower()
@@ -666,7 +666,7 @@ def test_ac20_scope_guard_no_features_engine_edit_and_gitattributes_pin():
     matching_lines = [
         line
         for line in gitattributes_text.splitlines()
-        if "src/segqc/reference/reference_default.json" in line
+        if "src/segfacet/reference/reference_default.json" in line
     ]
     assert any("text eol=lf" in line for line in matching_lines)
 

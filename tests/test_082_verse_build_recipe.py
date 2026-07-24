@@ -1,10 +1,10 @@
 """Tests for item 082 -- the real-VerSe acquisition & versioned reference-
-artifact build recipe (``docs/reference-build.md`` + the existing ``segqc
-build-reference`` CLI, ``src/segqc/reference/{artifact,ingest}.py``).
+artifact build recipe (``docs/reference-build.md`` + the existing ``segfacet
+build-reference`` CLI, ``src/segfacet/reference/{artifact,ingest}.py``).
 
 This item adds **no** new production code beyond a docstring extension --
 it documents and tests the *recipe* for building a separately versioned
-``reference_verse_vN.json`` from the already-existing ``segqc
+``reference_verse_vN.json`` from the already-existing ``segfacet
 build-reference`` CLI (items 044/045/063/081). No real VerSe data is
 downloaded or committed; every AC is exercised against a tiny (2-3 subject)
 VerSe-*shaped* synthetic stand-in cohort written with the real VerSe mask
@@ -12,7 +12,7 @@ suffix ``_seg-vert_msk.nii.gz``.
 
 Covers Acceptance Criteria AC1-AC12:
 
-- AC1: the documented invocation (driven via ``segqc.cli.main``) exits 0 and
+- AC1: the documented invocation (driven via ``segfacet.cli.main``) exits 0 and
   writes a JSON artifact that ``load_artifact`` parses into a
   ``ReferenceDistribution`` with >=1 per-level ``feature_stats`` entry.
 - AC2: ``provenance.source`` / ``provenance.build_date`` equal the
@@ -50,7 +50,7 @@ Adversarial / edge-case scenarios included:
   parsed artifacts (``reports_close``, given the platform-sensitive
   ``eigenvalue_ratio`` float per item 081/078).
 - Scope guards: no 082 test mutates the committed
-  ``src/segqc/reference/reference_default.json``; the repo tree contains no
+  ``src/segfacet/reference/reference_default.json``; the repo tree contains no
   committed ``reference_verse_*.json``.
 """
 
@@ -62,16 +62,16 @@ import pathlib
 import nibabel as nib
 import pytest
 
-from segqc.cli import main
-from segqc.reference import load_artifact
-from segqc.reference.ingest import (
+from segfacet.cli import main
+from segfacet.reference import load_artifact
+from segfacet.reference.ingest import (
     INGESTED_FEATURES,
     INGESTED_INTENSITY_FEATURES,
     INGESTED_MORPHOLOGY_FEATURES,
 )
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.golden import reports_close
-from segqc.synth.intensity import paint_clean_scan
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.golden import reports_close
+from segfacet.synth.intensity import paint_clean_scan
 
 VERSE_SEG_SUFFIX = "_seg-vert_msk.nii.gz"
 VERSE_SCAN_SUFFIX = "_scan.nii.gz"
@@ -113,7 +113,7 @@ def _write_verse_shaped_cohort(dest_dir, n=3, levels=("L1", "L2", "L3", "L4", "L
 
 def _run_build_reference(cohort_dir, out_path, *, seg_suffix=VERSE_SEG_SUFFIX,
                           source=VERSE_SOURCE, build_date=VERSE_BUILD_DATE):
-    """Drive the documented invocation through ``segqc.cli.main`` (the CLI
+    """Drive the documented invocation through ``segfacet.cli.main`` (the CLI
     surface, not the library function) and return the exit code."""
     return main(
         [
@@ -200,10 +200,10 @@ def test_ac3_subject_ids_equal_verse_suffix_stripped_stems(tmp_path):
 
 def test_ac3_scope_guard_no_new_suffix_mapping_symbol_in_ingest_or_artifact():
     repo_root = pathlib.Path(__file__).resolve().parent.parent
-    ingest_source = (repo_root / "src" / "segqc" / "reference" / "ingest.py").read_text(
+    ingest_source = (repo_root / "src" / "segfacet" / "reference" / "ingest.py").read_text(
         encoding="utf-8"
     )
-    artifact_source = (repo_root / "src" / "segqc" / "reference" / "artifact.py").read_text(
+    artifact_source = (repo_root / "src" / "segfacet" / "reference" / "artifact.py").read_text(
         encoding="utf-8"
     )
 
@@ -407,7 +407,7 @@ def test_adv_determinism_two_builds_produce_equal_parsed_artifacts(tmp_path):
 
 def test_adv_scope_guard_default_reference_artifact_untouched():
     repo_root = pathlib.Path(__file__).resolve().parent.parent
-    default_path = repo_root / "src" / "segqc" / "reference" / "reference_default.json"
+    default_path = repo_root / "src" / "segfacet" / "reference" / "reference_default.json"
     assert default_path.exists()
     # No 082 test writes to this path; this is a read-only sanity check that
     # it still parses under the current schema.
@@ -423,14 +423,14 @@ def test_adv_scope_guard_only_derived_verse_artifacts_committed():
     assertion, which encoded that fence for *that item only* ("This item commits
     no such file"). The recipe explicitly anticipates the file appearing later:
     "When an actual real-VerSe artifact is built by a data-holding human or CI
-    runner, it is committed under ``src/segqc/reference/`` as package data." That
+    runner, it is committed under ``src/segfacet/reference/`` as package data." That
     happened on 2026-07-17 (``reference_verse_v1.json``, built from the mounted
     VerSe19 training split), so the durable invariant is asserted instead: any
     committed ``reference_verse_*`` is a well-formed derived artifact, LF-pinned,
     and no raw imaging data rides along.
     """
     repo_root = pathlib.Path(__file__).resolve().parent.parent
-    reference_dir = repo_root / "src" / "segqc" / "reference"
+    reference_dir = repo_root / "src" / "segfacet" / "reference"
 
     # Any committed real-VerSe artifact is a well-formed *derived* artifact.
     for path in sorted(reference_dir.glob("reference_verse_*.json")):
@@ -445,4 +445,4 @@ def test_adv_scope_guard_only_derived_verse_artifacts_committed():
 
     # The versioned-artifact filename pattern stays LF-pinned for CRLF hygiene.
     gitattributes = (repo_root / ".gitattributes").read_text(encoding="utf-8")
-    assert "src/segqc/reference/reference_verse_*.json text eol=lf" in gitattributes
+    assert "src/segfacet/reference/reference_verse_*.json text eol=lf" in gitattributes

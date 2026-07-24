@@ -1,5 +1,5 @@
 """Tests for item 064 -- level-aware intensity delta-to-reference rule
-(``src/segqc/heuristics/intensity_reference_delta.py``).
+(``src/segfacet/heuristics/intensity_reference_delta.py``).
 
 Covers Acceptance Criteria AC12-AC26 (Group B/C -- the rule half):
 
@@ -41,13 +41,13 @@ import pathlib
 
 import pytest
 
-import segqc.heuristics.intensity_reference_delta  # noqa: F401 — triggers IntensityReferenceDeltaRule registration
-from segqc.aggregate import build_case_result
-from segqc.config import SUPPORTED_SCHEMA_VERSION, default_config, load_config
-from segqc.heuristics import Rule, get_rule, iter_rules, run_rules
-from segqc.heuristics.intensity_reference_delta import IntensityReferenceDeltaRule
-from segqc.heuristics.rule import _RULES
-from segqc.verdict import Severity
+import segfacet.heuristics.intensity_reference_delta  # noqa: F401 — triggers IntensityReferenceDeltaRule registration
+from segfacet.aggregate import build_case_result
+from segfacet.config import SUPPORTED_SCHEMA_VERSION, default_config, load_config
+from segfacet.heuristics import Rule, get_rule, iter_rules, run_rules
+from segfacet.heuristics.intensity_reference_delta import IntensityReferenceDeltaRule
+from segfacet.heuristics.rule import _RULES
+from segfacet.verdict import Severity
 
 
 # =========================================================================== #
@@ -694,7 +694,7 @@ def test_ac26_default_config_yaml_declares_no_intensity_reference_delta_section(
     the absent-section rule_enabled fallback."""
     import yaml
 
-    from segqc.config import default_config_path
+    from segfacet.config import default_config_path
 
     with open(default_config_path(), "r", encoding="utf-8") as fh:
         raw = yaml.safe_load(fh)

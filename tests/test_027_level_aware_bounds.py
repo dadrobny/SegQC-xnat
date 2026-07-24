@@ -38,12 +38,12 @@ import pathlib
 
 import pytest
 
-import segqc.heuristics.bounds  # noqa: F401 — triggers BoundsRule registration
-from segqc.heuristics import Finding, get_rule, iter_rules, run_rules
-from segqc.heuristics.bounds import DEFAULT_BOUNDS
-from segqc.heuristics.rule import _RULES
-from segqc.verdict import Severity
-from segqc.config import (
+import segfacet.heuristics.bounds  # noqa: F401 — triggers BoundsRule registration
+from segfacet.heuristics import Finding, get_rule, iter_rules, run_rules
+from segfacet.heuristics.bounds import DEFAULT_BOUNDS
+from segfacet.heuristics.rule import _RULES
+from segfacet.verdict import Severity
+from segfacet.config import (
     SUPPORTED_SCHEMA_VERSION,
     default_config,
     load_config,
@@ -149,7 +149,7 @@ def _bounds_yaml_header() -> str:
 def _isolated_registry():
     """Snapshot _RULES before each test (includes 'bounds') and restore after.
 
-    The module-level import of segqc.heuristics.bounds registers BoundsRule
+    The module-level import of segfacet.heuristics.bounds registers BoundsRule
     at collection time; this snapshot captures that state so tests that clear
     or mutate _RULES do not bleed into one another.
     """

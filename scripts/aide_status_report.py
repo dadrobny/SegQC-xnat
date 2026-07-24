@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generate an evolving HTML project-status summary for Seg-QC-xnat.
+"""Generate an evolving HTML project-status summary for FACET.
 
-This is an AIDE *process* tool, not part of the shipped ``segqc`` package. It
+This is an AIDE *process* tool, not part of the shipped ``segfacet`` package. It
 reads the living AIDE documents under ``docs/aide/`` (vision, roadmap, progress,
 queues, item specs), summarises the test suite, and renders a single
 self-contained HTML dashboard that answers, at a glance:
@@ -118,7 +118,7 @@ class CorpusCase:
 class ReferenceArtifact:
     """The versioned reference-distribution artifact (Stage 6, item 045):
     per-level, per-feature summary statistics the delta-to-reference rules
-    consume. Parsed from ``src/segqc/reference/reference_default.json``."""
+    consume. Parsed from ``src/segfacet/reference/reference_default.json``."""
     source: str
     subject_count: int
     build_date: str
@@ -163,7 +163,7 @@ class TestSummary:
 @dataclass
 class ReportModel:
     generated_at: str
-    project: str = "Seg-QC-xnat"
+    project: str = "FACET"
     phases: List[Phase] = field(default_factory=list)
     stages: List[Stage] = field(default_factory=list)
     objectives: List[Objective] = field(default_factory=list)
@@ -502,7 +502,7 @@ def build_report_model(
         )
 
     if reference_path is None:
-        reference_path = REPO_ROOT / "src" / "segqc" / "reference" / "reference_default.json"
+        reference_path = REPO_ROOT / "src" / "segfacet" / "reference" / "reference_default.json"
     model = ReportModel(
         generated_at=now.strftime("%Y-%m-%d %H:%M UTC"),
         phases=phases,
@@ -820,8 +820,8 @@ def _render_corpus_section(model: ReportModel) -> str:
 # --------------------------------------------------------------------------- #
 # Feature catalog (static — grouped documentation of every computed feature,
 # item numbers, source module, and the calculation itself, drawn from the
-# extractor module docstrings under src/segqc/features/ and
-# src/segqc/reference/delta.py). Not derived from a filesystem scan: keep in
+# extractor module docstrings under src/segfacet/features/ and
+# src/segfacet/reference/delta.py). Not derived from a filesystem scan: keep in
 # sync by hand when a feature module changes shape.
 # --------------------------------------------------------------------------- #
 
@@ -846,7 +846,7 @@ FEATURE_CATALOG: Tuple[FeatureGroupSpec, ...] = (
     FeatureGroupSpec(
         title="Per-Label Geometry",
         stage="Stage 2 · item 011",
-        module="segqc.features.geometry",
+        module="segfacet.features.geometry",
         intro="For every present integer label, computed directly from the voxel "
         "mask (NumPy/CuPy) with spacing read from the NIfTI header.",
         items=(
@@ -874,7 +874,7 @@ FEATURE_CATALOG: Tuple[FeatureGroupSpec, ...] = (
     FeatureGroupSpec(
         title="Connected Components & Fragmentation",
         stage="Stage 2 · items 012, 025",
-        module="segqc.features.components / segqc.features.fragmentation",
+        module="segfacet.features.components / segfacet.features.fragmentation",
         intro="6-connectivity (face-neighbour only) connected-components analysis of "
         "each label's voxel mask via scipy.ndimage.label (or the CuPy equivalent on GPU).",
         items=(
@@ -896,7 +896,7 @@ FEATURE_CATALOG: Tuple[FeatureGroupSpec, ...] = (
     FeatureGroupSpec(
         title="Centroid",
         stage="Stage 2 · item 013",
-        module="segqc.features.centroids",
+        module="segfacet.features.centroids",
         intro="Centre of mass of each label's voxel mask.",
         items=(
             FeatureItem("centroid_voxel", "Mean (x, y, z) voxel-index position of the label's voxels.",
@@ -911,7 +911,7 @@ FEATURE_CATALOG: Tuple[FeatureGroupSpec, ...] = (
     FeatureGroupSpec(
         title="Case-Level Relationships",
         stage="Stage 2 · item 014",
-        module="segqc.features.relationships",
+        module="segfacet.features.relationships",
         intro="Computed once per case from the full ordered set of centroids "
         "(ascending integer-label order).",
         items=(
@@ -932,7 +932,7 @@ FEATURE_CATALOG: Tuple[FeatureGroupSpec, ...] = (
     FeatureGroupSpec(
         title="Voxel Overlap",
         stage="Stage 2 · item 015",
-        module="segqc.features.overlap",
+        module="segfacet.features.overlap",
         intro="Requires a boolean per-label mask stack (a single integer label map "
         "cannot represent a voxel claimed by two labels at once).",
         items=(
@@ -945,7 +945,7 @@ FEATURE_CATALOG: Tuple[FeatureGroupSpec, ...] = (
     FeatureGroupSpec(
         title="Spinal Curve & Alignment",
         stage="Stage 3 · items 017–020 (needs ≥ 2 labelled vertebrae)",
-        module="segqc.features.spline / spline_offset / orientation / consistency",
+        module="segfacet.features.spline / spline_offset / orientation / consistency",
         intro="A cubic (degree clamped to n_points−1 when the sequence is short) "
         "B-spline is fit through the ordered centroids' mm-coordinates "
         "(scipy.interpolate.splprep, s=0 → passes exactly through every centroid); "
@@ -988,7 +988,7 @@ FEATURE_CATALOG: Tuple[FeatureGroupSpec, ...] = (
     FeatureGroupSpec(
         title="Intensity — First-Order",
         stage="Stage 8 · item 059 (requires a co-registered scan)",
-        module="segqc.features.intensity",
+        module="segfacet.features.intensity",
         intro="The first feature family to read scan intensities rather than only "
         "the label map; computed over the finite (non-NaN/inf) scan voxels under each label's mask.",
         items=(
@@ -1008,7 +1008,7 @@ FEATURE_CATALOG: Tuple[FeatureGroupSpec, ...] = (
     FeatureGroupSpec(
         title="Intensity — Extended Radiomics",
         stage="Stage 8 · item 060 (optional, environment-gated)",
-        module="segqc.features.radiomics",
+        module="segfacet.features.radiomics",
         intro="Populated only when the optional PyRadiomics dependency is installed "
         "and enabled; degrades to an empty dict otherwise without failing the pipeline.",
         items=(
@@ -1024,7 +1024,7 @@ FEATURE_CATALOG: Tuple[FeatureGroupSpec, ...] = (
     FeatureGroupSpec(
         title="Reference-Distribution Deltas",
         stage="Stage 6 / 8 · items 046, 064 (requires a built reference artifact)",
-        module="segqc.reference.delta",
+        module="segfacet.reference.delta",
         intro="Not new extraction — scores a case's already-computed per-label "
         "features against a versioned cohort ReferenceDistribution (item 045), for the "
         "geometric/morphology vocabulary (physical_volume_mm3, extent_x/y/z_mm, "
@@ -1055,13 +1055,13 @@ FEATURE_CATALOG: Tuple[FeatureGroupSpec, ...] = (
 UNWIRED_EXTRACTORS: Tuple[Tuple[str, str, str], ...] = (
     (
         "EDT-based centroid variants & centroid depth",
-        "item 023 · segqc.features.centroids.compute_edt_centroids",
+        "item 023 · segfacet.features.centroids.compute_edt_centroids",
         "Smoothed/strict interior centroids and their depth-to-surface, derived "
         "from a Euclidean distance transform of the label mask.",
     ),
     (
         "Local neighbourhood deviation score",
-        "item 024 · segqc.features.neighbourhood.compute_neighbourhood_features",
+        "item 024 · segfacet.features.neighbourhood.compute_neighbourhood_features",
         "Sliding-window comparison of a vertebra's offset/spacing/volume against "
         "its immediate neighbours, with a leave-one-out z-score outlier flag.",
     ),
@@ -1130,7 +1130,7 @@ def _render_reference_section(model: ReportModel) -> str:
   <h2>Reference Feature Distributions (VerSe)</h2>
   <p class="placeholder"><strong>Extension point.</strong> The versioned reference
   artifact (roadmap Stage 6, item 045) populates here once
-  <code>src/segqc/reference/reference_default.json</code> exists — per-level,
+  <code>src/segfacet/reference/reference_default.json</code> exists — per-level,
   per-feature expected distributions the delta-to-reference rules compare against.</p>
 </section>"""
 

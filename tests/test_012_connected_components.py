@@ -25,8 +25,8 @@ from synthetic import (
     make_labelmap,
 )
 
-from segqc.features.components import ComponentsInfo, compute_components
-from segqc.config import HeuristicConfig
+from segfacet.features.components import ComponentsInfo, compute_components
+from segfacet.config import HeuristicConfig
 
 
 # =========================================================================== #
@@ -106,21 +106,21 @@ def _all_disconnected_label_img(n_voxels: int):
 # =========================================================================== #
 
 def test_import_components_info():
-    """ComponentsInfo is importable from segqc.features.components."""
-    from segqc.features.components import ComponentsInfo as CI  # noqa: F401
+    """ComponentsInfo is importable from segfacet.features.components."""
+    from segfacet.features.components import ComponentsInfo as CI  # noqa: F401
     assert CI is ComponentsInfo
 
 
 def test_import_compute_components():
-    """compute_components is importable from segqc.features.components."""
-    from segqc.features.components import compute_components as cc  # noqa: F401
+    """compute_components is importable from segfacet.features.components."""
+    from segfacet.features.components import compute_components as cc  # noqa: F401
     assert callable(cc)
 
 
 def test_no_import_error():
-    """Importing segqc.features.components raises no error."""
+    """Importing segfacet.features.components raises no error."""
     import importlib
-    mod = importlib.import_module("segqc.features.components")
+    mod = importlib.import_module("segfacet.features.components")
     assert hasattr(mod, "ComponentsInfo")
     assert hasattr(mod, "compute_components")
 

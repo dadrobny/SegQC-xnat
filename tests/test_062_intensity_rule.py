@@ -1,5 +1,5 @@
 """Tests for item 062 -- implausible-intensity heuristic
-(``src/segqc/heuristics/intensity.py``).
+(``src/segfacet/heuristics/intensity.py``).
 
 Covers Acceptance Criteria AC1-AC24:
 
@@ -49,16 +49,16 @@ import pathlib
 import nibabel as nib
 import pytest
 
-import segqc.heuristics.intensity  # noqa: F401 — triggers IntensityRule registration
-from segqc.aggregate import build_case_result
-from segqc.config import SUPPORTED_SCHEMA_VERSION, default_config, load_config
-from segqc.feature_report import build_image_features_block
-from segqc.features.intensity import compute_intensity_features
-from segqc.heuristics import Rule, get_rule, iter_rules, run_rules
-from segqc.heuristics.intensity import IntensityRule
-from segqc.heuristics.rule import _RULES
-from segqc.synth.intensity import INTENSITY_CORPUS_DIR, load_intensity_manifest
-from segqc.verdict import Severity
+import segfacet.heuristics.intensity  # noqa: F401 — triggers IntensityRule registration
+from segfacet.aggregate import build_case_result
+from segfacet.config import SUPPORTED_SCHEMA_VERSION, default_config, load_config
+from segfacet.feature_report import build_image_features_block
+from segfacet.features.intensity import compute_intensity_features
+from segfacet.heuristics import Rule, get_rule, iter_rules, run_rules
+from segfacet.heuristics.intensity import IntensityRule
+from segfacet.heuristics.rule import _RULES
+from segfacet.synth.intensity import INTENSITY_CORPUS_DIR, load_intensity_manifest
+from segfacet.verdict import Severity
 
 
 # =========================================================================== #

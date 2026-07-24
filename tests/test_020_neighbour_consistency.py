@@ -48,9 +48,9 @@ from typing import List, Tuple
 
 import pytest
 
-from segqc.features.centroids import LabelCentroid
-from segqc.features.spline import SplineFit, fit_centroid_spline
-from segqc.features.consistency import (
+from segfacet.features.centroids import LabelCentroid
+from segfacet.features.spline import SplineFit, fit_centroid_spline
+from segfacet.features.consistency import (
     SpacingConsistency,
     MonotonicConsistency,
     compute_spacing_consistency,
@@ -107,33 +107,33 @@ def _fit(centroids: List[LabelCentroid], degree: int = 3) -> SplineFit:
 
 
 def test_import_spacing_consistency():
-    """SpacingConsistency is importable from segqc.features.consistency."""
-    from segqc.features.consistency import SpacingConsistency as SC  # noqa: F401
+    """SpacingConsistency is importable from segfacet.features.consistency."""
+    from segfacet.features.consistency import SpacingConsistency as SC  # noqa: F401
     assert SC is SpacingConsistency
 
 
 def test_import_monotonic_consistency():
-    """MonotonicConsistency is importable from segqc.features.consistency."""
-    from segqc.features.consistency import MonotonicConsistency as MC  # noqa: F401
+    """MonotonicConsistency is importable from segfacet.features.consistency."""
+    from segfacet.features.consistency import MonotonicConsistency as MC  # noqa: F401
     assert MC is MonotonicConsistency
 
 
 def test_import_compute_spacing_consistency():
-    """compute_spacing_consistency is importable from segqc.features.consistency."""
-    from segqc.features.consistency import compute_spacing_consistency as csc  # noqa: F401
+    """compute_spacing_consistency is importable from segfacet.features.consistency."""
+    from segfacet.features.consistency import compute_spacing_consistency as csc  # noqa: F401
     assert callable(csc)
 
 
 def test_import_compute_monotonic_consistency():
-    """compute_monotonic_consistency is importable from segqc.features.consistency."""
-    from segqc.features.consistency import compute_monotonic_consistency as cmc  # noqa: F401
+    """compute_monotonic_consistency is importable from segfacet.features.consistency."""
+    from segfacet.features.consistency import compute_monotonic_consistency as cmc  # noqa: F401
     assert callable(cmc)
 
 
 def test_no_import_error():
-    """Importing segqc.features.consistency raises no error."""
+    """Importing segfacet.features.consistency raises no error."""
     import importlib
-    mod = importlib.import_module("segqc.features.consistency")
+    mod = importlib.import_module("segfacet.features.consistency")
     assert hasattr(mod, "SpacingConsistency")
     assert hasattr(mod, "MonotonicConsistency")
     assert hasattr(mod, "compute_spacing_consistency")

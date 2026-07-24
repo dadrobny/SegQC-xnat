@@ -2,7 +2,7 @@
 
 These assert the builders' *own* contract — shape, dtype, label set, per-label
 voxel counts, affine/spacing, on-disk round-trip and determinism. Validation
-deliberately uses ``nibabel.load`` directly (not the future ``segqc`` loader),
+deliberately uses ``nibabel.load`` directly (not the future ``segfacet`` loader),
 so this item is self-contained and does not pre-empt item 003's design.
 """
 

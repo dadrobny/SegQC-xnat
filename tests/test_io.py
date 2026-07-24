@@ -12,9 +12,9 @@ import numpy as np
 import nibabel as nib
 import pytest
 
-from segqc.io import (
+from segfacet.io import (
     Case,
-    SegQCInputError,
+    FacetInputError,
     Volume,
     load_case,
     load_volume,
@@ -193,7 +193,7 @@ def test_load_case_tolerant_affine(tmp_path):
 
 
 def test_load_case_incompatible_affine_raises(tmp_path):
-    """A meaningfully different affine raises SegQCInputError."""
+    """A meaningfully different affine raises FacetInputError."""
     affine_scan = np.diag([1.0, 1.0, 1.0, 1.0])
     affine_seg = np.diag([2.0, 1.0, 1.0, 1.0])  # different spacing
     scan = np.zeros((3, 3, 3), dtype=np.float32)
@@ -201,7 +201,7 @@ def test_load_case_incompatible_affine_raises(tmp_path):
     scan_path = _write_nii(tmp_path, scan, None, name="scan.nii.gz", affine=affine_scan)
     seg_path = _write_nii(tmp_path, seg, None, name="seg.nii.gz", affine=affine_seg)
 
-    with pytest.raises(SegQCInputError, match="incompatible affines"):
+    with pytest.raises(FacetInputError, match="incompatible affines"):
         load_case(scan_path, seg_path)
 
 
@@ -210,14 +210,14 @@ def test_load_case_incompatible_affine_raises(tmp_path):
 # --------------------------------------------------------------------------- #
 
 def test_load_case_shape_mismatch_raises(tmp_path):
-    """Differing scan/seg shapes raise SegQCInputError naming both shapes."""
+    """Differing scan/seg shapes raise FacetInputError naming both shapes."""
     affine = np.diag([1.0, 1.0, 1.0, 1.0])
     scan = np.zeros((3, 3, 3), dtype=np.float32)
     seg = np.zeros((3, 3, 4), dtype=np.int16)
     scan_path = _write_nii(tmp_path, scan, None, name="scan.nii.gz", affine=affine)
     seg_path = _write_nii(tmp_path, seg, None, name="seg.nii.gz", affine=affine)
 
-    with pytest.raises(SegQCInputError) as exc_info:
+    with pytest.raises(FacetInputError) as exc_info:
         load_case(scan_path, seg_path)
 
     msg = str(exc_info.value)
@@ -226,27 +226,27 @@ def test_load_case_shape_mismatch_raises(tmp_path):
 
 
 def test_missing_file_raises(tmp_path):
-    """A nonexistent path raises SegQCInputError naming the path."""
+    """A nonexistent path raises FacetInputError naming the path."""
     missing = str(tmp_path / "does_not_exist.nii.gz")
 
-    with pytest.raises(SegQCInputError) as exc_info:
+    with pytest.raises(FacetInputError) as exc_info:
         load_volume(missing)
 
     assert missing in str(exc_info.value)
 
 
 def test_directory_path_raises(tmp_path):
-    """A directory passed as a path raises a clear SegQCInputError."""
-    with pytest.raises(SegQCInputError, match="directory"):
+    """A directory passed as a path raises a clear FacetInputError."""
+    with pytest.raises(FacetInputError, match="directory"):
         load_volume(str(tmp_path))
 
 
 def test_malformed_file_raises(tmp_path):
-    """A non-NIfTI file renamed .nii.gz raises a wrapped SegQCInputError."""
+    """A non-NIfTI file renamed .nii.gz raises a wrapped FacetInputError."""
     bogus = tmp_path / "not_really.nii.gz"
     bogus.write_text("this is plain text, not a NIfTI image")
 
-    with pytest.raises(SegQCInputError) as exc_info:
+    with pytest.raises(FacetInputError) as exc_info:
         load_volume(str(bogus))
 
     # The wrapped error names the offending path; no raw nibabel error leaks.

@@ -31,9 +31,9 @@ Covers Acceptance Criteria AC1-AC24:
 
 Adversarial / edge-case scenarios included:
 - ``displace`` / ``sequence_break`` with an explicit target not present raise
-  ``SegQCInputError``.
+  ``FacetInputError``.
 - ``displace`` with a ``displacement_mm`` too large to fit the FOV margins
-  raises ``SegQCInputError``.
+  raises ``FacetInputError``.
 - ``relabel_swap`` swapping a different adjacent pair (23<->24) still fires
   the ordering finding on exactly that pair via the reconstruction.
 - Two different seeds with an unspecified target may pick different
@@ -47,24 +47,24 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-import segqc.synth  # noqa: F401 -- triggers self-registration of the three operators
-from segqc.config import bundled_default_config
-from segqc.features.centroids import compute_centroid
-from segqc.features.components import compute_components
-from segqc.features.consistency import compute_monotonic_consistency
-from segqc.features.spline import fit_centroid_spline
-from segqc.features.spline_offset import compute_spline_offsets
-from segqc.heuristics.mislabel import MislabelRule
-from segqc.io import SegQCInputError
-from segqc.pipeline import extract_feature_record, run_qc
-from segqc.synth import (
+import segfacet.synth  # noqa: F401 -- triggers self-registration of the three operators
+from segfacet.config import bundled_default_config
+from segfacet.features.centroids import compute_centroid
+from segfacet.features.components import compute_components
+from segfacet.features.consistency import compute_monotonic_consistency
+from segfacet.features.spline import fit_centroid_spline
+from segfacet.features.spline_offset import compute_spline_offsets
+from segfacet.heuristics.mislabel import MislabelRule
+from segfacet.io import FacetInputError
+from segfacet.pipeline import extract_feature_record, run_qc
+from segfacet.synth import (
     FAILURE_MODE_NAMES,
     build_clean_spine,
     get_perturbation,
     iter_perturbations,
     perturbation_names,
 )
-from segqc.synth.identity_ordering_alignment import (
+from segfacet.synth.identity_ordering_alignment import (
     DisplacePerturbation,
     RelabelSwapPerturbation,
     SequenceBreakPerturbation,
@@ -380,14 +380,14 @@ def test_ac12_relabel_swap_expectation_well_formed():
 
 
 def test_ac13_relabel_swap_rejects_too_small_or_non_adjacent_input():
-    """AC13: a single-label map raises SegQCInputError; an explicit
-    non-adjacent pair (20, 23) raises SegQCInputError."""
+    """AC13: a single-label map raises FacetInputError; an explicit
+    non-adjacent pair (20, 23) raises FacetInputError."""
     single = build_clean_spine(levels=["L3"]).seg_img
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         RelabelSwapPerturbation().apply(single, seed=0)
 
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         RelabelSwapPerturbation(target_label=20, neighbour_label=23).apply(
             clean.seg_img, seed=0
         )
@@ -465,14 +465,14 @@ def test_ac18_sequence_break_expectation_well_formed_and_pipeline_agrees():
 
 def test_ac19_sequence_break_rejects_degenerate_input():
     """AC19: a single-label map (no ordering to break) raises
-    SegQCInputError; an explicit new_label already present raises
-    SegQCInputError."""
+    FacetInputError; an explicit new_label already present raises
+    FacetInputError."""
     single = build_clean_spine(levels=["L3"]).seg_img
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         SequenceBreakPerturbation().apply(single, seed=0)
 
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         SequenceBreakPerturbation(target_label=24, new_label=22).apply(
             clean.seg_img, seed=0
         )
@@ -572,25 +572,25 @@ def test_ac24_spacing_aware_under_anisotropic_spacing(make_operator, name):
 
 def test_adv_displace_explicit_target_absent_raises_clear_error():
     """Adversarial: an explicit target_label not present in the map raises
-    SegQCInputError rather than silently no-op-ing."""
+    FacetInputError rather than silently no-op-ing."""
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         DisplacePerturbation(target_label=999).apply(clean.seg_img, seed=0)
 
 
 def test_adv_sequence_break_explicit_target_absent_raises_clear_error():
     """Adversarial: an explicit target_label not present in the map raises
-    SegQCInputError."""
+    FacetInputError."""
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         SequenceBreakPerturbation(target_label=999).apply(clean.seg_img, seed=0)
 
 
 def test_adv_displace_too_large_displacement_raises_clear_error():
     """Adversarial: a displacement_mm too large to fit inside the FOV margins
-    raises SegQCInputError (does not silently clip the body)."""
+    raises FacetInputError (does not silently clip the body)."""
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         DisplacePerturbation(target_label=22, displacement_mm=10_000.0).apply(
             clean.seg_img, seed=0
         )

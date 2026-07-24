@@ -4,13 +4,13 @@ synthetic corpus (``tests/corpus/``) plus a purpose-built graded-quality
 cohort. Completes **Stage 7 and Phase 1**.
 
 Reproducing this suite's numbers from the command line, once item 057's
-``segqc evaluate`` subcommand is wired up (item 057's CLI half; see
+``segfacet evaluate`` subcommand is wired up (item 057's CLI half; see
 ``tests/test_057_evaluate_cli.py``)::
 
     # A synth-independent evaluation-cohort manifest (a directory of GT /
     # candidate NIfTI pairs + an expectations manifest -- e.g. a mounted
     # VerSe GT / TotalSegmentator-vs-GT cohort):
-    segqc evaluate --cohort <manifest.json> --out <dir> [--calibrate]
+    segfacet evaluate --cohort <manifest.json> --out <dir> [--calibrate]
 
 The three acceptance criteria this suite asserts on directly:
 
@@ -55,23 +55,23 @@ import functools
 
 import pytest
 
-from segqc.config import bundled_default_config, load_config
-from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
-from segqc.eval.harness import EvaluationCase, evaluate_cohort
-from segqc.eval.metrics import compute_cohort_metrics
-from segqc.eval.outcome import Outcome
-from segqc.eval.report import (
+from segfacet.config import bundled_default_config, load_config
+from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
+from segfacet.eval.harness import EvaluationCase, evaluate_cohort
+from segfacet.eval.metrics import compute_cohort_metrics
+from segfacet.eval.outcome import Outcome
+from segfacet.eval.report import (
     EvaluationProvenance,
     build_evaluation_report,
     record_calibrated_config,
     serialize_evaluation_report_json,
 )
-from segqc.io import SegQCInputError
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.corpus import load_manifest
-from segqc.synth.coverage_border_overlap import CropAtBorderPerturbation
-from segqc.synth.perturbation import FAILURE_MODE_NAMES
-from segqc.synth.regression import loaded_seg_image
+from segfacet.io import FacetInputError
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.corpus import load_manifest
+from segfacet.synth.coverage_border_overlap import CropAtBorderPerturbation
+from segfacet.synth.perturbation import FAILURE_MODE_NAMES
+from segfacet.synth.regression import loaded_seg_image
 
 #: Sec.6 modes the plain pipeline is documented to catch (Assumptions).
 _PIPELINE_DETECTABLE_MODES = (2, 3, 5, 6, 7)
@@ -448,7 +448,7 @@ def test_adversarial_candidate_less_case_excluded_from_correlation_pair_count():
     assert metrics.dice_vs_flag.n == 1
 
 
-def test_adversarial_duplicate_case_id_raises_segqc_input_error():
+def test_adversarial_duplicate_case_id_raises_segfacet_input_error():
     base = build_clean_spine(levels=["L3"])
     case_a = EvaluationCase(
         case_id="dup", gt=base.seg_img, expected={"expected_verdict": "pass"}
@@ -456,5 +456,5 @@ def test_adversarial_duplicate_case_id_raises_segqc_input_error():
     case_b = EvaluationCase(
         case_id="dup", gt=base.seg_img, expected={"expected_verdict": "pass"}
     )
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         evaluate_cohort([case_a, case_b], bundled_default_config())

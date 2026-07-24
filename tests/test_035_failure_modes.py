@@ -18,11 +18,11 @@ import copy
 
 import pytest
 
-from segqc.aggregate import build_case_result
-from segqc.config import bundled_default_config
-from segqc.heuristics import run_rules
-from segqc.pipeline import run_qc
-from segqc.verdict import Severity
+from segfacet.aggregate import build_case_result
+from segfacet.config import bundled_default_config
+from segfacet.heuristics import run_rules
+from segfacet.pipeline import run_qc
+from segfacet.verdict import Severity
 
 from synthetic import make_labelmap
 

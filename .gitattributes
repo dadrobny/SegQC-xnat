@@ -1,7 +1,7 @@
 tests/corpus/manifest.json text eol=lf
 tests/corpus/golden/*.json text eol=lf
 tests/corpus/fixtures/*.nii.gz binary
-src/segqc/reference/reference_default.json text eol=lf
-src/segqc/reference/reference_verse_*.json text eol=lf
+src/segfacet/reference/reference_default.json text eol=lf
+src/segfacet/reference/reference_verse_*.json text eol=lf
 tests/corpus/intensity/manifest.json text eol=lf
 tests/corpus/intensity/fixtures/*.nii.gz binary
