@@ -1,11 +1,67 @@
-# Seg-QC-xnat — Project Vision
+# FACET — Project Vision
 
 > **Status:** Draft v2 · **Created:** 2026-06-24 · **Re-issued:** 2026-07-02
+> **Partially superseded 2026-07-25 — read §0 first.**
 > (structure per `.aide/templates/vision.md`; content carried over unchanged)
 > Step 1 of the AIDE loop. This document is the single source of truth from
 > which the roadmap, progress tracker, and all work items are derived. Its
 > guiding principles, out-of-scope list, and success criteria are the mandatory
 > core the validator checks implementations against.
+
+---
+
+## 0. Supersession note (2026-07-25)
+
+**Everything below §0 is retained verbatim as the provenance trail.** It is history,
+not instruction. Where this section and the text below disagree, this section wins.
+Sections 1–9 still describe the project as `Seg-QC-xnat`, an XNAT-deployed QC gate.
+
+### What changed
+
+The project was an explainable **QC gate**: score a segmentation, flag the suspect
+cases, hand them to a human. It is now a **failure-analysis toolkit** —
+**FACET** (Failure Analysis, Characterisation & Evaluation Toolkit; Python package
+`segfacet`).
+
+The shift is in what the output is *for*. A QC gate's product is a verdict about one
+case. FACET's product is a **characterisation of how a segmentation tool fails**:
+which failure modes a tool actually produces, how often, with what severity, and which
+measurable features isolate each one. That characterisation is what makes a failure mode
+addressable rather than merely detectable. QC stops being a gatekeeper and becomes a
+source of evidence about the tool that produced the segmentation.
+
+Consequences for this repository:
+
+- **Deployment is out of scope.** FACET is a library and CLI, not a deployed service.
+- **No deep-learning framework dependency.** FACET never imports torch or any training
+  stack; it reads label maps that other tools produced. This keeps it deterministic,
+  cheap to run, and testable in isolation. Optional **array-level** GPU acceleration
+  (CuPy, potentially cuCIM) stays welcome and unchanged — `segfacet.backend` already
+  resolves `cpu`/`gpu`/`auto`, and the full suite runs with zero GPU dependencies.
+- **Real segmenter output is the target input**, not only ground truth and synthetic
+  perturbations of it.
+
+### Objectives — retyped, never renumbered
+
+The G-numbers keep their identity. Their *targets* move:
+
+| Objective | Disposition |
+|---|---|
+| G1 Empty/trivial detection | **Unchanged.** |
+| G2 Detect catalogued failure modes | **Retargeted** — from synthetically perturbed GT to failures a real segmenter actually produces. |
+| G3 Failure vs. legitimate variation | **Becomes the open research question**, not a shipping gate. Its two `❌ Not met` Outcome targets carry forward to Stage 23. |
+| G4 Per-case report | **Unchanged**, but the aggregate (cohort-level) report becomes the primary artifact. |
+| G5 Deploy on XNAT | **Removed from scope.** Retained XNAT artefacts (`command.json`, `docker/`, `docs/deployment.md`) are legacy, pending relocation out of this repo. |
+| G6 Portable execution | **Unchanged** — CPU is the reference path; GPU acceleration stays optional and never required. |
+| G7 Evaluable & regression-testable | **Retargeted** to real cohorts — Stages 19–21 record why the synthetic corpus cannot carry this alone. |
+| G8 Extensible | **Unchanged.** |
+
+### Scope of this note
+
+This is the **minimal** supersession: enough to unblock the loop, which had run out of
+open stages. The full re-vision is deliberately deferred until FACET has measured real
+segmenter failures — a roadmap written before that measurement would be speculation.
+Stages 22–25 are recorded as placeholders for exactly that reason.
 
 ---
 

@@ -92,10 +92,17 @@ segfacet evaluate --cohort manifest.json --out out/ [--calibrate] # Stage 7 harn
 
 CI (`.github/workflows/ci.yml`) installs with `pip install -e .[dev] -c
 constraints.txt` (the Stage-9 Docker lockfile) rather than `pyproject.toml`'s
-loose bounds — several tests assert byte-identical output against committed
-golden files (items 042/045/063), which only holds within that pinned
-numpy/scipy environment. Regenerate goldens locally against the same
-constraints. Two **environment-gated** capabilities (PyRadiomics, Docker) skip
+loose bounds. **Note what the golden tests actually assert** (items 042/045/063):
+every `read_bytes()` comparison is *run-to-run within one session* (`dest1` vs
+`dest2`) — a **determinism** check, independent of dependency versions.
+Comparison against the **committed** artifacts goes through `reports_close`, a
+**numeric-tolerance** comparison, deliberately relaxed by item 078 because
+full-precision floats differ by ~1 ULP across platforms. So `constraints.txt` is
+not load-bearing for golden byte-identity, and a numpy-major change is tolerated
+(verified 2026-07-25: green on numpy 1.26.4, previously pinned 2.0.2). Structure,
+keys, strings, bools and ordering are still compared exactly, so a genuine change
+— a changed verdict, a new or removed finding, a meaningfully different feature
+value — is still caught. Two **environment-gated** capabilities (PyRadiomics, Docker) skip
 cleanly when their dependency is absent; a second CI job
 (`verify-environment-gated`) installs both and fails if any gated test merely
 skipped instead of running — see `.aide/conventions.md` "Environment-gated

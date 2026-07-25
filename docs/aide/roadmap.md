@@ -1,6 +1,10 @@
-# Seg-QC-xnat — Development Roadmap
+# FACET — Development Roadmap
 
 > **Status:** Draft v2 · **Created:** 2026-06-24 · **Re-issued:** 2026-07-02
+> **Partially superseded 2026-07-25** — see [`vision.md`](vision.md) §0. Stages 0–14
+> are history and are not reopened; Stage 15 is `❌ Excluded`; Stage 16 was retargeted
+> in place; Stages 17–21 are the live work; Stages 22–25 are placeholders authored at
+> the full re-vision.
 > (structure per `.aide/templates/roadmap.md`; content carried over unchanged)
 > Step 2 of the AIDE loop. Derived from [`vision.md`](vision.md). Breaks the
 > vision into incremental, demonstrable, locally-deployable stages (~1 week each).
@@ -37,8 +41,8 @@ Per the agreed steering:
 | G2 Detect catalogued failure modes (§6) | Stages 4, 5 (real failures: **Stage 16**) |
 | G3 Distinguish failure from variation | Stages 6, 7 (real-VerSe grounding: Stage 12; **recalibration: Stage 14**) |
 | G4 Per-case QC report (JSON + human) | Stage 1 (extended by 2–4) |
-| G7 Evaluable & regression-testable | Stages 5, 7 (real-VerSe evaluation: Stage 12; **real data: Stages 14, 16**) |
-| *(deferred)* G5 Deploy on XNAT | Stage 9 (**real session data: Stage 15**) |
+| G7 Evaluable & regression-testable | Stages 5, 7 (real-VerSe evaluation: Stage 12; **real data: Stages 14, 16**; corpus rework: **Stages 19–21**) |
+| *(out of scope 2026-07-25)* G5 Deploy on XNAT | Stage 9 shipped the artefacts; **Stage 15 `❌ Excluded`** — see `vision.md` §0 |
 | *(deferred)* G6 Portable / GPU | Stage 10 |
 | *(deferred)* G8 Extensible / classification | Stage 11 |
 
@@ -550,7 +554,14 @@ points at calibration.
 
 ---
 
-## Stage 15 — Real-XNAT Deployment Validation (G5)
+## Stage 15 — Real-XNAT Deployment Validation (G5) — ❌ Excluded
+
+> **❌ Excluded (2026-07-25). Reason:** deployment left this project's scope in the
+> `vision.md` §0 supersession — FACET is a library and CLI, not a deployed service, and
+> G5 was removed from scope rather than deferred. Nothing here was attempted, so no work
+> is lost; the Stage 9 artefacts (`command.json`, `docker/`, `docs/deployment.md`) are
+> retained as legacy pending relocation out of this repo. **This stage is not reopened.**
+> Everything below is the original text, kept as the provenance trail.
 
 **Goal.** Do what Stage 9 documented. G5's measurable outcome is *"Runs as an
 XNAT Container Service command on **real session data**"*; Stage 9 shipped a
@@ -585,10 +596,17 @@ detected only on *synthetically perturbed* GT: the corpus proves each mode is
 *detectable in principle*, not that real tools produce it or that we catch it
 when they do.
 
+> **Retargeted in place 2026-07-25** (this stage was `📋`, never started). **SPINEPS**
+> is now the primary reference segmenter rather than TotalSegmentator, and this stage is
+> **rung 3** of the realism ladder introduced in Stage 21 — the *validation* corpus of
+> real segmenter failures, distinct from Stage 21's rung 2 (real GT + scripted
+> perturbation, used for calibration). Depends on Stage 21, which supplies the
+> per-mode metrics and the specificity harness this stage's sensitivity claims rest on.
+
 **Deliverables.**
-- **Real candidate cohort**: run **TotalSegmentator** (the vision's reference
-  segmenter) and/or **SPINEPS** over real VerSe CT, ingested as `role: candidate`
-  through the Stage-13 adapter and scored against real GT.
+- **Real candidate cohort**: run **SPINEPS** (primary; TotalSegmentator optional as a
+  second opinion) over real VerSe CT, ingested as `role: candidate` through the
+  Stage-13 adapter and scored against real GT.
 - **Real per-mode sensitivity + DICE-vs-flag correlation**, superseding the
   synthetic-only figures in Stage 7's metrics block (Success Criterion 6).
 - **Curated challenging-case corpus** — real pathology / post-op / atypical
@@ -605,3 +623,211 @@ against the rules we intend to ship). Feeds Stage 11's abnormality arm.
 mode present in the cohort (**G2**); real DICE-vs-flag correlation measured and
 correctly signed (**G7**); curated cases run with recorded outcomes and
 legitimate variation is not flagged at Stage 14's FPR bar.
+
+---
+
+# Post-supersession stages (2026-07-25)
+
+> Stages 17–21 are the live work following [`vision.md`](vision.md) §0. Stages 17 and 18
+> unblock work on real segmenter output; 19–21 audit what was built while the framework
+> itself was the priority. **19 and 20 are pure audit — they touch no production
+> behaviour and should run alongside 17/18**, because every later stage that adds or
+> retunes a rule is safer once the catalogue and the specificity ratchet exist.
+
+---
+
+## Stage 17 — Foreign-Convention Interop & Orientation-Safe Image Layer (G2, G6)
+
+**Goal.** Make FACET read another tool's output correctly. Today `segfacet.labels`
+defines its own vertebra numbering in which **25 = `S`, 26 = `Cocygis`, 29 = `L6`**,
+while the TPTBox convention that SPINEPS emits reads **25 = `L6`, 26 = `S1`, 29 = `S2`**.
+Only 28 (`T13`) agrees. Feeding SPINEPS output in with the current defaults **silently
+misreads the sacrum as L6** — no error, plausible-looking numbers, wrong. Every
+downstream measurement would be quietly invalid, so this stage must land before any
+real-segmenter number is computed.
+
+**Deliverables.**
+- **Adopt the TPTBox vertebra standard as the default** (`DEFAULT_LABEL_MAP`,
+  `CANONICAL_ORDER`), retiring the legacy table. `LabelConvention` stays overridable for
+  genuinely foreign inputs. Note TPTBox's `v_idx2name` also carries subregion names from
+  `Location` (≥ 40, plus `0: Unknown`) — the 1–33 vertebra range is clean, but filter
+  rather than consume the mapping wholesale.
+- **TPTBox-backed image layer**: back `segfacet.io`'s `Volume`/`Case` with TPTBox `NII` —
+  orientation-safe load, `reorient`, `rescale`/`resample_from_to`, mm-space conversion,
+  `zoom`/`affine` — replacing the hand-rolled `_spacing_from_affine`. Keep `Volume`/`Case`
+  as the public shape so the ~22 modules importing nibabel migrate behind one seam.
+- **Environment migration**: `requires-python = ">=3.11"`, a numpy **range**
+  (`>=1.26,<3`) rather than a pin, regenerated `constraints.txt`, and a CI leg on each
+  numpy major so the library stays major-agnostic.
+- **Run-manifest schema** — the provenance record carried alongside every number:
+  segmenter version/SHA, weights hash, post-processing toggles, seed, dataset id, and
+  the resolved `numpy`/`TPTBox` versions.
+
+**Dependencies.** None blocking; supersedes nothing.
+
+**Validation / acceptance.** A regression test asserts 25/26/29 now match the TPTBox
+table; the reference artifact (`reference_verse_v1.json`, keyed by vertebra **name**)
+loads and scores unchanged, proving no re-fit was needed; the suite is green on both
+numpy majors (**G6**); a real segmenter output round-trips with correct level names
+(**G2**).
+
+---
+
+## Stage 18 — Failure-Mode-Specific Metric Surface (G2, G7)
+
+**Goal.** You cannot improve what you cannot measure per mode. Today the pipeline emits
+a verdict and findings, but the quantities that *isolate* a specific failure mode are
+either unexposed or recomputed privately inside a rule — e.g. "foreground beyond the main
+connected component" is calculated inside `heuristics/fragmentation.py` rather than
+existing as a named field anything else can read.
+
+**Deliverables.**
+- **Promote stray-component metrics to first-class fields** in `features/components.py`
+  (stray volume mm³, count, fraction) and have the fragmentation rule *read* them instead
+  of recomputing.
+- **A per-mode metric API** mapping each §6 failure mode to the metric that isolates it,
+  reusing `eval/overlap.py::compute_overlap` for Dice/Jaccard and its
+  `mean_dice`/`volume_weighted_dice` aggregates — no new overlap code.
+- **A cohort-level, per-mode report** suitable for comparing two runs of a segmentation
+  tool against each other (e.g. with a post-processing step on vs off), so a change in
+  behaviour is attributable to a specific failure mode rather than to aggregate Dice.
+
+**Dependencies.** Stage 17 (level names must be right before per-level metrics mean
+anything).
+
+**Validation / acceptance.** Each §6 mode has ≥1 named metric that moves monotonically
+with injected severity of that mode and is comparatively insensitive to the others
+(**G2**); the fragmentation rule's behaviour is unchanged by the refactor (**G7**).
+
+---
+
+## Stage 19 — Generated Feature & Rule Catalogue + Steering Review (G7, G8)
+
+**Goal.** Make the feature set reviewable, then review it. `FEATURE_CATALOG` in
+`scripts/aide_status_report.py` documents 9 groups / 41 entries and says in a comment
+*"Not derived from a filesystem scan: keep in sync by hand"*; a single realised feature
+record has **185 distinct leaf paths**. Those count different things (an entry such as
+`touches_*` covers six fields), so the gap is not a straight drift figure — but nothing
+verifies the two agree, and no document records *which failure mode each feature is for*.
+
+**Deliverables.**
+- **A generated catalogue** — realised record shape from `extract_feature_record` plus
+  extractor docstrings — replacing the hand-maintained table. Columns: feature ·
+  module/item · what it measures · **how it is computed** · units · spacing/scale
+  sensitivity · **§6 failure mode(s) targeted** · **rules that consume it** ·
+  **status: keep / retune / retire / unwired**.
+- **A drift test**: every leaf path in a reference record must be covered; CI fails when
+  a feature lands undocumented.
+- **A golden-file decision table** — one row per committed golden: what it asserts,
+  keep or retire, and what replaces it. Working assumption is **retire most**: the nine
+  `tests/corpus/golden/*.json` are whole-record snapshots (~185 leaf paths) of a corpus
+  Stage 21 replaces, and every feature retune this stage authorises forces a wholesale
+  regeneration, after which the golden diff can no longer distinguish an intended change
+  from a regression. Byte-level reproducibility is **not** what they guard — that is the
+  separate intra-run `dest1 == dest2` determinism assertion, which is independent of the
+  goldens and stays. Report-formatting and schema goldens are the likely survivors.
+
+**Dependencies.** None. **This stage carries the human checkpoint** — `aide.toml` sets
+`clarify = "assume"`, so run it through `/aide-spec-queue`, which front-loads the review
+so execution can then proceed unattended.
+
+**Validation / acceptance.** The catalogue is generated, not hand-written; the drift test
+fails on a deliberately undocumented feature (**G7**); every feature carries a status and
+a named failure mode or is explicitly marked `unwired` (**G8**); the golden decision table
+is complete and signed off.
+
+---
+
+## Stage 20 — Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness (G2, G7)
+
+**Goal.** Close the gap between "the suite is green" and "the rules are specific".
+Measured on the committed corpus: **10 rules are registered and enabled, but only 4 ever
+fire** (`fragmentation`, `coverage`, `border`, `sequence`) — `bounds`, `mislabel`,
+`overlap`, `intensity`, `reference_delta` and `intensity_reference_delta` fire on **zero**
+cases. **Three of nine cases fire nothing at all** through `run_qc`
+(`mode1_displace`, `mode4_relabel_swap`, `mode8_force_overlap`); their intended rule is
+reached only by feeding a hand-reconstructed record straight to the rule. That is
+documented as item 040's limitation, but the effect is that **three of eight failure modes
+are not detected end-to-end while the corpus still reads as covering all eight**.
+
+Separately, `verify_case` asserts the designated rule fires and the offending labels
+match — it **never asserts that no other rule fires**. Cross-talk today is 0/9, so the
+assertion is free to adopt *now*; once cases become realistic it is expensive to
+introduce retroactively.
+
+**Deliverables.**
+- The **traceability matrix**: 8 failure modes × features × 10 rules, gaps visible rather
+  than implied.
+- **The specificity assertion** — no unintended rule may fire — adopted as a ratchet.
+- **Close the reachability hole**: make modes 1/4/8 pipeline-detectable, or record them
+  explicitly as *not detected end-to-end* in the coverage accounting. Not both silent.
+- **Per-rule corpus-exercise reporting**, so "6 of 10 rules fire on zero cases" cannot
+  recur unnoticed.
+
+**Dependencies.** Stage 19 (the catalogue supplies the feature↔mode column).
+
+**Validation / acceptance.** Every registered rule is either exercised by ≥1 case or
+recorded as unexercised with a reason (**G2**); the specificity assertion is enforced for
+every case; the end-to-end detection count is stated honestly in `progress.md` (**G7**).
+
+---
+
+## Stage 21 — Real-GT Perturbation Corpus (G3, G7)
+
+**Goal.** Move calibration off hand-crafted geometry. The current corpus is built from
+synthetic fixtures (`synth/clean_gt.py`) — five stacked lumbar blocks at 1 mm isotropic.
+Thresholds fitted against that geometry are fitted against a shape no real spine has, and
+as the rule set grows, hand-crafted cases increasingly trip rules they were never meant
+to exercise. Real ground truth is the natural base: the perturbation operators already
+take label maps, so the change is largely one of input sourcing.
+
+Make the **three rungs of realism** explicit, and stop conflating them:
+
+| Rung | Corpus | Role |
+|---|---|---|
+| 1 | hand-crafted fixtures (`synth/clean_gt.py`, `tests/synthetic.py`) | fast unit-test scaffolding **only** |
+| 2 | **real GT + scripted perturbation** *(this stage)* | threshold calibration, regression, sensitivity |
+| 3 | real segmenter failures (**Stage 16**) | validation |
+
+**Deliverables.**
+- The existing `Perturbation` operators re-sourced from **real VerSe GT**, with a manifest
+  recording subject IDs, seeds and operator parameters so the corpus is reproducible
+  without committing bulk data.
+- **A real clean-control baseline** — a *cohort* false-positive rate rather than a single
+  synthetic pass case, which is the only honest baseline for G3.
+- Threshold calibration and every sensitivity claim moved to rung 2; rung 1 retained for
+  fast unit tests only.
+- **Act on Stage 19's golden decision** — retire the corpus-snapshot goldens as their
+  cases are superseded. Do **not** regenerate the nine snapshots against the new corpus;
+  that recreates the same problem one rung up.
+
+**Dependencies.** Stages 13 (VerSe adapter), 19 (golden decision), 20 (specificity
+harness — the new corpus is exactly what the ratchet is there to police).
+
+**Validation / acceptance.** Every threshold-bearing rule is calibrated against rung 2,
+not rung 1 (**G3**); the specificity assertion from Stage 20 holds on the new corpus, or
+each violation is recorded with a reason (**G7**); the corpus regenerates reproducibly
+from the manifest.
+
+---
+
+## Stages 22–25 — placeholders (authored at the full re-vision)
+
+> Recorded so numbering is stable and dependencies can be named. **Deliberately not
+> specified**: each depends on measurements that do not exist yet, and a stage written
+> before its evidence would be speculation.
+
+- **Stage 22 — Unified `(scan, seg)` extraction.** One entry point over the paired scan
+  and segmentation, replacing the current split between label-map-only and
+  intensity-aware paths.
+- **Stage 23 — Multivariate normative model.** Replaces the univariate per-level
+  percentile z-scores aggregated by RMS. **Carries forward the two `❌ Not met` Outcome
+  targets** (held-out real-GT FPR ≤ 0.10; no real-GT sensitivity regression), and absorbs
+  the open insight that `reference_delta`'s threshold should derive from the training
+  cohort's own percentiles rather than a hand-set constant — the fixed-constant mechanism
+  is what cannot clear the FPR target without sacrificing sensitivity.
+- **Stage 24 — Failure-mode discovery & typed reference set.** Cluster the feature space
+  to surface modes not in the §6 catalogue; curate per-class exemplars.
+- **Stage 25 — Segmenter-native perturbations.** Rung 3's generator: perturbations derived
+  from what a real segmenter actually does wrong, rather than from a catalogue written in
+  advance.
