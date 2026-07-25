@@ -5,13 +5,13 @@ stdlib-only plain-text rendering, and a byte-reproducible calibrated-config
 writer).
 
 Covers all seventeen Acceptance Criteria plus adversarial and edge-case
-inputs. ``segqc.eval.report`` does not exist yet at the time this file is
+inputs. ``segfacet.eval.report`` does not exist yet at the time this file is
 written; its names are imported **locally inside each test function**
 (mirroring ``tests/test_054_metrics.py`` / ``tests/test_055_calibrate.py``'s
 treatment of their then-new modules) so the file can still be collected
 before the module is implemented. Names from the already-merged
-``segqc.eval.harness``/``segqc.eval.metrics``/``segqc.eval.calibrate`` and
-``segqc.config`` modules (items 053/054/055/005) are imported at the top of
+``segfacet.eval.harness``/``segfacet.eval.metrics``/``segfacet.eval.calibrate`` and
+``segfacet.config`` modules (items 053/054/055/005) are imported at the top of
 the file as usual.
 
 Every ``CohortMetrics`` fixture is a **hand-built** cohort assembled entirely
@@ -42,19 +42,19 @@ import json
 import jsonschema
 import pytest
 
-from segqc.config import default_config, default_config_path, load_config
-from segqc.eval.calibrate import (
+from segfacet.config import default_config, default_config_path, load_config
+from segfacet.eval.calibrate import (
     CalibrationObjective,
     CalibrationResult,
     CandidateResult,
     ThresholdAxis,
 )
-from segqc.eval.feature_match import FeatureMatchResult
-from segqc.eval.harness import CaseEvaluation, CohortEvaluation
-from segqc.eval.metrics import CohortMetrics, compute_cohort_metrics
-from segqc.eval.outcome import CaseOutcome, Outcome
-from segqc.eval.overlap import OverlapResult
-from segqc.io import SegQCInputError
+from segfacet.eval.feature_match import FeatureMatchResult
+from segfacet.eval.harness import CaseEvaluation, CohortEvaluation
+from segfacet.eval.metrics import CohortMetrics, compute_cohort_metrics
+from segfacet.eval.outcome import CaseOutcome, Outcome
+from segfacet.eval.overlap import OverlapResult
+from segfacet.io import FacetInputError
 
 
 # =========================================================================== #
@@ -200,7 +200,7 @@ def _none_sentinel_cases():
 
 
 def _provenance(metrics, config, build_date="2026-07-11", cohort_id="cohort-a"):
-    from segqc.eval.report import EvaluationProvenance
+    from segfacet.eval.report import EvaluationProvenance
 
     return EvaluationProvenance(
         cohort_id=cohort_id,
@@ -251,7 +251,7 @@ def _appears_numeric(text: str, value) -> bool:
 def _load_eval_schema() -> dict:
     import importlib.resources as pkg_resources
 
-    import segqc.eval as eval_pkg
+    import segfacet.eval as eval_pkg
 
     ref = pkg_resources.files(eval_pkg).joinpath("eval_report_schema_v0.json")
     return json.loads(ref.read_text(encoding="utf-8"))
@@ -263,7 +263,7 @@ def _load_eval_schema() -> dict:
 
 
 def test_ac1_schema_loadable_via_importlib_resources_with_version_and_required_keys():
-    """AC1: eval_report_schema_v0.json lives alongside segqc.eval, loads via
+    """AC1: eval_report_schema_v0.json lives alongside segfacet.eval, loads via
     importlib.resources, declares schema_version const '0.1', and requires
     schema_version/provenance/metrics."""
     schema = _load_eval_schema()
@@ -274,8 +274,8 @@ def test_ac1_schema_loadable_via_importlib_resources_with_version_and_required_k
 
 def test_ac1_public_names_reexported_from_eval_package():
     """AC1 (Implementation Step 9): the module's public names, including the
-    EVAL_REPORT_SCHEMA_VERSION constant, are re-exported from segqc.eval."""
-    from segqc.eval import (  # noqa: F401
+    EVAL_REPORT_SCHEMA_VERSION constant, are re-exported from segfacet.eval."""
+    from segfacet.eval import (  # noqa: F401
         EVAL_REPORT_SCHEMA_VERSION,
         EvaluationProvenance,
         build_evaluation_report,
@@ -284,7 +284,7 @@ def test_ac1_public_names_reexported_from_eval_package():
         serialize_evaluation_report_json,
         write_evaluation_report,
     )
-    from segqc.eval.report import build_evaluation_report as direct
+    from segfacet.eval.report import build_evaluation_report as direct
 
     assert EVAL_REPORT_SCHEMA_VERSION == "0.1"
     assert build_evaluation_report is direct
@@ -299,7 +299,7 @@ def test_ac1_public_names_reexported_from_eval_package():
 def test_ac2_build_evaluation_report_bundles_metrics_and_provenance():
     """AC2: schema_version == '0.1', a provenance block, metrics ==
     metrics.to_dict(), and no raise (validated inside the call)."""
-    from segqc.eval.report import build_evaluation_report
+    from segfacet.eval.report import build_evaluation_report
 
     metrics = _basic_metrics()
     config = default_config()
@@ -320,7 +320,7 @@ def test_ac2_build_evaluation_report_bundles_metrics_and_provenance():
 def test_ac3_calibration_block_present_when_supplied_absent_when_omitted():
     """AC3: with a CalibrationResult -> 'calibration' key present; with
     calibration=None (the default) -> no 'calibration' key; both validate."""
-    from segqc.eval.report import build_evaluation_report
+    from segfacet.eval.report import build_evaluation_report
 
     metrics = _basic_metrics()
     config = default_config()
@@ -344,7 +344,7 @@ def test_ac3_calibration_block_present_when_supplied_absent_when_omitted():
 def test_ac4_provenance_cohort_size_and_config_version_consistent():
     """AC4: provenance carries cohort_id/cohort_size/config_version/build_date;
     cohort_size == metrics.n_cases; config_version == config.schema_version."""
-    from segqc.eval.report import build_evaluation_report
+    from segfacet.eval.report import build_evaluation_report
 
     metrics = _basic_metrics()
     config = default_config()
@@ -367,7 +367,7 @@ def test_ac4_provenance_cohort_size_and_config_version_consistent():
 def test_ac5_identical_inputs_yield_equal_build_date_and_equal_reports():
     """AC5: two builds with the same inputs (same build_date) yield equal
     provenance.build_date and equal reports overall."""
-    from segqc.eval.report import build_evaluation_report
+    from segfacet.eval.report import build_evaluation_report
 
     metrics = _basic_metrics()
     config = default_config()
@@ -381,10 +381,10 @@ def test_ac5_identical_inputs_yield_equal_build_date_and_equal_reports():
 
 
 def test_ac5_module_source_reads_no_wall_clock():
-    """AC5: segqc.eval.report never calls date.today()/datetime.now()."""
+    """AC5: segfacet.eval.report never calls date.today()/datetime.now()."""
     import inspect
 
-    import segqc.eval.report as report_mod
+    import segfacet.eval.report as report_mod
 
     source = inspect.getsource(report_mod)
     assert "date.today(" not in source
@@ -399,7 +399,7 @@ def test_ac5_module_source_reads_no_wall_clock():
 def test_ac6_headline_metrics_reachable_and_equal_cohort_metrics_fields():
     """AC6: FPR, per-mode sensitivity, and DICE-vs-flag correlation are
     reachable under 'metrics' and equal the CohortMetrics fields."""
-    from segqc.eval.report import build_evaluation_report
+    from segfacet.eval.report import build_evaluation_report
 
     metrics = _basic_metrics()
     config = default_config()
@@ -424,7 +424,7 @@ def test_ac6_headline_metrics_reachable_and_equal_cohort_metrics_fields():
 def test_ac7_calibration_block_exposes_best_assignment_metrics_and_status():
     """AC7: a feasible CalibrationResult's chosen assignment, achieved
     metrics, and status == 'ok' all surface under 'calibration'."""
-    from segqc.eval.report import build_evaluation_report
+    from segfacet.eval.report import build_evaluation_report
 
     metrics = _basic_metrics()
     config = default_config()
@@ -452,7 +452,7 @@ def test_ac7_calibration_block_exposes_best_assignment_metrics_and_status():
 def test_ac8_schema_validation_rejects_report_missing_a_required_key(required_field):
     """AC8: deleting a required top-level key from a built report dict and
     re-validating raises jsonschema.ValidationError."""
-    from segqc.eval.report import build_evaluation_report
+    from segfacet.eval.report import build_evaluation_report
 
     schema = _load_eval_schema()
     metrics = _basic_metrics()
@@ -472,7 +472,7 @@ def test_ac8_schema_validation_rejects_report_missing_a_required_key(required_fi
 
 def test_ac9_serialize_json_repeated_calls_produce_identical_text():
     """AC9: serialize_evaluation_report_json is deterministic across calls."""
-    from segqc.eval.report import build_evaluation_report, serialize_evaluation_report_json
+    from segfacet.eval.report import build_evaluation_report, serialize_evaluation_report_json
 
     metrics = _basic_metrics()
     config = default_config()
@@ -489,7 +489,7 @@ def test_ac9_serialize_json_repeated_calls_produce_identical_text():
 def test_ac9_written_artifact_has_single_trailing_newline_and_round_trips(tmp_path):
     """AC9: the written JSON artifact ends in exactly one '\\n' and round-trips
     through json.loads back to the built dict."""
-    from segqc.eval.report import build_evaluation_report, write_evaluation_report
+    from segfacet.eval.report import build_evaluation_report, write_evaluation_report
 
     metrics = _basic_metrics()
     config = default_config()
@@ -508,7 +508,7 @@ def test_ac9_written_artifact_has_single_trailing_newline_and_round_trips(tmp_pa
 def test_ac9_two_writes_of_the_same_report_are_byte_identical(tmp_path):
     """AC9: writing the same report to two distinct paths yields byte-
     identical files."""
-    from segqc.eval.report import build_evaluation_report, write_evaluation_report
+    from segfacet.eval.report import build_evaluation_report, write_evaluation_report
 
     metrics = _basic_metrics()
     config = default_config()
@@ -530,7 +530,7 @@ def test_ac10_human_rendering_reproduces_same_numbers_and_no_raw_internals():
     """AC10: the rendered text reproduces FPR/per-mode sensitivity/DICE-vs-
     flag correlation and the chosen assignment, and contains no raw class
     names/dataclass reprs/enum reprs."""
-    from segqc.eval.report import render_evaluation_report
+    from segfacet.eval.report import render_evaluation_report
 
     metrics = _basic_metrics()
     config = default_config()
@@ -569,7 +569,7 @@ def test_ac10_human_rendering_reproduces_same_numbers_and_no_raw_internals():
 def test_ac11_none_metric_sentinels_render_as_na_not_none_string():
     """AC11: a None FPR and a None correlation coefficient render as 'n/a',
     never the literal string 'None', and no raise."""
-    from segqc.eval.report import render_evaluation_report
+    from segfacet.eval.report import render_evaluation_report
 
     metrics = compute_cohort_metrics(_cohort(_none_sentinel_cases()))
     assert metrics.false_positive_rate is None
@@ -592,7 +592,7 @@ def test_ac11_none_metric_sentinels_render_as_na_not_none_string():
 def test_ac12_record_calibrated_config_round_trips_through_load_config(tmp_path):
     """AC12: load_config(path) yields a config whose swept param equals the
     chosen value and whose other fields equal base_config's."""
-    from segqc.eval.report import record_calibrated_config
+    from segfacet.eval.report import record_calibrated_config
 
     base_config = default_config()
     axis = ThresholdAxis(
@@ -623,7 +623,7 @@ def test_ac12_record_calibrated_config_round_trips_through_load_config(tmp_path)
 def test_ac13_recording_to_two_paths_is_byte_identical(tmp_path):
     """AC13: writing the same calibrated config to two paths yields byte-
     identical files ending in '\\n'."""
-    from segqc.eval.report import record_calibrated_config
+    from segfacet.eval.report import record_calibrated_config
 
     base_config = default_config()
     axis = ThresholdAxis(
@@ -649,7 +649,7 @@ def test_ac13_recording_to_two_paths_is_byte_identical(tmp_path):
 def test_ac14_recording_does_not_mutate_inputs_or_touch_shipped_default(tmp_path):
     """AC14: base_config/calibration_result/axes unchanged after the call;
     the bundled default_config.yaml is byte-unchanged."""
-    from segqc.eval.report import record_calibrated_config
+    from segfacet.eval.report import record_calibrated_config
 
     base_config = default_config()
     base_before = copy.deepcopy(base_config)
@@ -678,10 +678,10 @@ def test_ac14_recording_does_not_mutate_inputs_or_touch_shipped_default(tmp_path
 # =========================================================================== #
 
 
-def test_ac15_no_feasible_best_raises_segqc_input_error_and_writes_nothing(tmp_path):
-    """AC15: calibration_result.best is None -> SegQCInputError, and no file
+def test_ac15_no_feasible_best_raises_segfacet_input_error_and_writes_nothing(tmp_path):
+    """AC15: calibration_result.best is None -> FacetInputError, and no file
     is written at path."""
-    from segqc.eval.report import record_calibrated_config
+    from segfacet.eval.report import record_calibrated_config
 
     base_config = default_config()
     axis = ThresholdAxis(
@@ -693,7 +693,7 @@ def test_ac15_no_feasible_best_raises_segqc_input_error_and_writes_nothing(tmp_p
     assert infeasible.status == "no-feasible-setting"
 
     out_path = tmp_path / "out.yaml"
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         record_calibrated_config(base_config, infeasible, (axis,), out_path)
 
     assert not out_path.exists()
@@ -705,11 +705,11 @@ def test_ac15_no_feasible_best_raises_segqc_input_error_and_writes_nothing(tmp_p
 
 
 def test_ac16_module_source_has_no_progress_or_roadmap_references():
-    """AC16: segqc.eval.report contains no reference to progress.md or
+    """AC16: segfacet.eval.report contains no reference to progress.md or
     roadmap.md."""
     import inspect
 
-    import segqc.eval.report as report_mod
+    import segfacet.eval.report as report_mod
 
     source = inspect.getsource(report_mod)
     assert "progress.md" not in source
@@ -719,7 +719,7 @@ def test_ac16_module_source_has_no_progress_or_roadmap_references():
 def test_ac16_build_and_render_write_nothing_to_disk(tmp_path):
     """AC16: build_evaluation_report/render_evaluation_report perform no file
     I/O -- a tmp_path directory stays empty across both calls."""
-    from segqc.eval.report import build_evaluation_report, render_evaluation_report
+    from segfacet.eval.report import build_evaluation_report, render_evaluation_report
 
     metrics = _basic_metrics()
     config = default_config()
@@ -771,7 +771,7 @@ def test_ac17_no_committed_golden_fixture_or_it_is_lf_pinned_in_gitattributes():
 def test_adversarial_empty_cohort_builds_validates_renders_and_serialises(tmp_path):
     """An empty cohort (n_cases == 0, all-None sentinel metrics) still builds,
     validates, renders, and serialises without crashing."""
-    from segqc.eval.report import (
+    from segfacet.eval.report import (
         build_evaluation_report,
         render_evaluation_report,
         serialize_evaluation_report_json,
@@ -796,7 +796,7 @@ def test_adversarial_empty_cohort_builds_validates_renders_and_serialises(tmp_pa
 def test_adversarial_per_mode_zero_cases_renders_cleanly():
     """A requested per-mode entry with n_cases == 0 (sensitivity is None per
     item 054's sentinel) renders as 'n/a', not a crash or 'None'."""
-    from segqc.eval.report import render_evaluation_report
+    from segfacet.eval.report import render_evaluation_report
 
     metrics = compute_cohort_metrics(_cohort([]), failure_modes=[9])
     assert metrics.per_mode[0].n_cases == 0
@@ -814,7 +814,7 @@ def test_adversarial_per_mode_zero_cases_renders_cleanly():
 def test_adversarial_report_without_calibration_renders_not_calibrated_marker():
     """A report built without a calibration argument still renders a
     calibration section reading something like '(not calibrated)'."""
-    from segqc.eval.report import render_evaluation_report
+    from segfacet.eval.report import render_evaluation_report
 
     metrics = _basic_metrics()
     config = default_config()
@@ -826,15 +826,15 @@ def test_adversarial_report_without_calibration_renders_not_calibrated_marker():
 
 
 def test_adversarial_provenance_optional_fields_default_none_and_settable():
-    """EvaluationProvenance's optional reference_schema_version/segqc_version
+    """EvaluationProvenance's optional reference_schema_version/segfacet_version
     default to None and are carried through to_dict() when supplied."""
-    from segqc.eval.report import EvaluationProvenance
+    from segfacet.eval.report import EvaluationProvenance
 
     minimal = EvaluationProvenance(
         cohort_id="c", cohort_size=0, config_version="0.1", build_date="2026-01-01"
     )
     assert minimal.reference_schema_version is None
-    assert minimal.segqc_version is None
+    assert minimal.segfacet_version is None
     assert minimal.to_dict()["cohort_id"] == "c"
 
     full = EvaluationProvenance(
@@ -843,16 +843,16 @@ def test_adversarial_provenance_optional_fields_default_none_and_settable():
         config_version="0.1",
         build_date="2026-01-01",
         reference_schema_version="0.2",
-        segqc_version="1.2.3",
+        segfacet_version="1.2.3",
     )
     assert full.reference_schema_version == "0.2"
-    assert full.segqc_version == "1.2.3"
+    assert full.segfacet_version == "1.2.3"
 
 
 def test_adversarial_write_evaluation_report_creates_parent_directories(tmp_path):
     """write_evaluation_report creates missing parent directories (mirrors
-    segqc.reference.artifact.write_artifact)."""
-    from segqc.eval.report import build_evaluation_report, write_evaluation_report
+    segfacet.reference.artifact.write_artifact)."""
+    from segfacet.eval.report import build_evaluation_report, write_evaluation_report
 
     metrics = _basic_metrics()
     config = default_config()
@@ -869,7 +869,7 @@ def test_adversarial_write_evaluation_report_creates_parent_directories(tmp_path
 def test_adversarial_record_calibrated_config_creates_parent_directories(tmp_path):
     """record_calibrated_config creates missing parent directories for its
     output path."""
-    from segqc.eval.report import record_calibrated_config
+    from segfacet.eval.report import record_calibrated_config
 
     base_config = default_config()
     axis = ThresholdAxis(
@@ -889,7 +889,7 @@ def test_adversarial_malformed_report_dict_wrong_type_rejected_by_schema():
     """A report dict whose 'metrics' value is the wrong JSON type (a string
     instead of an object) still fails validation against the bundled
     schema -- schema strictness is not limited to missing-key checks."""
-    from segqc.eval.report import build_evaluation_report
+    from segfacet.eval.report import build_evaluation_report
 
     schema = _load_eval_schema()
     metrics = _basic_metrics()

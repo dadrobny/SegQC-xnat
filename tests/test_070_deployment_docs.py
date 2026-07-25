@@ -24,7 +24,7 @@ DEPLOYMENT_DOC_PATH = REPO_ROOT / "docs" / "deployment.md"
 COMMAND_JSON_PATH = REPO_ROOT / "command.json"
 
 MOUNT_PATHS = ("/input/scan", "/input/seg", "/output")
-REPORT_FILENAMES = ("segqc_report.json", "segqc_report.txt")
+REPORT_FILENAMES = ("segfacet_report.json", "segfacet_report.txt")
 
 
 # =========================================================================== #
@@ -79,8 +79,8 @@ def test_ac1_deployment_doc_is_readable_utf8():
 def test_ac2_default_build_command_documented(doc_text):
     lowered = doc_text.lower()
     assert "docker build" in lowered, "must document a docker build command"
-    assert "-t segqc:latest" in lowered or "-t segqc" in lowered, (
-        "must document tagging the default image (e.g. docker build -t segqc:latest .)"
+    assert "-t segfacet:latest" in lowered or "-t segfacet" in lowered, (
+        "must document tagging the default image (e.g. docker build -t segfacet:latest .)"
     )
 
 

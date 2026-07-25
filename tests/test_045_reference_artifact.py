@@ -1,5 +1,5 @@
 """Tests for item 045 -- versioned reference-data artifact + builder script
-(``src/segqc/reference/artifact.py``).
+(``src/segfacet/reference/artifact.py``).
 
 Covers Acceptance Criteria AC1-AC17:
 
@@ -29,7 +29,7 @@ Covers Acceptance Criteria AC1-AC17:
   the caller-supplied string and repeated builds are byte-identical.
 - AC14: size-stratified vs unstratified builds thread size_proxy_name/strata
   correctly.
-- AC15: the ``segqc build-reference`` CLI writes a loadable artifact equal to
+- AC15: the ``segfacet build-reference`` CLI writes a loadable artifact equal to
   a direct build_reference call.
 - AC16: the CLI errors cleanly (non-zero, no --out write) on a bad cohort.
 - AC17: .gitattributes pins the committed artifact with text eol=lf.
@@ -54,8 +54,8 @@ import json
 import nibabel as nib
 import pytest
 
-from segqc.config import bundled_default_config
-from segqc.reference import (
+from segfacet.config import bundled_default_config
+from segfacet.reference import (
     ARTIFACT_SCHEMA_VERSION,
     ReferenceArtifactError,
     aggregate_reference,
@@ -71,10 +71,10 @@ from segqc.reference import (
     to_json_text,
     write_artifact,
 )
-from segqc.reference.artifact import DEFAULT_BUILD_DATE, DEFAULT_SOURCE
-from segqc.reference.ingest import DEFAULT_SEG_SUFFIX, SIZE_PROXY_NAME
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.golden import reports_close
+from segfacet.reference.artifact import DEFAULT_BUILD_DATE, DEFAULT_SOURCE
+from segfacet.reference.ingest import DEFAULT_SEG_SUFFIX, SIZE_PROXY_NAME
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.golden import reports_close
 
 
 # =========================================================================== #
@@ -113,7 +113,7 @@ def test_ac1_builder_chains_ingestion_and_aggregation(tmp_path):
     dist = build_reference(cohort_dir, source="s", build_date="2026-07-11")
 
     cohort = ingest_cohort(cohort_dir)
-    from segqc.reference import Provenance
+    from segfacet.reference import Provenance
 
     expected = aggregate_reference(
         cohort.records,
@@ -400,12 +400,12 @@ def test_ac14_unstratified_build_has_all_stratum_and_no_size_proxy_name(tmp_path
 
 
 # =========================================================================== #
-# AC15: the segqc build-reference CLI writes a loadable artifact
+# AC15: the segfacet build-reference CLI writes a loadable artifact
 # =========================================================================== #
 
 
 def test_ac15_cli_build_reference_writes_loadable_artifact(tmp_path, capsys):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     cohort_dir, _ = _write_cohort(tmp_path, n=2, levels=("L1", "L2"))
     out_path = tmp_path / "cli_artifact.json"
@@ -433,7 +433,7 @@ def test_ac15_cli_build_reference_writes_loadable_artifact(tmp_path, capsys):
 
 
 def test_ac16_cli_errors_cleanly_on_nonexistent_cohort(tmp_path, capsys):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     missing_cohort = tmp_path / "does_not_exist"
     out_path = tmp_path / "should_not_exist.json"
@@ -452,7 +452,7 @@ def test_ac16_cli_errors_cleanly_on_nonexistent_cohort(tmp_path, capsys):
 
 
 def test_ac16_cli_errors_cleanly_on_bad_config(tmp_path, capsys):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     cohort_dir, _ = _write_cohort(tmp_path, n=1, levels=("L1",))
     bad_config = tmp_path / "bad_config.yaml"
@@ -485,10 +485,10 @@ def test_ac17_gitattributes_pins_committed_artifact_lf():
     gitattributes_path = repo_root / ".gitattributes"
     text = gitattributes_path.read_text(encoding="utf-8")
 
-    assert "src/segqc/reference/reference_default.json" in text
+    assert "src/segfacet/reference/reference_default.json" in text
     matching_lines = [
         line for line in text.splitlines()
-        if "src/segqc/reference/reference_default.json" in line
+        if "src/segfacet/reference/reference_default.json" in line
     ]
     assert any("text eol=lf" in line for line in matching_lines)
 
@@ -585,7 +585,7 @@ def test_adv_determinism_under_cohort_write_order(tmp_path):
 
 
 def test_adv_cli_missing_required_cohort_argument_exits_nonzero(capsys):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     # Since Stage 13 (item 087), --cohort is optional (one may instead pass
     # --dataset-schema), so a build-reference with neither is caught by the

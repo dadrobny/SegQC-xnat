@@ -1,60 +1,76 @@
-# SegQC-xnat
-Segmentation Quality Control Pipeline for XNAT created during the BMEIS Hackathon 2026
+# FACET
 
-## Team Members - Maximum of 5 people per project
-- David (david.drobny@kcl.ac.uk)
-- Liane
-- Name 3
-- Name 4
-- Name 5
+**F**ailure **A**nalysis, **C**haracterisation & **E**valuation **T**oolkit for
+instance segmentations of medical images.
 
-## Project Title
+FACET takes a segmentation label map (and optionally the scan it came from),
+derives a description of it, and judges that description against what a correct
+segmentation should look like. It is built around the premise that segmentation
+tools fail in *characteristic, nameable ways* — and that those failure modes are
+worth cataloguing, generating on demand, and measuring individually rather than
+collapsing into a single quality score.
 
-**SegQC-xnat**: Segmentation Quality Control Pipeline for XNAT
+Applied here to 3D spine/vertebra segmentation, a task with well-known failure
+modes: heterogeneous modalities and resolutions, variable field of view, normal
+and pathological appearance variation, and inconsistent labelling (e.g. T13 vs
+L1).
 
-(_SQUAT: Segmentation QUality Assessment Tool?_)
+## What it does
 
-## Overview
+- **Extract** — geometric, topological and intensity features from an instance
+  label map: per-label volume/extent/bbox, connected components and
+  fragmentation, centroids, a spline fit through the spinal curve and per-vertebra
+  offsets from it, orientation and curvature, inter-vertebra spacing and ordering,
+  first-order intensity statistics (optionally PyRadiomics).
+- **Perturb** — fabricate deliberately-broken label maps from clean ones, each
+  carrying a machine-readable record of *what was broken*: fragmentation, fusion,
+  stray islands, missing levels, border truncation, overlap, displacement,
+  relabelling and sequence breaks. This is the stress-test corpus that makes
+  detection claims quantitative.
+- **Score** — compare a case against reference feature distributions built from
+  ground-truth cohorts (VerSe), stratified by anatomical level and subject size.
+- **Judge** — an explainable rule engine turns those features into a verdict
+  (pass / flagged-for-review / fail) where **every flag carries a reason**,
+  emitted as both JSON and a human-readable report.
+- **Evaluate** — a cohort-level harness comparing verdicts, overlap (Dice) and
+  feature divergence against ground truth, with threshold calibration.
 
-A Docker container deployable on XNAT that runs automated image segmentation, heuristic quality control, and generates a targeted report for human review.
-Applied here to 3D spine/vertebra segmentation, a task with well-known failure modes: heterogeneous imaging modalities and resolutions, variable FoV, normal and pathological appearance variation, and inconsistent labelling (e.g. T13 vs. L1).
-The project also serves as a practical exercise in specification driven development (https://github.com/github/spec-kit) and AI driven engineering (e.g. https://github.com/mnriem/spec-kit-aide-extension-demo).
+Explainability is a design constraint, not a feature: a heuristic you can inspect
+and argue with is preferred over a black-box score you cannot.
 
-### Extendability
-Segmentation heuristics can support downstream classification tasks:
-- vertebral segment (C/T/L/S),
-- pathologies (e.g. compression fracture),
-- implant presence (pedicle screws, rods, intervertebral cages),
-- spinal shape (scoliosis)
+## Status
 
-Additional tools can be plugged in:
-- registration-based template matching,
-- radiomics or similar features,
-- SSM's to extend feature space towards complex shape representations
-
-### Transferability
-The pipeline generalises to any application where automated segmentation has a high failure rate.
+Pre-alpha research code. The feature extraction, perturbation and reporting
+layers are mature and well covered by tests; the normative scoring model is
+under active rework. Interfaces may change without notice.
 
 ## Data
 
-We are using the VerSe dataset as an example for vertebra segmentation.
-- https://github.com/anjany/verse
-- 355 CT scans with semantic vertebra segmentations
-- for a subset, there are vertebral fracture gradings available (https://osf.io/4skx2/files/zy68u)
+Reference distributions are built from **VerSe** (<https://github.com/anjany/verse>),
+355 CT scans with semantic vertebra segmentations; a subset carries vertebral
+fracture gradings (<https://osf.io/4skx2/files/zy68u>). No dataset is bundled —
+cohorts are supplied via the dataset adapters in `segfacet.datasets`.
 
-We use TotalSegmentator as a pre-trained model for vertebra segmentation
-- https://github.com/wasserth/totalsegmentator
-- good general purpose segmentation tool
-- provides C1-5, T1-12, L1-5, and sacrum segmentations (does not accommodate variation in numbering of vertebral segments, e.g. T13)
-  
+FACET is segmentation-tool agnostic: it consumes label maps in a documented,
+overridable label convention rather than any one segmenter's internals.
+
+## Origin
+
+Began at the BMEIS Hackathon 2026 as an XNAT-deployed QC gate, and doubles as a
+practical exercise in specification-driven, AI-assisted development
+(see [`.aide/`](.aide/README.md)).
+
+## Licence
+
+MIT — see [LICENSE](LICENSE).
 
 ## GitHub Repository
 
-https://github.com/dadrobny/SegQC-xnat
+https://github.com/dadrobny/segfacet
 
 ## Development setup
 
-`segqc` is a Python 3.9+ package using a `src/` layout and a `pyproject.toml`
+`segfacet` is a Python 3.9+ package using a `src/` layout and a `pyproject.toml`
 build (hatchling). Develop against a clean virtual environment:
 
 ```bash
@@ -72,17 +88,16 @@ pip install -e .[dev]
 pytest
 ```
 
-After installing, the `segqc` console script is available:
+After installing, the `segfacet` console script is available:
 
 ```bash
-segqc --help          # top-level usage, lists the `run` subcommand
-segqc --version       # print the package version
-segqc run --help      # usage for `run` (--scan / --seg / --out)
-```
+segfacet --help             # top-level usage, lists the subcommands
+segfacet --version          # print the package version
 
-> Note: `segqc run` is currently a scaffold stub — it parses its arguments and
-> exits without performing any I/O. The QC pipeline is wired up in later work
-> items (see `docs/aide/`).
+segfacet run --scan scan.nii.gz --seg seg.nii.gz --out out/    # QC one case
+segfacet build-reference --cohort cohort/ --out reference.json  # fit reference distributions
+segfacet evaluate --cohort manifest.json --out out/            # cohort metrics (+ --calibrate)
+```
 
 ## Testing & synthetic fixtures
 

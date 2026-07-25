@@ -14,7 +14,7 @@ Also hosts the shared Docker-gating helpers and the session-scoped item-066
 image-build fixture (promoted here from ``tests/test_066_dockerfile.py`` by
 item 069) so every Docker-gated test module in the suite -- item 066's own
 image-contract checks and item 069's container smoke test -- builds the
-``segqc:test-066`` image **at most once** per test session.
+``segfacet:test-066`` image **at most once** per test session.
 """
 
 from __future__ import annotations
@@ -132,7 +132,7 @@ def docker_image_tag():
     if not _docker_available():
         pytest.skip("docker CLI/daemon not available on this host")
 
-    tag = "segqc:test-066"
+    tag = "segfacet:test-066"
     try:
         result = subprocess.run(
             ["docker", "build", "-t", tag, "."],

@@ -25,8 +25,8 @@ from synthetic import (
     make_labelmap,
 )
 
-from segqc.features.centroids import LabelCentroid, compute_centroid
-from segqc.labels import UNKNOWN, LabelConvention
+from segfacet.features.centroids import LabelCentroid, compute_centroid
+from segfacet.labels import UNKNOWN, LabelConvention
 
 
 # =========================================================================== #
@@ -43,21 +43,21 @@ def _default_convention() -> LabelConvention:
 # =========================================================================== #
 
 def test_import_label_centroid():
-    """LabelCentroid is importable from segqc.features.centroids."""
-    from segqc.features.centroids import LabelCentroid as LC  # noqa: F401
+    """LabelCentroid is importable from segfacet.features.centroids."""
+    from segfacet.features.centroids import LabelCentroid as LC  # noqa: F401
     assert LC is LabelCentroid
 
 
 def test_import_compute_centroid():
-    """compute_centroid is importable from segqc.features.centroids."""
-    from segqc.features.centroids import compute_centroid as cc  # noqa: F401
+    """compute_centroid is importable from segfacet.features.centroids."""
+    from segfacet.features.centroids import compute_centroid as cc  # noqa: F401
     assert callable(cc)
 
 
 def test_no_import_error():
-    """Importing segqc.features.centroids raises no error."""
+    """Importing segfacet.features.centroids raises no error."""
     import importlib
-    mod = importlib.import_module("segqc.features.centroids")
+    mod = importlib.import_module("segfacet.features.centroids")
     assert hasattr(mod, "LabelCentroid")
     assert hasattr(mod, "compute_centroid")
 

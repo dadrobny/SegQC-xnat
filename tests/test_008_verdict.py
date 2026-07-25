@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from segqc.verdict import Reason, Severity, Verdict
+from segfacet.verdict import Reason, Severity, Verdict
 
 
 # =========================================================================== #
@@ -384,20 +384,20 @@ def test_ac8_reasons_is_not_the_same_object_as_input():
 # AC-9  Module location / importability
 # =========================================================================== #
 
-def test_ac9_imports_from_segqc_verdict():
-    """Severity, Reason, and Verdict are all importable from segqc.verdict."""
+def test_ac9_imports_from_segfacet_verdict():
+    """Severity, Reason, and Verdict are all importable from segfacet.verdict."""
     # The imports at the top of this file already verify this; the explicit
     # assertion here ensures the test fails if a future refactor moves them.
-    from segqc.verdict import Reason as R, Severity as S, Verdict as V
+    from segfacet.verdict import Reason as R, Severity as S, Verdict as V
     assert S is Severity
     assert R is Reason
     assert V is Verdict
 
 
 def test_ac9_no_import_error():
-    """Importing segqc.verdict raises no ImportError or AttributeError."""
+    """Importing segfacet.verdict raises no ImportError or AttributeError."""
     import importlib
-    mod = importlib.import_module("segqc.verdict")
+    mod = importlib.import_module("segfacet.verdict")
     assert hasattr(mod, "Severity")
     assert hasattr(mod, "Reason")
     assert hasattr(mod, "Verdict")
@@ -408,7 +408,7 @@ def test_ac9_no_import_error():
 # =========================================================================== #
 
 def test_ac10_verdict_module_has_no_numpy_dependency():
-    """segqc.verdict must not import numpy at module level.
+    """segfacet.verdict must not import numpy at module level.
 
     The verdict model is pure data; requiring NumPy would make it impossible to
     use in lightweight / import-time contexts.
@@ -417,29 +417,29 @@ def test_ac10_verdict_module_has_no_numpy_dependency():
     # numpy may already be imported by other modules; we check that verdict
     # does NOT list it as a direct module-level dependency by inspecting
     # the module's globals (no numpy name should appear there).
-    import segqc.verdict as verdict_mod
+    import segfacet.verdict as verdict_mod
     module_globals = vars(verdict_mod)
     assert "numpy" not in module_globals, (
-        "segqc.verdict has 'numpy' in its module namespace — "
+        "segfacet.verdict has 'numpy' in its module namespace — "
         "the verdict model must not depend on numpy at import time."
     )
 
 
 def test_ac10_verdict_module_has_no_nibabel_dependency():
-    """segqc.verdict must not import nibabel at module level."""
-    import segqc.verdict as verdict_mod
+    """segfacet.verdict must not import nibabel at module level."""
+    import segfacet.verdict as verdict_mod
     module_globals = vars(verdict_mod)
     assert "nibabel" not in module_globals
     assert "nib" not in module_globals
 
 
 def test_ac10_import_does_not_require_scipy():
-    """Importing segqc.verdict should not fail even if scipy were absent.
+    """Importing segfacet.verdict should not fail even if scipy were absent.
 
     We can't uninstall scipy, but we verify verdict's __init__ names do not
     reference it — a proxy for the 'no non-stdlib runtime imports' requirement.
     """
-    import segqc.verdict as verdict_mod
+    import segfacet.verdict as verdict_mod
     assert "scipy" not in vars(verdict_mod)
 
 

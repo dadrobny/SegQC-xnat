@@ -2,14 +2,14 @@
 AC14 -- the Part-A half of Stage 10's integration closer).
 
 Item 072's Stage-2/3 feature functions auto-resolve ``backend=None ->
-get_backend()`` at call time (honouring the ``SEGQC_BACKEND`` env var, item
+get_backend()`` at call time (honouring the ``SEGFACET_BACKEND`` env var, item
 071); ``run_qc``/``evaluate_cohort``/``build_reference`` were never given a
 ``backend`` parameter to thread. Item 075 exposes that seam as a first-class
-``--backend`` flag on all three ``segqc`` subcommands
+``--backend`` flag on all three ``segfacet`` subcommands
 (``run``/``evaluate``/``build-reference``) via a shared
 ``_apply_backend_selection(args)`` helper in ``cli.py`` that eagerly resolves
-the flag through ``segqc.backend.get_backend(override=...)`` (fail-fast on a
-forced-but-unavailable GPU) and then sets ``os.environ["SEGQC_BACKEND"]``
+the flag through ``segfacet.backend.get_backend(override=...)`` (fail-fast on a
+forced-but-unavailable GPU) and then sets ``os.environ["SEGFACET_BACKEND"]``
 **only** when the flag was explicitly given -- leaving the ambient env var (or
 ``auto``) to govern when it is omitted. ``cli.py``/``backend.py`` are not
 touched by this module; only ``cli.py`` gains production code (the builder's
@@ -17,7 +17,7 @@ job).
 
 Every test that reaches a subcommand's compute entry point spies on that
 entry point by wrapping the **real** implementation (recording
-``os.environ.get("SEGQC_BACKEND")`` at call time, then delegating) so the run
+``os.environ.get("SEGFACET_BACKEND")`` at call time, then delegating) so the run
 completes normally and both reports/artifacts are written exactly as before
 -- this is what proves the flag reaches the *unmodified* compute path via the
 env var alone (A2), not a stubbed/short-circuited one.
@@ -39,11 +39,11 @@ from pathlib import Path
 import nibabel as nib
 import pytest
 
-from segqc.backend import cupy_available
-from segqc.cli import _build_parser, main
-from segqc.reference.ingest import DEFAULT_SEG_SUFFIX
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.corpus import CORPUS_DIR
+from segfacet.backend import cupy_available
+from segfacet.cli import _build_parser, main
+from segfacet.reference.ingest import DEFAULT_SEG_SUFFIX
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.corpus import CORPUS_DIR
 
 from synthetic import make_labelmap, make_scan, write_nifti
 
@@ -65,7 +65,7 @@ _PLACEHOLDER_ARGV = {
 
 
 def _run_files(tmp_path):
-    """A small real scan+seg pair for ``segqc run`` (load_case is never
+    """A small real scan+seg pair for ``segfacet run`` (load_case is never
     mocked, so this must be a real, loadable fixture)."""
     shape = (12, 12, 12)
     blocks = {20: ((2, 6), (2, 6), (2, 6)), 21: ((6, 10), (6, 10), (6, 10))}
@@ -134,7 +134,7 @@ def _build_argv(sub, tmp_path, extra=()):
 def _expected_outputs(sub, out_target):
     """The file(s) a successful *sub* invocation writes to *out_target*."""
     if sub == "run":
-        return [out_target / "segqc_report.json", out_target / "segqc_report.txt"]
+        return [out_target / "segfacet_report.json", out_target / "segfacet_report.txt"]
     if sub == "evaluate":
         return [out_target / "eval_report.json", out_target / "eval_report.txt"]
     if sub == "build-reference":
@@ -144,38 +144,38 @@ def _expected_outputs(sub, out_target):
 
 def _install_compute_spy(sub, monkeypatch, recorder):
     """Wrap *sub*'s real compute entry point with a spy that records
-    ``os.environ.get("SEGQC_BACKEND")`` at call time, then delegates to the
+    ``os.environ.get("SEGFACET_BACKEND")`` at call time, then delegates to the
     real implementation so the run completes normally (AC4)."""
     if sub == "run":
         # Item 090: reference mode is ON by default, so a default `run`
         # invocation now dispatches through run_qc_with_reference rather
         # than the reference-less run_qc (cli.py's _handle_run).
-        import segqc.pipeline as mod
+        import segfacet.pipeline as mod
 
         original = mod.run_qc_with_reference
 
         def spy(*args, **kwargs):
-            recorder["env"] = os.environ.get("SEGQC_BACKEND")
+            recorder["env"] = os.environ.get("SEGFACET_BACKEND")
             return original(*args, **kwargs)
 
         monkeypatch.setattr(mod, "run_qc_with_reference", spy)
     elif sub == "evaluate":
-        import segqc.eval.harness as mod
+        import segfacet.eval.harness as mod
 
         original = mod.evaluate_cohort
 
         def spy(*args, **kwargs):
-            recorder["env"] = os.environ.get("SEGQC_BACKEND")
+            recorder["env"] = os.environ.get("SEGFACET_BACKEND")
             return original(*args, **kwargs)
 
         monkeypatch.setattr(mod, "evaluate_cohort", spy)
     elif sub == "build-reference":
-        import segqc.reference.artifact as mod
+        import segfacet.reference.artifact as mod
 
         original = mod.build_reference
 
         def spy(*args, **kwargs):
-            recorder["env"] = os.environ.get("SEGQC_BACKEND")
+            recorder["env"] = os.environ.get("SEGFACET_BACKEND")
             return original(*args, **kwargs)
 
         monkeypatch.setattr(mod, "build_reference", spy)
@@ -225,7 +225,7 @@ def test_ac2_invalid_backend_token_is_usage_error(sub):
 
 @pytest.mark.parametrize("sub", SUBCOMMANDS)
 def test_ac3_backend_flag_eagerly_resolves_via_get_backend(sub, tmp_path, monkeypatch):
-    import segqc.backend as backend_mod
+    import segfacet.backend as backend_mod
 
     real_get_backend = backend_mod.get_backend
     calls = []
@@ -245,7 +245,7 @@ def test_ac3_backend_flag_eagerly_resolves_via_get_backend(sub, tmp_path, monkey
 
 
 # =========================================================================== #
-# AC4  Explicit --backend selects the backend via SEGQC_BACKEND for the
+# AC4  Explicit --backend selects the backend via SEGFACET_BACKEND for the
 #      unmodified compute entry point
 # =========================================================================== #
 
@@ -284,12 +284,12 @@ def test_ac5_forcing_gpu_without_cupy_fails_cleanly(sub, tmp_path, capsys):
 
 
 # =========================================================================== #
-# AC6  Flag omitted + SEGQC_BACKEND unset -> env untouched, no behaviour change
+# AC6  Flag omitted + SEGFACET_BACKEND unset -> env untouched, no behaviour change
 # =========================================================================== #
 
 
 def test_ac6_backend_omitted_env_unset_no_behaviour_change(tmp_path, monkeypatch):
-    monkeypatch.delenv("SEGQC_BACKEND", raising=False)
+    monkeypatch.delenv("SEGFACET_BACKEND", raising=False)
     recorder = {}
     _install_compute_spy("run", monkeypatch, recorder)
 
@@ -297,18 +297,18 @@ def test_ac6_backend_omitted_env_unset_no_behaviour_change(tmp_path, monkeypatch
     main(argv)
 
     assert recorder["env"] is None
-    assert (out_target / "segqc_report.json").exists()
-    assert (out_target / "segqc_report.txt").exists()
-    assert "SEGQC_BACKEND" not in os.environ
+    assert (out_target / "segfacet_report.json").exists()
+    assert (out_target / "segfacet_report.txt").exists()
+    assert "SEGFACET_BACKEND" not in os.environ
 
 
 # =========================================================================== #
-# AC7  Flag omitted + ambient SEGQC_BACKEND set -> ambient value governs
+# AC7  Flag omitted + ambient SEGFACET_BACKEND set -> ambient value governs
 # =========================================================================== #
 
 
 def test_ac7_backend_omitted_ambient_env_governs(tmp_path, monkeypatch):
-    monkeypatch.setenv("SEGQC_BACKEND", "cpu")
+    monkeypatch.setenv("SEGFACET_BACKEND", "cpu")
     recorder = {}
     _install_compute_spy("run", monkeypatch, recorder)
 
@@ -316,8 +316,8 @@ def test_ac7_backend_omitted_ambient_env_governs(tmp_path, monkeypatch):
     main(argv)
 
     assert recorder["env"] == "cpu"
-    assert os.environ.get("SEGQC_BACKEND") == "cpu"
-    assert (out_target / "segqc_report.json").exists()
+    assert os.environ.get("SEGFACET_BACKEND") == "cpu"
+    assert (out_target / "segfacet_report.json").exists()
 
 
 # =========================================================================== #
@@ -335,8 +335,8 @@ def test_ac8_end_to_end_cpu_run_needs_zero_gpu_dependency(tmp_path):
     argv, out_target = _build_argv("run", tmp_path, extra=["--backend", "cpu"])
     main(argv)
 
-    assert (out_target / "segqc_report.json").exists()
-    assert (out_target / "segqc_report.txt").exists()
+    assert (out_target / "segfacet_report.json").exists()
+    assert (out_target / "segfacet_report.txt").exists()
     assert "cupy" not in sys.modules
 
 
@@ -368,7 +368,7 @@ def test_ac13_no_new_core_dependency():
 
 def test_ac14_existing_run_cli_behaviour_unchanged_without_backend_flag(tmp_path):
     """Two independent invocations omitting --backend on the same inputs
-    still produce byte-identical segqc_report.json and matching exit codes --
+    still produce byte-identical segfacet_report.json and matching exit codes --
     the new optional, None-default flag introduces no behavioural change to
     the pre-existing unflagged path (regression guard). The pre-existing
     run/evaluate/build-reference CLI test modules themselves are left
@@ -385,8 +385,8 @@ def test_ac14_existing_run_cli_behaviour_unchanged_without_backend_flag(tmp_path
     )
 
     assert code_a == code_b
-    text_a = (out_a / "segqc_report.json").read_text(encoding="utf-8")
-    text_b = (out_b / "segqc_report.json").read_text(encoding="utf-8")
+    text_a = (out_a / "segfacet_report.json").read_text(encoding="utf-8")
+    text_b = (out_b / "segfacet_report.json").read_text(encoding="utf-8")
     assert text_a == text_b
 
 
@@ -400,26 +400,26 @@ def test_adv_env_hermeticity_after_explicit_backend_selection(tmp_path):
     os.environ is restored -- no selection leaks across tests, even though
     the process-scoped mutation is intentional for the run's own duration
     (A11)."""
-    original_present = "SEGQC_BACKEND" in os.environ
-    original_value = os.environ.get("SEGQC_BACKEND")
+    original_present = "SEGFACET_BACKEND" in os.environ
+    original_value = os.environ.get("SEGFACET_BACKEND")
 
     with pytest.MonkeyPatch.context() as mp:
-        mp.delenv("SEGQC_BACKEND", raising=False)
+        mp.delenv("SEGFACET_BACKEND", raising=False)
         argv, _out_target = _build_argv("run", tmp_path, extra=["--backend", "cpu"])
         main(argv)
-        assert os.environ.get("SEGQC_BACKEND") == "cpu"
+        assert os.environ.get("SEGFACET_BACKEND") == "cpu"
 
     if original_present:
-        assert os.environ.get("SEGQC_BACKEND") == original_value
+        assert os.environ.get("SEGFACET_BACKEND") == original_value
     else:
-        assert "SEGQC_BACKEND" not in os.environ
+        assert "SEGFACET_BACKEND" not in os.environ
 
 
 def test_adv_explicit_backend_auto_overrides_ambient_cpu(tmp_path, monkeypatch):
     """A3: an explicit --backend auto overrides a preset ambient
-    SEGQC_BACKEND=cpu -- the compute path observes "auto" (which resolves to
+    SEGFACET_BACKEND=cpu -- the compute path observes "auto" (which resolves to
     CPU on this host), proving the flag's precedence over the ambient env."""
-    monkeypatch.setenv("SEGQC_BACKEND", "cpu")
+    monkeypatch.setenv("SEGFACET_BACKEND", "cpu")
     recorder = {}
     _install_compute_spy("run", monkeypatch, recorder)
 
@@ -427,8 +427,8 @@ def test_adv_explicit_backend_auto_overrides_ambient_cpu(tmp_path, monkeypatch):
     main(argv)
 
     assert recorder["env"] == "auto"
-    assert os.environ.get("SEGQC_BACKEND") == "auto"
-    assert (out_target / "segqc_report.json").exists()
+    assert os.environ.get("SEGFACET_BACKEND") == "auto"
+    assert (out_target / "segfacet_report.json").exists()
 
 
 def test_adv_gpu_force_fails_before_any_input_loaded(tmp_path):
@@ -454,13 +454,13 @@ def test_adv_gpu_force_fails_before_any_input_loaded(tmp_path):
 
 @pytest.mark.parametrize("sub", SUBCOMMANDS)
 def test_adv_bad_ambient_env_flag_omitted_fails_cleanly(sub, tmp_path, monkeypatch, capsys):
-    """A4: a bad *ambient* SEGQC_BACKEND (gpu, CuPy absent) with --backend
+    """A4: a bad *ambient* SEGFACET_BACKEND (gpu, CuPy absent) with --backend
     omitted must surface as a clean Error: + exit 1 (eager validation), not a
     mid-pipeline traceback, and must write no output."""
     if cupy_available():
         pytest.skip("This test targets a CuPy-absent host only.")
 
-    monkeypatch.setenv("SEGQC_BACKEND", "gpu")
+    monkeypatch.setenv("SEGFACET_BACKEND", "gpu")
     argv, out_target = _build_argv(sub, tmp_path)
 
     code = main(argv)

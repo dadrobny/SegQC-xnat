@@ -1,7 +1,7 @@
 # GPU capability verification (Stage 10)
 
 Procedure and record for verifying the GPU-accelerated feature-extraction path
-(`segqc.backend`, Stage 10) for real, on a machine with an NVIDIA GPU + CUDA
+(`segfacet.backend`, Stage 10) for real, on a machine with an NVIDIA GPU + CUDA
 driver. This complements `.github/workflows/ci.yml`'s `verify-environment-gated`
 job (which covers pyradiomics and Docker in CI) — GPU hardware isn't available on
 standard GitHub-hosted runners, so this path is manual.

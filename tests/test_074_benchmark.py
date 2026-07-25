@@ -1,9 +1,9 @@
 """CPU/GPU feature-extraction performance benchmark test suite (item 074).
 
-Structural-correctness suite for ``segqc.benchmark`` -- a lightweight,
+Structural-correctness suite for ``segfacet.benchmark`` -- a lightweight,
 deterministic-in-*scope* (not in timing) benchmark that times
-``segqc.pipeline.extract_feature_record`` per available backend
-(``SEGQC_BACKEND``-driven, item 071/072) and emits a schema-valid JSON report.
+``segfacet.pipeline.extract_feature_record`` per available backend
+(``SEGFACET_BACKEND``-driven, item 071/072) and emits a schema-valid JSON report.
 
 **No absolute-time assertions.** Per the item scope fence, this suite never
 compares a timing value to a fixed second-count threshold -- only structural
@@ -26,10 +26,10 @@ from pathlib import Path
 import numpy
 import pytest
 
-from segqc.backend import ENV_VAR, cupy_available
-from segqc.config import bundled_default_config
-from segqc.synth.corpus import load_manifest
-from segqc.synth.regression import loaded_seg_image
+from segfacet.backend import ENV_VAR, cupy_available
+from segfacet.config import bundled_default_config
+from segfacet.synth.corpus import load_manifest
+from segfacet.synth.regression import loaded_seg_image
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -109,13 +109,13 @@ def _cpu_entry(report: dict) -> dict:
 
 
 def test_ac1_module_imports_gpu_free():
-    import segqc.benchmark  # noqa: F401 -- must import cleanly with no cupy installed
+    import segfacet.benchmark  # noqa: F401 -- must import cleanly with no cupy installed
 
     # The module itself must not have imported cupy at module scope: check the
     # module's own namespace for a bound `cupy` name (a module-scope `import
     # cupy` would bind one), rather than sys.modules (which other test modules
     # may have already populated via unrelated stubs).
-    assert "cupy" not in vars(segqc.benchmark)
+    assert "cupy" not in vars(segfacet.benchmark)
 
 
 # =========================================================================== #
@@ -124,7 +124,7 @@ def test_ac1_module_imports_gpu_free():
 
 
 def test_ac2_run_benchmark_returns_dict_without_raising():
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     report = run_benchmark(iterations=2, warmup=1)
     assert isinstance(report, dict)
@@ -136,7 +136,7 @@ def test_ac2_run_benchmark_returns_dict_without_raising():
 
 
 def test_ac3_report_carries_documented_schema():
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     report = run_benchmark(iterations=2, warmup=1)
     _assert_schema_valid(report)
@@ -149,7 +149,7 @@ def test_ac3_report_carries_documented_schema():
 
 
 def test_ac4_exactly_one_cpu_entry_present():
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     report = run_benchmark(iterations=2, warmup=1)
     cpu_entries = [b for b in report["backends"] if b["name"] == "cpu"]
@@ -163,7 +163,7 @@ def test_ac4_exactly_one_cpu_entry_present():
 
 
 def test_ac5_cpu_timings_are_positive():
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     report = run_benchmark(iterations=2, warmup=1)
     cpu = _cpu_entry(report)
@@ -179,7 +179,7 @@ def test_ac5_cpu_timings_are_positive():
 
 
 def test_ac6_iteration_scope_honoured():
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     report = run_benchmark(iterations=3, warmup=1)
     cpu = _cpu_entry(report)
@@ -195,7 +195,7 @@ def test_ac6_iteration_scope_honoured():
 
 
 def test_ac7_gpu_entry_absent_when_cupy_absent():
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     if cupy_available():
         pytest.skip("This assertion targets a CuPy-absent host only.")
@@ -211,7 +211,7 @@ def test_ac7_gpu_entry_absent_when_cupy_absent():
 
 
 def test_ac8_backend_name_set_matches_availability():
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     report = run_benchmark(iterations=2, warmup=1)
     names = {b["name"] for b in report["backends"]}
@@ -225,7 +225,7 @@ def test_ac8_backend_name_set_matches_availability():
 
 
 def test_ac9_report_is_json_round_trippable():
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     report = run_benchmark(iterations=2, warmup=1)
     assert json.loads(json.dumps(report)) == report
@@ -237,7 +237,7 @@ def test_ac9_report_is_json_round_trippable():
 
 
 def test_ac10_main_writes_parseable_json_file(tmp_path):
-    from segqc.benchmark import main
+    from segfacet.benchmark import main
 
     out_path = tmp_path / "r.json"
     rc = main(["--out", str(out_path), "--iterations", "2", "--warmup", "1"])
@@ -256,7 +256,7 @@ def test_ac10_main_writes_parseable_json_file(tmp_path):
 
 
 def test_ac11_fixture_identifies_a_committed_corpus_case():
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     report = run_benchmark(iterations=2, warmup=1)
     fixture = report["fixture"]
@@ -293,7 +293,7 @@ def test_ac11_no_new_binary_fixture_added_by_this_item():
 
 
 def test_ac12_benchmark_does_not_mutate_fixture_seg_image():
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     case = _first_multilabel_case()
     before = loaded_seg_image(case).get_fdata().copy()
@@ -358,7 +358,7 @@ def test_ac14_gpu_gate_is_genuine_skip_marker():
 
 @requires_cupy
 def test_ac15_gpu_entry_present_and_positive_when_cupy_available():
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     report = run_benchmark(iterations=2, warmup=1)
     gpu_entries = [b for b in report["backends"] if b["name"] == "gpu"]
@@ -376,13 +376,13 @@ def test_ac15_gpu_entry_present_and_positive_when_cupy_available():
 
 
 def test_edge_env_var_hygiene_no_leak_after_run_benchmark():
-    """After run_benchmark returns, SEGQC_BACKEND must not be left set in
+    """After run_benchmark returns, SEGFACET_BACKEND must not be left set in
     os.environ -- a leaked selection would silently affect any subsequent
     test/module that reads the env var."""
     original_present = ENV_VAR in os.environ
     original_value = os.environ.get(ENV_VAR)
 
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     run_benchmark(iterations=2, warmup=1)
 
@@ -393,7 +393,7 @@ def test_edge_env_var_hygiene_no_leak_after_run_benchmark():
 
 
 def test_edge_iterations_one_boundary_min_mean_median_equal_single_sample():
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     report = run_benchmark(iterations=1, warmup=1)
     cpu = _cpu_entry(report)
@@ -406,7 +406,7 @@ def test_edge_iterations_one_boundary_min_mean_median_equal_single_sample():
 
 
 def test_edge_explicit_case_selects_exactly_that_case():
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     case = _first_multilabel_case()
     report = run_benchmark(case_id=case["case_id"], iterations=2, warmup=1)
@@ -426,7 +426,7 @@ def test_edge_scope_determinism_across_repeated_calls():
     """Two run_benchmark(iterations=2) calls yield identical structure /
     field-sets and identical fixture metadata; only the timings themselves
     (and their derived stats) are allowed to differ."""
-    from segqc.benchmark import run_benchmark
+    from segfacet.benchmark import run_benchmark
 
     report_a = run_benchmark(iterations=2, warmup=1)
     report_b = run_benchmark(iterations=2, warmup=1)

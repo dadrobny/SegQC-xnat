@@ -54,12 +54,12 @@ import nibabel as nib
 import numpy as np
 import pytest
 
-import segqc.synth  # noqa: F401 -- triggers self-registration of every operator
-from segqc.config import bundled_default_config
-from segqc.io import load_case
-from segqc.pipeline import run_qc
-from segqc.synth import FAILURE_MODE_NAMES, build_clean_spine, get_perturbation
-from segqc.synth.corpus import (
+import segfacet.synth  # noqa: F401 -- triggers self-registration of every operator
+from segfacet.config import bundled_default_config
+from segfacet.io import load_case
+from segfacet.pipeline import run_qc
+from segfacet.synth import FAILURE_MODE_NAMES, build_clean_spine, get_perturbation
+from segfacet.synth.corpus import (
     CORPUS_DIR,
     FIXTURES_DIRNAME,
     MANIFEST_PATH,
@@ -68,7 +68,7 @@ from segqc.synth.corpus import (
     main,
     write_corpus,
 )
-from segqc.verdict import Severity
+from segfacet.verdict import Severity
 
 # =========================================================================== #
 # Schema constants (mirroring the manifest schema documented in the item spec)
@@ -374,7 +374,7 @@ def test_ac17_manifest_expectations_equal_operators_expectation():
 
 
 def test_ac18_the_one_command_regeneration_entry_point_runs(tmp_path):
-    """AC18: segqc.synth.corpus.main(["--out", tmp]) returns 0 and writes a
+    """AC18: segfacet.synth.corpus.main(["--out", tmp]) returns 0 and writes a
     manifest.json that load_manifest() parses to a dict with the same set of
     case_ids as the committed manifest."""
     out_dir = tmp_path / "regen_main"

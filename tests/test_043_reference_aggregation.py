@@ -1,5 +1,5 @@
 """Tests for item 043 -- reference-distribution schema & per-level
-aggregation core (``src/segqc/reference``).
+aggregation core (``src/segfacet/reference``).
 
 Covers Acceptance Criteria AC1-AC15:
 
@@ -55,7 +55,7 @@ import json
 import numpy as np
 import pytest
 
-from segqc.reference import (
+from segfacet.reference import (
     ALL_STRATUM,
     DEFAULT_PERCENTILES,
     SCHEMA_VERSION,

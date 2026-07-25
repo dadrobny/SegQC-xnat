@@ -14,7 +14,7 @@ mocking ``sys.modules["cupy"]`` -- never a real ``import cupy``:
   ``sys.modules`` as "module known absent"), modelling absence robustly even
   on a host where CuPy happens to be genuinely installed.
 
-``SEGQC_BACKEND`` is always explicitly set/cleared via
+``SEGFACET_BACKEND`` is always explicitly set/cleared via
 ``monkeypatch.setenv``/``delenv`` so tests are hermetic and order-independent.
 
 All tests are deterministic, CPU-only, and portable (no network, no absolute
@@ -28,13 +28,13 @@ import sys
 import numpy as np
 import pytest
 
-from segqc.backend import (
+from segfacet.backend import (
     BACKEND_AUTO,
     BACKEND_CPU,
     BACKEND_GPU,
     ENV_VAR,
     Backend,
-    SegQCBackendError,
+    FacetBackendError,
     backend_name,
     cupy_available,
     get_backend,
@@ -72,7 +72,7 @@ def cupy_absent(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch):
-    """Hermetic default: SEGQC_BACKEND unset unless a test sets it."""
+    """Hermetic default: SEGFACET_BACKEND unset unless a test sets it."""
     monkeypatch.delenv(ENV_VAR, raising=False)
 
 
@@ -82,20 +82,20 @@ def _clean_env(monkeypatch):
 
 
 def test_ac1_module_imports_without_cupy(monkeypatch):
-    """import segqc.backend succeeds with cupy modelled absent -- no
+    """import segfacet.backend succeeds with cupy modelled absent -- no
     ImportError, and the module does not depend on cupy at import time."""
     _make_cupy_absent(monkeypatch)
     import importlib
 
-    mod = importlib.import_module("segqc.backend")
+    mod = importlib.import_module("segfacet.backend")
     assert mod is not None
 
 
 def test_ac1_public_api_names_present():
-    import segqc.backend as mod
+    import segfacet.backend as mod
 
     for name in (
-        "SegQCBackendError",
+        "FacetBackendError",
         "Backend",
         "cupy_available",
         "get_backend",
@@ -114,7 +114,7 @@ def test_ac1_constants_have_expected_values():
     assert BACKEND_CPU == "cpu"
     assert BACKEND_GPU == "gpu"
     assert BACKEND_AUTO == "auto"
-    assert ENV_VAR == "SEGQC_BACKEND"
+    assert ENV_VAR == "SEGFACET_BACKEND"
 
 
 # =========================================================================== #
@@ -173,36 +173,36 @@ def test_ac6_env_cpu_wins_over_available_gpu(fake_cupy, monkeypatch):
 # =========================================================================== #
 
 
-def test_ac7_env_gpu_absent_raises_segqc_backend_error(cupy_absent, monkeypatch):
+def test_ac7_env_gpu_absent_raises_segfacet_backend_error(cupy_absent, monkeypatch):
     monkeypatch.setenv(ENV_VAR, "gpu")
-    with pytest.raises(SegQCBackendError) as excinfo:
+    with pytest.raises(FacetBackendError) as excinfo:
         get_backend()
     message = str(excinfo.value)
     assert message
     assert "cupy" in message.lower() or "gpu" in message.lower()
 
 
-def test_ac7_override_gpu_absent_raises_segqc_backend_error(cupy_absent):
-    with pytest.raises(SegQCBackendError) as excinfo:
+def test_ac7_override_gpu_absent_raises_segfacet_backend_error(cupy_absent):
+    with pytest.raises(FacetBackendError) as excinfo:
         get_backend(override="gpu")
     message = str(excinfo.value)
     assert message
 
 
 def test_ac7_backend_name_also_raises_for_forced_gpu_absent(cupy_absent):
-    with pytest.raises(SegQCBackendError):
+    with pytest.raises(FacetBackendError):
         backend_name(override="gpu")
 
 
 def test_ac7_raised_type_is_not_bare_import_error(cupy_absent):
-    """The typed SegQCBackendError must not itself be a bare ImportError."""
-    with pytest.raises(SegQCBackendError) as excinfo:
+    """The typed FacetBackendError must not itself be a bare ImportError."""
+    with pytest.raises(FacetBackendError) as excinfo:
         get_backend(override="gpu")
     assert not isinstance(excinfo.value, ImportError)
 
 
 def test_ac7_message_mentions_remediation(cupy_absent):
-    with pytest.raises(SegQCBackendError) as excinfo:
+    with pytest.raises(FacetBackendError) as excinfo:
         get_backend(override="gpu")
     lowered = str(excinfo.value).lower()
     assert "gpu" in lowered
@@ -232,7 +232,7 @@ def test_ac8_get_backend_explicit_override_beats_env_var(fake_cupy, monkeypatch)
 
 def test_ac9_invalid_token_via_env_raises(monkeypatch):
     monkeypatch.setenv(ENV_VAR, "turbo")
-    with pytest.raises(SegQCBackendError) as excinfo:
+    with pytest.raises(FacetBackendError) as excinfo:
         backend_name()
     message = str(excinfo.value).lower()
     assert "cpu" in message
@@ -241,7 +241,7 @@ def test_ac9_invalid_token_via_env_raises(monkeypatch):
 
 
 def test_ac9_invalid_token_via_argument_raises():
-    with pytest.raises(SegQCBackendError) as excinfo:
+    with pytest.raises(FacetBackendError) as excinfo:
         backend_name(override="turbo")
     message = str(excinfo.value).lower()
     assert "cpu" in message
@@ -250,7 +250,7 @@ def test_ac9_invalid_token_via_argument_raises():
 
 
 def test_ac9_invalid_token_not_bare_exception_type():
-    with pytest.raises(SegQCBackendError):
+    with pytest.raises(FacetBackendError):
         resolve_backend_choice(override="turbo")
 
 
@@ -406,19 +406,19 @@ def test_adv_explicit_override_auto_beats_conflicting_env(cupy_absent, monkeypat
 
 def test_adv_invalid_token_env_and_argument_both_raise_with_message(monkeypatch):
     monkeypatch.setenv(ENV_VAR, "turbo")
-    with pytest.raises(SegQCBackendError):
+    with pytest.raises(FacetBackendError):
         backend_name()
     monkeypatch.delenv(ENV_VAR, raising=False)
-    with pytest.raises(SegQCBackendError):
+    with pytest.raises(FacetBackendError):
         backend_name(override="turbo")
 
 
 def test_adv_force_gpu_absent_env_and_argument_both_raise(cupy_absent, monkeypatch):
     monkeypatch.setenv(ENV_VAR, "gpu")
-    with pytest.raises(SegQCBackendError):
+    with pytest.raises(FacetBackendError):
         get_backend()
     monkeypatch.delenv(ENV_VAR, raising=False)
-    with pytest.raises(SegQCBackendError):
+    with pytest.raises(FacetBackendError):
         get_backend(override="gpu")
 
 

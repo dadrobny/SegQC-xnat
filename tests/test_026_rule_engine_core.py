@@ -14,7 +14,7 @@ Covers all 18 Acceptance Criteria plus adversarial and edge-case inputs:
 - AC15:     HeuristicConfig.rule_enabled defaults to True; False when explicit.
 - AC16:     HeuristicConfig.rule_param returns configured value or caller default.
 - AC17:     backward compatibility — default_config / load_config unaffected.
-- AC18:     segqc/heuristics/ ships no concrete rule-family module.
+- AC18:     segfacet/heuristics/ ships no concrete rule-family module.
 
 Adversarial / edge-case scenarios included:
 - Finding.labels coercion from a plain list (deduplication to frozenset).
@@ -37,7 +37,7 @@ Adversarial / edge-case scenarios included:
 - run_rules always returns a list (never None).
 
 All stub Rule subclasses are defined locally in this file.  No concrete rule
-family from segqc/heuristics/ is referenced.  All tests are deterministic,
+family from segfacet/heuristics/ is referenced.  All tests are deterministic,
 CPU-only, and cross-platform (no network, no absolute paths).
 """
 
@@ -50,9 +50,9 @@ import pathlib
 
 import pytest
 
-from segqc.heuristics import Finding, Rule, get_rule, iter_rules, register_rule, run_rules
-from segqc.verdict import Severity
-from segqc.config import (
+from segfacet.heuristics import Finding, Rule, get_rule, iter_rules, register_rule, run_rules
+from segfacet.verdict import Severity
+from segfacet.config import (
     SUPPORTED_SCHEMA_VERSION,
     HeuristicConfig,
     default_config,
@@ -150,10 +150,10 @@ def _isolated_registry():
     """Snapshot the rule registry before each test and restore it afterwards.
 
     This prevents test-to-test leakage when stub rules are registered inside
-    individual tests.  The fixture imports _RULES from segqc.heuristics.rule
+    individual tests.  The fixture imports _RULES from segfacet.heuristics.rule
     directly, as specified in the implementation steps.
     """
-    from segqc.heuristics.rule import _RULES
+    from segfacet.heuristics.rule import _RULES
     snapshot = dict(_RULES)
     _RULES.clear()
     yield
@@ -840,10 +840,10 @@ def test_ac17_existing_flat_fields_unaffected_by_rules_section(tmp_path):
 
 
 def test_ac17_schema_version_validation_still_enforced(tmp_path):
-    """AC17: An unsupported schema_version still raises SegQCConfigError."""
-    from segqc.config import SegQCConfigError
+    """AC17: An unsupported schema_version still raises FacetConfigError."""
+    from segfacet.config import FacetConfigError
     p = _write_yaml(tmp_path, "schema_version: '99.0'\n")
-    with pytest.raises(SegQCConfigError):
+    with pytest.raises(FacetConfigError):
         load_config(p)
 
 
@@ -853,8 +853,8 @@ def test_ac17_schema_version_validation_still_enforced(tmp_path):
 
 
 def test_ac18_no_concrete_rule_family_module_in_package():
-    """AC18: segqc/heuristics/ contains no rule-family module (bounds, fragmentation, etc.)."""
-    import segqc.heuristics as pkg
+    """AC18: segfacet/heuristics/ contains no rule-family module (bounds, fragmentation, etc.)."""
+    import segfacet.heuristics as pkg
     pkg_dir = pathlib.Path(pkg.__file__).parent
     forbidden_stems = {
         "misalignment",
@@ -862,7 +862,7 @@ def test_ac18_no_concrete_rule_family_module_in_package():
     for py_file in pkg_dir.glob("*.py"):
         stem = py_file.stem
         assert stem not in forbidden_stems, (
-            f"Rule-family module '{py_file.name}' found in segqc/heuristics/ — "
+            f"Rule-family module '{py_file.name}' found in segfacet/heuristics/ — "
             f"no concrete families should be present in item 026."
         )
 

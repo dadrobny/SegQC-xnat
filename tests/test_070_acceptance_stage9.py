@@ -172,16 +172,16 @@ def test_ac8_container_run_exits_zero_and_produces_both_reports(docker_image_tag
         f"Stage-9 acceptance run failed:\n"
         f"--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}"
     )
-    assert (out_dir / "segqc_report.json").is_file(), "no JSON report produced"
-    assert (out_dir / "segqc_report.txt").is_file(), "no human report produced"
+    assert (out_dir / "segfacet_report.json").is_file(), "no JSON report produced"
+    assert (out_dir / "segfacet_report.txt").is_file(), "no human report produced"
 
     import jsonschema
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    schema_ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    schema_ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(schema_ref.read_text(encoding="utf-8"))
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     jsonschema.validate(report, schema)
 
 
@@ -211,8 +211,8 @@ def test_ac8_failure_path_empty_scan_mount_exits_nonzero_with_no_partial_report(
         ],
     )
     assert result.returncode != 0
-    assert not (out_dir / "segqc_report.json").exists()
-    assert not (out_dir / "segqc_report.txt").exists()
+    assert not (out_dir / "segfacet_report.json").exists()
+    assert not (out_dir / "segfacet_report.txt").exists()
 
 
 # =========================================================================== #

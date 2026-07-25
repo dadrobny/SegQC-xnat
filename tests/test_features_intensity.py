@@ -25,10 +25,10 @@ import nibabel as nib
 import numpy as np
 import pytest
 
-from segqc.io import load_case
-from segqc.synth.intensity import INTENSITY_CORPUS_DIR, load_intensity_manifest
+from segfacet.io import load_case
+from segfacet.synth.intensity import INTENSITY_CORPUS_DIR, load_intensity_manifest
 
-from segqc.features.intensity import (
+from segfacet.features.intensity import (
     LabelIntensity,
     compute_intensity_features,
     compute_label_intensity,
@@ -101,27 +101,27 @@ def _assert_all_stats_none(result):
 # =========================================================================== #
 
 def test_import_label_intensity():
-    """LabelIntensity is importable from segqc.features.intensity."""
-    from segqc.features.intensity import LabelIntensity as LI  # noqa: F401
+    """LabelIntensity is importable from segfacet.features.intensity."""
+    from segfacet.features.intensity import LabelIntensity as LI  # noqa: F401
     assert LI is LabelIntensity
 
 
 def test_import_compute_label_intensity():
-    """compute_label_intensity is importable from segqc.features.intensity."""
-    from segqc.features.intensity import compute_label_intensity as cli  # noqa: F401
+    """compute_label_intensity is importable from segfacet.features.intensity."""
+    from segfacet.features.intensity import compute_label_intensity as cli  # noqa: F401
     assert callable(cli)
 
 
 def test_import_compute_intensity_features():
-    """compute_intensity_features is importable from segqc.features.intensity."""
-    from segqc.features.intensity import compute_intensity_features as cif  # noqa: F401
+    """compute_intensity_features is importable from segfacet.features.intensity."""
+    from segfacet.features.intensity import compute_intensity_features as cif  # noqa: F401
     assert callable(cif)
 
 
 def test_no_import_error():
-    """Importing segqc.features.intensity raises no error."""
+    """Importing segfacet.features.intensity raises no error."""
     import importlib
-    mod = importlib.import_module("segqc.features.intensity")
+    mod = importlib.import_module("segfacet.features.intensity")
     assert hasattr(mod, "LabelIntensity")
     assert hasattr(mod, "compute_label_intensity")
     assert hasattr(mod, "compute_intensity_features")
@@ -148,7 +148,7 @@ def test_ac1_label_intensity_is_frozen():
 def test_ac1_module_imports_only_numpy_scipy_nibabel_stdlib():
     """The module's top-level imports are restricted to NumPy/SciPy/NiBabel
     (+ dataclasses/typing/__future__), no PyRadiomics or file-I/O libraries."""
-    import segqc.features.intensity as mod
+    import segfacet.features.intensity as mod
     tree = ast.parse(inspect.getsource(mod))
     allowed_roots = {"numpy", "scipy", "nibabel", "dataclasses", "typing", "__future__"}
     for node in ast.walk(tree):
@@ -497,7 +497,7 @@ def test_ac18_clean_fixture_medians_within_expected_hu_bands():
     seg_path = INTENSITY_CORPUS_DIR / clean_case["seg_fixture"]
     loaded = load_case(scan_path, seg_path)
     scan_img = nib.Nifti1Image(loaded.scan.data, loaded.scan.affine)
-    # loaded.seg.data is int64 (segqc.io preserves the label map's native
+    # loaded.seg.data is int64 (segfacet.io preserves the label map's native
     # integer dtype); nibabel 5.x rejects a bare int64 array with no header,
     # so cast to int32 explicitly when reconstructing the Nifti1Image.
     seg_img = nib.Nifti1Image(loaded.seg.data.astype(np.int32), loaded.seg.affine)

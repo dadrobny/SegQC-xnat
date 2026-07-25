@@ -15,12 +15,12 @@ from pathlib import Path
 import nibabel as nib
 import pytest
 
-from segqc.cli import main
-from segqc.datasets import resolve, load_descriptor
-from segqc.reference import build_reference, build_reference_from_cohort, load_artifact
-from segqc.reference.ingest import ingest_cohort, ingest_dataset_cohort
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.intensity import paint_clean_scan
+from segfacet.cli import main
+from segfacet.datasets import resolve, load_descriptor
+from segfacet.reference import build_reference, build_reference_from_cohort, load_artifact
+from segfacet.reference.ingest import ingest_cohort, ingest_dataset_cohort
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.intensity import paint_clean_scan
 
 SUBJECTS = ("sub-verse004", "sub-verse005", "sub-verse006")
 LEVELS = ("L1", "L2", "L3", "L4", "L5")
@@ -199,8 +199,8 @@ def test_cli_run_dataset_schema_batch(tmp_path):
     rc = main(["run", "--dataset-schema", str(desc), "--out", str(out)])
     assert rc == 0
     for sub in SUBJECTS:
-        assert (out / sub / "segqc_report.json").exists()
-        assert (out / sub / "segqc_report.txt").exists()
+        assert (out / sub / "segfacet_report.json").exists()
+        assert (out / sub / "segfacet_report.txt").exists()
 
 
 def test_cli_run_requires_scan_seg_or_schema(tmp_path, capsys):

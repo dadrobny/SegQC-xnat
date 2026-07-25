@@ -60,9 +60,9 @@ if _tests_dir not in sys.path:
 
 from synthetic import affine_from_spacing, make_labelmap  # noqa: E402
 
-from segqc.features.centroids import LabelCentroid  # noqa: E402
-from segqc.features.spline import fit_centroid_spline  # noqa: E402
-from segqc.features.orientation import (  # noqa: E402
+from segfacet.features.centroids import LabelCentroid  # noqa: E402
+from segfacet.features.spline import fit_centroid_spline  # noqa: E402
+from segfacet.features.orientation import (  # noqa: E402
     SpineCurvature,
     VertebralOrientation,
     compute_spine_curvature,
@@ -203,33 +203,33 @@ def _axis_angle_deg_sign_ambiguous(
 
 
 def test_import_vertebral_orientation():
-    """VertebralOrientation is importable from segqc.features.orientation."""
-    from segqc.features.orientation import VertebralOrientation as VO  # noqa: F401
+    """VertebralOrientation is importable from segfacet.features.orientation."""
+    from segfacet.features.orientation import VertebralOrientation as VO  # noqa: F401
     assert VO is VertebralOrientation
 
 
 def test_import_spine_curvature():
-    """SpineCurvature is importable from segqc.features.orientation."""
-    from segqc.features.orientation import SpineCurvature as SC  # noqa: F401
+    """SpineCurvature is importable from segfacet.features.orientation."""
+    from segfacet.features.orientation import SpineCurvature as SC  # noqa: F401
     assert SC is SpineCurvature
 
 
 def test_import_compute_vertebra_orientations():
-    """compute_vertebra_orientations is importable from segqc.features.orientation."""
-    from segqc.features.orientation import compute_vertebra_orientations as cvo  # noqa: F401
+    """compute_vertebra_orientations is importable from segfacet.features.orientation."""
+    from segfacet.features.orientation import compute_vertebra_orientations as cvo  # noqa: F401
     assert callable(cvo)
 
 
 def test_import_compute_spine_curvature():
-    """compute_spine_curvature is importable from segqc.features.orientation."""
-    from segqc.features.orientation import compute_spine_curvature as csc  # noqa: F401
+    """compute_spine_curvature is importable from segfacet.features.orientation."""
+    from segfacet.features.orientation import compute_spine_curvature as csc  # noqa: F401
     assert callable(csc)
 
 
 def test_no_import_error():
-    """Importing segqc.features.orientation raises no error."""
+    """Importing segfacet.features.orientation raises no error."""
     import importlib
-    mod = importlib.import_module("segqc.features.orientation")
+    mod = importlib.import_module("segfacet.features.orientation")
     assert hasattr(mod, "VertebralOrientation")
     assert hasattr(mod, "SpineCurvature")
     assert hasattr(mod, "compute_vertebra_orientations")

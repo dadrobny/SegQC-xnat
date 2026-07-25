@@ -1,20 +1,20 @@
-"""Tests for the evaluation-cohort manifest loader and the ``segqc evaluate``
+"""Tests for the evaluation-cohort manifest loader and the ``segfacet evaluate``
 CLI subcommand (item 057, AC1-AC7 -- the CLI/cohort-spec half of Stage-7's
 final integration item).
 
-``segqc.eval.cohort`` does not exist yet at the time this file is written;
+``segfacet.eval.cohort`` does not exist yet at the time this file is written;
 its names (``load_cohort_manifest``) are imported **locally inside each test
 function** (mirroring ``tests/test_054_metrics.py`` / ``tests/test_055_
 calibrate.py``'s / ``tests/test_056_eval_report.py``'s treatment of their
 then-new modules) so this file can still be collected before the module is
-implemented. The ``segqc evaluate`` subcommand itself is likewise not yet
-wired into ``segqc.cli``'s parser -- ``cli.main([...])`` calls below will
+implemented. The ``segfacet evaluate`` subcommand itself is likewise not yet
+wired into ``segfacet.cli``'s parser -- ``cli.main([...])`` calls below will
 fail until item 057's ``_handle_evaluate`` handler is implemented; this is
 expected at test-authoring time.
 
 Running a real evaluation once implemented::
 
-    segqc evaluate --cohort <manifest.json> --out <dir> [--calibrate]
+    segfacet evaluate --cohort <manifest.json> --out <dir> [--calibrate]
 
 The evaluation-cohort manifest is a small, synth-independent JSON document
 (pinned in the item 057 spec's Assumptions): a top-level ``"cases"`` array,
@@ -45,9 +45,9 @@ from pathlib import Path
 import jsonschema
 import pytest
 
-from segqc.io import SegQCInputError
-from segqc.synth.corpus import CORPUS_DIR
-from segqc.synth.perturbation import FAILURE_MODE_NAMES
+from segfacet.io import FacetInputError
+from segfacet.synth.corpus import CORPUS_DIR
+from segfacet.synth.perturbation import FAILURE_MODE_NAMES
 
 
 # =========================================================================== #
@@ -76,7 +76,7 @@ def _write_manifest(tmp_path, cases, name="cohort.json"):
 def _eval_report_schema():
     import importlib.resources as pkg_resources
 
-    import segqc.eval as eval_pkg
+    import segfacet.eval as eval_pkg
 
     ref = pkg_resources.files(eval_pkg).joinpath("eval_report_schema_v0.json")
     return json.loads(ref.read_text(encoding="utf-8"))
@@ -84,7 +84,7 @@ def _eval_report_schema():
 
 # A small, fast, real end-to-end cohort: one clean-control (self-vs-self,
 # expected pass) + one border-crop failure caught by BorderRule -- used
-# throughout AC3-AC7 so every ``segqc evaluate`` invocation stays cheap.
+# throughout AC3-AC7 so every ``segfacet evaluate`` invocation stays cheap.
 _SMALL_COHORT_CASES = [
     {
         "case_id": "clean",
@@ -113,7 +113,7 @@ _SMALL_COHORT_CASES = [
 
 
 def test_ac1_loader_builds_evaluation_cases_in_order_with_resolved_paths(tmp_path):
-    from segqc.eval.cohort import load_cohort_manifest
+    from segfacet.eval.cohort import load_cohort_manifest
 
     _copy_corpus_fixtures(tmp_path)
     case_with_candidate = {
@@ -214,25 +214,25 @@ def _ok_case():
         ),
     ],
 )
-def test_ac2_malformed_manifest_raises_segqc_input_error(tmp_path, build_manifest):
-    from segqc.eval.cohort import load_cohort_manifest
+def test_ac2_malformed_manifest_raises_segfacet_input_error(tmp_path, build_manifest):
+    from segfacet.eval.cohort import load_cohort_manifest
 
     _copy_corpus_fixtures(tmp_path)
     manifest = build_manifest(_ok_case())
     manifest_path = tmp_path / "malformed.json"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         load_cohort_manifest(manifest_path)
 
 
 # =========================================================================== #
-# AC3/AC4: segqc evaluate runs end-to-end and writes a schema-valid report
+# AC3/AC4: segfacet evaluate runs end-to-end and writes a schema-valid report
 # =========================================================================== #
 
 
 def test_ac3_evaluate_runs_end_to_end_and_writes_both_reports(tmp_path):
-    from segqc import cli
+    from segfacet import cli
 
     manifest_path = _write_manifest(tmp_path, _SMALL_COHORT_CASES, name="ac3.json")
     out_dir = tmp_path / "out"
@@ -257,7 +257,7 @@ def test_ac3_evaluate_runs_end_to_end_and_writes_both_reports(tmp_path):
 
 
 def test_ac4_written_json_report_is_schema_valid_and_carries_metrics(tmp_path):
-    from segqc import cli
+    from segfacet import cli
 
     manifest_path = _write_manifest(tmp_path, _SMALL_COHORT_CASES, name="ac4.json")
     out_dir = tmp_path / "out"
@@ -294,8 +294,8 @@ def test_ac4_written_json_report_is_schema_valid_and_carries_metrics(tmp_path):
 
 
 def test_ac5_calibrate_writes_config_and_calibration_block(tmp_path):
-    from segqc import cli
-    from segqc.config import load_config
+    from segfacet import cli
+    from segfacet.config import load_config
 
     manifest_path = _write_manifest(tmp_path, _SMALL_COHORT_CASES, name="ac5.json")
     out_dir = tmp_path / "out_calibrate"
@@ -326,7 +326,7 @@ def test_ac5_calibrate_writes_config_and_calibration_block(tmp_path):
 
 
 def test_ac5_without_calibrate_writes_neither_config_nor_calibration_block(tmp_path):
-    from segqc import cli
+    from segfacet import cli
 
     manifest_path = _write_manifest(tmp_path, _SMALL_COHORT_CASES, name="ac5b.json")
     out_dir = tmp_path / "out_plain"
@@ -352,12 +352,12 @@ def test_ac5_without_calibrate_writes_neither_config_nor_calibration_block(tmp_p
 
 
 # =========================================================================== #
-# AC6: segqc evaluate is reproducible
+# AC6: segfacet evaluate is reproducible
 # =========================================================================== #
 
 
 def test_ac6_two_identical_invocations_write_byte_identical_reports(tmp_path):
-    from segqc import cli
+    from segfacet import cli
 
     manifest_path = _write_manifest(tmp_path, _SMALL_COHORT_CASES, name="ac6.json")
     out_a = tmp_path / "out_a"
@@ -387,7 +387,7 @@ def test_ac6_two_identical_invocations_write_byte_identical_reports(tmp_path):
 
 
 def test_ac7_nonexistent_cohort_path_exits_1_with_no_traceback(tmp_path, capsys):
-    from segqc import cli
+    from segfacet import cli
 
     out_dir = tmp_path / "out"
     exit_code = cli.main(
@@ -408,7 +408,7 @@ def test_ac7_nonexistent_cohort_path_exits_1_with_no_traceback(tmp_path, capsys)
 
 
 def test_ac7_malformed_config_path_exits_1_with_no_traceback(tmp_path, capsys):
-    from segqc import cli
+    from segfacet import cli
 
     manifest_path = _write_manifest(tmp_path, _SMALL_COHORT_CASES, name="ac7.json")
     out_dir = tmp_path / "out"

@@ -21,8 +21,8 @@ import math
 
 import pytest
 
-from segqc.io import SegQCInputError
-from segqc.labels import UNKNOWN
+from segfacet.io import FacetInputError
+from segfacet.labels import UNKNOWN
 
 
 # =========================================================================== #
@@ -79,8 +79,8 @@ def _block(entries, offsets=None):
 
 
 def test_ac1_import_from_feature_match_module():
-    """AC1: all five names import from segqc.eval.feature_match."""
-    from segqc.eval.feature_match import (  # noqa: F401
+    """AC1: all five names import from segfacet.eval.feature_match."""
+    from segfacet.eval.feature_match import (  # noqa: F401
         TRACKED_FEATURES,
         FeatureDifference,
         FeatureMatchResult,
@@ -92,15 +92,15 @@ def test_ac1_import_from_feature_match_module():
 
 
 def test_ac1_reexported_from_eval_package():
-    """AC1: compute_feature_match is re-exported from segqc.eval."""
-    from segqc.eval import compute_feature_match
+    """AC1: compute_feature_match is re-exported from segfacet.eval."""
+    from segfacet.eval import compute_feature_match
 
     assert callable(compute_feature_match)
 
 
 def test_ac1_module_dunder_all():
-    """AC1: segqc.eval.feature_match.__all__ lists all five public names."""
-    import segqc.eval.feature_match as fm_mod
+    """AC1: segfacet.eval.feature_match.__all__ lists all five public names."""
+    import segfacet.eval.feature_match as fm_mod
 
     assert set(fm_mod.__all__) >= {
         "compute_feature_match",
@@ -115,7 +115,7 @@ def test_ac1_feature_difference_is_frozen_dataclass_with_fields():
     """AC1: FeatureDifference is frozen and carries the documented fields."""
     import dataclasses
 
-    from segqc.eval.feature_match import FeatureDifference
+    from segfacet.eval.feature_match import FeatureDifference
 
     assert dataclasses.is_dataclass(FeatureDifference)
     field_names = {f.name for f in dataclasses.fields(FeatureDifference)}
@@ -134,7 +134,7 @@ def test_ac1_label_feature_divergence_is_frozen_dataclass_with_fields():
     """AC1: LabelFeatureDivergence is frozen and carries the documented fields."""
     import dataclasses
 
-    from segqc.eval.feature_match import LabelFeatureDivergence
+    from segfacet.eval.feature_match import LabelFeatureDivergence
 
     assert dataclasses.is_dataclass(LabelFeatureDivergence)
     field_names = {f.name for f in dataclasses.fields(LabelFeatureDivergence)}
@@ -153,7 +153,7 @@ def test_ac1_feature_match_result_is_frozen_dataclass_with_fields():
     """AC1: FeatureMatchResult is frozen and carries the documented fields."""
     import dataclasses
 
-    from segqc.eval.feature_match import FeatureMatchResult
+    from segfacet.eval.feature_match import FeatureMatchResult
 
     assert dataclasses.is_dataclass(FeatureMatchResult)
     field_names = {f.name for f in dataclasses.fields(FeatureMatchResult)}
@@ -174,7 +174,7 @@ def test_ac1_feature_match_result_is_frozen_dataclass_with_fields():
 
 def test_ac2_tracked_features_documented_tuple():
     """AC2: TRACKED_FEATURES equals the documented ordered tuple."""
-    from segqc.eval.feature_match import TRACKED_FEATURES
+    from segfacet.eval.feature_match import TRACKED_FEATURES
 
     assert TRACKED_FEATURES == (
         "physical_volume_mm3",
@@ -187,7 +187,7 @@ def test_ac2_tracked_features_documented_tuple():
 
 def test_ac2_differences_one_per_tracked_feature_in_order():
     """AC2: a matched label's differences has one entry per name, in order."""
-    from segqc.eval.feature_match import TRACKED_FEATURES, compute_feature_match
+    from segfacet.eval.feature_match import TRACKED_FEATURES, compute_feature_match
 
     block = _block([_entry(20, "L1")], offsets=[(20, 1.0)])
     result = compute_feature_match(block, block)
@@ -202,7 +202,7 @@ def test_ac2_differences_one_per_tracked_feature_in_order():
 
 def test_ac3_identical_blocks_all_zero():
     """AC3: same block on both sides -> every difference/score is exactly zero."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     block = _block(
         [
@@ -231,7 +231,7 @@ def test_ac3_identical_blocks_all_zero():
 
 def test_ac4_candidate_larger_gives_positive_difference():
     """AC4: candidate volume > GT volume -> positive absolute/relative."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     cand = _block([_entry(20, "L1", volume=1200.0)])
     gt = _block([_entry(20, "L1", volume=1000.0)])
@@ -246,7 +246,7 @@ def test_ac4_candidate_larger_gives_positive_difference():
 
 def test_ac4_candidate_smaller_gives_negative_difference():
     """AC4: candidate volume < GT volume -> negative absolute/relative."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     cand = _block([_entry(20, "L1", volume=800.0)])
     gt = _block([_entry(20, "L1", volume=1000.0)])
@@ -265,7 +265,7 @@ def test_ac4_candidate_smaller_gives_negative_difference():
 
 def test_ac5_single_label_perturbation_is_localised():
     """AC5: only the perturbed label has a non-zero divergence score."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     gt = _block(
         [_entry(20, "L1", volume=1000.0), _entry(21, "L2", volume=2000.0)],
@@ -297,7 +297,7 @@ def test_ac5_single_label_perturbation_is_localised():
 
 def test_ac6_centroid_distance_hand_computed():
     """AC6: a (3, 4, 0) centroid shift yields centroid_distance_mm == 5.0."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     gt = _block([_entry(20, "L1", centroid_mm=(0.0, 0.0, 0.0))])
     cand = _block([_entry(20, "L1", centroid_mm=(3.0, 4.0, 0.0))])
@@ -310,7 +310,7 @@ def test_ac6_centroid_distance_hand_computed():
 
 def test_ac6_centroid_distance_zero_when_equal():
     """AC6: equal centroids yield centroid_distance_mm == 0.0."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     block = _block([_entry(20, "L1", centroid_mm=(1.0, 2.0, 3.0))])
     result = compute_feature_match(block, block)
@@ -324,7 +324,7 @@ def test_ac6_centroid_distance_zero_when_equal():
 
 def test_ac7_divergence_score_hand_computed():
     """AC7: divergence_score equals mean(abs(relative)) over available features."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     gt = _block([_entry(20, "L1", volume=1000.0, ex=10.0, ey=10.0, ez=10.0)])
     cand = _block([_entry(20, "L1", volume=1100.0, ex=8.0, ey=10.0, ez=10.0)])
@@ -343,7 +343,7 @@ def test_ac7_divergence_score_hand_computed():
 
 def test_ac7_divergence_score_none_when_no_defined_relative():
     """AC7: no tracked feature has a defined relative -> divergence_score is None."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     gt = _block([_entry(20, "L1", volume=0.0, ex=0.0, ey=0.0, ez=0.0)])
     cand = _block([_entry(20, "L1", volume=5.0, ex=5.0, ey=5.0, ez=5.0)])
@@ -360,7 +360,7 @@ def test_ac7_divergence_score_none_when_no_defined_relative():
 
 def test_ac8_case_aggregates_hand_computed():
     """AC8: case_divergence/mean_centroid_distance_mm equal the hand means."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     gt = _block(
         [
@@ -383,7 +383,7 @@ def test_ac8_case_aggregates_hand_computed():
 
 def test_ac8_no_qualifying_labels_aggregates_none():
     """AC8: zero matched labels -> case_divergence and mean_centroid_distance_mm are None."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     cand = _block([_entry(20, "L1")])
     gt = _block([_entry(21, "L2")])
@@ -400,7 +400,7 @@ def test_ac8_no_qualifying_labels_aggregates_none():
 
 def test_ac9_candidate_only_label_is_unmatched():
     """AC9: a label only in candidate is unmatched with empty differences and None scores."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     cand = _block([_entry(20, "L1"), _entry(21, "L2")])
     gt = _block([_entry(20, "L1")])
@@ -416,7 +416,7 @@ def test_ac9_candidate_only_label_is_unmatched():
 
 def test_ac9_gt_only_label_is_unmatched_and_excluded_from_aggregates():
     """AC9: a label only in GT is unmatched, no raise, excluded from aggregates."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     cand = _block([_entry(20, "L1", volume=1000.0)])
     gt = _block([_entry(20, "L1", volume=1000.0), _entry(23, "L4")])
@@ -440,7 +440,7 @@ def test_ac9_gt_only_label_is_unmatched_and_excluded_from_aggregates():
 
 def test_ac10_offset_present_only_on_candidate_side():
     """AC10: spline_offset_mm present in candidate stage3 but absent in gt -> unavailable."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     cand = _block([_entry(20, "L1")], offsets=[(20, 2.5)])
     gt = _block([_entry(20, "L1")])  # no stage3 at all
@@ -461,7 +461,7 @@ def test_ac10_offset_present_only_on_candidate_side():
 
 def test_ac10_offset_present_only_on_gt_side():
     """AC10: spline_offset_mm present in gt stage3 but absent in candidate -> unavailable."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     cand = _block([_entry(20, "L1")])
     gt = _block([_entry(20, "L1")], offsets=[(20, 1.0)])
@@ -484,7 +484,7 @@ def test_ac10_offset_present_only_on_gt_side():
 
 def test_ac11_zero_gt_value_relative_none_absolute_defined():
     """AC11: GT volume 0.0, candidate non-zero -> absolute defined, relative None."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     gt = _block([_entry(20, "L1", volume=0.0)])
     cand = _block([_entry(20, "L1", volume=42.0)])
@@ -506,7 +506,7 @@ def test_ac11_zero_gt_value_relative_none_absolute_defined():
 
 def test_ac12_ordered_canonically_then_by_value_with_unmapped_distinct():
     """AC12: per_label is ordered by CANONICAL_ORDER then value; unmapped stay distinct."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     entries_cand = [
         _entry(22, "L3"),
@@ -530,7 +530,7 @@ def test_ac12_ordered_canonically_then_by_value_with_unmapped_distinct():
 
 def test_ac12_matched_name_is_gt_authoritative():
     """AC12: for a matched label, name comes from the GT side's level_name."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     cand = _block([_entry(20, "WrongName")])
     gt = _block([_entry(20, "L1")])
@@ -539,49 +539,49 @@ def test_ac12_matched_name_is_gt_authoritative():
 
 
 # =========================================================================== #
-# AC13: malformed input raises SegQCInputError
+# AC13: malformed input raises FacetInputError
 # =========================================================================== #
 
 
 def test_ac13_candidate_not_a_mapping_raises():
-    """AC13: candidate=None raises SegQCInputError."""
-    from segqc.eval.feature_match import compute_feature_match
+    """AC13: candidate=None raises FacetInputError."""
+    from segfacet.eval.feature_match import compute_feature_match
 
     gt = _block([_entry(20, "L1")])
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         compute_feature_match(None, gt)
 
 
 def test_ac13_missing_per_label_raises():
-    """AC13: a block dict lacking per_label raises SegQCInputError."""
-    from segqc.eval.feature_match import compute_feature_match
+    """AC13: a block dict lacking per_label raises FacetInputError."""
+    from segfacet.eval.feature_match import compute_feature_match
 
     gt = _block([_entry(20, "L1")])
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         compute_feature_match({}, gt)
 
 
 def test_ac13_per_label_not_a_dict_raises():
-    """AC13: per_label as a list (not a mapping) raises SegQCInputError."""
-    from segqc.eval.feature_match import compute_feature_match
+    """AC13: per_label as a list (not a mapping) raises FacetInputError."""
+    from segfacet.eval.feature_match import compute_feature_match
 
     gt = _block([_entry(20, "L1")])
     bad = {"features_version": "0.1", "per_label": []}
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         compute_feature_match(bad, gt)
 
 
 def test_ac13_not_raw_type_error_or_attribute_error():
-    """AC13: malformed input is a SegQCInputError, not a bare TypeError/AttributeError."""
-    from segqc.eval.feature_match import compute_feature_match
+    """AC13: malformed input is a FacetInputError, not a bare TypeError/AttributeError."""
+    from segfacet.eval.feature_match import compute_feature_match
 
     gt = _block([_entry(20, "L1")])
     try:
         compute_feature_match(42, gt)
-    except SegQCInputError:
+    except FacetInputError:
         pass
     else:
-        pytest.fail("expected SegQCInputError")
+        pytest.fail("expected FacetInputError")
 
 
 # =========================================================================== #
@@ -591,7 +591,7 @@ def test_ac13_not_raw_type_error_or_attribute_error():
 
 def test_ac14_deterministic_across_two_calls():
     """AC14: two calls on the same inputs return equal per_label ordering and aggregates."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     cand = _block(
         [_entry(20, "L1", volume=1200.0), _entry(900, UNKNOWN)],
@@ -612,7 +612,7 @@ def test_ac14_deterministic_across_two_calls():
 
 def test_ac14_inputs_not_mutated():
     """AC14: candidate and gt block dicts (and nested dicts) are unchanged after the call."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     cand = _block([_entry(20, "L1", volume=1200.0)], offsets=[(20, 1.0)])
     gt = _block([_entry(20, "L1", volume=1000.0)], offsets=[(20, 0.5)])
@@ -630,7 +630,7 @@ def test_ac14_inputs_not_mutated():
 
 def test_adv_empty_blocks_both_sides():
     """Both blocks empty -> per_label == (), counts 0, aggregates None."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     cand = _block([])
     gt = _block([])
@@ -644,7 +644,7 @@ def test_adv_empty_blocks_both_sides():
 
 def test_adv_negative_volume_difference():
     """A matched label with candidate volume below GT yields negative absolute/relative."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     cand = _block([_entry(20, "L1", volume=-50.0)])
     gt = _block([_entry(20, "L1", volume=100.0)])
@@ -660,7 +660,7 @@ def test_adv_negative_volume_difference():
 
 def test_adv_all_tracked_features_unavailable_but_matched():
     """A matched label with every tracked feature missing on one side -> divergence_score None, matched True."""
-    from segqc.eval.feature_match import FeatureDifference, compute_feature_match
+    from segfacet.eval.feature_match import FeatureDifference, compute_feature_match
 
     cand_entry = _entry(20, "L1")
     del cand_entry["geometry"]["extent_x_mm"]
@@ -683,7 +683,7 @@ def test_adv_all_tracked_features_unavailable_but_matched():
 
 def test_adv_matched_label_missing_centroid_entirely():
     """A matched label missing the centroid entry -> centroid_distance_mm is None, no crash."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     cand_entry = _entry(20, "L1")
     del cand_entry["centroid"]
@@ -698,7 +698,7 @@ def test_adv_matched_label_missing_centroid_entirely():
 
 def test_adv_stage2_only_blocks_no_stage3_on_either_side():
     """Neither block has stage3 -> spline_offset_mm unavailable everywhere, others still compared."""
-    from segqc.eval.feature_match import compute_feature_match
+    from segfacet.eval.feature_match import compute_feature_match
 
     cand = _block([_entry(20, "L1", volume=1100.0)])
     gt = _block([_entry(20, "L1", volume=1000.0)])

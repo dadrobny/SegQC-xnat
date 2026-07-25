@@ -64,8 +64,8 @@
       "Edit(docs/aide/progress.md)",
       "Write(docs/aide/queue/**)",
       "Edit(docs/aide/queue/**)",
-      "Write(src/segqc/**)",
-      "Edit(src/segqc/**)",
+      "Write(src/segfacet/**)",
+      "Edit(src/segfacet/**)",
       "Write(tests/**)",
       "Edit(tests/**)",
       "Write(.claude/settings.local.json)"

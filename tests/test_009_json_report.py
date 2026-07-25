@@ -16,9 +16,9 @@ import json
 
 import pytest
 
-from segqc.config import HeuristicConfig, default_config
-from segqc.report import serialize_report, serialize_report_json
-from segqc.verdict import Reason, Severity, Verdict
+from segfacet.config import HeuristicConfig, default_config
+from segfacet.report import serialize_report, serialize_report_json
+from segfacet.verdict import Reason, Severity, Verdict
 
 
 # =========================================================================== #
@@ -74,10 +74,10 @@ def _multi_label_verdict() -> Verdict:
 def test_ac1_schema_file_is_loadable():
     """The v0 schema file is locatable via importlib.resources and parses as JSON."""
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
     # Access the schema file as a package resource.
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     text = ref.read_text(encoding="utf-8")
     schema = json.loads(text)
     assert isinstance(schema, dict)
@@ -86,9 +86,9 @@ def test_ac1_schema_file_is_loadable():
 def test_ac1_schema_has_dollar_schema_field():
     """The schema has a '$schema' field indicating its meta-schema."""
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
     assert "$schema" in schema
 
@@ -96,9 +96,9 @@ def test_ac1_schema_has_dollar_schema_field():
 def test_ac1_schema_is_an_object_type():
     """The top-level schema type is 'object'."""
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
     assert schema.get("type") == "object"
 
@@ -111,9 +111,9 @@ def test_ac2_schema_requires_schema_version():
     """A report missing 'schema_version' fails jsonschema validation."""
     import jsonschema
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
 
     report = serialize_report(_empty_verdict(), "case001", _config())
@@ -126,9 +126,9 @@ def test_ac2_schema_requires_config_version():
     """A report missing 'config_version' fails jsonschema validation."""
     import jsonschema
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
 
     report = serialize_report(_empty_verdict(), "case001", _config())
@@ -141,9 +141,9 @@ def test_ac2_schema_requires_case_id():
     """A report missing 'case_id' fails jsonschema validation."""
     import jsonschema
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
 
     report = serialize_report(_empty_verdict(), "case001", _config())
@@ -156,9 +156,9 @@ def test_ac2_schema_requires_verdict():
     """A report missing 'verdict' fails jsonschema validation."""
     import jsonschema
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
 
     report = serialize_report(_empty_verdict(), "case001", _config())
@@ -171,9 +171,9 @@ def test_ac2_schema_requires_reasons():
     """A report missing 'reasons' fails jsonschema validation."""
     import jsonschema
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
 
     report = serialize_report(_empty_verdict(), "case001", _config())
@@ -186,9 +186,9 @@ def test_ac2_schema_requires_per_label():
     """A report missing 'per_label' fails jsonschema validation."""
     import jsonschema
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
 
     report = serialize_report(_empty_verdict(), "case001", _config())
@@ -204,9 +204,9 @@ def test_ac2_schema_requires_each_field(required_field):
     """Each of the six required fields, when removed, causes validation failure."""
     import jsonschema
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
 
     report = serialize_report(_empty_verdict(), "case001", _config())
@@ -220,14 +220,14 @@ def test_ac2_schema_requires_each_field(required_field):
 # =========================================================================== #
 
 def test_ac3_serialize_report_importable():
-    """serialize_report is importable from segqc.report with no errors."""
-    from segqc.report import serialize_report as sr
+    """serialize_report is importable from segfacet.report with no errors."""
+    from segfacet.report import serialize_report as sr
     assert callable(sr)
 
 
 def test_ac3_serialize_report_json_importable():
-    """serialize_report_json is importable from segqc.report with no errors."""
-    from segqc.report import serialize_report_json as srj
+    """serialize_report_json is importable from segfacet.report with no errors."""
+    from segfacet.report import serialize_report_json as srj
     assert callable(srj)
 
 
@@ -239,9 +239,9 @@ def test_ac4_empty_verdict_conforms_to_schema():
     """An empty verdict serialized to dict validates against the v0 schema."""
     import jsonschema
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
 
     report = serialize_report(_empty_verdict(), "case-empty", _config())
@@ -252,9 +252,9 @@ def test_ac4_flag_verdict_conforms_to_schema():
     """A FLAG verdict dict validates against the v0 schema."""
     import jsonschema
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
 
     report = serialize_report(_simple_flag_verdict(), "case-flag", _config())
@@ -265,9 +265,9 @@ def test_ac4_fail_verdict_with_per_label_conforms_to_schema():
     """A FAIL verdict with per-label reasons validates against the v0 schema."""
     import jsonschema
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
 
     report = serialize_report(_fail_verdict_with_per_label(), "case-fail", _config())
@@ -278,9 +278,9 @@ def test_ac4_multi_label_verdict_conforms_to_schema():
     """A verdict spanning multiple labels validates against the v0 schema."""
     import jsonschema
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
 
     report = serialize_report(_multi_label_verdict(), "case-multi", _config())
@@ -577,9 +577,9 @@ def test_ac11_empty_verdict_validates_against_schema():
     """An empty verdict dict validates against the v0 schema."""
     import jsonschema
     import importlib.resources as pkg_resources
-    import segqc
+    import segfacet
 
-    ref = pkg_resources.files(segqc).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet).joinpath("report_schema_v0.json")
     schema = json.loads(ref.read_text(encoding="utf-8"))
 
     report = serialize_report(_empty_verdict(), "c", _config())
@@ -624,18 +624,18 @@ def test_ac12_json_string_with_custom_indent():
 # AC-13  Module location
 # =========================================================================== #
 
-def test_ac13_import_from_segqc_report():
-    """Both functions are importable directly from segqc.report."""
-    from segqc.report import serialize_report as sr
-    from segqc.report import serialize_report_json as srj
+def test_ac13_import_from_segfacet_report():
+    """Both functions are importable directly from segfacet.report."""
+    from segfacet.report import serialize_report as sr
+    from segfacet.report import serialize_report_json as srj
     assert sr is not None
     assert srj is not None
 
 
 def test_ac13_no_import_error():
-    """Importing segqc.report raises no ImportError or AttributeError."""
+    """Importing segfacet.report raises no ImportError or AttributeError."""
     import importlib
-    mod = importlib.import_module("segqc.report")
+    mod = importlib.import_module("segfacet.report")
     assert hasattr(mod, "serialize_report")
     assert hasattr(mod, "serialize_report_json")
 
@@ -645,23 +645,23 @@ def test_ac13_no_import_error():
 # =========================================================================== #
 
 def test_ac14_no_numpy_in_report_module():
-    """segqc.report must not import numpy at module level."""
-    import segqc.report as report_mod
+    """segfacet.report must not import numpy at module level."""
+    import segfacet.report as report_mod
     module_globals = vars(report_mod)
     assert "numpy" not in module_globals
 
 
 def test_ac14_no_nibabel_in_report_module():
-    """segqc.report must not import nibabel at module level."""
-    import segqc.report as report_mod
+    """segfacet.report must not import nibabel at module level."""
+    import segfacet.report as report_mod
     module_globals = vars(report_mod)
     assert "nibabel" not in module_globals
     assert "nib" not in module_globals
 
 
 def test_ac14_no_scipy_in_report_module():
-    """segqc.report must not import scipy at module level."""
-    import segqc.report as report_mod
+    """segfacet.report must not import scipy at module level."""
+    import segfacet.report as report_mod
     assert "scipy" not in vars(report_mod)
 
 

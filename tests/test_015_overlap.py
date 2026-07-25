@@ -21,8 +21,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from segqc.features.overlap import OverlapPair, detect_overlaps
-from segqc.labels import UNKNOWN
+from segfacet.features.overlap import OverlapPair, detect_overlaps
+from segfacet.labels import UNKNOWN
 
 
 # =========================================================================== #
@@ -77,21 +77,21 @@ def _pairs_by_labels(results, a, b):
 
 
 def test_import_overlap_pair():
-    """OverlapPair is importable from segqc.features.overlap."""
-    from segqc.features.overlap import OverlapPair as OP  # noqa: F401
+    """OverlapPair is importable from segfacet.features.overlap."""
+    from segfacet.features.overlap import OverlapPair as OP  # noqa: F401
     assert OP is OverlapPair
 
 
 def test_import_detect_overlaps():
-    """detect_overlaps is importable from segqc.features.overlap."""
-    from segqc.features.overlap import detect_overlaps as do  # noqa: F401
+    """detect_overlaps is importable from segfacet.features.overlap."""
+    from segfacet.features.overlap import detect_overlaps as do  # noqa: F401
     assert callable(do)
 
 
 def test_no_import_error():
-    """Importing segqc.features.overlap raises no error."""
+    """Importing segfacet.features.overlap raises no error."""
     import importlib
-    mod = importlib.import_module("segqc.features.overlap")
+    mod = importlib.import_module("segfacet.features.overlap")
     assert hasattr(mod, "OverlapPair")
     assert hasattr(mod, "detect_overlaps")
 

@@ -4,9 +4,9 @@
 Covers all seventeen Acceptance Criteria plus adversarial and edge-case inputs,
 built on small hand-written ``expected``-side dicts (``Expectation.to_dict()`` /
 ``tests/corpus`` manifest-case shaped) and an ``actual`` side assembled directly
-from ``segqc.verdict.Verdict.build(...)`` + a tuple of
-``segqc.heuristics.finding.Finding`` objects (bundled into a
-``segqc.aggregate.CaseResult``), per the Testing Strategy's guidance to avoid a
+from ``segfacet.verdict.Verdict.build(...)`` + a tuple of
+``segfacet.heuristics.finding.Finding`` objects (bundled into a
+``segfacet.aggregate.CaseResult``), per the Testing Strategy's guidance to avoid a
 ``HeuristicConfig`` stub entirely. Every expected outcome/flag is hand-reasoned
 and exact.
 
@@ -28,10 +28,10 @@ import copy
 
 import pytest
 
-from segqc.aggregate import CaseResult
-from segqc.heuristics.finding import Finding
-from segqc.io import SegQCInputError
-from segqc.verdict import Reason, Severity, Verdict
+from segfacet.aggregate import CaseResult
+from segfacet.heuristics.finding import Finding
+from segfacet.io import FacetInputError
+from segfacet.verdict import Reason, Severity, Verdict
 
 
 # =========================================================================== #
@@ -82,29 +82,29 @@ def _expected(
 
 
 def test_ac1_import_from_outcome_module():
-    """AC1: classify_outcome, Outcome, CaseOutcome import from segqc.eval.outcome."""
-    from segqc.eval.outcome import CaseOutcome, Outcome, classify_outcome  # noqa: F401
+    """AC1: classify_outcome, Outcome, CaseOutcome import from segfacet.eval.outcome."""
+    from segfacet.eval.outcome import CaseOutcome, Outcome, classify_outcome  # noqa: F401
 
     assert callable(classify_outcome)
 
 
 def test_ac1_reexported_from_eval_package():
-    """AC1: classify_outcome is re-exported from segqc.eval."""
-    from segqc.eval import classify_outcome
+    """AC1: classify_outcome is re-exported from segfacet.eval."""
+    from segfacet.eval import classify_outcome
 
     assert callable(classify_outcome)
 
 
 def test_ac1_module_dunder_all():
-    """AC1: segqc.eval.outcome.__all__ lists all three public names."""
-    import segqc.eval.outcome as outcome_mod
+    """AC1: segfacet.eval.outcome.__all__ lists all three public names."""
+    import segfacet.eval.outcome as outcome_mod
 
     assert set(outcome_mod.__all__) >= {"classify_outcome", "Outcome", "CaseOutcome"}
 
 
 def test_ac1_outcome_enum_members_and_labels():
     """AC1: Outcome has exactly the four documented members with the correct labels."""
-    from segqc.eval.outcome import Outcome
+    from segfacet.eval.outcome import Outcome
 
     assert {m.name for m in Outcome} == {
         "TRUE_POSITIVE",
@@ -122,7 +122,7 @@ def test_ac1_case_outcome_is_frozen_dataclass_with_fields():
     """AC1: CaseOutcome is frozen and carries the documented fields."""
     import dataclasses
 
-    from segqc.eval.outcome import CaseOutcome
+    from segfacet.eval.outcome import CaseOutcome
 
     assert dataclasses.is_dataclass(CaseOutcome)
     field_names = {f.name for f in dataclasses.fields(CaseOutcome)}
@@ -151,7 +151,7 @@ def test_ac1_case_outcome_is_frozen_dataclass_with_fields():
 
 def test_ac2_clean_gt_passes_is_true_negative():
     """AC2: pass expectation + no-findings PASS CaseResult -> TN."""
-    from segqc.eval.outcome import Outcome, classify_outcome
+    from segfacet.eval.outcome import Outcome, classify_outcome
 
     result = classify_outcome(_expected("pass"), _actual([]))
     assert result.outcome is Outcome.TRUE_NEGATIVE
@@ -169,7 +169,7 @@ def test_ac2_clean_gt_passes_is_true_negative():
 
 def test_ac3_clean_gt_flagged_is_false_positive():
     """AC3: pass expectation + a FLAG CaseResult -> FP, fired_rule_ids populated."""
-    from segqc.eval.outcome import Outcome, classify_outcome
+    from segfacet.eval.outcome import Outcome, classify_outcome
 
     actual = _actual([_finding("bounds", Severity.FLAG, {5})])
     result = classify_outcome(_expected("pass"), actual)
@@ -182,7 +182,7 @@ def test_ac3_clean_gt_flagged_is_false_positive():
 
 def test_ac3_clean_gt_failed_is_false_positive():
     """AC3: pass expectation + a FAIL CaseResult -> FP."""
-    from segqc.eval.outcome import Outcome, classify_outcome
+    from segfacet.eval.outcome import Outcome, classify_outcome
 
     actual = _actual([_finding("bounds", Severity.FAIL, {5})])
     result = classify_outcome(_expected("pass"), actual)
@@ -198,7 +198,7 @@ def test_ac3_clean_gt_failed_is_false_positive():
 
 def test_ac4_known_failure_caught_by_designated_rule():
     """AC4: fail expectation + a matching designated-rule Finding on the label -> TP, caught."""
-    from segqc.eval.outcome import Outcome, classify_outcome
+    from segfacet.eval.outcome import Outcome, classify_outcome
 
     expected = _expected(
         "fail",
@@ -226,7 +226,7 @@ def test_ac4_known_failure_caught_by_designated_rule():
 
 def test_ac5_known_failure_missed_is_false_negative():
     """AC5: same fail expectation as AC4 + a no-findings PASS CaseResult -> FN, both flags False."""
-    from segqc.eval.outcome import Outcome, classify_outcome
+    from segfacet.eval.outcome import Outcome, classify_outcome
 
     expected = _expected(
         "fail",
@@ -251,7 +251,7 @@ def test_ac5_known_failure_missed_is_false_negative():
 
 def test_ac6_flag_only_verdict_is_true_positive_against_fail_expectation():
     """AC6: default threshold -> a FLAG-only CaseResult vs a fail expectation is TP."""
-    from segqc.eval.outcome import Outcome, classify_outcome
+    from segfacet.eval.outcome import Outcome, classify_outcome
 
     actual = _actual([_finding("r", Severity.FLAG, {1})])
     result = classify_outcome(_expected("fail", rule_ids={"r"}, labels={1}), actual)
@@ -261,7 +261,7 @@ def test_ac6_flag_only_verdict_is_true_positive_against_fail_expectation():
 
 def test_ac6_flagged_for_review_expectation_is_a_failure():
     """AC6: an expected_verdict of flagged-for-review yields expected_failure True by default."""
-    from segqc.eval.outcome import classify_outcome
+    from segfacet.eval.outcome import classify_outcome
 
     result = classify_outcome(_expected("flagged-for-review"), _actual([]))
     assert result.expected_failure is True
@@ -274,7 +274,7 @@ def test_ac6_flagged_for_review_expectation_is_a_failure():
 
 def test_ac7_stricter_threshold_flag_only_is_not_flagged():
     """AC7: with positive_severity=FAIL, a FLAG-only CaseResult is not actual_flagged."""
-    from segqc.eval.outcome import Outcome, classify_outcome
+    from segfacet.eval.outcome import Outcome, classify_outcome
 
     actual = _actual([_finding("r", Severity.FLAG, {1})])
     result = classify_outcome(
@@ -286,7 +286,7 @@ def test_ac7_stricter_threshold_flag_only_is_not_flagged():
 
 def test_ac7_stricter_threshold_flag_only_vs_fail_expectation_is_false_negative():
     """AC7: with positive_severity=FAIL, a FLAG-only CaseResult vs a fail expectation is FN."""
-    from segqc.eval.outcome import Outcome, classify_outcome
+    from segfacet.eval.outcome import Outcome, classify_outcome
 
     actual = _actual([_finding("r", Severity.FLAG, {1})])
     result = classify_outcome(
@@ -299,7 +299,7 @@ def test_ac7_stricter_threshold_flag_only_vs_fail_expectation_is_false_negative(
 
 def test_ac7_stricter_threshold_reduces_flagged_for_review_expectation_symmetrically():
     """AC7: with positive_severity=FAIL, a flagged-for-review expectation is expected_failure False."""
-    from segqc.eval.outcome import classify_outcome
+    from segfacet.eval.outcome import classify_outcome
 
     result = classify_outcome(
         _expected("flagged-for-review"), _actual([]), positive_severity=Severity.FAIL
@@ -314,7 +314,7 @@ def test_ac7_stricter_threshold_reduces_flagged_for_review_expectation_symmetric
 
 def test_ac8_incidental_rule_is_true_positive_but_not_designated_credited():
     """AC8: only an "other" rule fires -> TP, caught True, designated flags False."""
-    from segqc.eval.outcome import Outcome, classify_outcome
+    from segfacet.eval.outcome import Outcome, classify_outcome
 
     expected = _expected("fail", rule_ids={"r"}, labels={22})
     actual = _actual([_finding("other", Severity.FAIL, {22})])
@@ -332,7 +332,7 @@ def test_ac8_incidental_rule_is_true_positive_but_not_designated_credited():
 
 def test_ac9_designated_rule_wrong_label_not_credited():
     """AC9: designated rule fires on K != expected label L -> fired True, credited False."""
-    from segqc.eval.outcome import Outcome, classify_outcome
+    from segfacet.eval.outcome import Outcome, classify_outcome
 
     expected = _expected("fail", rule_ids={"r"}, labels={22})
     actual = _actual([_finding("r", Severity.FAIL, {99})])
@@ -350,7 +350,7 @@ def test_ac9_designated_rule_wrong_label_not_credited():
 
 def test_ac10_partial_label_match_credits_designated_rule():
     """AC10: expected_labels={L1, L2}, finding hits only L1 -> caught_by_designated_rule True."""
-    from segqc.eval.outcome import classify_outcome
+    from segfacet.eval.outcome import classify_outcome
 
     expected = _expected("fail", rule_ids={"r"}, labels={22, 23})
     actual = _actual([_finding("r", Severity.FAIL, {22})])
@@ -365,7 +365,7 @@ def test_ac10_partial_label_match_credits_designated_rule():
 
 def test_ac11_empty_expected_labels_rule_id_match_suffices():
     """AC11: expected_labels={} + Finding(rule_id="r", labels={}) -> both designated flags True."""
-    from segqc.eval.outcome import classify_outcome
+    from segfacet.eval.outcome import classify_outcome
 
     expected = _expected("fail", rule_ids={"r"}, labels=set())
     actual = _actual([_finding("r", Severity.FAIL, set())])
@@ -381,7 +381,7 @@ def test_ac11_empty_expected_labels_rule_id_match_suffices():
 
 def test_ac12_multiple_expected_rule_ids_any_one_credits():
     """AC12: expected_rule_ids={"r1","r2"} + Finding("r2", labels={L}) on expected L -> both credited."""
-    from segqc.eval.outcome import classify_outcome
+    from segfacet.eval.outcome import classify_outcome
 
     expected = _expected("fail", rule_ids={"r1", "r2"}, labels={22})
     actual = _actual([_finding("r2", Severity.FAIL, {22})])
@@ -397,7 +397,7 @@ def test_ac12_multiple_expected_rule_ids_any_one_credits():
 
 def test_ac13_full_manifest_case_shaped_dict_round_trips():
     """AC13: a full manifest-case-shaped dict (all keys) populates every corresponding field."""
-    from segqc.eval.outcome import classify_outcome
+    from segfacet.eval.outcome import classify_outcome
 
     expected = {
         "expected_verdict": "fail",
@@ -417,7 +417,7 @@ def test_ac13_full_manifest_case_shaped_dict_round_trips():
 
 def test_ac13_minimal_expected_verdict_only_defaults():
     """AC13: {"expected_verdict": "pass"} defaults failure_mode/name to None and tuples to ()."""
-    from segqc.eval.outcome import classify_outcome
+    from segfacet.eval.outcome import classify_outcome
 
     result = classify_outcome({"expected_verdict": "pass"}, _actual([]))
     assert result.failure_mode is None
@@ -433,7 +433,7 @@ def test_ac13_minimal_expected_verdict_only_defaults():
 
 def test_ac14_unsorted_duplicated_inputs_normalise_identically():
     """AC14: unsorted lists with a duplicate, and out-of-order findings, still normalise sorted+deduped."""
-    from segqc.eval.outcome import classify_outcome
+    from segfacet.eval.outcome import classify_outcome
 
     expected = _expected(
         "fail",
@@ -453,88 +453,88 @@ def test_ac14_unsorted_duplicated_inputs_normalise_identically():
 
 
 # =========================================================================== #
-# AC15: malformed expected input raises SegQCInputError
+# AC15: malformed expected input raises FacetInputError
 # =========================================================================== #
 
 
 def test_ac15_expected_not_a_mapping_raises():
-    """AC15: expected=None raises SegQCInputError."""
-    from segqc.eval.outcome import classify_outcome
+    """AC15: expected=None raises FacetInputError."""
+    from segfacet.eval.outcome import classify_outcome
 
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         classify_outcome(None, _actual([]))
 
 
 def test_ac15_expected_missing_verdict_key_raises():
-    """AC15: an empty expected mapping (no expected_verdict) raises SegQCInputError."""
-    from segqc.eval.outcome import classify_outcome
+    """AC15: an empty expected mapping (no expected_verdict) raises FacetInputError."""
+    from segfacet.eval.outcome import classify_outcome
 
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         classify_outcome({}, _actual([]))
 
 
 def test_ac15_expected_verdict_unrecognised_label_raises():
-    """AC15: an unrecognised expected_verdict string raises SegQCInputError."""
-    from segqc.eval.outcome import classify_outcome
+    """AC15: an unrecognised expected_verdict string raises FacetInputError."""
+    from segfacet.eval.outcome import classify_outcome
 
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         classify_outcome({"expected_verdict": "bogus"}, _actual([]))
 
 
 def test_ac15_not_raw_key_error_or_value_error():
-    """AC15: malformed expected input is a SegQCInputError, not a bare KeyError/ValueError."""
-    from segqc.eval.outcome import classify_outcome
+    """AC15: malformed expected input is a FacetInputError, not a bare KeyError/ValueError."""
+    from segfacet.eval.outcome import classify_outcome
 
     try:
         classify_outcome({}, _actual([]))
-    except SegQCInputError:
+    except FacetInputError:
         pass
     else:
-        pytest.fail("expected SegQCInputError")
+        pytest.fail("expected FacetInputError")
 
 
 # =========================================================================== #
-# AC16: malformed actual input raises SegQCInputError
+# AC16: malformed actual input raises FacetInputError
 # =========================================================================== #
 
 
 def test_ac16_actual_none_raises():
-    """AC16: actual=None raises SegQCInputError."""
-    from segqc.eval.outcome import classify_outcome
+    """AC16: actual=None raises FacetInputError."""
+    from segfacet.eval.outcome import classify_outcome
 
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         classify_outcome(_expected("pass"), None)
 
 
 def test_ac16_actual_is_a_mapping_not_case_result_raises():
-    """AC16: actual as a plain mapping (not a CaseResult) raises SegQCInputError."""
-    from segqc.eval.outcome import classify_outcome
+    """AC16: actual as a plain mapping (not a CaseResult) raises FacetInputError."""
+    from segfacet.eval.outcome import classify_outcome
 
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         classify_outcome(_expected("pass"), {"verdict": "pass"})
 
 
 def test_ac16_actual_missing_findings_attribute_raises():
-    """AC16: an object with .verdict but no .findings raises SegQCInputError."""
-    from segqc.eval.outcome import classify_outcome
+    """AC16: an object with .verdict but no .findings raises FacetInputError."""
+    from segfacet.eval.outcome import classify_outcome
 
     class _NoFindings:
         verdict = Verdict.build(reasons=(), per_label={})
 
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         classify_outcome(_expected("pass"), _NoFindings())
 
 
 def test_ac16_not_raw_attribute_error():
-    """AC16: malformed actual input is a SegQCInputError, not a bare AttributeError."""
-    from segqc.eval.outcome import classify_outcome
+    """AC16: malformed actual input is a FacetInputError, not a bare AttributeError."""
+    from segfacet.eval.outcome import classify_outcome
 
     try:
         classify_outcome(_expected("pass"), None)
-    except SegQCInputError:
+    except FacetInputError:
         pass
     else:
-        pytest.fail("expected SegQCInputError")
+        pytest.fail("expected FacetInputError")
 
 
 # =========================================================================== #
@@ -544,7 +544,7 @@ def test_ac16_not_raw_attribute_error():
 
 def test_ac17_deterministic_across_two_calls():
     """AC17: two calls on the same inputs return equal CaseOutcomes."""
-    from segqc.eval.outcome import classify_outcome
+    from segfacet.eval.outcome import classify_outcome
 
     expected = _expected("fail", rule_ids={"r"}, labels={22})
     actual = _actual([_finding("r", Severity.FAIL, {22})])
@@ -555,7 +555,7 @@ def test_ac17_deterministic_across_two_calls():
 
 def test_ac17_inputs_not_mutated():
     """AC17: the expected dict and the actual CaseResult are unchanged after the call."""
-    from segqc.eval.outcome import classify_outcome
+    from segfacet.eval.outcome import classify_outcome
 
     expected = _expected("fail", rule_ids={"r"}, labels={22})
     actual = _actual([_finding("r", Severity.FAIL, {22})])
@@ -577,7 +577,7 @@ def test_ac17_inputs_not_mutated():
 
 def test_adv_no_expected_rule_ids_but_still_true_positive():
     """A fail expectation with no expected_rule_ids -> TP by verdict, no designated credit."""
-    from segqc.eval.outcome import Outcome, classify_outcome
+    from segfacet.eval.outcome import Outcome, classify_outcome
 
     expected = _expected("fail")
     actual = _actual([_finding("some_rule", Severity.FAIL, {22})])
@@ -590,7 +590,7 @@ def test_adv_no_expected_rule_ids_but_still_true_positive():
 
 def test_adv_clean_case_flagged_by_multiple_rules_lists_all():
     """A clean case flagged by two rules -> FP with both rule ids in fired_rule_ids."""
-    from segqc.eval.outcome import Outcome, classify_outcome
+    from segfacet.eval.outcome import Outcome, classify_outcome
 
     actual = _actual(
         [
@@ -605,7 +605,7 @@ def test_adv_clean_case_flagged_by_multiple_rules_lists_all():
 
 def test_adv_duplicate_rule_ids_across_findings_deduplicated():
     """Two findings sharing the same rule_id (different labels) -> fired_rule_ids has one entry."""
-    from segqc.eval.outcome import classify_outcome
+    from segfacet.eval.outcome import classify_outcome
 
     actual = _actual(
         [
@@ -620,7 +620,7 @@ def test_adv_duplicate_rule_ids_across_findings_deduplicated():
 @pytest.mark.parametrize("label_container", [frozenset({22}), {22}, [22], (22,)])
 def test_adv_expected_labels_container_types_normalise_identically(label_container):
     """expected_labels given as frozenset/set/list/tuple all normalise to the same tuple."""
-    from segqc.eval.outcome import classify_outcome
+    from segfacet.eval.outcome import classify_outcome
 
     expected = _expected("fail", rule_ids={"r"}, labels=label_container)
     actual = _actual([_finding("r", Severity.FAIL, {22})])
@@ -631,7 +631,7 @@ def test_adv_expected_labels_container_types_normalise_identically(label_contain
 
 def test_adv_flagged_for_review_actual_against_flagged_for_review_expected_is_true_positive():
     """A flagged-for-review actual verdict vs a flagged-for-review expectation -> TP under default threshold."""
-    from segqc.eval.outcome import Outcome, classify_outcome
+    from segfacet.eval.outcome import Outcome, classify_outcome
 
     expected = _expected("flagged-for-review", rule_ids={"r"}, labels={1})
     actual = _actual([_finding("r", Severity.FLAG, {1})])
@@ -643,7 +643,7 @@ def test_adv_flagged_for_review_actual_against_flagged_for_review_expected_is_tr
 
 def test_adv_empty_findings_list_is_pass_verdict():
     """An actual CaseResult with an empty findings tuple has actual_verdict 'pass'."""
-    from segqc.eval.outcome import classify_outcome
+    from segfacet.eval.outcome import classify_outcome
 
     result = classify_outcome(_expected("pass"), _actual([]))
     assert result.actual_verdict == "pass"

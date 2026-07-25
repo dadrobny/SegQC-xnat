@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One-command reference-refresh wrapper (item 083).
 
-This is an AIDE *project tool*, not part of the shipped ``segqc`` package
+This is an AIDE *project tool*, not part of the shipped ``segfacet`` package
 (mirrors ``scripts/aide_status_report.py``'s path-loaded, testable-helper
 shape). In one ``main(argv)`` invocation it refreshes the project's reference
 artifacts and re-runs the Stage-7 evaluation, so a maintainer who changed a
@@ -12,10 +12,10 @@ feature or config can rebuild and re-check *everything* with one command
    ``build_and_write_default``) into ``<out>/reference_default.json`` --
    never touching the committed package copy.
 2. Synthesizes a tiny, deterministic self-vs-self evaluation cohort from the
-   production synth builders (``segqc.synth.clean_gt.build_clean_spine``)
+   production synth builders (``segfacet.synth.clean_gt.build_clean_spine``)
    into ``<out>/eval_cohort/``.
-3. Runs ``segqc evaluate`` over that cohort (in-process, via
-   ``segqc.cli.main``), producing ``<out>/eval_synthetic/eval_report.json``.
+3. Runs ``segfacet evaluate`` over that cohort (in-process, via
+   ``segfacet.cli.main``), producing ``<out>/eval_synthetic/eval_report.json``.
 4. Optionally builds the versioned real-VerSe artifact -- only if
    ``--verse-cohort <dir>`` is supplied *and* exists -- via item 045's
    ``build_reference`` following item 082's recipe, and re-evaluates a
@@ -35,7 +35,7 @@ Usage::
     python scripts/refresh_reference.py --out out/refresh --verse-cohort /mnt/verse \\
         --verse-seg-suffix _seg-vert_msk.nii.gz --build-date 2026-07-15
 
-Self-contained: imports only ``segqc.*`` production modules; never imports
+Self-contained: imports only ``segfacet.*`` production modules; never imports
 the ``tests`` package nor reads the test corpus fixtures, so it runs unmodified
 in a deployed checkout with no test fixtures present.
 """
@@ -86,7 +86,7 @@ def _step(name: str, status: str, reason: str, output: Optional[str] = None) -> 
 def synthesize_eval_cohort(out_dir: "Path | str", *, spec: Optional[Any] = None) -> Path:
     """Write a deterministic self-vs-self clean-spine eval cohort (GT +
     byte-identical candidate NIfTIs + an ``evaluate``-shape manifest) into
-    ``<out_dir>/eval_cohort`` from ``segqc.synth.clean_gt.build_clean_spine``.
+    ``<out_dir>/eval_cohort`` from ``segfacet.synth.clean_gt.build_clean_spine``.
 
     ``gt``/``candidate`` manifest paths are stored relative to the manifest's
     own directory (item 057's resolution rule), so the cohort directory is
@@ -98,7 +98,7 @@ def synthesize_eval_cohort(out_dir: "Path | str", *, spec: Optional[Any] = None)
     """
     import nibabel as nib
 
-    from segqc.synth.clean_gt import build_clean_spine
+    from segfacet.synth.clean_gt import build_clean_spine
 
     recipe = spec if spec is not None else _EVAL_COHORT_RECIPE
 
@@ -137,9 +137,9 @@ def synthesize_eval_cohort(out_dir: "Path | str", *, spec: Optional[Any] = None)
 
 
 def _run_synthetic_eval(manifest_path: Path, out_subdir: Path, *, build_date: str, cohort_id: str) -> Path:
-    from segqc.cli import main as segqc_main
+    from segfacet.cli import main as segfacet_main
 
-    rc = segqc_main(
+    rc = segfacet_main(
         [
             "evaluate",
             "--cohort",
@@ -153,7 +153,7 @@ def _run_synthetic_eval(manifest_path: Path, out_subdir: Path, *, build_date: st
         ]
     )
     if rc != 0:
-        raise RuntimeError(f"segqc evaluate exited with code {rc} for {manifest_path}")
+        raise RuntimeError(f"segfacet evaluate exited with code {rc} for {manifest_path}")
     return out_subdir / "eval_report.json"
 
 
@@ -170,7 +170,7 @@ def run_refresh(
     Never raises for an absent/missing ``verse_cohort`` -- that path is
     always a structured skip, not an exception.
     """
-    from segqc.reference import build_and_write_default, build_reference, write_artifact
+    from segfacet.reference import build_and_write_default, build_reference, write_artifact
 
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
@@ -209,7 +209,7 @@ def run_refresh(
         _step(
             STEP_SYNTH_EVALUATE,
             "ran",
-            "ran segqc evaluate over the synthetic self-vs-self cohort",
+            "ran segfacet evaluate over the synthetic self-vs-self cohort",
             str(eval_report),
         )
     )
@@ -267,7 +267,7 @@ def run_refresh(
                     _step(
                         STEP_VERSE_EVALUATE,
                         "ran",
-                        "ran segqc evaluate over a self-vs-self cohort synthesized "
+                        "ran segfacet evaluate over a self-vs-self cohort synthesized "
                         "alongside the real-VerSe GT",
                         str(verse_eval_report),
                     )

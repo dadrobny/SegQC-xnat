@@ -2,7 +2,7 @@
 
 Covers:
 - AC1: the bundled default config file exists and loads via
-  ``segqc.config.default_config_path()`` + ``load_config``.
+  ``segfacet.config.default_config_path()`` + ``load_config``.
 - AC2: the file declares every rule family and the verdict policy.
 - AC3: documented thresholds match the shipped code defaults.
 - AC4: ``bundled_default_config()`` is a convenience for the file.
@@ -23,15 +23,15 @@ import pathlib
 
 import pytest
 
-from segqc.aggregate import build_case_result
-from segqc.config import (
+from segfacet.aggregate import build_case_result
+from segfacet.config import (
     SUPPORTED_SCHEMA_VERSION,
     bundled_default_config,
     default_config,
     default_config_path,
     load_config,
 )
-from segqc.heuristics import run_rules
+from segfacet.heuristics import run_rules
 
 # Default label convention (item 004): the labels used throughout this file.
 _LABEL_L1 = 20
@@ -64,7 +64,7 @@ def test_ac1_loading_default_config_path_yields_correct_schema_version():
 
 
 def test_ac1_loading_default_config_path_does_not_raise():
-    """AC1: loading the bundled file never raises SegQCConfigError."""
+    """AC1: loading the bundled file never raises FacetConfigError."""
     # Simply not raising is the assertion; load_config already validates the
     # schema_version and YAML syntax internally.
     load_config(default_config_path())
@@ -149,7 +149,7 @@ def test_ac3_flag_escalation_count_matches_code_default():
 def test_ac3_lumbar_max_volume_mm3_reachable_via_rule_param():
     """AC3: a bounds group value (lumbar.max_volume_mm3 == 120000) is reachable
     via rule_param, matching heuristics.bounds.DEFAULT_BOUNDS."""
-    from segqc.heuristics.bounds import DEFAULT_BOUNDS
+    from segfacet.heuristics.bounds import DEFAULT_BOUNDS
 
     cfg = load_config(default_config_path())
     lumbar_params = cfg.rule_params("bounds").get("lumbar", {})
@@ -179,7 +179,7 @@ def test_ac4_bundled_default_config_equals_load_config_of_path():
 
 def test_ac4_bundled_default_config_is_heuristic_config_instance():
     """AC4: bundled_default_config() returns a HeuristicConfig."""
-    from segqc.config import HeuristicConfig
+    from segfacet.config import HeuristicConfig
 
     assert isinstance(bundled_default_config(), HeuristicConfig)
 
@@ -272,7 +272,7 @@ def test_ac5_bundled_default_yields_pass_on_gt_record():
     findings = run_rules(record, bundled_default_config())
     result = build_case_result(findings, bundled_default_config())
     assert findings == []
-    from segqc.verdict import Severity
+    from segfacet.verdict import Severity
 
     assert result.verdict.overall == Severity.PASS
 

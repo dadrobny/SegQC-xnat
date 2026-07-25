@@ -1,17 +1,17 @@
 """Stage-6 G3 acceptance suite for item 049 — clean ground truth sits inside
 the reference ranges; size-distorting perturbations fall outside
-(``src/segqc/pipeline.py::run_qc_with_reference`` over the committed
+(``src/segfacet/pipeline.py::run_qc_with_reference`` over the committed
 Stage-5 synthetic corpus, ``tests/corpus/``).
 
 Building & evaluating against a reference (item 045's reproducible commands,
 threaded through item 049's CLI/pipeline wiring):
     # Build a fresh artifact from a mounted VerSe-style cohort directory:
-    segqc build-reference --cohort <dir> --out reference.json
+    segfacet build-reference --cohort <dir> --out reference.json
     # Regenerate the bundled default from the fixed synthetic cohort:
-    python -m segqc.reference.artifact
+    python -m segfacet.reference.artifact
     # Evaluate a real case against a reference (reference mode, off by
     # default -- see item 049's Assumptions):
-    segqc run --scan <nii> --seg <nii> --out <dir> --reference \
+    segfacet run --scan <nii> --seg <nii> --out <dir> --reference \
         [--reference-artifact <json>]
 
 Covers Acceptance Criteria AC10-AC12:
@@ -43,14 +43,14 @@ import tempfile
 import nibabel as nib
 import pytest
 
-import segqc.synth  # noqa: F401 -- triggers self-registration of every operator
-from segqc.config import bundled_default_config
-from segqc.pipeline import run_qc_with_reference
-from segqc.reference import build_reference, bundled_default_reference
-from segqc.reference.ingest import DEFAULT_SEG_SUFFIX
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.corpus import load_manifest
-from segqc.synth.regression import loaded_seg_image
+import segfacet.synth  # noqa: F401 -- triggers self-registration of every operator
+from segfacet.config import bundled_default_config
+from segfacet.pipeline import run_qc_with_reference
+from segfacet.reference import build_reference, bundled_default_reference
+from segfacet.reference.ingest import DEFAULT_SEG_SUFFIX
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.corpus import load_manifest
+from segfacet.synth.regression import loaded_seg_image
 
 _MANIFEST = load_manifest()
 _CASES = _MANIFEST["cases"]
@@ -65,7 +65,7 @@ _LABEL_L3 = 22
 # exact floor) -- clean_control's own values (18750.0 mm^3 / 25.0mm) already
 # sit AT that floor, not above it. A percentile-based reference therefore can
 # only ever bracket clean_control non-strictly from below (p1 == the floor,
-# not p1 < the floor): out_of_range in ``segqc.reference.delta`` is a strict
+# not p1 < the floor): out_of_range in ``segfacet.reference.delta`` is a strict
 # ``value < lower or value > upper``, so ``value == lower`` is in-range. The
 # cohort below stacks three subjects on that exact floor (spacing_z = 1.0,
 # 0.5, 0.25mm) so p1 lands on the floor with comfortable index margin
@@ -201,7 +201,7 @@ def test_ac12_bundled_default_reference_covers_l1_to_l5():
 def test_ac12_fresh_build_reference_covers_l1_to_l5(tmp_path):
     import nibabel as nib
 
-    from segqc.reference.ingest import DEFAULT_SEG_SUFFIX
+    from segfacet.reference.ingest import DEFAULT_SEG_SUFFIX
 
     cohort_dir = tmp_path / "cohort"
     cohort_dir.mkdir()
@@ -220,7 +220,7 @@ def test_ac12_fresh_build_reference_covers_l1_to_l5(tmp_path):
 def test_ac12_both_references_are_usable_by_run_qc_with_reference(tmp_path):
     import nibabel as nib
 
-    from segqc.reference.ingest import DEFAULT_SEG_SUFFIX
+    from segfacet.reference.ingest import DEFAULT_SEG_SUFFIX
 
     case = _case("clean_control")
     seg_img = loaded_seg_image(case)

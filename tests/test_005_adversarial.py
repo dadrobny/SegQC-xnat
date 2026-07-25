@@ -14,11 +14,11 @@ import pathlib
 
 import pytest
 
-from segqc._logging import JsonFormatter, setup_logging
-from segqc.config import (
+from segfacet._logging import JsonFormatter, setup_logging
+from segfacet.config import (
     SUPPORTED_SCHEMA_VERSION,
     HeuristicConfig,
-    SegQCConfigError,
+    FacetConfigError,
     default_config,
     load_config,
 )
@@ -34,8 +34,8 @@ def _write_yaml(tmp_path: pathlib.Path, content: str, name: str = "cfg.yaml") ->
     return p
 
 
-def _reset_segqc_logger() -> None:
-    root = logging.getLogger("segqc")
+def _reset_segfacet_logger() -> None:
+    root = logging.getLogger("segfacet")
     for h in list(root.handlers):
         root.removeHandler(h)
         h.close()
@@ -53,18 +53,18 @@ def _reset_segqc_logger() -> None:
 def test_load_schema_version_unquoted_float_raises(tmp_path):
     """YAML 'schema_version: 0.1' (unquoted) is parsed as float 0.1, not '0.1'.
 
-    The strict string equality check must reject it with SegQCConfigError and
+    The strict string equality check must reject it with FacetConfigError and
     a message that does not leak a raw TypeError or AttributeError.
     """
     p = _write_yaml(tmp_path, "schema_version: 0.1\n")
-    with pytest.raises(SegQCConfigError):
+    with pytest.raises(FacetConfigError):
         load_config(p)
 
 
 def test_load_schema_version_unquoted_float_error_is_informative(tmp_path):
     """The error for an unquoted-float schema_version names the bad value."""
     p = _write_yaml(tmp_path, "schema_version: 0.1\n")
-    with pytest.raises(SegQCConfigError) as exc_info:
+    with pytest.raises(FacetConfigError) as exc_info:
         load_config(p)
     # The message should mention the bad value, not raw Python exception text.
     msg = str(exc_info.value)
@@ -75,16 +75,16 @@ def test_load_schema_version_unquoted_float_error_is_informative(tmp_path):
 
 
 def test_load_schema_version_null_raises(tmp_path):
-    """YAML 'schema_version: ~' (null) must raise SegQCConfigError, not TypeError."""
+    """YAML 'schema_version: ~' (null) must raise FacetConfigError, not TypeError."""
     p = _write_yaml(tmp_path, "schema_version: ~\n")
-    with pytest.raises(SegQCConfigError):
+    with pytest.raises(FacetConfigError):
         load_config(p)
 
 
 def test_load_schema_version_integer_raises(tmp_path):
-    """YAML 'schema_version: 1' (bare integer) must raise SegQCConfigError."""
+    """YAML 'schema_version: 1' (bare integer) must raise FacetConfigError."""
     p = _write_yaml(tmp_path, "schema_version: 1\n")
-    with pytest.raises(SegQCConfigError):
+    with pytest.raises(FacetConfigError):
         load_config(p)
 
 
@@ -92,7 +92,7 @@ def test_load_schema_version_trailing_whitespace_raises(tmp_path):
     """'schema_version: 0.1   ' (trailing whitespace) must not silently match."""
     # YAML preserves the string as-is when quoted, so this is a real user mistake.
     p = _write_yaml(tmp_path, f"schema_version: '{SUPPORTED_SCHEMA_VERSION}   '\n")
-    with pytest.raises(SegQCConfigError):
+    with pytest.raises(FacetConfigError):
         load_config(p)
 
 
@@ -101,16 +101,16 @@ def test_load_schema_version_trailing_whitespace_raises(tmp_path):
 # --------------------------------------------------------------------------- #
 
 def test_load_empty_file_raises(tmp_path):
-    """An empty YAML file (safe_load returns None) raises SegQCConfigError."""
+    """An empty YAML file (safe_load returns None) raises FacetConfigError."""
     p = _write_yaml(tmp_path, "")
-    with pytest.raises(SegQCConfigError):
+    with pytest.raises(FacetConfigError):
         load_config(p)
 
 
 def test_load_whitespace_only_file_raises(tmp_path):
-    """A file with only whitespace/newlines raises SegQCConfigError."""
+    """A file with only whitespace/newlines raises FacetConfigError."""
     p = _write_yaml(tmp_path, "   \n\n  \n")
-    with pytest.raises(SegQCConfigError):
+    with pytest.raises(FacetConfigError):
         load_config(p)
 
 
@@ -119,9 +119,9 @@ def test_load_whitespace_only_file_raises(tmp_path):
 # --------------------------------------------------------------------------- #
 
 def test_load_directory_path_raises(tmp_path):
-    """Passing a directory path raises SegQCConfigError (not IsADirectoryError)."""
-    with pytest.raises((SegQCConfigError, IsADirectoryError, OSError)):
-        # We accept SegQCConfigError or OS-level errors — the key requirement is
+    """Passing a directory path raises FacetConfigError (not IsADirectoryError)."""
+    with pytest.raises((FacetConfigError, IsADirectoryError, OSError)):
+        # We accept FacetConfigError or OS-level errors — the key requirement is
         # that it does NOT return a HeuristicConfig and does NOT raise a raw
         # internal exception (like AttributeError) from the implementation.
         load_config(tmp_path)
@@ -184,7 +184,7 @@ def test_load_config_does_not_mutate_defaults(tmp_path):
     If _DEFAULTS is modified in place, subsequent calls to default_config()
     would return different values.
     """
-    from segqc.config import _DEFAULTS
+    from segfacet.config import _DEFAULTS
     snapshot_before = dict(_DEFAULTS)
 
     content = (
@@ -209,26 +209,26 @@ def test_load_config_does_not_mutate_defaults(tmp_path):
 # --------------------------------------------------------------------------- #
 
 def test_missing_file_does_not_leak_filenotfounderror(tmp_path):
-    """A missing-file error surfaces as SegQCConfigError, not raw FileNotFoundError."""
+    """A missing-file error surfaces as FacetConfigError, not raw FileNotFoundError."""
     p = tmp_path / "gone.yaml"
-    with pytest.raises(SegQCConfigError):
+    with pytest.raises(FacetConfigError):
         load_config(p)
     # Confirm it's NOT raised as a bare FileNotFoundError.
     try:
         load_config(p)
-    except SegQCConfigError:
+    except FacetConfigError:
         pass  # correct
     except FileNotFoundError:
         pytest.fail("load_config leaked a bare FileNotFoundError")
 
 
 def test_malformed_yaml_does_not_leak_yaml_error(tmp_path):
-    """A malformed YAML error surfaces as SegQCConfigError, not yaml.YAMLError."""
+    """A malformed YAML error surfaces as FacetConfigError, not yaml.YAMLError."""
     import yaml
     p = _write_yaml(tmp_path, "key: [unclosed\n")
     try:
         load_config(p)
-    except SegQCConfigError:
+    except FacetConfigError:
         pass  # correct
     except yaml.YAMLError:
         pytest.fail("load_config leaked a bare yaml.YAMLError")
@@ -248,7 +248,7 @@ def test_setup_logging_invalid_level_raises():
         with pytest.raises((ValueError, TypeError)):
             setup_logging("NOTLEVEL")
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 # --------------------------------------------------------------------------- #
@@ -260,10 +260,10 @@ def test_setup_logging_propagate_false_after_repeat():
     try:
         setup_logging("DEBUG")
         setup_logging("WARNING")
-        root = logging.getLogger("segqc")
+        root = logging.getLogger("segfacet")
         assert root.propagate is False
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 # --------------------------------------------------------------------------- #
@@ -274,7 +274,7 @@ def test_json_formatter_unicode_message():
     """JsonFormatter handles unicode characters in the message without raising."""
     formatter = JsonFormatter()
     record = logging.LogRecord(
-        name="segqc.test",
+        name="segfacet.test",
         level=logging.INFO,
         pathname="",
         lineno=0,
@@ -291,7 +291,7 @@ def test_json_formatter_message_with_braces():
     """JsonFormatter handles messages with literal braces without format errors."""
     formatter = JsonFormatter()
     record = logging.LogRecord(
-        name="segqc.test",
+        name="segfacet.test",
         level=logging.DEBUG,
         pathname="",
         lineno=0,
@@ -308,7 +308,7 @@ def test_json_formatter_output_is_single_line():
     """JsonFormatter emits exactly one line per record (no embedded newlines)."""
     formatter = JsonFormatter()
     record = logging.LogRecord(
-        name="segqc.test",
+        name="segfacet.test",
         level=logging.WARNING,
         pathname="",
         lineno=0,
@@ -330,14 +330,14 @@ def test_setup_logging_level_respected_on_handler(capfd):
     """The handler level matches the requested level so filtering works correctly."""
     try:
         setup_logging("ERROR", json_format=False)
-        logger = logging.getLogger("segqc.adversarial_level")
+        logger = logging.getLogger("segfacet.adversarial_level")
         logger.warning("should-be-filtered")
         logger.error("should-appear")
         captured = capfd.readouterr()
         assert "should-be-filtered" not in captured.err
         assert "should-appear" in captured.err
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 def test_setup_logging_switch_from_json_to_plain(capfd):
@@ -345,7 +345,7 @@ def test_setup_logging_switch_from_json_to_plain(capfd):
     try:
         setup_logging("DEBUG", json_format=True)
         setup_logging("DEBUG", json_format=False)
-        logger = logging.getLogger("segqc.adversarial_switch")
+        logger = logging.getLogger("segfacet.adversarial_switch")
         logger.info("switch-test-message")
         captured = capfd.readouterr()
         # Should be plain text, not JSON.
@@ -355,7 +355,7 @@ def test_setup_logging_switch_from_json_to_plain(capfd):
         with pytest.raises(json.JSONDecodeError):
             json.loads(lines[-1])
     finally:
-        _reset_segqc_logger()
+        _reset_segfacet_logger()
 
 
 # --------------------------------------------------------------------------- #

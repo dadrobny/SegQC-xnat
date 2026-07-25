@@ -11,7 +11,7 @@ Strategy. Every expected count/rate/coefficient is hand-computed (Pearson and
 Spearman via small pure-Python helpers, independent of the production
 module's ``numpy``-based implementation).
 
-``segqc.eval.metrics`` does not exist yet at the time this file is written;
+``segfacet.eval.metrics`` does not exist yet at the time this file is written;
 its names are imported **locally inside each test function** (mirroring
 ``tests/test_053_eval_harness.py``'s treatment of the then-new harness names)
 so the file can still be collected before the module is implemented.
@@ -29,11 +29,11 @@ import math
 
 import pytest
 
-from segqc.eval.feature_match import FeatureMatchResult
-from segqc.eval.harness import CaseEvaluation, CohortEvaluation
-from segqc.eval.outcome import CaseOutcome, Outcome
-from segqc.eval.overlap import OverlapResult
-from segqc.io import SegQCInputError
+from segfacet.eval.feature_match import FeatureMatchResult
+from segfacet.eval.harness import CaseEvaluation, CohortEvaluation
+from segfacet.eval.outcome import CaseOutcome, Outcome
+from segfacet.eval.overlap import OverlapResult
+from segfacet.io import FacetInputError
 
 
 # =========================================================================== #
@@ -166,23 +166,23 @@ def _assert_plain_json_types(obj):
 
 
 def test_ac1_imports_from_metrics_module_and_reexport():
-    """AC1: all five names import from segqc.eval.metrics and are re-exported
-    from segqc.eval."""
-    from segqc.eval.metrics import (  # noqa: F401
+    """AC1: all five names import from segfacet.eval.metrics and are re-exported
+    from segfacet.eval."""
+    from segfacet.eval.metrics import (  # noqa: F401
         CohortMetrics,
         ConfusionCounts,
         CorrelationResult,
         PerModeSensitivity,
         compute_cohort_metrics,
     )
-    from segqc.eval import compute_cohort_metrics as reexported
+    from segfacet.eval import compute_cohort_metrics as reexported
 
     assert reexported is compute_cohort_metrics
 
 
 def test_ac1_module_dunder_all():
-    """AC1: segqc.eval.metrics.__all__ lists all five public names."""
-    import segqc.eval.metrics as metrics_mod
+    """AC1: segfacet.eval.metrics.__all__ lists all five public names."""
+    import segfacet.eval.metrics as metrics_mod
 
     assert set(metrics_mod.__all__) == {
         "compute_cohort_metrics",
@@ -195,7 +195,7 @@ def test_ac1_module_dunder_all():
 
 def test_ac1_dataclasses_are_frozen_with_documented_fields():
     """AC1: each result dataclass is frozen and carries the documented fields."""
-    from segqc.eval.metrics import (
+    from segfacet.eval.metrics import (
         CohortMetrics,
         ConfusionCounts,
         CorrelationResult,
@@ -238,7 +238,7 @@ def test_ac1_dataclasses_are_frozen_with_documented_fields():
 
 def test_ac2_confusion_counts_aggregated_correctly():
     """AC2: counts.tp/fp/tn/fn match a known TP/FP/TN/FN mix; n_cases matches."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = (
         [
@@ -273,7 +273,7 @@ def test_ac2_confusion_counts_aggregated_correctly():
 def test_ac3_fpr_is_fp_over_fp_plus_tn():
     """AC3: 4 TN + 1 FP among the expected-pass set -> FPR == 0.2, unaffected
     by the expected-failure records also present."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = (
         [
@@ -294,7 +294,7 @@ def test_ac3_fpr_is_fp_over_fp_plus_tn():
 def test_ac4_fpr_sentinel_when_no_expected_pass_cases():
     """AC4: a cohort of only expected-failure records -> false_positive_rate is
     None (no divide-by-zero)."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case({"expected_failure": True, "actual_flagged": True}, case_id="tp0"),
@@ -313,7 +313,7 @@ def test_ac4_fpr_sentinel_when_no_expected_pass_cases():
 def test_ac5_per_mode_sensitivity_designated_vs_caught_rate():
     """AC5: n=4 expected-failure cases of mode 4, j=3 caught by the designated
     rule, c=4 caught at all -> sensitivity == 0.75, caught_rate == 1.0."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case(
@@ -354,7 +354,7 @@ def test_ac5_per_mode_sensitivity_designated_vs_caught_rate():
 def test_ac6_per_mode_sentinel_for_requested_mode_with_no_cases():
     """AC6: failure_modes=[7] with no mode-7 record -> n_cases == 0 and both
     rates are None, no divide-by-zero."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case(
@@ -384,7 +384,7 @@ def test_ac7_per_mode_grouping_over_observed_modes_when_omitted():
     """AC7: with failure_modes=None, one entry per distinct observed mode,
     ordered ascending with a trailing None entry; expected-pass records
     contribute to no entry."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case(
@@ -453,7 +453,7 @@ def test_ac8_dice_vs_flag_correlation_matches_hand_computed_pearson():
     """AC8: lower DICE co-occurs with flagged, higher with not-flagged -> a
     negative coefficient matching the independently hand-computed Pearson
     value to abs tol 1e-9."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case({"expected_failure": False, "actual_flagged": True}, dice=0.2, case_id="a"),
@@ -475,7 +475,7 @@ def test_ac8_dice_vs_flag_correlation_matches_hand_computed_pearson():
 def test_ac9_correlation_excludes_cases_without_usable_dice():
     """AC9: cases with overlap is None (no candidate) or a None selected DICE
     value are skipped, not errors -- n and coefficient are unchanged."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     base_cases = [
         _case({"expected_failure": False, "actual_flagged": True}, dice=0.2, case_id="a"),
@@ -506,7 +506,7 @@ def test_ac9_correlation_excludes_cases_without_usable_dice():
 
 def test_ac10_correlation_sentinel_fewer_than_two_pairs():
     """AC10(a): a single usable pair -> coefficient is None, n is still 1."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [_case({"expected_failure": False, "actual_flagged": True}, dice=0.4, case_id="a")]
     result = compute_cohort_metrics(_cohort(cases))
@@ -517,7 +517,7 @@ def test_ac10_correlation_sentinel_fewer_than_two_pairs():
 
 def test_ac10_correlation_sentinel_zero_variance_dice():
     """AC10(b): all DICE values equal -> coefficient is None (zero x-variance)."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case({"expected_failure": False, "actual_flagged": True}, dice=0.5, case_id="a"),
@@ -532,7 +532,7 @@ def test_ac10_correlation_sentinel_zero_variance_dice():
 
 def test_ac10_correlation_sentinel_zero_variance_flag():
     """AC10(c): every case flagged -> coefficient is None (zero y-variance)."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case({"expected_failure": False, "actual_flagged": True}, dice=0.2, case_id="a"),
@@ -554,7 +554,7 @@ def test_ac11_feature_divergence_vs_flag_positive_and_excludes_missing():
     """AC11: higher case_divergence co-occurs with flagged -> a positive
     coefficient matching the hand-computed value; a feature_match is None
     case is excluded from n."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case({"expected_failure": False, "actual_flagged": False}, divergence=0.1, case_id="a"),
@@ -586,7 +586,7 @@ def test_ac12_spearman_rank_correlation_exceeds_pearson_for_uneven_spacing():
     2-vs-2 split regardless of spacing) has a larger magnitude than the
     Pearson coefficient (which is sensitive to the uneven spacing); pearson
     remains the default method."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     xs = [0.1, 0.4, 0.6, 0.9]
     ys = [1.0, 1.0, 0.0, 0.0]
@@ -632,7 +632,7 @@ def test_ac13_dice_metric_selects_volume_weighted_aggregate():
     volume_weighted_dice (not mean_dice) -- proven by mean_dice being
     constant (zero variance -> None) while volume_weighted_dice varies and
     anti-correlates with flag."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case(
@@ -675,7 +675,7 @@ def test_ac13_dice_metric_selects_volume_weighted_aggregate():
 def test_ac14_overall_sensitivity_and_specificity():
     """AC14: sensitivity == TP/(TP+FN), specificity == TN/(TN+FP), and
     specificity == 1 - fpr when both are defined."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = (
         [
@@ -701,7 +701,7 @@ def test_ac14_overall_sensitivity_and_specificity():
 
 def test_ac14_sensitivity_none_when_no_failure_cases():
     """AC14: a cohort with no expected-failure cases -> sensitivity is None."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [_case({"expected_failure": False, "actual_flagged": False}, case_id="a")]
     result = compute_cohort_metrics(_cohort(cases))
@@ -717,7 +717,7 @@ def test_ac14_sensitivity_none_when_no_failure_cases():
 def test_ac15_empty_cohort_yields_all_sentinel_metrics():
     """AC15: an empty CohortEvaluation -> all-zero counts, all-None rates,
     empty per_mode, and both correlations sentinel with n == 0, no crash."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     result = compute_cohort_metrics(_cohort([]))
 
@@ -739,7 +739,7 @@ def test_ac15_empty_cohort_yields_all_sentinel_metrics():
 def test_ac15_empty_cohort_with_requested_modes_yields_sentinel_entries():
     """AC15 (per-mode variant): an empty cohort with failure_modes supplied
     still returns one all-sentinel entry per requested mode."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     result = compute_cohort_metrics(_cohort([]), failure_modes=[1, 2])
 
@@ -758,7 +758,7 @@ def test_ac15_empty_cohort_with_requested_modes_yields_sentinel_entries():
 def test_ac16_to_dict_is_plain_json_and_round_trips():
     """AC16: to_dict() contains only plain JSON types and round-trips through
     json.dumps/json.loads unchanged."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case(
@@ -791,7 +791,7 @@ def test_ac16_to_dict_is_plain_json_and_round_trips():
 def test_ac16_repeated_calls_are_equal_and_byte_identical():
     """AC16: two compute_cohort_metrics calls on the same cohort produce equal
     CohortMetrics and byte-identical sort_keys=True JSON."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case(
@@ -830,22 +830,22 @@ def test_ac16_repeated_calls_are_equal_and_byte_identical():
 
 
 def test_ac17_unrecognised_correlation_method_raises():
-    """AC17: an unrecognised correlation_method raises SegQCInputError, not a
+    """AC17: an unrecognised correlation_method raises FacetInputError, not a
     raw KeyError/ValueError."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [_case({"expected_failure": False, "actual_flagged": False}, case_id="a")]
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         compute_cohort_metrics(_cohort(cases), correlation_method="kendall")
 
 
 def test_ac17_unrecognised_dice_metric_raises():
-    """AC17: an unrecognised dice_metric raises SegQCInputError, not a raw
+    """AC17: an unrecognised dice_metric raises FacetInputError, not a raw
     KeyError/AttributeError."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [_case({"expected_failure": False, "actual_flagged": False}, case_id="a")]
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         compute_cohort_metrics(_cohort(cases), dice_metric="jaccard")
 
 
@@ -858,7 +858,7 @@ def test_ac18_pure_non_mutating_deterministic():
     """AC18: the input cohort and its records are unchanged after the call;
     repeated calls return equal results (no file I/O is exercised anywhere in
     this test file, matching the module's documented purity)."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case(
@@ -894,7 +894,7 @@ def test_adversarial_incidental_rule_catch_is_not_designated_sensitivity():
     """A mode where every case was caught by an incidental rule (caught is
     True but caught_by_designated_rule is False) -> caught_rate == 1.0 while
     sensitivity == 0.0, making the designated-rule strictness visible."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case(
@@ -919,7 +919,7 @@ def test_adversarial_incidental_rule_catch_is_not_designated_sensitivity():
 def test_adversarial_none_failure_mode_groups_and_counts_toward_recall():
     """An expected-failure record with failure_mode is None groups into the
     trailing None per-mode entry and still contributes to overall recall."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case(
@@ -944,7 +944,7 @@ def test_adversarial_identical_dice_but_defined_feature_correlation():
     dice_vs_flag is sentinel (zero variance) while
     feature_divergence_vs_flag, built from varying divergence values on the
     same cases, may still be defined."""
-    from segqc.eval.metrics import compute_cohort_metrics
+    from segfacet.eval.metrics import compute_cohort_metrics
 
     cases = [
         _case(

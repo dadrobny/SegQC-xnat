@@ -31,8 +31,8 @@ import pathlib
 import numpy as np
 import pytest
 
-from segqc.config import HeuristicConfig, default_config
-from segqc.feature_report import (
+from segfacet.config import HeuristicConfig, default_config
+from segfacet.feature_report import (
     FEATURES_VERSION,
     build_features_block,
     centroid_to_dict,
@@ -41,14 +41,14 @@ from segqc.feature_report import (
     overlap_to_dict,
     relationships_to_dict,
 )
-from segqc.features.centroids import compute_centroid
-from segqc.features.components import compute_components
-from segqc.features.geometry import compute_label_geometry
-from segqc.features.overlap import detect_overlaps
-from segqc.features.relationships import compute_spine_relationships
-from segqc.human_report import render_feature_table
-from segqc.report import serialize_report, serialize_report_json
-from segqc.verdict import Verdict
+from segfacet.features.centroids import compute_centroid
+from segfacet.features.components import compute_components
+from segfacet.features.geometry import compute_label_geometry
+from segfacet.features.overlap import detect_overlaps
+from segfacet.features.relationships import compute_spine_relationships
+from segfacet.human_report import render_feature_table
+from segfacet.report import serialize_report, serialize_report_json
+from segfacet.verdict import Verdict
 
 from synthetic import (
     anisotropic_case,
@@ -142,7 +142,7 @@ def test_ac1_direct_jsonschema_validate_passes():
     """The produced report validates directly against the loaded v0 schema."""
     import jsonschema
 
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     case = labelled_blocks_case()
     block, *_ = _features_for_case(case)
@@ -242,7 +242,7 @@ def test_ac4_feature_free_report_still_valid():
 def test_ac4_features_is_optional_property():
     """The extended schema keeps schema_version const '0.1' and lists features as
     an optional (non-required) property."""
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     assert _SCHEMA["properties"]["schema_version"]["const"] == "0.1"
     assert "features" in _SCHEMA["properties"]
@@ -253,7 +253,7 @@ def test_ac4_009_style_report_validates_against_extended_schema():
     """Explicitly validate a feature-free report against the extended schema."""
     import jsonschema
 
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     report = serialize_report(_empty_verdict(), "no-features", _config())
     jsonschema.validate(report, _SCHEMA)
@@ -290,7 +290,7 @@ def test_ac5_overlaps_sorted_by_label_pair():
     case = labelled_blocks_case()
     _block, geometry, components, centroids, relationships, _ov = _features_for_case(case)
 
-    from segqc.features.overlap import OverlapPair
+    from segfacet.features.overlap import OverlapPair
 
     unsorted = [
         OverlapPair(label_a=2, label_b=3, name_a="C2", name_b="C3", overlap_voxels=5),
@@ -467,8 +467,8 @@ def test_ac8_returned_lists_not_aliased():
 
 
 def test_ac8_no_heavy_imports_in_feature_report_module():
-    """segqc.feature_report imports no numpy/nibabel/scipy at module level."""
-    import segqc.feature_report as fr
+    """segfacet.feature_report imports no numpy/nibabel/scipy at module level."""
+    import segfacet.feature_report as fr
 
     g = vars(fr)
     for forbidden in ("numpy", "np", "nibabel", "nib", "scipy"):
@@ -497,7 +497,7 @@ def test_malformed_features_rejected_by_schema():
     """A features block missing a required key is rejected by jsonschema."""
     import jsonschema
 
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     case = labelled_blocks_case()
     block, *_ = _features_for_case(case)
@@ -516,7 +516,7 @@ def test_unknown_feature_key_rejected():
     """additionalProperties:false rejects an unexpected key in the features block."""
     import jsonschema
 
-    from segqc.report import _SCHEMA
+    from segfacet.report import _SCHEMA
 
     case = labelled_blocks_case()
     block, *_ = _features_for_case(case)

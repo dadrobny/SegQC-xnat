@@ -1,7 +1,7 @@
 """Unit tests for the versioned heuristic-config scaffold (item 005).
 
 Covers: ``default_config()``, ``load_config()`` with valid/invalid YAML files,
-schema-version validation, default filling, and the ``SegQCConfigError``
+schema-version validation, default filling, and the ``FacetConfigError``
 exception surface.
 """
 
@@ -11,10 +11,10 @@ import pathlib
 
 import pytest
 
-from segqc.config import (
+from segfacet.config import (
     SUPPORTED_SCHEMA_VERSION,
     HeuristicConfig,
-    SegQCConfigError,
+    FacetConfigError,
     default_config,
     load_config,
 )
@@ -127,30 +127,30 @@ def test_load_returns_heuristic_config_instance(tmp_path):
 # --------------------------------------------------------------------------- #
 
 def test_load_unsupported_version_raises(tmp_path):
-    """A config with an unsupported schema_version raises SegQCConfigError."""
+    """A config with an unsupported schema_version raises FacetConfigError."""
     p = _write_yaml(tmp_path, "schema_version: '99.0'\n")
-    with pytest.raises(SegQCConfigError, match="schema_version"):
+    with pytest.raises(FacetConfigError, match="schema_version"):
         load_config(p)
 
 
 def test_load_future_version_raises(tmp_path):
-    """A 'future' schema version not yet supported raises SegQCConfigError."""
+    """A 'future' schema version not yet supported raises FacetConfigError."""
     p = _write_yaml(tmp_path, "schema_version: '1.0'\n")
-    with pytest.raises(SegQCConfigError):
+    with pytest.raises(FacetConfigError):
         load_config(p)
 
 
 def test_load_missing_version_field_raises(tmp_path):
-    """A config without any schema_version key raises SegQCConfigError."""
+    """A config without any schema_version key raises FacetConfigError."""
     p = _write_yaml(tmp_path, "min_foreground_voxels: 10\n")
-    with pytest.raises(SegQCConfigError, match="schema_version"):
+    with pytest.raises(FacetConfigError, match="schema_version"):
         load_config(p)
 
 
 def test_load_empty_version_string_raises(tmp_path):
-    """An empty string schema_version raises SegQCConfigError."""
+    """An empty string schema_version raises FacetConfigError."""
     p = _write_yaml(tmp_path, "schema_version: ''\n")
-    with pytest.raises(SegQCConfigError, match="schema_version"):
+    with pytest.raises(FacetConfigError, match="schema_version"):
         load_config(p)
 
 
@@ -159,23 +159,23 @@ def test_load_empty_version_string_raises(tmp_path):
 # --------------------------------------------------------------------------- #
 
 def test_load_malformed_yaml_raises(tmp_path):
-    """Syntactically invalid YAML raises SegQCConfigError."""
+    """Syntactically invalid YAML raises FacetConfigError."""
     p = _write_yaml(tmp_path, "key: [unclosed bracket\n")
-    with pytest.raises(SegQCConfigError):
+    with pytest.raises(FacetConfigError):
         load_config(p)
 
 
 def test_load_yaml_not_a_mapping_raises(tmp_path):
-    """A YAML file whose top level is a list (not a mapping) raises SegQCConfigError."""
+    """A YAML file whose top level is a list (not a mapping) raises FacetConfigError."""
     p = _write_yaml(tmp_path, "- item1\n- item2\n")
-    with pytest.raises(SegQCConfigError):
+    with pytest.raises(FacetConfigError):
         load_config(p)
 
 
 def test_load_yaml_scalar_raises(tmp_path):
-    """A YAML file whose top level is a bare scalar raises SegQCConfigError."""
+    """A YAML file whose top level is a bare scalar raises FacetConfigError."""
     p = _write_yaml(tmp_path, "just a string\n")
-    with pytest.raises(SegQCConfigError):
+    with pytest.raises(FacetConfigError):
         load_config(p)
 
 
@@ -184,46 +184,46 @@ def test_load_yaml_scalar_raises(tmp_path):
 # --------------------------------------------------------------------------- #
 
 def test_load_missing_file_raises(tmp_path):
-    """A path to a non-existent file raises SegQCConfigError."""
+    """A path to a non-existent file raises FacetConfigError."""
     p = tmp_path / "does_not_exist.yaml"
-    with pytest.raises(SegQCConfigError, match="not found"):
+    with pytest.raises(FacetConfigError, match="not found"):
         load_config(p)
 
 
 def test_load_missing_file_chains_original_exception(tmp_path):
-    """The SegQCConfigError for a missing file chains the original FileNotFoundError."""
+    """The FacetConfigError for a missing file chains the original FileNotFoundError."""
     p = tmp_path / "nonexistent.yaml"
-    with pytest.raises(SegQCConfigError) as exc_info:
+    with pytest.raises(FacetConfigError) as exc_info:
         load_config(p)
     assert exc_info.value.__cause__ is not None
     assert isinstance(exc_info.value.__cause__, FileNotFoundError)
 
 
 # --------------------------------------------------------------------------- #
-# SegQCConfigError is raised, not raw exceptions
+# FacetConfigError is raised, not raw exceptions
 # --------------------------------------------------------------------------- #
 
-def test_error_is_segqc_config_error_type(tmp_path):
-    """All config errors are instances of SegQCConfigError, not raw exceptions."""
+def test_error_is_segfacet_config_error_type(tmp_path):
+    """All config errors are instances of FacetConfigError, not raw exceptions."""
     # Malformed YAML — should not leak yaml.YAMLError directly
     p = _write_yaml(tmp_path, "bad: [unclosed\n")
     exc = None
     try:
         load_config(p)
-    except SegQCConfigError as e:
+    except FacetConfigError as e:
         exc = e
-    assert exc is not None, "Expected SegQCConfigError to be raised"
+    assert exc is not None, "Expected FacetConfigError to be raised"
 
 
-def test_segqc_config_error_is_exception_subclass():
-    """SegQCConfigError is a subclass of Exception (catchable with 'except Exception')."""
-    assert issubclass(SegQCConfigError, Exception)
+def test_segfacet_config_error_is_exception_subclass():
+    """FacetConfigError is a subclass of Exception (catchable with 'except Exception')."""
+    assert issubclass(FacetConfigError, Exception)
 
 
-def test_segqc_config_error_message_is_informative(tmp_path):
-    """The SegQCConfigError message names the bad version."""
+def test_segfacet_config_error_message_is_informative(tmp_path):
+    """The FacetConfigError message names the bad version."""
     p = _write_yaml(tmp_path, "schema_version: 'bad-version'\n")
-    with pytest.raises(SegQCConfigError) as exc_info:
+    with pytest.raises(FacetConfigError) as exc_info:
         load_config(p)
     assert "bad-version" in str(exc_info.value)
 

@@ -1,5 +1,5 @@
 """Tests for item 063 -- extending reference distributions with per-level
-intensity feature distributions (``src/segqc/reference/{ingest,schema,artifact}.py``).
+intensity feature distributions (``src/segfacet/reference/{ingest,schema,artifact}.py``).
 
 Covers Acceptance Criteria AC1-AC16:
 
@@ -53,11 +53,11 @@ import nibabel as nib
 import numpy as np
 import pytest
 
-from segqc.config import bundled_default_config
-from segqc.features.intensity import compute_label_intensity
-from segqc.labels import LabelConvention
-from segqc.pipeline import extract_feature_record
-from segqc.reference import (
+from segfacet.config import bundled_default_config
+from segfacet.features.intensity import compute_label_intensity
+from segfacet.labels import LabelConvention
+from segfacet.pipeline import extract_feature_record
+from segfacet.reference import (
     ARTIFACT_SCHEMA_VERSION,
     SCHEMA_VERSION,
     Provenance,
@@ -74,20 +74,20 @@ from segqc.reference import (
     to_dict,
     write_artifact,
 )
-from segqc.reference.ingest import (
+from segfacet.reference.ingest import (
     DEFAULT_SEG_SUFFIX,
     INGESTED_FEATURES,
     ingest_cohort,
     ingest_subject,
 )
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.golden import reports_close
-from segqc.synth.intensity import paint_clean_scan
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.golden import reports_close
+from segfacet.synth.intensity import paint_clean_scan
 
 # INGESTED_INTENSITY_FEATURES is item 063's new companion constant -- not yet
 # part of the module's stable exports at spec time, so import it directly
 # from the ingest submodule per the item spec's "Public interface" section.
-from segqc.reference.ingest import INGESTED_INTENSITY_FEATURES
+from segfacet.reference.ingest import INGESTED_INTENSITY_FEATURES
 
 PROV = Provenance(
     source="test-cohort", config_hash="cfg-hash", build_date="2000-01-01"
@@ -370,7 +370,7 @@ def test_ac8_aggregate_reference_tracks_intensity_with_no_core_change(tmp_path):
     # item's Assumptions/Implementation Steps mandate the file stays
     # unmodified. A source-text marker check catches an accidental edit
     # that special-cases the "intensity" vocabulary.
-    from segqc.reference import aggregate as aggregate_module
+    from segfacet.reference import aggregate as aggregate_module
 
     source = inspect.getsource(aggregate_module)
     assert "intensity" not in source.lower()
@@ -441,7 +441,7 @@ def test_ac10_build_reference_default_with_intensity_is_true(tmp_path):
 
 
 def test_ac11_build_default_cohort_writes_aligned_reproducible_scans(tmp_path):
-    from segqc.io import load_case
+    from segfacet.io import load_case
 
     dest1 = tmp_path / "cohort1"
     dest2 = tmp_path / "cohort2"
@@ -587,7 +587,7 @@ def test_ac15_gitattributes_still_pins_bundled_artifact_lf():
     matching_lines = [
         line
         for line in text.splitlines()
-        if "src/segqc/reference/reference_default.json" in line
+        if "src/segfacet/reference/reference_default.json" in line
     ]
     assert any("text eol=lf" in line for line in matching_lines)
 

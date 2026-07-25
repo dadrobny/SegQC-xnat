@@ -1,4 +1,4 @@
-# constraints.txt — pinned dependency versions for the segqc Docker image (item 066).
+# constraints.txt — pinned dependency versions for the segfacet Docker image (item 066).
 #
 # Generated (not hand-written) by resolving the project's core runtime
 # dependency graph in a clean environment:

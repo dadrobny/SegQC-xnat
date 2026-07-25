@@ -1,5 +1,5 @@
 """Tests for item 065 -- the intensity-aware pipeline entry point
-(``src/segqc/pipeline.py::run_qc_with_intensity``), the new sibling of item
+(``src/segfacet/pipeline.py::run_qc_with_intensity``), the new sibling of item
 049's ``run_qc_with_reference`` that wires items 058-064's already-merged
 intensity/radiomics/reference-delta family into the real pipeline.
 
@@ -50,18 +50,18 @@ import tempfile
 import nibabel as nib
 import pytest
 
-from segqc.config import bundled_default_config
-from segqc.io import load_case
-from segqc.pipeline import (
+from segfacet.config import bundled_default_config
+from segfacet.io import load_case
+from segfacet.pipeline import (
     extract_feature_record,
     run_qc,
     run_qc_with_intensity,
     run_qc_with_reference,
 )
-from segqc.reference import build_reference, bundled_default_reference
-from segqc.reference.ingest import DEFAULT_SCAN_SUFFIX, DEFAULT_SEG_SUFFIX
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.intensity import (
+from segfacet.reference import build_reference, bundled_default_reference
+from segfacet.reference.ingest import DEFAULT_SCAN_SUFFIX, DEFAULT_SEG_SUFFIX
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.intensity import (
     DEFAULT_HU_MODEL,
     INTENSITY_CORPUS_DIR,
     HUModel,
@@ -88,7 +88,7 @@ def _case(case_id):
 
 def _loaded_case_images(case, corpus_dir=INTENSITY_CORPUS_DIR):
     """Load *case*'s committed scan + seg fixtures as a pair of fresh
-    ``Nifti1Image``s, mirroring ``segqc.synth.regression.loaded_seg_image``
+    ``Nifti1Image``s, mirroring ``segfacet.synth.regression.loaded_seg_image``
     but returning both images (this item's entry point needs the scan)."""
     scan_path = corpus_dir / case["scan_fixture"]
     seg_path = corpus_dir / case["seg_fixture"]

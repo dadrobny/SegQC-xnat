@@ -1,5 +1,5 @@
 """Tests for item 086 -- the dataset-agnostic Cohort/Case interface, descriptor
-schema, and resolver (``segqc.datasets``, Stage 13).
+schema, and resolver (``segfacet.datasets``, Stage 13).
 
 All fixtures are tiny synthetic directory trees built in ``tmp_path`` (empty
 ``.nii.gz`` files -- the resolver discovers files by layout, never reads voxels).
@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from segqc.datasets import (
+from segfacet.datasets import (
     ROLE_CANDIDATE,
     ROLE_GT,
     Case,
@@ -22,7 +22,7 @@ from segqc.datasets import (
     load_descriptor,
     resolve,
 )
-from segqc.labels import LabelConvention
+from segfacet.labels import LabelConvention
 
 # VerSe-shaped case-id regex reused across tests.
 VERSE_ID = r"(?P<id>sub-verse\d+(?:_split-verse\d+)?)_seg-vert_msk\.nii\.gz$"

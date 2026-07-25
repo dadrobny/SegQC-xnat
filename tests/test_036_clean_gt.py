@@ -5,7 +5,7 @@ Covers Acceptance Criteria AC1-AC11 (Group A, the clean-GT builder) and AC24
 
 - AC1:  build_clean_spine() returns a well-formed CleanSpine.
 - AC2:  the clean GT passes run_qc with zero findings (positive control).
-- AC3:  the clean GT passes end-to-end through segqc run (CLI).
+- AC3:  the clean GT passes end-to-end through segfacet run (CLI).
 - AC4:  the builder honours anisotropic spacing (physical volumes correct).
 - AC5:  the level span is parametric and stays clean (thoracic span).
 - AC6:  bounds cannot fire -- every body is within its level group's bounds.
@@ -17,9 +17,9 @@ Covers Acceptance Criteria AC1-AC11 (Group A, the clean-GT builder) and AC24
 - AC24: the builder is deterministic.
 
 Adversarial / edge-case scenarios included:
-- An unknown level name raises SegQCInputError.
+- An unknown level name raises FacetInputError.
 - A span crossing the T12->L1 transitional-vertebra junction raises
-  SegQCInputError (the transitional-vertebra trap).
+  FacetInputError (the transitional-vertebra trap).
 - A single-level span still builds (not the intended positive control, but
   must not crash).
 - Two builds at different (but still valid) spacings do not accidentally
@@ -33,22 +33,22 @@ import json
 import numpy as np
 import pytest
 
-from segqc.cli import main
-from segqc.config import bundled_default_config
-from segqc.features.centroids import compute_centroid
-from segqc.features.components import compute_components
-from segqc.features.consistency import compute_monotonic_consistency
-from segqc.features.fragmentation import compute_fragmentation_index
-from segqc.features.geometry import compute_label_geometry
-from segqc.features.overlap import detect_overlaps
-from segqc.features.relationships import compute_spine_relationships
-from segqc.features.spline import fit_centroid_spline
-from segqc.features.spline_offset import compute_spline_offsets
-from segqc.heuristics.bounds import DEFAULT_BOUNDS
-from segqc.io import SegQCInputError
-from segqc.pipeline import run_qc
-from segqc.synth import CleanSpine, build_clean_spine
-from segqc.verdict import Severity
+from segfacet.cli import main
+from segfacet.config import bundled_default_config
+from segfacet.features.centroids import compute_centroid
+from segfacet.features.components import compute_components
+from segfacet.features.consistency import compute_monotonic_consistency
+from segfacet.features.fragmentation import compute_fragmentation_index
+from segfacet.features.geometry import compute_label_geometry
+from segfacet.features.overlap import detect_overlaps
+from segfacet.features.relationships import compute_spine_relationships
+from segfacet.features.spline import fit_centroid_spline
+from segfacet.features.spline_offset import compute_spline_offsets
+from segfacet.heuristics.bounds import DEFAULT_BOUNDS
+from segfacet.io import FacetInputError
+from segfacet.pipeline import run_qc
+from segfacet.synth import CleanSpine, build_clean_spine
+from segfacet.verdict import Severity
 
 from synthetic import write_nifti
 
@@ -117,7 +117,7 @@ def test_ac2_clean_gt_verdict_is_pass():
 
 
 # =========================================================================== #
-# AC3: The clean GT passes end-to-end through segqc run
+# AC3: The clean GT passes end-to-end through segfacet run
 # =========================================================================== #
 
 
@@ -132,7 +132,7 @@ def test_ac3_cli_run_exits_zero(tmp_path):
 
 
 def test_ac3_cli_report_verdict_is_pass(tmp_path):
-    """AC3: the emitted segqc_report.json has "verdict" == "pass".
+    """AC3: the emitted segfacet_report.json has "verdict" == "pass".
 
     Item 090 turns reference mode ON by default, and this synthetic clean-GT
     fixture's geometry is not grounded against the real verse-v1 reference
@@ -146,12 +146,12 @@ def test_ac3_cli_report_verdict_is_pass(tmp_path):
     seg_path = write_nifti(clean.seg_img, tmp_path / "seg.nii.gz")
     out_dir = tmp_path / "out"
     main(["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir), "--no-reference"])
-    data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    data = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert data["verdict"] == "pass"
 
 
 def test_ac3_cli_report_findings_empty(tmp_path):
-    """AC3: the emitted segqc_report.json has an empty "findings" array.
+    """AC3: the emitted segfacet_report.json has an empty "findings" array.
 
     See test_ac3_cli_report_verdict_is_pass above for why --no-reference is
     now required to isolate this synthetic fixture's "clean" invariant from
@@ -162,7 +162,7 @@ def test_ac3_cli_report_findings_empty(tmp_path):
     seg_path = write_nifti(clean.seg_img, tmp_path / "seg.nii.gz")
     out_dir = tmp_path / "out"
     main(["run", "--scan", str(scan_path), "--seg", str(seg_path), "--out", str(out_dir), "--no-reference"])
-    data = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    data = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert data["findings"] == []
 
 
@@ -363,17 +363,17 @@ def test_ac24_two_builds_yield_equal_affines():
 # =========================================================================== #
 
 
-def test_adv_unknown_level_name_raises_segqc_input_error():
-    """Adversarial: an unrecognised level name raises SegQCInputError."""
-    with pytest.raises(SegQCInputError):
+def test_adv_unknown_level_name_raises_segfacet_input_error():
+    """Adversarial: an unrecognised level name raises FacetInputError."""
+    with pytest.raises(FacetInputError):
         build_clean_spine(levels=["L1", "NOT_A_LEVEL"])
 
 
-def test_adv_transitional_crossing_span_raises_segqc_input_error():
+def test_adv_transitional_crossing_span_raises_segfacet_input_error():
     """Adversarial: a span crossing the T12->L1 junction (interleaving the
-    transitional T13) raises SegQCInputError rather than silently emitting a
+    transitional T13) raises FacetInputError rather than silently emitting a
     coverage-flagging map."""
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         build_clean_spine(levels=["T12", "L1"])
 
 

@@ -43,9 +43,9 @@ import copy
 
 import pytest
 
-import segqc.synth  # noqa: F401 -- triggers self-registration of every operator
-from segqc.synth.corpus import load_manifest
-from segqc.synth.regression import (
+import segfacet.synth  # noqa: F401 -- triggers self-registration of every operator
+from segfacet.synth.corpus import load_manifest
+from segfacet.synth.regression import (
     RECONSTRUCTIONS,
     designated_rule_fired,
     offending_labels_match,

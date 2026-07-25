@@ -39,8 +39,8 @@ from typing import List
 import numpy as np
 import pytest
 
-from segqc.features.centroids import LabelCentroid
-from segqc.features.spline import SplineFit, evaluate_spline, fit_centroid_spline
+from segfacet.features.centroids import LabelCentroid
+from segfacet.features.spline import SplineFit, evaluate_spline, fit_centroid_spline
 
 
 # =========================================================================== #
@@ -90,27 +90,27 @@ def _dist3(a: tuple[float, float, float], b: tuple[float, float, float]) -> floa
 
 
 def test_import_spline_fit():
-    """SplineFit is importable from segqc.features.spline."""
-    from segqc.features.spline import SplineFit as SF  # noqa: F401
+    """SplineFit is importable from segfacet.features.spline."""
+    from segfacet.features.spline import SplineFit as SF  # noqa: F401
     assert SF is SplineFit
 
 
 def test_import_fit_centroid_spline():
-    """fit_centroid_spline is importable from segqc.features.spline."""
-    from segqc.features.spline import fit_centroid_spline as fcs  # noqa: F401
+    """fit_centroid_spline is importable from segfacet.features.spline."""
+    from segfacet.features.spline import fit_centroid_spline as fcs  # noqa: F401
     assert callable(fcs)
 
 
 def test_import_evaluate_spline():
-    """evaluate_spline is importable from segqc.features.spline."""
-    from segqc.features.spline import evaluate_spline as es  # noqa: F401
+    """evaluate_spline is importable from segfacet.features.spline."""
+    from segfacet.features.spline import evaluate_spline as es  # noqa: F401
     assert callable(es)
 
 
 def test_no_import_error():
-    """Importing segqc.features.spline raises no error."""
+    """Importing segfacet.features.spline raises no error."""
     import importlib
-    mod = importlib.import_module("segqc.features.spline")
+    mod = importlib.import_module("segfacet.features.spline")
     assert hasattr(mod, "SplineFit")
     assert hasattr(mod, "fit_centroid_spline")
     assert hasattr(mod, "evaluate_spline")

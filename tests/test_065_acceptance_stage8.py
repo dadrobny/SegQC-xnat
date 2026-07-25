@@ -1,13 +1,13 @@
 """Stage-8 acceptance suite for item 065 -- the roadmap's Stage-8 bar (image-
 based / radiomics features, phase 2) proven end-to-end over item 058's
 committed intensity corpus (``tests/corpus/intensity/``), driven through the
-real pipeline entry point ``segqc.pipeline.run_qc_with_intensity``. Completes
+real pipeline entry point ``segfacet.pipeline.run_qc_with_intensity``. Completes
 Stage 8.
 
 Reproducing this suite's outcomes from the command line, once item 065's CLI
 wiring is live (see ``tests/test_065_cli_intensity.py``)::
 
-    segqc run --scan <scan.nii.gz> --seg <seg.nii.gz> --out <dir> --intensity
+    segfacet run --scan <scan.nii.gz> --seg <seg.nii.gz> --out <dir> --intensity
 
 The roadmap Stage-8 bar this suite closes: image-based (first-order
 intensity) features are computed on real fixtures and fed into an
@@ -40,10 +40,10 @@ from __future__ import annotations
 import nibabel as nib
 import pytest
 
-from segqc.config import bundled_default_config
-from segqc.io import load_case
-from segqc.pipeline import run_qc_with_intensity
-from segqc.synth.intensity import INTENSITY_CORPUS_DIR, load_intensity_manifest
+from segfacet.config import bundled_default_config
+from segfacet.io import load_case
+from segfacet.pipeline import run_qc_with_intensity
+from segfacet.synth.intensity import INTENSITY_CORPUS_DIR, load_intensity_manifest
 
 _TARGET_LABEL = 22
 

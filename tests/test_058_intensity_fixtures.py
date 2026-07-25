@@ -52,9 +52,9 @@ import re
 import numpy as np
 import pytest
 
-from segqc.io import load_case
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.intensity import (
+from segfacet.io import load_case
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.intensity import (
     DEFAULT_HU_MODEL,
     IMPLAUSIBLE_FILLS,
     INTENSITY_CORPUS_DIR,
@@ -485,7 +485,7 @@ def test_ac19_regeneration_is_byte_identical_across_runs_and_vs_committed(tmp_pa
 
 
 def test_ac20_one_command_regeneration_entry_point_runs(tmp_path):
-    """AC20: segqc.synth.intensity.main(["--out", tmp]) returns 0 and writes
+    """AC20: segfacet.synth.intensity.main(["--out", tmp]) returns 0 and writes
     a manifest.json that load_intensity_manifest(tmp/manifest.json) parses
     to a dict with the same set of case_ids as the committed manifest."""
     out_dir = tmp_path / "regen_main"

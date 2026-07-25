@@ -19,12 +19,12 @@ import copy
 
 import pytest
 
-from segqc.aggregate import aggregate_verdict, build_case_result
-from segqc.config import default_config
-from segqc.heuristics import run_rules
-from segqc.pipeline import extract_feature_record, run_qc
-from segqc.report import serialize_report
-from segqc.verdict import Reason, Severity, Verdict
+from segfacet.aggregate import aggregate_verdict, build_case_result
+from segfacet.config import default_config
+from segfacet.heuristics import run_rules
+from segfacet.pipeline import extract_feature_record, run_qc
+from segfacet.report import serialize_report
+from segfacet.verdict import Reason, Severity, Verdict
 
 from synthetic import empty_case, labelled_blocks_case, make_labelmap
 
@@ -157,7 +157,7 @@ def test_ac7_zero_label_map_does_not_raise():
 
 def test_ac8_run_qc_returns_case_result_and_block_tuple():
     """AC8: run_qc returns a (CaseResult, features_block) pair."""
-    from segqc.aggregate import CaseResult
+    from segfacet.aggregate import CaseResult
 
     case = labelled_blocks_case()
     case_result, block = run_qc(case.seg_img, _config())

@@ -1,5 +1,5 @@
 """Tests for item 065's ``intensity:`` config-mode section
-(``src/segqc/config.py``): a top-level mode section mirroring item 049's
+(``src/segfacet/config.py``): a top-level mode section mirroring item 049's
 ``reference:`` section -- an ``intensity_param(key, default)`` accessor,
 excluded from ``config_hash``'s canonical field list, and a guarantee that
 no new active ``rules.intensity`` / ``rules.intensity_reference_delta``
@@ -39,7 +39,7 @@ above, mirroring the fix applied to item 048's AC7
 
 from __future__ import annotations
 
-from segqc.config import (
+from segfacet.config import (
     SUPPORTED_SCHEMA_VERSION,
     bundled_default_config,
     default_config,
@@ -117,7 +117,7 @@ def test_ac12_bundled_default_config_rule_ids_are_exactly_the_seven():
 
 
 def test_ac12_config_hash_matches_committed_reference_default_provenance():
-    from segqc.reference.artifact import config_hash
+    from segfacet.reference.artifact import config_hash
 
     cfg = bundled_default_config()
     assert config_hash(cfg) == _COMMITTED_REFERENCE_DEFAULT_CONFIG_HASH
@@ -129,7 +129,7 @@ def test_ac12_config_hash_matches_committed_reference_default_provenance():
 
 
 def test_adv_intensity_section_does_not_change_config_hash(tmp_path):
-    from segqc.reference.artifact import config_hash
+    from segfacet.reference.artifact import config_hash
 
     cfg_without = default_config()
     cfg_with = load_config(

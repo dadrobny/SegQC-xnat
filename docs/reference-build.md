@@ -4,7 +4,7 @@
 > real-VerSe layout/naming facts) and the item-082 spec
 > ([`docs/aide/items/082-real-verse-build-recipe.md`](aide/items/082-real-verse-build-recipe.md)).
 > This document is the **recipe + policy**; it adds no code. The build
-> machinery it drives (`segqc build-reference`, `ingest_cohort`,
+> machinery it drives (`segfacet build-reference`, `ingest_cohort`,
 > `build_reference`, `write_artifact`, `load_artifact`) already exists
 > (items 044/045/063/081).
 
@@ -12,17 +12,17 @@
 
 The project ships and consumes **two** reference-data artifacts:
 
-1. **The committed synthetic default** — `src/segqc/reference/reference_default.json`.
+1. **The committed synthetic default** — `src/segfacet/reference/reference_default.json`.
    Built from a fixed, seeded, no-wall-clock synthetic cohort
-   (`segqc.reference.artifact.build_default_cohort`) via
-   `python -m segqc.reference.artifact`. This is the **test/determinism
+   (`segfacet.reference.artifact.build_default_cohort`) via
+   `python -m segfacet.reference.artifact`. This is the **test/determinism
    baseline**: it is byte-reproducible across platforms and runs, and Stage
    6/8 determinism tests depend on it never changing shape unexpectedly. It
    is not a stand-in for real anatomical grounding.
 2. **A separately versioned real-VerSe artifact** —
    `reference_verse_vN.json` (e.g. `reference_verse_v1.json`), with
    `provenance.source == "verse-vN"` (e.g. `"verse-v1"`). Built from a real
-   mounted VerSe ground-truth cohort via `segqc build-reference` (see
+   mounted VerSe ground-truth cohort via `segfacet build-reference` (see
    *Build invocation* below). This is the artifact that grounds the
    delta-to-reference machinery in real anatomy.
 
@@ -46,7 +46,7 @@ The real-VerSe artifact is **additive** — it never overwrites or replaces
   `provenance.source == "verse-vN"` (`N` = 1, 2, 3, … incrementing on each
   new real build, e.g. after a larger cohort or a schema bump). When an
   actual real-VerSe artifact is built by a data-holding human or CI runner,
-  it is committed under `src/segqc/reference/` as package data (so it ships
+  it is committed under `src/segfacet/reference/` as package data (so it ships
   importable/selectable by path alongside the default), and its filename
   pattern should be pinned `text eol=lf` in `.gitattributes` for CRLF
   hygiene on Windows checkouts (see the Gotchas note in the project
@@ -78,7 +78,7 @@ PNGs that the build recipe does not need).
 
 ## Staging the cohort for ingestion
 
-`segqc.reference.ingest.ingest_cohort` was built for item 044's flat,
+`segfacet.reference.ingest.ingest_cohort` was built for item 044's flat,
 **non-recursive** convention: it lists a single `--cohort` directory with
 `os.listdir` (no recursive walk of subdirectories) looking for files ending
 in `--seg-suffix`, and for each match hardcodes the sibling scan filename as
@@ -120,13 +120,13 @@ each mask have a `<id>_scan.nii.gz` sibling.
 
 ## Build invocation
 
-Once staged, drive the existing `segqc build-reference` CLI directly — no
+Once staged, drive the existing `segfacet build-reference` CLI directly — no
 new code, no wrapper:
 
 ```bash
-segqc build-reference \
+segfacet build-reference \
     --cohort staged_verse \
-    --out src/segqc/reference/reference_verse_v1.json \
+    --out src/segfacet/reference/reference_verse_v1.json \
     --source verse-v1 \
     --build-date 2026-07-15 \
     --seg-suffix _seg-vert_msk.nii.gz
@@ -149,7 +149,7 @@ segqc build-reference \
   override either flag, so no extra CLI switches are required to get the
   full `"1.2"` artifact.
 - An absent or empty `--cohort` (or a mistyped `--seg-suffix` that matches
-  nothing) errors cleanly: `segqc build-reference` exits non-zero, writes no
+  nothing) errors cleanly: `segfacet build-reference` exits non-zero, writes no
   partial file at `--out`, and prints an `Error:`-prefixed message to
   stderr — no Python traceback. This is existing behaviour
   (`_handle_build_reference` catching `(OSError, ReferenceArtifactError)`),
@@ -160,8 +160,8 @@ segqc build-reference \
 A deployment picks up the real-VerSe artifact instead of the bundled
 default via either:
 
-- the CLI flag: `segqc run --reference-artifact src/segqc/reference/reference_verse_v1.json …`, or
-- the config key: `reference.artifact_path: src/segqc/reference/reference_verse_v1.json`
+- the CLI flag: `segfacet run --reference-artifact src/segfacet/reference/reference_verse_v1.json …`, or
+- the config key: `reference.artifact_path: src/segfacet/reference/reference_verse_v1.json`
   in the run config.
 
 **Discouraged alternative — bundle-swap.** Overwriting
@@ -182,7 +182,7 @@ filename and select it explicitly.
 - `eigenvalue_ratio` (item 081's PCA-based morphology feature) is a
   platform-sensitive float — its last few bits of precision can differ
   across BLAS/LAPACK implementations. Two builds of the *same* cohort should
-  be compared with a numeric tolerance (`segqc.synth.golden.reports_close`),
+  be compared with a numeric tolerance (`segfacet.synth.golden.reports_close`),
   not byte-identity, per items 078/081.
 - The real-VerSe artifact is **committed once**, by whoever runs the build
   against the mounted real cohort — it is **not** regenerated in CI (CI has
@@ -193,4 +193,4 @@ filename and select it explicitly.
 - For a **one-command** refresh (rebuild synthetic default + optionally the
   real artifact when a cohort is mounted + re-evaluate), see **item 083**'s
   refresh wrapper — this document only covers the manual invocation of the
-  existing `segqc build-reference` CLI.
+  existing `segfacet build-reference` CLI.

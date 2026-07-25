@@ -1,12 +1,12 @@
-"""Tests for item 065's ``segqc run --intensity`` CLI wiring
-(``src/segqc/cli.py``'s ``_handle_run``), the sibling of item 049's
+"""Tests for item 065's ``segfacet run --intensity`` CLI wiring
+(``src/segfacet/cli.py``'s ``_handle_run``), the sibling of item 049's
 ``--reference`` flag: OFF by default, driving ``run_qc_with_intensity`` and
 embedding an ``image_features`` block in the written JSON report when
 enabled.
 
 Covers Acceptance Criteria AC8-AC11, AC15:
 
-- AC8: ``segqc run --scan <clean_hu> --seg <shared seg> --intensity --out
+- AC8: ``segfacet run --scan <clean_hu> --seg <shared seg> --intensity --out
   <dir>`` exits 0 and writes a report whose ``image_features`` block is
   present, ``available == True``, carries a per-label ``first_order`` dict,
   and whose ``findings`` carry no ``intensity`` finding.
@@ -19,8 +19,8 @@ Covers Acceptance Criteria AC8-AC11, AC15:
 - AC11: the intensity path is flag/config toggleable -- off (absent), on via
   ``--intensity`` (present), on via config ``intensity.enabled: true``
   without the CLI flag (present).
-- AC15: two identical ``segqc run --intensity`` invocations write
-  byte-identical ``segqc_report.json``.
+- AC15: two identical ``segfacet run --intensity`` invocations write
+  byte-identical ``segfacet_report.json``.
 
 Adversarial / edge-case scenarios included:
 - ``--scan``/``--seg`` pointing at a nonexistent path -- clean exit 1, no
@@ -40,8 +40,8 @@ import json
 
 import jsonschema
 
-from segqc.config import SUPPORTED_SCHEMA_VERSION
-from segqc.synth.intensity import INTENSITY_CORPUS_DIR, load_intensity_manifest
+from segfacet.config import SUPPORTED_SCHEMA_VERSION
+from segfacet.synth.intensity import INTENSITY_CORPUS_DIR, load_intensity_manifest
 
 _TARGET_LABEL = 22
 
@@ -67,9 +67,9 @@ def _case_paths(case_id):
 def _report_schema():
     import importlib.resources as pkg_resources
 
-    import segqc as segqc_pkg
+    import segfacet as segfacet_pkg
 
-    ref = pkg_resources.files(segqc_pkg).joinpath("report_schema_v0.json")
+    ref = pkg_resources.files(segfacet_pkg).joinpath("report_schema_v0.json")
     return json.loads(ref.read_text(encoding="utf-8"))
 
 
@@ -85,7 +85,7 @@ def _write_yaml(tmp_path, content, name="config.yaml"):
 
 
 def test_ac8_cli_intensity_flag_writes_image_features_on_clean_run(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _case_paths("clean_hu")
     out_dir = tmp_path / "out"
@@ -101,7 +101,7 @@ def test_ac8_cli_intensity_flag_writes_image_features_on_clean_run(tmp_path):
     )
     assert code == 0
 
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     image_features = report["image_features"]
     assert image_features["available"] is True
     assert image_features["per_label"]
@@ -113,7 +113,7 @@ def test_ac8_cli_intensity_flag_writes_image_features_on_clean_run(tmp_path):
 
 
 def test_ac8_report_is_schema_valid_with_image_features(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _case_paths("clean_hu")
     out_dir = tmp_path / "out"
@@ -127,7 +127,7 @@ def test_ac8_report_is_schema_valid_with_image_features(tmp_path):
             "--intensity",
         ]
     )
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     jsonschema.validate(report, _report_schema())
 
 
@@ -137,7 +137,7 @@ def test_ac8_report_is_schema_valid_with_image_features(tmp_path):
 
 
 def test_ac9_cli_intensity_flag_flags_implausible_metal_on_label_22(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _case_paths("implausible_metal")
     out_dir = tmp_path / "out"
@@ -153,7 +153,7 @@ def test_ac9_cli_intensity_flag_flags_implausible_metal_on_label_22(tmp_path):
     )
     assert code in (0, 1)
 
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert report["image_features"]["available"] is True
 
     findings = report["findings"]
@@ -168,7 +168,7 @@ def test_ac9_cli_intensity_flag_flags_implausible_metal_on_label_22(tmp_path):
 
 
 def test_ac10_no_intensity_flag_omits_image_features_key(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _case_paths("implausible_metal")
     out_dir = tmp_path / "out"
@@ -181,7 +181,7 @@ def test_ac10_no_intensity_flag_omits_image_features_key(tmp_path):
             "--out", str(out_dir),
         ]
     )
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert "image_features" not in report
     findings = report.get("findings", [])
     assert not any(f["rule_id"] == "intensity" for f in findings)
@@ -192,7 +192,7 @@ def test_ac10_no_intensity_flag_report_shape_matches_pre_065_shape(tmp_path):
     reference_delta key unrelated to what this test is isolating (the
     intensity flag's own effect on report shape) -- pass --no-reference so
     the pre-065 shape comparison stays about intensity, not reference mode."""
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _case_paths("clean_hu")
     out_dir = tmp_path / "out"
@@ -206,7 +206,7 @@ def test_ac10_no_intensity_flag_report_shape_matches_pre_065_shape(tmp_path):
             "--no-reference",
         ]
     )
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     expected_keys = {
         "schema_version", "config_version", "case_id", "verdict",
         "reasons", "per_label", "features", "findings",
@@ -220,7 +220,7 @@ def test_ac10_no_intensity_flag_report_shape_matches_pre_065_shape(tmp_path):
 
 
 def test_ac11_config_intensity_enabled_without_cli_flag(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _case_paths("clean_hu")
     out_dir = tmp_path / "out"
@@ -241,19 +241,19 @@ def test_ac11_config_intensity_enabled_without_cli_flag(tmp_path):
         ]
     )
     assert code == 0
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert "image_features" in report
 
 
 def test_ac11_intensity_param_default_and_override():
-    from segqc.config import default_config, load_config
+    from segfacet.config import default_config, load_config
 
     cfg = default_config()
     assert cfg.intensity_param("enabled", False) is False
 
 
 def test_ac11_flag_off_and_config_absent_leaves_image_features_absent(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _case_paths("clean_hu")
     out_dir = tmp_path / "out"
@@ -266,7 +266,7 @@ def test_ac11_flag_off_and_config_absent_leaves_image_features_absent(tmp_path):
             "--out", str(out_dir),
         ]
     )
-    report = json.loads((out_dir / "segqc_report.json").read_text(encoding="utf-8"))
+    report = json.loads((out_dir / "segfacet_report.json").read_text(encoding="utf-8"))
     assert "image_features" not in report
 
 
@@ -276,7 +276,7 @@ def test_ac11_flag_off_and_config_absent_leaves_image_features_absent(tmp_path):
 
 
 def test_ac15_two_intensity_invocations_write_byte_identical_reports(tmp_path):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, seg_path = _case_paths("implausible_metal")
     out_a = tmp_path / "out_a"
@@ -291,8 +291,8 @@ def test_ac15_two_intensity_invocations_write_byte_identical_reports(tmp_path):
     assert main(common_args + ["--out", str(out_a)]) in (0, 1)
     assert main(common_args + ["--out", str(out_b)]) in (0, 1)
 
-    bytes_a = (out_a / "segqc_report.json").read_bytes()
-    bytes_b = (out_b / "segqc_report.json").read_bytes()
+    bytes_a = (out_a / "segfacet_report.json").read_bytes()
+    bytes_b = (out_b / "segfacet_report.json").read_bytes()
     assert bytes_a == bytes_b
 
 
@@ -302,7 +302,7 @@ def test_ac15_two_intensity_invocations_write_byte_identical_reports(tmp_path):
 
 
 def test_adv_nonexistent_scan_path_with_intensity_exits_1_no_traceback(tmp_path, capsys):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     _scan_path, seg_path = _case_paths("clean_hu")
     out_dir = tmp_path / "out"
@@ -324,7 +324,7 @@ def test_adv_nonexistent_scan_path_with_intensity_exits_1_no_traceback(tmp_path,
 
 
 def test_adv_nonexistent_seg_path_with_intensity_exits_1_no_traceback(tmp_path, capsys):
-    from segqc.cli import main
+    from segfacet.cli import main
 
     scan_path, _seg_path = _case_paths("clean_hu")
     out_dir = tmp_path / "out"
@@ -354,8 +354,8 @@ def test_adv_grid_mismatched_scan_and_seg_with_intensity_exits_1_no_traceback(
     import nibabel as nib
     import numpy as np
 
-    from segqc.cli import main
-    from segqc.synth.clean_gt import build_clean_spine
+    from segfacet.cli import main
+    from segfacet.synth.clean_gt import build_clean_spine
 
     spine = build_clean_spine(levels=("L1", "L2", "L3"))
     seg_path = tmp_path / "seg.nii.gz"

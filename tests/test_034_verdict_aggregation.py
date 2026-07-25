@@ -2,7 +2,7 @@
 
 Covers all 22 Acceptance Criteria plus adversarial and edge-case inputs:
 
-- AC1:      segqc.aggregate public API (__all__ contents).
+- AC1:      segfacet.aggregate public API (__all__ contents).
 - AC2-AC5:  Severity-dominance verdict mapping (no findings / all-FLAG /
             mixed-with-FAIL / all-PASS).
 - AC6-AC9:  Case-level vs per-vertebra attribution; message carried verbatim.
@@ -39,15 +39,15 @@ import pathlib
 
 import pytest
 
-from segqc.aggregate import (
+from segfacet.aggregate import (
     CaseResult,
     aggregate_verdict,
     build_case_result,
     finding_to_reason,
 )
-from segqc.config import SUPPORTED_SCHEMA_VERSION, HeuristicConfig, default_config, load_config
-from segqc.heuristics.finding import Finding
-from segqc.verdict import Reason, Severity, Verdict
+from segfacet.config import SUPPORTED_SCHEMA_VERSION, HeuristicConfig, default_config, load_config
+from segfacet.heuristics.finding import Finding
+from segfacet.verdict import Reason, Severity, Verdict
 
 # Default convention integer labels (T12 == 19, L1 == 20, L2 == 21).
 T12 = 19
@@ -96,8 +96,8 @@ def _write_yaml(tmp_path: pathlib.Path, content: str, name: str = "config.yaml")
 
 
 def test_ac1_aggregate_module_exposes_public_names():
-    """AC1: segqc.aggregate exposes all four public names via __all__."""
-    import segqc.aggregate as agg
+    """AC1: segfacet.aggregate exposes all four public names via __all__."""
+    import segfacet.aggregate as agg
 
     assert set(agg.__all__) == {
         "aggregate_verdict",

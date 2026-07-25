@@ -1,5 +1,5 @@
 """Tests for item 047 — delta-to-reference rule family
-(``src/segqc/heuristics/reference_delta.py``).
+(``src/segfacet/heuristics/reference_delta.py``).
 
 Covers Acceptance Criteria AC1-AC18:
 
@@ -41,13 +41,13 @@ import pathlib
 
 import pytest
 
-import segqc.heuristics.reference_delta  # noqa: F401 — triggers ReferenceDeltaRule registration
-from segqc.aggregate import build_case_result
-from segqc.config import SUPPORTED_SCHEMA_VERSION, default_config, load_config
-from segqc.heuristics import Rule, get_rule, iter_rules, run_rules
-from segqc.heuristics.reference_delta import ReferenceDeltaRule
-from segqc.heuristics.rule import _RULES
-from segqc.verdict import Severity
+import segfacet.heuristics.reference_delta  # noqa: F401 — triggers ReferenceDeltaRule registration
+from segfacet.aggregate import build_case_result
+from segfacet.config import SUPPORTED_SCHEMA_VERSION, default_config, load_config
+from segfacet.heuristics import Rule, get_rule, iter_rules, run_rules
+from segfacet.heuristics.reference_delta import ReferenceDeltaRule
+from segfacet.heuristics.rule import _RULES
+from segfacet.verdict import Severity
 
 
 # =========================================================================== #

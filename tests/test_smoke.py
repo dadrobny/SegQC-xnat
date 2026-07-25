@@ -1,4 +1,4 @@
-"""Smoke tests for the segqc package scaffolding (item 001).
+"""Smoke tests for the segfacet package scaffolding (item 001).
 
 These tests intentionally cover only that the package imports and the CLI parses
 and dispatches cleanly. The full test harness and synthetic NIfTI fixtures are
@@ -7,18 +7,18 @@ item 002; real ``run`` behaviour is item 006.
 
 import pytest
 
-import segqc
-from segqc.cli import main
+import segfacet
+from segfacet.cli import main
 
 
 def test_import_package():
-    """`import segqc` succeeds and exposes a non-empty version string."""
-    assert isinstance(segqc.__version__, str)
-    assert segqc.__version__ != ""
+    """`import segfacet` succeeds and exposes a non-empty version string."""
+    assert isinstance(segfacet.__version__, str)
+    assert segfacet.__version__ != ""
 
 
 def test_cli_help_exits_zero(capsys):
-    """`segqc --help` exits 0 and mentions the `run` subcommand."""
+    """`segfacet --help` exits 0 and mentions the `run` subcommand."""
     with pytest.raises(SystemExit) as exc_info:
         main(["--help"])
     assert exc_info.value.code == 0
@@ -26,15 +26,15 @@ def test_cli_help_exits_zero(capsys):
 
 
 def test_cli_version_exits_zero(capsys):
-    """`segqc --version` exits 0 and prints the package version."""
+    """`segfacet --version` exits 0 and prints the package version."""
     with pytest.raises(SystemExit) as exc_info:
         main(["--version"])
     assert exc_info.value.code == 0
-    assert segqc.__version__ in capsys.readouterr().out
+    assert segfacet.__version__ in capsys.readouterr().out
 
 
 def test_run_subcommand_help(capsys):
-    """`segqc run --help` exits 0 and lists --scan/--seg/--out."""
+    """`segfacet run --help` exits 0 and lists --scan/--seg/--out."""
     with pytest.raises(SystemExit) as exc_info:
         main(["run", "--help"])
     assert exc_info.value.code == 0
@@ -45,7 +45,7 @@ def test_run_subcommand_help(capsys):
 
 
 def test_run_missing_inputs_returns_one(tmp_path):
-    """`segqc run` with non-existent inputs returns 1 (item 006 behaviour).
+    """`segfacet run` with non-existent inputs returns 1 (item 006 behaviour).
 
     Item 001 originally shipped a stub that returned 0 regardless. Item 006
     replaced that stub with a real loader: missing files now return exit code 1

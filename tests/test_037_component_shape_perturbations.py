@@ -10,7 +10,7 @@ Covers Acceptance Criteria AC1-AC22:
 - AC7-AC12 (Group B, ``fuse``): registration; absorbs an adjacent neighbour;
   the surviving label fires the fragmentation-kind finding; Expectation is
   well-formed and the pipeline agrees; un-perturbed present labels stay
-  unflagged; a single-label input raises SegQCInputError.
+  unflagged; a single-label input raises FacetInputError.
 - AC13-AC18 (Group C, ``inject_islands``): registration; adds a tiny
   disconnected component; the injected island does not read as
   fragmentation; fires the island-kind finding; Expectation is well-formed
@@ -23,8 +23,8 @@ Covers Acceptance Criteria AC1-AC22:
 
 Adversarial / edge-case scenarios included:
 - ``fragment`` / ``inject_islands`` with an explicit target absent from the
-  map raise SegQCInputError rather than silently no-op-ing.
-- ``fuse`` with an explicit non-adjacent pair raises SegQCInputError.
+  map raise FacetInputError rather than silently no-op-ing.
+- ``fuse`` with an explicit non-adjacent pair raises FacetInputError.
 - Each operator still fires its designated rule and preserves spacing under
   anisotropic spacing.
 - Two different seeds with an unspecified target may pick different labels,
@@ -38,25 +38,25 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-import segqc.synth  # noqa: F401 -- triggers self-registration of the three operators
-from segqc.config import bundled_default_config
-from segqc.features.components import compute_components
-from segqc.features.geometry import compute_label_geometry
-from segqc.heuristics.bounds import DEFAULT_BOUNDS
-from segqc.heuristics.fragmentation import (
+import segfacet.synth  # noqa: F401 -- triggers self-registration of the three operators
+from segfacet.config import bundled_default_config
+from segfacet.features.components import compute_components
+from segfacet.features.geometry import compute_label_geometry
+from segfacet.heuristics.bounds import DEFAULT_BOUNDS
+from segfacet.heuristics.fragmentation import (
     DEFAULT_FRAGMENTATION_INDEX_THRESHOLD,
     DEFAULT_ISLAND_MIN_VOXELS,
 )
-from segqc.io import SegQCInputError
-from segqc.pipeline import run_qc
-from segqc.synth import (
+from segfacet.io import FacetInputError
+from segfacet.pipeline import run_qc
+from segfacet.synth import (
     FAILURE_MODE_NAMES,
     build_clean_spine,
     get_perturbation,
     iter_perturbations,
     perturbation_names,
 )
-from segqc.synth.component_shape import (
+from segfacet.synth.component_shape import (
     FragmentPerturbation,
     FusePerturbation,
     InjectIslandsPerturbation,
@@ -261,9 +261,9 @@ def test_ac11_fuse_leaves_other_present_labels_unflagged():
 
 def test_ac12_fuse_rejects_input_with_fewer_than_two_labels():
     """AC12: applying FusePerturbation() to a single-label map raises
-    SegQCInputError."""
+    FacetInputError."""
     single = build_clean_spine(levels=["L3"]).seg_img
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         FusePerturbation().apply(single, seed=0)
 
 
@@ -417,25 +417,25 @@ def test_ac22_unspecified_target_is_seed_deterministic_and_self_consistent(
 
 def test_adv_fragment_explicit_target_absent_raises_clear_error():
     """Adversarial: an explicit target_label not present in the map raises
-    SegQCInputError rather than silently no-op-ing."""
+    FacetInputError rather than silently no-op-ing."""
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         FragmentPerturbation(target_label=999).apply(clean.seg_img, seed=0)
 
 
 def test_adv_inject_islands_explicit_target_absent_raises_clear_error():
     """Adversarial: an explicit target_label not present in the map raises
-    SegQCInputError rather than silently no-op-ing."""
+    FacetInputError rather than silently no-op-ing."""
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         InjectIslandsPerturbation(target_label=999).apply(clean.seg_img, seed=0)
 
 
 def test_adv_fuse_explicit_non_adjacent_pair_raises():
     """Adversarial: fuse requires the target/neighbour pair to be adjacent;
-    a non-adjacent explicit pair raises SegQCInputError."""
+    a non-adjacent explicit pair raises FacetInputError."""
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         FusePerturbation(target_label=20, neighbour_label=23).apply(
             clean.seg_img, seed=0
         )
@@ -443,9 +443,9 @@ def test_adv_fuse_explicit_non_adjacent_pair_raises():
 
 def test_adv_fuse_explicit_neighbour_absent_raises():
     """Adversarial: an explicit neighbour_label not present in the map
-    raises SegQCInputError."""
+    raises FacetInputError."""
     clean = _clean()
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         FusePerturbation(target_label=20, neighbour_label=999).apply(
             clean.seg_img, seed=0
         )

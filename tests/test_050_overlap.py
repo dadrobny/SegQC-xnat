@@ -18,8 +18,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from segqc.io import SegQCInputError
-from segqc.labels import CANONICAL_ORDER, UNKNOWN, LabelConvention
+from segfacet.io import FacetInputError
+from segfacet.labels import CANONICAL_ORDER, UNKNOWN, LabelConvention
 
 
 # =========================================================================== #
@@ -53,8 +53,8 @@ def _range_1d(n, label_voxels):
 
 
 def test_ac1_import_from_overlap_module():
-    """AC1: compute_overlap, LabelOverlap, OverlapResult import from segqc.eval.overlap."""
-    from segqc.eval.overlap import (  # noqa: F401
+    """AC1: compute_overlap, LabelOverlap, OverlapResult import from segfacet.eval.overlap."""
+    from segfacet.eval.overlap import (  # noqa: F401
         LabelOverlap,
         OverlapResult,
         compute_overlap,
@@ -64,15 +64,15 @@ def test_ac1_import_from_overlap_module():
 
 
 def test_ac1_reexported_from_eval_package():
-    """AC1: compute_overlap is re-exported from segqc.eval."""
-    from segqc.eval import compute_overlap
+    """AC1: compute_overlap is re-exported from segfacet.eval."""
+    from segfacet.eval import compute_overlap
 
     assert callable(compute_overlap)
 
 
 def test_ac1_module_dunder_all():
-    """AC1: segqc.eval.overlap.__all__ lists all three public names."""
-    import segqc.eval.overlap as overlap_mod
+    """AC1: segfacet.eval.overlap.__all__ lists all three public names."""
+    import segfacet.eval.overlap as overlap_mod
 
     assert set(overlap_mod.__all__) >= {
         "compute_overlap",
@@ -85,7 +85,7 @@ def test_ac1_label_overlap_is_frozen_dataclass_with_fields():
     """AC1: LabelOverlap is frozen and carries the documented fields."""
     import dataclasses
 
-    from segqc.eval.overlap import LabelOverlap
+    from segfacet.eval.overlap import LabelOverlap
 
     assert dataclasses.is_dataclass(LabelOverlap)
     assert dataclasses.fields(LabelOverlap)[0].name  # non-empty
@@ -109,7 +109,7 @@ def test_ac1_overlap_result_is_frozen_dataclass_with_fields():
     """AC1: OverlapResult is frozen and carries the documented fields."""
     import dataclasses
 
-    from segqc.eval.overlap import OverlapResult
+    from segfacet.eval.overlap import OverlapResult
 
     assert dataclasses.is_dataclass(OverlapResult)
     field_names = {f.name for f in dataclasses.fields(OverlapResult)}
@@ -127,7 +127,7 @@ def test_ac1_overlap_result_is_frozen_dataclass_with_fields():
 
 def test_ac1_compute_overlap_default_spacing():
     """AC1: compute_overlap accepts (candidate, gt) with a default spacing."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     arr = _range_1d(4, {1: (0, 4)})
     result = compute_overlap(arr, arr)
@@ -141,7 +141,7 @@ def test_ac1_compute_overlap_default_spacing():
 
 def test_ac2_identical_maps_all_dice_one():
     """AC2: candidate == gt with two labels -> every entry has dice == jaccard == 1.0."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     arr = _range_1d(10, {1: (0, 4), 2: (4, 10)})
     result = compute_overlap(arr, arr)
@@ -155,7 +155,7 @@ def test_ac2_identical_maps_all_dice_one():
 
 def test_ac2_identical_maps_aggregates_one():
     """AC2: identical maps -> mean_dice, mean_jaccard, volume_weighted_dice all 1.0."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     arr = _range_1d(10, {1: (0, 4), 2: (4, 10)})
     result = compute_overlap(arr, arr)
@@ -171,7 +171,7 @@ def test_ac2_identical_maps_aggregates_one():
 
 def test_ac3_disjoint_same_label_dice_zero():
     """AC3: a label present in both maps but on disjoint voxels -> dice == jaccard == 0.0."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _range_1d(10, {1: (0, 4)})
     gt = _range_1d(10, {1: (6, 10)})
@@ -192,7 +192,7 @@ def test_ac3_disjoint_same_label_dice_zero():
 
 def test_ac4_partial_overlap_hand_computed():
     """AC4: a=10, b=8, i=4 -> dice == 2*4/18, jaccard == 4/(18-4)."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     # candidate label 1 occupies [0:10) (a=10); gt label 1 occupies [6:14) (b=8);
     # intersection is [6:10) -> i=4.
@@ -214,7 +214,7 @@ def test_ac4_partial_overlap_hand_computed():
 
 def test_ac5_candidate_only_label_is_unmatched():
     """AC5: a label present only in candidate is unmatched with dice/jaccard 0 and gt_voxels 0."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _range_1d(10, {1: (0, 4)})
     gt = _range_1d(10, {})
@@ -230,7 +230,7 @@ def test_ac5_candidate_only_label_is_unmatched():
 
 def test_ac5_gt_only_label_is_unmatched():
     """AC5: a label present only in gt is unmatched with dice/jaccard 0 and candidate_voxels 0."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _range_1d(10, {})
     gt = _range_1d(10, {2: (0, 5)})
@@ -246,7 +246,7 @@ def test_ac5_gt_only_label_is_unmatched():
 
 def test_ac5_no_exception_raised():
     """AC5: unmatched labels never raise."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _range_1d(10, {1: (0, 4)})
     gt = _range_1d(10, {2: (5, 9)})
@@ -255,7 +255,7 @@ def test_ac5_no_exception_raised():
 
 def test_ac5_unmatched_excluded_from_aggregates_and_counted():
     """AC5: unmatched entries are excluded from aggregates and counted in n_unmatched."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _range_1d(10, {1: (0, 4)})
     gt = _range_1d(10, {2: (5, 9)})
@@ -274,7 +274,7 @@ def test_ac5_unmatched_excluded_from_aggregates_and_counted():
 
 def test_ac6_mean_over_matched_only():
     """AC6: mean_dice/mean_jaccard equal the hand mean over matched labels only."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     # Label 1: matched, full overlap -> dice 1.0, jaccard 1.0.
     # Label 2: matched, disjoint -> dice 0.0, jaccard 0.0.
@@ -303,7 +303,7 @@ def test_ac6_mean_over_matched_only():
 
 def test_ac7_physical_volume_uses_gt_voxels_and_spacing():
     """AC7: physical_volume_mm3 == gt_voxels * sx * sy * sz for every entry."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _range_1d(20, {1: (0, 10), 2: (10, 12)})
     gt = _range_1d(20, {1: (0, 8), 2: (10, 14)})
@@ -318,7 +318,7 @@ def test_ac7_physical_volume_uses_gt_voxels_and_spacing():
 
 def test_ac7_volume_weighted_dice_hand_computed_and_differs_from_mean():
     """AC7: volume_weighted_dice equals the hand weighted mean and differs from mean_dice."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     # Label 1: full overlap -> dice 1.0, gt volume 2 voxels (small).
     # Label 2: partial overlap -> dice < 1.0, gt volume 20 voxels (large).
@@ -349,7 +349,7 @@ def test_ac7_volume_weighted_dice_hand_computed_and_differs_from_mean():
 
 def test_ac8_dice_jaccard_identical_across_spacing():
     """AC8: per-label dice/jaccard and mean aggregates are identical across spacings."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _array(
         (40,),
@@ -372,7 +372,7 @@ def test_ac8_dice_jaccard_identical_across_spacing():
 
 def test_ac8_physical_volume_scales_with_spacing():
     """AC8: physical_volume_mm3 reflects spacing while dice/jaccard do not."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _range_1d(20, {1: (0, 10)})
     gt = _range_1d(20, {1: (0, 8)})
@@ -390,7 +390,7 @@ def test_ac8_physical_volume_scales_with_spacing():
 
 def test_ac9_all_zero_inputs_empty_result():
     """AC9: two all-background arrays yield an empty per_label, zero counts, None aggregates."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = np.zeros((10,), dtype=np.int64)
     gt = np.zeros((10,), dtype=np.int64)
@@ -410,7 +410,7 @@ def test_ac9_all_zero_inputs_empty_result():
 
 def test_ac10_names_match_default_convention():
     """AC10: LabelOverlap.name equals convention.name_of(value) for L1 and L3."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _range_1d(20, {20: (0, 4), 22: (10, 14)})
     gt = _range_1d(20, {20: (0, 4), 22: (10, 14)})
@@ -422,7 +422,7 @@ def test_ac10_names_match_default_convention():
 
 def test_ac10_per_label_ordered_canonically_then_by_value():
     """AC10: per_label is ordered by CANONICAL_ORDER for recognised, then value for unrecognised."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     # Values inserted out of canonical order: L3(22), C1(1), unmapped(500), T1(8).
     label_map = {22: (0, 2), 1: (2, 4), 500: (4, 6), 8: (6, 8)}
@@ -444,7 +444,7 @@ def test_ac10_per_label_ordered_canonically_then_by_value():
 
 def test_ac11_two_unmapped_labels_stay_separate():
     """AC11: two distinct unmapped labels produce two separate UNKNOWN-named entries."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _range_1d(20, {900: (0, 4), 901: (10, 18)})
     gt = _range_1d(20, {900: (0, 4), 901: (10, 14)})
@@ -460,32 +460,32 @@ def test_ac11_two_unmapped_labels_stay_separate():
 
 
 # =========================================================================== #
-# AC12: mismatched array shapes raise SegQCInputError
+# AC12: mismatched array shapes raise FacetInputError
 # =========================================================================== #
 
 
-def test_ac12_mismatched_shapes_raise_segqc_input_error():
-    """AC12: candidate/gt of different shape raise SegQCInputError."""
-    from segqc.eval.overlap import compute_overlap
+def test_ac12_mismatched_shapes_raise_segfacet_input_error():
+    """AC12: candidate/gt of different shape raise FacetInputError."""
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = np.zeros((10,), dtype=np.int64)
     gt = np.zeros((12,), dtype=np.int64)
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         compute_overlap(candidate, gt)
 
 
 def test_ac12_mismatched_shapes_not_raw_value_error():
-    """AC12: the shape mismatch is a SegQCInputError, not a bare numpy ValueError."""
-    from segqc.eval.overlap import compute_overlap
+    """AC12: the shape mismatch is a FacetInputError, not a bare numpy ValueError."""
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = np.zeros((4, 4), dtype=np.int64)
     gt = np.zeros((4, 5), dtype=np.int64)
     try:
         compute_overlap(candidate, gt)
-    except SegQCInputError:
+    except FacetInputError:
         pass
     else:
-        pytest.fail("expected SegQCInputError")
+        pytest.fail("expected FacetInputError")
 
 
 # =========================================================================== #
@@ -495,7 +495,7 @@ def test_ac12_mismatched_shapes_not_raw_value_error():
 
 def test_ac13_deterministic_across_two_calls():
     """AC13: two calls on the same inputs return equal per_label ordering and aggregates."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _range_1d(20, {1: (0, 10), 900: (12, 16)})
     gt = _range_1d(20, {1: (4, 14), 900: (12, 15)})
@@ -513,7 +513,7 @@ def test_ac13_deterministic_across_two_calls():
 
 def test_ac13_inputs_not_mutated():
     """AC13: candidate and gt arrays are byte-for-byte unchanged after the call."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _range_1d(20, {1: (0, 10), 900: (12, 16)})
     gt = _range_1d(20, {1: (4, 14), 900: (12, 15)})
@@ -531,7 +531,7 @@ def test_ac13_inputs_not_mutated():
 
 def test_adv_single_voxel_label_matched():
     """A single-voxel matched label has candidate_voxels == gt_voxels == 1, dice == 1.0."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _array((10,), {5: [(3,)]})
     gt = _array((10,), {5: [(3,)]})
@@ -544,7 +544,7 @@ def test_adv_single_voxel_label_matched():
 
 def test_adv_asymmetric_containment_dice_less_than_one():
     """A label fully contained in the other (asymmetric sizes) yields DICE < 1."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     # candidate label occupies [0:2) fully inside gt's [0:10).
     candidate = _range_1d(20, {1: (0, 2)})
@@ -562,7 +562,7 @@ def test_adv_asymmetric_containment_dice_less_than_one():
 
 def test_adv_matched_label_zero_intersection_nonzero_both_sides():
     """A label present (non-zero voxels) in both maps but zero intersection is matched, DICE 0."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _range_1d(20, {7: (0, 3)})
     gt = _range_1d(20, {7: (10, 15)})
@@ -578,7 +578,7 @@ def test_adv_matched_label_zero_intersection_nonzero_both_sides():
 
 def test_adv_negative_and_large_unmapped_label_still_computed():
     """A negative or very large unmapped integer label is named UNKNOWN and still computed."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = np.zeros((10,), dtype=np.int64)
     gt = np.zeros((10,), dtype=np.int64)
@@ -597,7 +597,7 @@ def test_adv_negative_and_large_unmapped_label_still_computed():
 
 def test_adv_zero_spacing_component_zeroes_physical_volume_but_not_dice():
     """A zero spacing component zeroes physical_volume_mm3 while per-label dice is unaffected."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _range_1d(20, {1: (0, 10)})
     gt = _range_1d(20, {1: (0, 8)})
@@ -611,7 +611,7 @@ def test_adv_all_weights_zero_volume_weighted_dice_is_none():
     """When every matched label's GT voxel count is nonzero but spacing collapses volume to zero,
     volume_weighted_dice still computes (weight 0 for every matched entry -> falls back to None).
     """
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = _range_1d(20, {1: (0, 10), 2: (10, 15)})
     gt = _range_1d(20, {1: (0, 8), 2: (10, 14)})
@@ -622,7 +622,7 @@ def test_adv_all_weights_zero_volume_weighted_dice_is_none():
 
 def test_adv_custom_convention_overrides_naming():
     """A caller-supplied convention names labels instead of the default."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     custom = LabelConvention.from_mapping({42: "Custom"})
     candidate = _range_1d(10, {42: (0, 4)})
@@ -633,7 +633,7 @@ def test_adv_custom_convention_overrides_naming():
 
 def test_adv_3d_shape_supported():
     """compute_overlap works on 3-D arrays, not just 1-D."""
-    from segqc.eval.overlap import compute_overlap
+    from segfacet.eval.overlap import compute_overlap
 
     candidate = np.zeros((4, 4, 4), dtype=np.int64)
     gt = np.zeros((4, 4, 4), dtype=np.int64)

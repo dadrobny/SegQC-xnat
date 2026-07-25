@@ -2,19 +2,19 @@
 over item 053's harness + item 054's metrics).
 
 Covers all fifteen Acceptance Criteria plus adversarial and edge-case inputs.
-``segqc.eval.calibrate`` does not exist yet at the time this file is written;
+``segfacet.eval.calibrate`` does not exist yet at the time this file is written;
 its names are imported **locally inside each test function** (mirroring
 ``tests/test_053_eval_harness.py`` / ``tests/test_054_metrics.py``'s treatment
 of their then-new modules) so the file can still be collected before the
-module is implemented. Names from the already-merged ``segqc.eval.harness``
-and ``segqc.eval.metrics`` modules (items 053/054) are imported at the top of
+module is implemented. Names from the already-merged ``segfacet.eval.harness``
+and ``segfacet.eval.metrics`` modules (items 053/054) are imported at the top of
 the file as usual.
 
 Three complementary techniques keep this suite fast and precise:
 
 1. **Pure config-transformation tests** (AC1-AC4, adversarial) exercise
    ``ThresholdAxis``/``apply_assignment`` directly against a bare
-   ``segqc.config.default_config()`` -- no pipeline, no evaluation.
+   ``segfacet.config.default_config()`` -- no pipeline, no evaluation.
 2. **Direct ``CalibrationObjective.evaluate(metrics)`` unit tests** (AC6) feed
    hand-built ``CohortMetrics`` (mirroring test_054's ``_outcome``/``_case``
    factories) straight into the objective, independent of the grid loop.
@@ -26,8 +26,8 @@ Three complementary techniques keep this suite fast and precise:
    QC pipeline per grid point -- exactly the "fake/stub cohort object
    exposing ``.cases``" approach the item's Testing Strategy documents as an
    alternative to a full synthetic cohort. The stub is installed at
-   ``segqc.eval.harness.evaluate_cohort`` *and*, if importable,
-   ``segqc.eval.calibrate.evaluate_cohort`` (``raising=False``) so it takes
+   ``segfacet.eval.harness.evaluate_cohort`` *and*, if importable,
+   ``segfacet.eval.calibrate.evaluate_cohort`` (``raising=False``) so it takes
    effect whichever import style (module-level or per-call local import) the
    new module ends up using.
 4. **Real small synthetic-cohort tests** (AC7, AC13, an empty-cohort
@@ -35,7 +35,7 @@ Three complementary techniques keep this suite fast and precise:
    single-level ground truths built directly as raw ``ndarray`` label maps
    (bare rectangular blocks at integer vertebra label 22 / "L3"), following
    ``tests/test_053_eval_harness.py``'s own adversarial pattern of
-   constructing raw arrays rather than the heavier ``segqc.synth`` corpus
+   constructing raw arrays rather than the heavier ``segfacet.synth`` corpus
    machinery. A single, compact, off-border label keeps every other default
    rule (coverage/sequence/border/mislabel/fragmentation/reference_delta)
    silent, isolating the swept ``bounds`` threshold as the only variable
@@ -53,19 +53,19 @@ import json
 import numpy as np
 import pytest
 
-from segqc.config import default_config
-from segqc.eval.harness import CaseEvaluation, CohortEvaluation, EvaluationCase
-from segqc.eval.metrics import (
+from segfacet.config import default_config
+from segfacet.eval.harness import CaseEvaluation, CohortEvaluation, EvaluationCase
+from segfacet.eval.metrics import (
     CohortMetrics,
     ConfusionCounts,
     CorrelationResult,
     PerModeSensitivity,
     compute_cohort_metrics,
 )
-from segqc.eval.outcome import CaseOutcome, Outcome
-from segqc.io import SegQCInputError
+from segfacet.eval.outcome import CaseOutcome, Outcome
+from segfacet.io import FacetInputError
 
-LUMBAR_LABEL = 22  # "L3" per segqc.labels.DEFAULT_LABEL_MAP
+LUMBAR_LABEL = 22  # "L3" per segfacet.labels.DEFAULT_LABEL_MAP
 
 
 # =========================================================================== #
@@ -113,7 +113,7 @@ def _stub_case(outcome_kwargs, case_id="c") -> CaseEvaluation:
 
 
 def _make_evaluate_cohort_stub(builder):
-    """Return a stand-in for ``segqc.eval.harness.evaluate_cohort`` that
+    """Return a stand-in for ``segfacet.eval.harness.evaluate_cohort`` that
     ignores ``cases``/``positive_severity``/the item-092 reference kwargs and
     instead derives the cohort entirely from ``config`` via
     ``builder(config) -> list[CaseEvaluation]``, so a grid point's config
@@ -129,19 +129,19 @@ def _make_evaluate_cohort_stub(builder):
 def _patch_evaluate_cohort(monkeypatch, stub):
     """Install *stub* in place of ``evaluate_cohort`` for calibrate_thresholds.
 
-    Patches the source module (``segqc.eval.harness.evaluate_cohort``) --
+    Patches the source module (``segfacet.eval.harness.evaluate_cohort``) --
     effective if the new module does a per-call local import, matching
-    ``segqc.eval.harness.evaluate_case``'s own lazy-import-of-pipeline
-    convention -- and, if importable, ``segqc.eval.calibrate.evaluate_cohort``
+    ``segfacet.eval.harness.evaluate_case``'s own lazy-import-of-pipeline
+    convention -- and, if importable, ``segfacet.eval.calibrate.evaluate_cohort``
     directly (``raising=False``) -- effective if it is instead imported once
     at module load time. Whichever style the implementation uses, the stub
     takes effect.
     """
-    import segqc.eval.harness as harness_mod
+    import segfacet.eval.harness as harness_mod
 
     monkeypatch.setattr(harness_mod, "evaluate_cohort", stub)
     try:
-        import segqc.eval.calibrate as calibrate_mod
+        import segfacet.eval.calibrate as calibrate_mod
     except ImportError:
         return
     monkeypatch.setattr(calibrate_mod, "evaluate_cohort", stub, raising=False)
@@ -167,7 +167,7 @@ def _bounds_case(case_id, dims, expected_verdict, **expected_extra):
     """Build an EvaluationCase from a raw ndarray: a single compact
     rectangular block of ``LUMBAR_LABEL`` voxels sized ``dims`` (x, y, z),
     isotropic 1mm spacing so ``physical_volume_mm3 == prod(dims)`` exactly
-    and each ``extent_*_mm == dims[i]`` exactly (segqc.features.geometry).
+    and each ``extent_*_mm == dims[i]`` exactly (segfacet.features.geometry).
     Placed well away from the volume border so no other default rule
     (coverage/sequence/border/mislabel/fragmentation) fires."""
     shape = (160, 160, 160)
@@ -188,7 +188,7 @@ def _bounds_case(case_id, dims, expected_verdict, **expected_extra):
 
 def test_ac1_constructs_with_documented_fields():
     """AC1: ThresholdAxis carries name/rule_id/param_path/values verbatim."""
-    from segqc.eval.calibrate import ThresholdAxis
+    from segfacet.eval.calibrate import ThresholdAxis
 
     axis = ThresholdAxis(
         name="lumbar_max_volume",
@@ -204,7 +204,7 @@ def test_ac1_constructs_with_documented_fields():
 
 def test_ac1_coerces_list_inputs_to_tuples():
     """AC1: list-typed param_path/values are coerced to tuples (immutable/hashable)."""
-    from segqc.eval.calibrate import ThresholdAxis
+    from segfacet.eval.calibrate import ThresholdAxis
 
     axis = ThresholdAxis(
         name="k", rule_id="reference_delta", param_path=["max_robust_z"], values=[1.0, 2.0]
@@ -214,19 +214,19 @@ def test_ac1_coerces_list_inputs_to_tuples():
     hash(axis)  # must not raise -- confirms fields are hashable tuples
 
 
-def test_ac1_empty_param_path_raises_segqc_input_error():
-    """AC1: an empty param_path raises SegQCInputError."""
-    from segqc.eval.calibrate import ThresholdAxis
+def test_ac1_empty_param_path_raises_segfacet_input_error():
+    """AC1: an empty param_path raises FacetInputError."""
+    from segfacet.eval.calibrate import ThresholdAxis
 
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         ThresholdAxis(name="k", rule_id="bounds", param_path=(), values=(1.0,))
 
 
-def test_ac1_empty_values_raises_segqc_input_error():
-    """AC1: an empty values tuple raises SegQCInputError."""
-    from segqc.eval.calibrate import ThresholdAxis
+def test_ac1_empty_values_raises_segfacet_input_error():
+    """AC1: an empty values tuple raises FacetInputError."""
+    from segfacet.eval.calibrate import ThresholdAxis
 
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         ThresholdAxis(
             name="k", rule_id="bounds", param_path=("lumbar", "max_volume_mm3"), values=()
         )
@@ -240,7 +240,7 @@ def test_ac1_empty_values_raises_segqc_input_error():
 def test_ac2_apply_assignment_sets_nested_param_and_preserves_other_fields():
     """AC2: apply_assignment sets rules[bounds][params][lumbar][max_volume_mm3]
     while every other config field is preserved."""
-    from segqc.eval.calibrate import ThresholdAxis, apply_assignment
+    from segfacet.eval.calibrate import ThresholdAxis, apply_assignment
 
     base_config = default_config()
     axis = ThresholdAxis(
@@ -261,7 +261,7 @@ def test_ac2_apply_assignment_sets_nested_param_and_preserves_other_fields():
 
 def test_ac2_apply_assignment_creates_intermediate_dicts_when_absent():
     """AC2: rules/params/nested dicts are created as needed for a fresh rule id."""
-    from segqc.eval.calibrate import ThresholdAxis, apply_assignment
+    from segfacet.eval.calibrate import ThresholdAxis, apply_assignment
 
     base_config = default_config()
     assert base_config.rules == {}
@@ -279,7 +279,7 @@ def test_ac2_apply_assignment_creates_intermediate_dicts_when_absent():
 
 def test_ac3_apply_assignment_does_not_mutate_base_config():
     """AC3: base_config (and its rules dict) is unchanged after apply_assignment."""
-    from segqc.eval.calibrate import ThresholdAxis, apply_assignment
+    from segfacet.eval.calibrate import ThresholdAxis, apply_assignment
 
     base_config = default_config()
     base_before = copy.deepcopy(base_config)
@@ -295,7 +295,7 @@ def test_ac3_apply_assignment_does_not_mutate_base_config():
 def test_ac3_repeated_application_yields_independent_configs():
     """AC3: two applications off the same base yield independent configs with
     no shared nested state."""
-    from segqc.eval.calibrate import ThresholdAxis, apply_assignment
+    from segfacet.eval.calibrate import ThresholdAxis, apply_assignment
 
     base_config = default_config()
     axis = ThresholdAxis(
@@ -326,7 +326,7 @@ def _trivial_stub(config):
 def test_ac4_grid_is_cartesian_product_last_axis_fastest(monkeypatch):
     """AC4: N axes with k_i values each yield prod(k_i) assignments, axes in
     given order, values in each axis's order, last axis varying fastest."""
-    from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
+    from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
 
     _patch_evaluate_cohort(monkeypatch, _make_evaluate_cohort_stub(_trivial_stub))
 
@@ -353,7 +353,7 @@ def test_ac4_grid_is_cartesian_product_last_axis_fastest(monkeypatch):
 def test_ac4_empty_axes_yields_single_empty_assignment(monkeypatch):
     """AC4: an empty axis sequence yields exactly one candidate: the empty
     assignment (base config unchanged)."""
-    from segqc.eval.calibrate import calibrate_thresholds
+    from segfacet.eval.calibrate import calibrate_thresholds
 
     _patch_evaluate_cohort(monkeypatch, _make_evaluate_cohort_stub(_trivial_stub))
 
@@ -370,7 +370,7 @@ def test_ac4_empty_axes_yields_single_empty_assignment(monkeypatch):
 def test_ac5_one_candidate_result_per_grid_point_in_order(monkeypatch):
     """AC5: result.candidates has one CandidateResult per grid point, in grid
     order, each carrying a real CohortMetrics."""
-    from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
+    from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
 
     _patch_evaluate_cohort(monkeypatch, _make_evaluate_cohort_stub(_trivial_stub))
 
@@ -414,7 +414,7 @@ def _metrics_with_per_mode(per_mode, false_positive_rate=0.0):
 
 def test_ac6_objective_feasible_when_every_present_mode_meets_floor():
     """AC6: every reported per-mode sensitivity (n_cases>0) >= floor -> feasible."""
-    from segqc.eval.calibrate import CalibrationObjective
+    from segfacet.eval.calibrate import CalibrationObjective
 
     metrics = _metrics_with_per_mode(
         (
@@ -436,7 +436,7 @@ def test_ac6_objective_feasible_when_every_present_mode_meets_floor():
 
 def test_ac6_objective_infeasible_when_a_present_mode_misses_floor():
     """AC6: any present-mode sensitivity below the floor -> infeasible."""
-    from segqc.eval.calibrate import CalibrationObjective
+    from segfacet.eval.calibrate import CalibrationObjective
 
     metrics = _metrics_with_per_mode(
         (
@@ -457,7 +457,7 @@ def test_ac6_objective_infeasible_when_a_present_mode_misses_floor():
 
 def test_ac6_objective_default_floor_is_one():
     """AC6/Assumptions: CalibrationObjective() defaults sensitivity_floor to 1.0."""
-    from segqc.eval.calibrate import CalibrationObjective
+    from segfacet.eval.calibrate import CalibrationObjective
 
     assert CalibrationObjective().sensitivity_floor == pytest.approx(1.0)
 
@@ -471,7 +471,7 @@ def test_ac7_selection_recovers_separating_bounds_threshold():
     """AC7: on a real cohort where only a mid-range max_volume_mm3 both passes
     the clean case and catches the oversized injected failure, calibrate_
     thresholds selects that value as best, feasible, minimal FPR."""
-    from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
+    from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
 
     clean_case = _bounds_case("clean", (22, 22, 21), "pass")  # volume 10164 mm3
     failure_case = _bounds_case(
@@ -525,7 +525,7 @@ def _ac8_build(config):
 
 def test_ac8_minimum_fpr_feasible_candidate_is_chosen(monkeypatch):
     """AC8: two feasible candidates (0.5 vs 0.0 FPR) -> the 0.0-FPR one wins."""
-    from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
+    from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
 
     _patch_evaluate_cohort(monkeypatch, _make_evaluate_cohort_stub(_ac8_build))
 
@@ -551,7 +551,7 @@ def test_ac9_fpr_tie_broken_by_sensitivity_then_grid_order(monkeypatch):
     """AC9: three candidates all feasible with FPR==0.0; candidate 2 beats
     candidate 1 on higher overall sensitivity, and beats candidate 3 (an exact
     tie with candidate 2 on both FPR and sensitivity) on earliest grid order."""
-    from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
+    from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
 
     def _build(config):
         value = config.rule_param("reference_delta", "max_robust_z", None)
@@ -624,7 +624,7 @@ def _ac10_build(config):
 def test_ac10_no_feasible_setting_reported_without_raising(monkeypatch):
     """AC10: no candidate meets the (default) floor -> best is None, feasible
     is False, status is a machine-readable reason, no exception raised."""
-    from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
+    from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
 
     _patch_evaluate_cohort(monkeypatch, _make_evaluate_cohort_stub(_ac10_build))
 
@@ -647,7 +647,7 @@ def test_ac10_no_feasible_setting_reported_without_raising(monkeypatch):
 def test_ac11_repeated_calls_are_equal_and_byte_identical(monkeypatch):
     """AC11: two calls with the same inputs return equal best assignments and
     byte-identical to_dict() JSON."""
-    from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
+    from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
 
     _patch_evaluate_cohort(monkeypatch, _make_evaluate_cohort_stub(_ac8_build))
 
@@ -674,7 +674,7 @@ def test_ac12_to_dict_round_trips_and_best_assignment_reproduces_metrics(monkeyp
     """AC12: to_dict() round-trips byte-identically through json.dumps/loads,
     and re-applying result.best.assignment reproduces the config that
     produced result.best.metrics."""
-    from segqc.eval.calibrate import ThresholdAxis, apply_assignment, calibrate_thresholds
+    from segfacet.eval.calibrate import ThresholdAxis, apply_assignment, calibrate_thresholds
 
     stub = _make_evaluate_cohort_stub(_ac8_build)
     _patch_evaluate_cohort(monkeypatch, stub)
@@ -693,7 +693,7 @@ def test_ac12_to_dict_round_trips_and_best_assignment_reproduces_metrics(monkeyp
     rebuilt_config = apply_assignment(base_config, result.best.assignment, (axis,))
     # Re-fetch evaluate_cohort now (after patching) so we call the stub, not
     # whatever was bound at module-import time.
-    from segqc.eval.harness import evaluate_cohort as patched_evaluate_cohort
+    from segfacet.eval.harness import evaluate_cohort as patched_evaluate_cohort
 
     rebuilt_cohort = patched_evaluate_cohort([], rebuilt_config)
     rebuilt_metrics = compute_cohort_metrics(rebuilt_cohort)
@@ -708,8 +708,8 @@ def test_ac12_to_dict_round_trips_and_best_assignment_reproduces_metrics(monkeyp
 def test_ac13_default_axes_cover_both_rule_families_and_run_without_error():
     """AC13: default_calibration_axes() covers reference_delta and bounds, and
     is a valid input to calibrate_thresholds on a small real cohort."""
-    from segqc.eval.calibrate import calibrate_thresholds, default_calibration_axes
-    from segqc.synth.clean_gt import build_clean_spine
+    from segfacet.eval.calibrate import calibrate_thresholds, default_calibration_axes
+    from segfacet.synth.clean_gt import build_clean_spine
 
     axes = default_calibration_axes()
     assert len(axes) >= 2
@@ -736,20 +736,20 @@ def test_ac13_default_axes_cover_both_rule_families_and_run_without_error():
 
 
 def test_ac14_grid_size_guard_raises_before_any_evaluation(monkeypatch):
-    """AC14: a grid exceeding max_grid_size raises SegQCInputError before
+    """AC14: a grid exceeding max_grid_size raises FacetInputError before
     evaluate_cohort is ever called."""
-    from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
+    from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
 
     def _boom(*_args, **_kwargs):
         raise AssertionError(
             "evaluate_cohort must not be called when the grid exceeds max_grid_size"
         )
 
-    import segqc.eval.harness as harness_mod
+    import segfacet.eval.harness as harness_mod
 
     monkeypatch.setattr(harness_mod, "evaluate_cohort", _boom)
     try:
-        import segqc.eval.calibrate as calibrate_mod
+        import segfacet.eval.calibrate as calibrate_mod
 
         monkeypatch.setattr(calibrate_mod, "evaluate_cohort", _boom, raising=False)
     except ImportError:
@@ -761,7 +761,7 @@ def test_ac14_grid_size_guard_raises_before_any_evaluation(monkeypatch):
     axis_b = ThresholdAxis(
         name="b", rule_id="reference_delta", param_path=("max_robust_z",), values=(1.0, 2.0, 3.0)
     )
-    with pytest.raises(SegQCInputError):
+    with pytest.raises(FacetInputError):
         calibrate_thresholds([], default_config(), (axis_a, axis_b), max_grid_size=5)
 
 
@@ -772,7 +772,7 @@ def test_ac14_grid_size_guard_raises_before_any_evaluation(monkeypatch):
 
 def test_ac15_inputs_not_mutated(monkeypatch):
     """AC15: base_config, cases, and axes are unchanged after the call."""
-    from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
+    from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
 
     _patch_evaluate_cohort(monkeypatch, _make_evaluate_cohort_stub(_trivial_stub))
 
@@ -808,7 +808,7 @@ def test_ac15_inputs_not_mutated(monkeypatch):
 def test_adversarial_axis_targets_nonexistent_param_path_creates_it():
     """A ThresholdAxis naming a brand-new rule id / param path is a valid
     input: apply_assignment creates the nested structure rather than erroring."""
-    from segqc.eval.calibrate import ThresholdAxis, apply_assignment
+    from segfacet.eval.calibrate import ThresholdAxis, apply_assignment
 
     base_config = default_config()
     axis = ThresholdAxis(
@@ -826,7 +826,7 @@ def test_adversarial_axis_targets_nonexistent_param_path_creates_it():
 
 def test_adversarial_single_axis_single_value_grid(monkeypatch):
     """A single axis with a single value yields exactly one candidate."""
-    from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
+    from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
 
     _patch_evaluate_cohort(monkeypatch, _make_evaluate_cohort_stub(_trivial_stub))
 
@@ -844,7 +844,7 @@ def test_adversarial_empty_cohort_no_crash_and_trivially_feasible():
     (item 053 AC15) propagates: zero-case metrics, no modes present, so the
     default sensitivity floor is trivially satisfied (nothing to catch) and
     the loop reports a well-formed feasible result without any stub."""
-    from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
+    from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
 
     axis = ThresholdAxis(
         name="k", rule_id="reference_delta", param_path=("max_robust_z",), values=(1.0, 2.0)
@@ -862,7 +862,7 @@ def test_adversarial_empty_cohort_no_crash_and_trivially_feasible():
 def test_adversarial_mode_with_zero_cases_excluded_from_floor():
     """A per-mode entry with n_cases == 0 (sensitivity is None) does not
     itself cause infeasibility -- it is excluded from the floor check."""
-    from segqc.eval.calibrate import CalibrationObjective
+    from segfacet.eval.calibrate import CalibrationObjective
 
     metrics = _metrics_with_per_mode(
         (
@@ -885,7 +885,7 @@ def test_adversarial_none_fpr_sorts_as_best_in_selection(monkeypatch):
     """A candidate with no expected-pass cases (false_positive_rate is None)
     beats a feasible candidate with a real, nonzero FPR -- None sorts as
     best/lowest per the item's documented ordering rule."""
-    from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
+    from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
 
     def _build(config):
         value = config.rule_param("reference_delta", "max_robust_z", None)
@@ -925,7 +925,7 @@ def test_adversarial_all_candidates_infeasible_still_evaluates_every_grid_point(
 ):
     """When every candidate is infeasible, the full grid is still evaluated
     (not short-circuited) and every CandidateResult is retained."""
-    from segqc.eval.calibrate import ThresholdAxis, calibrate_thresholds
+    from segfacet.eval.calibrate import ThresholdAxis, calibrate_thresholds
 
     _patch_evaluate_cohort(monkeypatch, _make_evaluate_cohort_stub(_ac10_build))
 

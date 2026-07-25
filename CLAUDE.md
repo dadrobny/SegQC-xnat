@@ -1,4 +1,4 @@
-# CLAUDE.md — SegQC-xnat
+# CLAUDE.md — FACET
 
 Project-specific notes for Claude Code. The **development workflow** (the AIDE
 loop, agents, claim protocol, merge policy, command hygiene, orchestrators) is a
@@ -7,20 +7,30 @@ first. This file holds only what is specific to *this* repository.
 
 ## What this project is
 
-**SegQC-xnat** is an automated quality-control tool for vertebra instance
-segmentations of spine CT. It extracts geometric/topological features from label
-maps, applies an explainable heuristic rule set to judge anatomical plausibility,
-and emits JSON + human-readable QC reports; it is packaged for deployment as an
-XNAT Container Service command. Full intent is in
-[`docs/aide/vision.md`](docs/aide/vision.md); the staged plan and status are in
-[`roadmap.md`](docs/aide/roadmap.md) and [`progress.md`](docs/aide/progress.md).
+**FACET** (Failure Analysis, Characterisation & Evaluation Toolkit) analyses
+instance segmentations of spine imaging. It extracts geometric/topological/
+intensity features from label maps, fabricates deliberately-broken label maps
+carrying a machine-readable record of *what* was broken, scores cases against
+reference distributions built from ground truth, and applies an explainable
+heuristic rule set that emits JSON + human-readable reports.
+
+> **⚠️ Pivot in progress (2026-07-25).** This repo was `SegQC-xnat`, an
+> XNAT-deployed QC gate. It is being refocused as the torch-free library half of
+> a failure-mode-driven segmentation-improvement research programme; the GPU /
+> SPINEPS / GSTT half lives in a separate private repo. **This rename landed
+> first; the AIDE re-vision has not happened yet** — so `docs/aide/` (vision,
+> roadmap, progress, 88 item specs, 12 queues) still describes the XNAT project
+> and still says `segqc` throughout. That is deliberate: those documents are the
+> provenance trail and are annotated, not rewritten. Treat them as history until
+> the re-vision lands. XNAT artefacts (`command.json`, `docker/`,
+> `docs/deployment.md`) are retained pending relocation to the programme repo.
 
 CPU-only, cross-platform (Windows/macOS/Linux), Python 3.9+.
 
 ## Project configuration
 
 All framework↔project settings live in **[`aide.toml`](aide.toml)**: source/test
-paths (`src/segqc`, `tests`), the venv layout and bootstrap, the test command,
+paths (`src/segfacet`, `tests`), the venv layout and bootstrap, the test command,
 the git merge mode, and loop knobs. Agents and scripts read it; edit `aide.toml`
 (not the framework) to change project facts. It also carries `[framework] repo`
 (where `framework`-typed insights are handed over) and `[validation]` — named
@@ -34,7 +44,7 @@ capability records **❓ Unverified** instead of silently passing.
 of the framework default and that overlay. Edit the **overlay**, never
 `settings.json` — including permission rules promoted by
 `/aide-review-permissions`, which belong in the overlay's
-`permissions.allow.add` list. The `src/segqc/**` and `tests/**` write-scope
+`permissions.allow.add` list. The `src/segfacet/**` and `tests/**` write-scope
 globs are templated from `aide.toml` and need no override.
 
 ## Virtual environment
@@ -75,9 +85,9 @@ Invoke Python/pytest via the venv in the relative form —
 .venv/bin/python -m pytest tests/test_035_cli_e2e.py::test_name -v
 
 # CLI, once installed editable (`pip install -e .[dev]`)
-segqc run --scan scan.nii.gz --seg seg.nii.gz --out out/       # QC one case
-segqc build-reference --cohort cohort/ --out reference.json    # Stage 6 artifact
-segqc evaluate --cohort manifest.json --out out/ [--calibrate] # Stage 7 harness
+segfacet run --scan scan.nii.gz --seg seg.nii.gz --out out/       # QC one case
+segfacet build-reference --cohort cohort/ --out reference.json    # Stage 6 artifact
+segfacet evaluate --cohort manifest.json --out out/ [--calibrate] # Stage 7 harness
 ```
 
 CI (`.github/workflows/ci.yml`) installs with `pip install -e .[dev] -c
@@ -94,7 +104,7 @@ capabilities" before adding a new one. There is no configured linter/formatter
 
 ## Architecture
 
-`segqc` extracts label-map features, runs an explainable rule engine over
+`segfacet` extracts label-map features, runs an explainable rule engine over
 them, and aggregates the findings into a verdict. The stage numbers below
 match `docs/aide/roadmap.md`/`progress.md` and the `NNN-*` work-item/test
 prefixes (`tests/test_0NN_*.py`) — when in doubt which stage a module belongs
@@ -105,7 +115,7 @@ to, its docstring names the item number.
   artifact from a cohort), `evaluate` (Stage 7, runs a cohort through the
   pipeline and reports aggregate metrics, optionally calibrating rule
   thresholds). All handlers defer heavy imports (NumPy/SciPy/NiBabel) into the
-  function body so `segqc --help` stays fast.
+  function body so `segfacet --help` stays fast.
 - **`pipeline.py`** is the orchestration seam: `extract_feature_record` calls
   the Stage 2/3 extractors under `features/` and assembles them (via
   `feature_report.build_features_block`) into one per-case `features` dict —
@@ -147,9 +157,9 @@ to, its docstring names the item number.
   manifest (`cohort.py`), `outcome.py`/`overlap.py`/`feature_match.py` compare
   against expected verdicts/ground truth, `metrics.py` aggregates
   FPR/FNR/etc., and `calibrate.py` grid-searches rule thresholds against those
-  metrics; `report.py` renders the `segqc evaluate` output.
+  metrics; `report.py` renders the `segfacet evaluate` output.
 - **`backend.py`** (Stage 10) — resolves `"cpu"`/`"gpu"`/`"auto"` (precedence:
-  explicit override → `SEGQC_BACKEND` env var → `"auto"`) to a NumPy- or
+  explicit override → `SEGFACET_BACKEND` env var → `"auto"`) to a NumPy- or
   CuPy-backed array-module handle. CuPy is probed with a guarded `import`
   inside the function body on every call (never cached at import time) so
   tests can inject/remove a fake `cupy` module in `sys.modules`. The default

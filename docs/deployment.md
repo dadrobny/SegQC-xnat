@@ -1,6 +1,6 @@
-# SegQC deployment guide (Docker + XNAT Container Service)
+# FACET deployment guide (Docker + XNAT Container Service)
 
-This guide covers deploying **SegQC** — automated quality control for vertebra
+This guide covers deploying **FACET** — automated quality control for vertebra
 instance segmentations of spine CT — as a Docker image and installing it as an
 **XNAT Container Service** command, so it can run against real XNAT session
 data. It closes Stage 9 of the project roadmap (see
@@ -24,12 +24,12 @@ steps documented"*.
   layers or packages — any Docker host (including a stock XNAT Docker server)
   can run it. No GPU is required.
 - **Bundled default reference artifact.** The image ships the default
-  reference artifact (`src/segqc/reference/reference_default.json`) as package
-  data, so `segqc run --reference` works out of the box with no extra mount —
+  reference artifact (`src/segfacet/reference/reference_default.json`) as package
+  data, so `segfacet run --reference` works out of the box with no extra mount —
   the optional `/input/reference` mount (see below) only matters if you want to
   *override* the bundled default.
 - **What you need on the Docker/XNAT host:** Docker (or the XNAT-managed Docker
-  server) able to pull/load the `segqc:latest` image, and access to a scan
+  server) able to pull/load the `segfacet:latest` image, and access to a scan
   (image) and segmentation (label-map) NIfTI resource per session.
 
 The four topics below map to the operator's actual workflow: build the image,
@@ -42,7 +42,7 @@ troubleshooting section closes out the guide.
 Build the default (no-radiomics) image from the repo root:
 
 ```bash
-docker build -t segqc:latest .
+docker build -t segfacet:latest .
 ```
 
 This produces a CPU-only image pinned against the committed `constraints.txt`
@@ -54,7 +54,7 @@ To build the variant with the optional `pyradiomics`/SimpleITK extra enabled
 arg:
 
 ```bash
-docker build -t segqc:radiomics --build-arg INSTALL_RADIOMICS=1 .
+docker build -t segfacet:radiomics --build-arg INSTALL_RADIOMICS=1 .
 ```
 
 `INSTALL_RADIOMICS` defaults to `0` (off); any of `1`/`true` enables it.
@@ -63,27 +63,27 @@ docker build -t segqc:radiomics --build-arg INSTALL_RADIOMICS=1 .
 container's entry point open so the XNAT Container Service (see item 067's
 `command.json`) can layer its own entry script on top. This means:
 
-- `docker run <image> segqc <args>` invokes the `segqc` CLI console script
-  directly (e.g. `docker run segqc:latest segqc --version`).
-- The image's `CMD` defaults to `segqc --help` for ergonomic manual inspection,
+- `docker run <image> segfacet <args>` invokes the `segfacet` CLI console script
+  directly (e.g. `docker run segfacet:latest segfacet --version`).
+- The image's `CMD` defaults to `segfacet --help` for ergonomic manual inspection,
   but is overridden by `command.json`'s `command-line`, which instead invokes
   the XNAT entry script (`python /app/docker/entrypoint.py ...`) described in
   §3 below.
 
 ## 2. Install `command.json` on an XNAT server
 
-The repo-root [`command.json`](../command.json) declares the `segqc` XNAT
+The repo-root [`command.json`](../command.json) declares the `segfacet` XNAT
 Container Service command: the scan/segmentation (+ optional config/reference)
 mounts, the `reference-mode`/`intensity-mode` boolean inputs, the two output
-report resources, and the `segqc-session` XNAT wrapper (external/derived
+report resources, and the `segfacet-session` XNAT wrapper (external/derived
 inputs and output handlers) that binds the command to an imaging session.
 
 To install it on an XNAT server:
 
 1. **Make the image available to the XNAT host's Docker server.** The image
-   referenced by `command.json` (`"image": "segqc:latest"`) must exist on (or
+   referenced by `command.json` (`"image": "segfacet:latest"`) must exist on (or
    be pullable by) the Docker server XNAT's Container Service is configured
-   against — e.g. `docker save segqc:latest | ... | docker load` on the XNAT
+   against — e.g. `docker save segfacet:latest | ... | docker load` on the XNAT
    host, push it to a registry the host can pull from, or build it directly on
    the host.
 2. **Upload/enable the command via the Container Service admin UI.** In
@@ -91,18 +91,18 @@ To install it on an XNAT server:
    Service admin panel), add a new command from the image (XNAT reads the
    image's embedded label or accepts a pasted `command.json`), then **enable**
    the command for the relevant project(s)/site, and **enable** its
-   `segqc-session` XNAT wrapper against the `xnat:imageSessionData` context so
+   `segfacet-session` XNAT wrapper against the `xnat:imageSessionData` context so
    it appears as a runnable action on an imaging session.
 3. **Follow the official XNAT Container Service documentation** for the exact
    click-path (it varies slightly by XNAT version):
    <https://wiki.xnat.org/container-service/building-docker-images-for-container-service>
 
-Once enabled, `segqc` (label "SegQC") appears as a runnable command on any
-session matching the `segqc-session` wrapper's context.
+Once enabled, `segfacet` (label "FACET") appears as a runnable command on any
+session matching the `segfacet-session` wrapper's context.
 
 ## 3. Configure inputs on a session
 
-The `segqc-session` XNAT wrapper in `command.json` binds a single **session**
+The `segfacet-session` XNAT wrapper in `command.json` binds a single **session**
 external input (the imaging session being QC'd) to a set of derived inputs
 mounted into the container, plus two boolean mode toggles:
 
@@ -120,9 +120,9 @@ entry script (`docker/entrypoint.py`) requires exactly one NIfTI file for
 Two boolean command inputs control which QC modes run:
 
 - **`reference-mode`** — when enabled, adds `--reference` to the underlying
-  `segqc run` invocation, turning on reference-grounded QC checks.
+  `segfacet run` invocation, turning on reference-grounded QC checks.
 - **`intensity-mode`** — when enabled, adds `--intensity` to the underlying
-  `segqc run` invocation, turning on the Stage-8 intensity/radiomics QC
+  `segfacet run` invocation, turning on the Stage-8 intensity/radiomics QC
   checks.
 
 Both default to `false` (off) and can be toggled per-run from the "Run
@@ -130,10 +130,10 @@ Containers" launch dialog on the session, alongside picking which
 scan/segmentation resource to use when a session has more than one.
 
 **Outputs.** The command produces two output resources, written back
-`as-a-child-of` the session under a resource labeled `SEGQC`:
+`as-a-child-of` the session under a resource labeled `SEGFACET`:
 
-- `segqc_report.json` — the machine-readable QC report.
-- `segqc_report.txt` — the human-readable QC report.
+- `segfacet_report.json` — the machine-readable QC report.
+- `segfacet_report.txt` — the human-readable QC report.
 
 Both land in the `/output` mount inside the container and are collected by
 XNAT's output handlers once the run completes successfully.
@@ -150,7 +150,7 @@ docker run --rm \
   -v /path/to/scan_dir:/input/scan:ro \
   -v /path/to/seg_dir:/input/seg:ro \
   -v /path/to/out_dir:/output \
-  segqc:latest \
+  segfacet:latest \
   python /app/docker/entrypoint.py \
     --scan-dir /input/scan --seg-dir /input/seg --out-dir /output
 ```
@@ -158,7 +158,7 @@ docker run --rm \
 - `scan_dir` and `seg_dir` must each contain **exactly one** NIfTI file
   (`*.nii`/`*.nii.gz`, case-insensitive).
 - `out_dir` must be writable by the container; on success it will contain both
-  `segqc_report.json` and `segqc_report.txt`.
+  `segfacet_report.json` and `segfacet_report.txt`.
 - To also exercise the optional overrides and mode toggles, add
   `-v /path/to/config_dir:/input/config:ro`,
   `-v /path/to/reference_dir:/input/reference:ro`, and append

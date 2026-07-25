@@ -5,7 +5,7 @@ The automated portion runs against a **synthetic VerSe-shaped stand-in** cohort
 built in ``tmp_path`` (real tiny NIfTIs from the production synth builders, laid
 out exactly like the committed ``verse19.yaml`` expects), driving the committed
 descriptor with ``--data-root`` pointed at the stand-in. The **real** VerSe19
-clause is gated on the ``SEGQC_VERSE_COHORT`` env var and **skips cleanly** when
+clause is gated on the ``SEGFACET_VERSE_COHORT`` env var and **skips cleanly** when
 the (uncommitted, large/licensed) cohort is absent — the common case, incl. CI.
 """
 from __future__ import annotations
@@ -17,25 +17,25 @@ from pathlib import Path
 import nibabel as nib
 import pytest
 
-from segqc.cli import main
-from segqc.datasets import (
+from segfacet.cli import main
+from segfacet.datasets import (
     DatasetDescriptor,
     bundled_descriptor_path,
     load_descriptor,
     resolve,
 )
-from segqc.synth.clean_gt import build_clean_spine
-from segqc.synth.intensity import paint_clean_scan
+from segfacet.synth.clean_gt import build_clean_spine
+from segfacet.synth.intensity import paint_clean_scan
 
 VERSE19 = bundled_descriptor_path("verse19.yaml")
 LEVELS = ("L1", "L2", "L3", "L4", "L5")
 
 
 def real_verse_cohort_dir() -> "Path | None":
-    """The real VerSe19 root from ``SEGQC_VERSE_COHORT`` iff set AND a directory,
+    """The real VerSe19 root from ``SEGFACET_VERSE_COHORT`` iff set AND a directory,
     else ``None`` — the single runtime gate for the real-cohort clause (analogue
     of item 084's ``real_verse_cohort_dir`` / item 075's ``cupy_available``)."""
-    raw = os.environ.get("SEGQC_VERSE_COHORT")
+    raw = os.environ.get("SEGFACET_VERSE_COHORT")
     if not raw:
         return None
     d = Path(raw)
@@ -44,7 +44,7 @@ def real_verse_cohort_dir() -> "Path | None":
 
 requires_verse = pytest.mark.skipif(
     real_verse_cohort_dir() is None,
-    reason="real VerSe19 cohort not mounted (set SEGQC_VERSE_COHORT to the VerSe19 root)",
+    reason="real VerSe19 cohort not mounted (set SEGFACET_VERSE_COHORT to the VerSe19 root)",
 )
 
 
@@ -143,11 +143,11 @@ def test_real_verse_clause_is_genuine_skip():
 
 
 def test_real_verse_cohort_dir_env(monkeypatch, tmp_path):
-    monkeypatch.delenv("SEGQC_VERSE_COHORT", raising=False)
+    monkeypatch.delenv("SEGFACET_VERSE_COHORT", raising=False)
     assert real_verse_cohort_dir() is None
-    monkeypatch.setenv("SEGQC_VERSE_COHORT", str(tmp_path / "nope"))
+    monkeypatch.setenv("SEGFACET_VERSE_COHORT", str(tmp_path / "nope"))
     assert real_verse_cohort_dir() is None  # nonexistent path -> None, not a crash
-    monkeypatch.setenv("SEGQC_VERSE_COHORT", str(tmp_path))
+    monkeypatch.setenv("SEGFACET_VERSE_COHORT", str(tmp_path))
     assert real_verse_cohort_dir() == tmp_path
 
 
@@ -170,7 +170,7 @@ def test_real_verse_resolves_training_split():
 # Scope guard: no raw scans committed, only the descriptor
 # --------------------------------------------------------------------------- #
 def test_no_raw_data_committed_under_datasets():
-    import segqc.datasets as ds
+    import segfacet.datasets as ds
 
     pkg_dir = Path(ds.__file__).resolve().parent
     offending = [
@@ -180,4 +180,4 @@ def test_no_raw_data_committed_under_datasets():
         and "__pycache__" not in p.parts  # ignore gitignored build bytecode
         and p.suffix not in {".py", ".yaml", ".yml", ".json"}
     ]
-    assert offending == [], f"unexpected non-descriptor files under segqc/datasets: {offending}"
+    assert offending == [], f"unexpected non-descriptor files under segfacet/datasets: {offending}"

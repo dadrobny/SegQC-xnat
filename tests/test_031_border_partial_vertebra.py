@@ -37,11 +37,11 @@ import pathlib
 
 import pytest
 
-import segqc.heuristics.border  # noqa: F401 — triggers BorderRule registration
-from segqc.heuristics import Finding, Rule, get_rule, iter_rules, run_rules
-from segqc.heuristics.rule import _RULES
-from segqc.verdict import Severity
-from segqc.config import (
+import segfacet.heuristics.border  # noqa: F401 — triggers BorderRule registration
+from segfacet.heuristics import Finding, Rule, get_rule, iter_rules, run_rules
+from segfacet.heuristics.rule import _RULES
+from segfacet.verdict import Severity
+from segfacet.config import (
     SUPPORTED_SCHEMA_VERSION,
     default_config,
     load_config,
@@ -142,7 +142,7 @@ def test_ac1_border_appears_in_iter_rules():
 
 
 def test_ac1_border_rule_is_rule_subclass():
-    """AC1: The registered BorderRule is a subclass of segqc.heuristics.Rule."""
+    """AC1: The registered BorderRule is a subclass of segfacet.heuristics.Rule."""
     assert isinstance(get_rule("border"), Rule)
 
 

@@ -25,8 +25,8 @@ import nibabel as nib
 import numpy as np
 import pytest
 
-from segqc.features.intensity import LabelIntensity, compute_label_intensity
-from segqc.features.radiomics import (
+from segfacet.features.intensity import LabelIntensity, compute_label_intensity
+from segfacet.features.radiomics import (
     LabelRadiomics,
     compute_label_radiomics,
     compute_radiomics_features,
@@ -86,17 +86,17 @@ def _blob_case_for_present_path():
 # =========================================================================== #
 
 def test_ac1_module_imports_without_pyradiomics():
-    """Importing segqc.features.radiomics raises nothing (PyRadiomics may
+    """Importing segfacet.features.radiomics raises nothing (PyRadiomics may
     be absent in this environment)."""
     import importlib
 
-    mod = importlib.import_module("segqc.features.radiomics")
+    mod = importlib.import_module("segfacet.features.radiomics")
     assert mod is not None
 
 
 def test_ac1_public_api_names_present():
     """The four public names + __all__ are exposed."""
-    import segqc.features.radiomics as mod
+    import segfacet.features.radiomics as mod
 
     for name in ("pyradiomics_available", "LabelRadiomics",
                  "compute_label_radiomics", "compute_radiomics_features"):
@@ -215,11 +215,11 @@ def test_ac6_disable_seam_first_order_still_populated():
 # =========================================================================== #
 
 def test_ac7_core_imports_succeed_without_pyradiomics():
-    """segqc, segqc.features, and segqc.features.radiomics all import
+    """segfacet, segfacet.features, and segfacet.features.radiomics all import
     cleanly (PyRadiomics is not required for the core package to load)."""
     import importlib
 
-    for module_name in ("segqc", "segqc.features", "segqc.features.radiomics"):
+    for module_name in ("segfacet", "segfacet.features", "segfacet.features.radiomics"):
         mod = importlib.import_module(module_name)
         assert mod is not None
 
@@ -476,7 +476,7 @@ def test_adv_single_voxel_label_builtin_path_valid_degenerate_result():
 def test_adv_backend_constants_match_result_values():
     """The module exposes backend marker constants matching the string
     values actually produced on the builtin path."""
-    import segqc.features.radiomics as mod
+    import segfacet.features.radiomics as mod
 
     scan_img, seg_img = _known_values_case()
     result = compute_label_radiomics(scan_img, seg_img, label=1, enable_pyradiomics=False)

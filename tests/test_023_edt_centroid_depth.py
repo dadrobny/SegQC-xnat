@@ -2,7 +2,7 @@
 
 Covers all eleven Acceptance Criteria plus adversarial and edge-case inputs:
 
-* AC1  — CentroidFeatures dataclass exported from segqc.features.centroids with
+* AC1  — CentroidFeatures dataclass exported from segfacet.features.centroids with
           all required fields.
 * AC2  — compute_edt_centroids exported and callable with expected signature.
 * AC3  — smooth_centre_voxel lies closer to the geometric interior than plain
@@ -68,11 +68,11 @@ from synthetic import (
 
 def _import_module():
     import importlib
-    return importlib.import_module("segqc.features.centroids")
+    return importlib.import_module("segfacet.features.centroids")
 
 
 def _get_api():
-    from segqc.features.centroids import CentroidFeatures, compute_edt_centroids
+    from segfacet.features.centroids import CentroidFeatures, compute_edt_centroids
     return CentroidFeatures, compute_edt_centroids
 
 
@@ -176,7 +176,7 @@ def _single_voxel_img(
 # =========================================================================== #
 
 def test_ac1_centroid_features_importable():
-    """AC1: CentroidFeatures is importable from segqc.features.centroids."""
+    """AC1: CentroidFeatures is importable from segfacet.features.centroids."""
     CentroidFeatures, _ = _get_api()
     assert CentroidFeatures is not None
 
@@ -254,7 +254,7 @@ def test_ac1_centroid_features_has_centroid_depth_strict():
 
 
 def test_ac1_centroid_features_in_module_all():
-    """AC1: CentroidFeatures appears in segqc.features.centroids.__all__."""
+    """AC1: CentroidFeatures appears in segfacet.features.centroids.__all__."""
     mod = _import_module()
     assert "CentroidFeatures" in getattr(mod, "__all__", [])
 
@@ -272,13 +272,13 @@ def test_ac1_centroid_features_label_field_value():
 # =========================================================================== #
 
 def test_ac2_compute_edt_centroids_importable():
-    """AC2: compute_edt_centroids is importable from segqc.features.centroids."""
+    """AC2: compute_edt_centroids is importable from segfacet.features.centroids."""
     _, compute_edt_centroids = _get_api()
     assert callable(compute_edt_centroids)
 
 
 def test_ac2_compute_edt_centroids_in_module_all():
-    """AC2: compute_edt_centroids appears in segqc.features.centroids.__all__."""
+    """AC2: compute_edt_centroids appears in segfacet.features.centroids.__all__."""
     mod = _import_module()
     assert "compute_edt_centroids" in getattr(mod, "__all__", [])
 
@@ -301,7 +301,7 @@ def test_ac2_callable_with_keyword_only_sigma():
 
 def test_ac2_callable_with_keyword_only_convention():
     """AC2: compute_edt_centroids accepts convention as a keyword argument."""
-    from segqc.labels import LabelConvention
+    from segfacet.labels import LabelConvention
     _, compute_edt_centroids = _get_api()
     img = _solid_label_img(label=1)
     convention = LabelConvention.default()
@@ -318,7 +318,7 @@ def test_ac2_returns_centroid_features_instance():
 
 
 def test_ac2_no_import_error():
-    """AC2: Importing segqc.features.centroids raises no error."""
+    """AC2: Importing segfacet.features.centroids raises no error."""
     mod = _import_module()
     assert hasattr(mod, "CentroidFeatures")
     assert hasattr(mod, "compute_edt_centroids")
@@ -335,7 +335,7 @@ def test_ac3_smooth_centre_inside_concave_label():
     block interior at y=7.5.  EDT-thresholding discards the thin flap, so the
     smooth centre stays in the deep block and is strictly closer to y=7.5.
     """
-    from segqc.features.centroids import compute_centroid
+    from segfacet.features.centroids import compute_centroid
     _, compute_edt_centroids = _get_api()
     img = _concave_label_img()
 
@@ -378,7 +378,7 @@ def test_ac3_smooth_centre_voxel_length_3():
 
 def test_ac4_strict_centre_inside_concave_label():
     """AC4: strict_centre_voxel is closer to the interior than CoM for a concave label."""
-    from segqc.features.centroids import compute_centroid
+    from segfacet.features.centroids import compute_centroid
     _, compute_edt_centroids = _get_api()
     img = _concave_label_img()
 
@@ -960,7 +960,7 @@ def test_adv_level_name_non_empty_for_mapped_label():
 
 def test_adv_level_name_non_empty_for_unmapped_label():
     """level_name is a non-empty string for an unmapped label (falls back to UNKNOWN)."""
-    from segqc.labels import UNKNOWN
+    from segfacet.labels import UNKNOWN
     _, compute_edt_centroids = _get_api()
     img = _solid_label_img(label=99)
     result = compute_edt_centroids(img, label=99)

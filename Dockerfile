@@ -1,20 +1,20 @@
-# Dockerfile — CPU-only base image for segqc (item 066).
+# Dockerfile — CPU-only base image for segfacet (item 066).
 #
-# Builds a slim, CPU-only image of the segqc pipeline pinned against the
+# Builds a slim, CPU-only image of the segfacet pipeline pinned against the
 # committed constraints.txt lockfile, with the bundled default reference
-# artifact (src/segqc/reference/reference_default.json) shipped as package
+# artifact (src/segfacet/reference/reference_default.json) shipped as package
 # data inside the installed wheel (no separate COPY needed for it — see
-# segqc.reference.artifact.default_artifact_path).
+# segfacet.reference.artifact.default_artifact_path).
 #
 # This image deliberately sets NO ENTRYPOINT: item 068 layers the XNAT entry
-# script on top of this base. `docker run <image> segqc <args>` invokes the
-# `segqc` console script directly.
+# script on top of this base. `docker run <image> segfacet <args>` invokes the
+# `segfacet` console script directly.
 #
 # Default build (no radiomics extra):
-#   docker build -t segqc:latest .
+#   docker build -t segfacet:latest .
 #
 # Radiomics-enabled variant (adds the optional `pyradiomics`/SimpleITK extra):
-#   docker build -t segqc:radiomics --build-arg INSTALL_RADIOMICS=1 .
+#   docker build -t segfacet:radiomics --build-arg INSTALL_RADIOMICS=1 .
 
 FROM python:3.11-slim
 
@@ -48,8 +48,8 @@ RUN python -m pip install --upgrade pip \
        fi
 
 # Non-root user for XNAT-host friendliness.
-RUN useradd --create-home --shell /bin/bash segqc
-USER segqc
+RUN useradd --create-home --shell /bin/bash segfacet
+USER segfacet
 
-# Ergonomic default; does not interfere with `docker run <image> segqc <args>`.
-CMD ["segqc", "--help"]
+# Ergonomic default; does not interfere with `docker run <image> segfacet <args>`.
+CMD ["segfacet", "--help"]

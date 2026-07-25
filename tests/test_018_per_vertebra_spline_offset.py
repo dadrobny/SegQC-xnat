@@ -44,9 +44,9 @@ from typing import List, Optional, Tuple
 import numpy as np
 import pytest
 
-from segqc.features.centroids import LabelCentroid
-from segqc.features.spline import SplineFit, fit_centroid_spline
-from segqc.features.spline_offset import VertebralSplineOffset, compute_spline_offsets
+from segfacet.features.centroids import LabelCentroid
+from segfacet.features.spline import SplineFit, fit_centroid_spline
+from segfacet.features.spline_offset import VertebralSplineOffset, compute_spline_offsets
 
 
 # =========================================================================== #
@@ -98,21 +98,21 @@ def _fit(centroids: List[LabelCentroid], degree: int = 3) -> SplineFit:
 
 
 def test_import_vertebral_spline_offset():
-    """VertebralSplineOffset is importable from segqc.features.spline_offset."""
-    from segqc.features.spline_offset import VertebralSplineOffset as VSO  # noqa: F401
+    """VertebralSplineOffset is importable from segfacet.features.spline_offset."""
+    from segfacet.features.spline_offset import VertebralSplineOffset as VSO  # noqa: F401
     assert VSO is VertebralSplineOffset
 
 
 def test_import_compute_spline_offsets():
-    """compute_spline_offsets is importable from segqc.features.spline_offset."""
-    from segqc.features.spline_offset import compute_spline_offsets as cso  # noqa: F401
+    """compute_spline_offsets is importable from segfacet.features.spline_offset."""
+    from segfacet.features.spline_offset import compute_spline_offsets as cso  # noqa: F401
     assert callable(cso)
 
 
 def test_no_import_error():
-    """Importing segqc.features.spline_offset raises no error."""
+    """Importing segfacet.features.spline_offset raises no error."""
     import importlib
-    mod = importlib.import_module("segqc.features.spline_offset")
+    mod = importlib.import_module("segfacet.features.spline_offset")
     assert hasattr(mod, "VertebralSplineOffset")
     assert hasattr(mod, "compute_spline_offsets")
 

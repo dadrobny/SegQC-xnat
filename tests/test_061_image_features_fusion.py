@@ -1,8 +1,8 @@
 """Tests for item 061 -- fusing intensity features into the JSON report &
-per-case feature table (``src/segqc/feature_report.py``: ``label_intensity_to_dict``
-/ ``build_image_features_block``; ``src/segqc/report.py``:
+per-case feature table (``src/segfacet/feature_report.py``: ``label_intensity_to_dict``
+/ ``build_image_features_block``; ``src/segfacet/report.py``:
 ``serialize_report``/``serialize_report_json`` gain ``image_features``;
-``src/segqc/human_report.py``: ``render_feature_table`` gains ``image_features``).
+``src/segfacet/human_report.py``: ``render_feature_table`` gains ``image_features``).
 
 Covers Acceptance Criteria AC1-AC13:
 
@@ -40,16 +40,16 @@ import json
 import jsonschema
 import pytest
 
-from segqc.config import bundled_default_config
-from segqc.feature_report import (
+from segfacet.config import bundled_default_config
+from segfacet.feature_report import (
     IMAGE_FEATURES_VERSION,
     build_image_features_block,
     label_intensity_to_dict,
 )
-from segqc.features.intensity import LabelIntensity
-from segqc.human_report import render_feature_table
-from segqc.report import serialize_report, serialize_report_json
-from segqc.verdict import Verdict
+from segfacet.features.intensity import LabelIntensity
+from segfacet.human_report import render_feature_table
+from segfacet.report import serialize_report, serialize_report_json
+from segfacet.verdict import Verdict
 
 
 # =========================================================================== #
