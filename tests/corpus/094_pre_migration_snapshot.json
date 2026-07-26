@@ -1,0 +1,632 @@
+{
+  "corpus/fixtures/base_scan.nii.gz|scan": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "45e89e885718d6083bc5de5994eb1c76f3e1d5d31743682fc5f0493cb6a3bf07",
+    "dtype": "float64",
+    "integer_labels": false,
+    "path": "corpus/fixtures/base_scan.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "corpus/fixtures/clean_control_seg.nii.gz|seg": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "74750af3a0299db5bc49af70d5c4db30739bb94efbeb93ae91fd2d734b5e849a",
+    "dtype": "int64",
+    "integer_labels": true,
+    "path": "corpus/fixtures/clean_control_seg.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "corpus/fixtures/mode1_displace_seg.nii.gz|seg": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "dc4cb9d0a5daec7d3669acf656ff73d1f4b17920e6f86aacb9998a67361bd134",
+    "dtype": "int64",
+    "integer_labels": true,
+    "path": "corpus/fixtures/mode1_displace_seg.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "corpus/fixtures/mode2_fragment_seg.nii.gz|seg": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "5d19ba57192fc5b8f04e60585a157a6d17884121709a7740ce279a49d8b67813",
+    "dtype": "int64",
+    "integer_labels": true,
+    "path": "corpus/fixtures/mode2_fragment_seg.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "corpus/fixtures/mode3_inject_islands_seg.nii.gz|seg": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "f6a6666e0ed5d3e0e87e6f1c60c2fe4be9373252cbefba3e597077c4ac119eff",
+    "dtype": "int64",
+    "integer_labels": true,
+    "path": "corpus/fixtures/mode3_inject_islands_seg.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "corpus/fixtures/mode4_relabel_swap_seg.nii.gz|seg": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "82eef45b8c7b3a921877c33ac2715648b1209f0d899f0b454ff1651b0ca4fb79",
+    "dtype": "int64",
+    "integer_labels": true,
+    "path": "corpus/fixtures/mode4_relabel_swap_seg.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "corpus/fixtures/mode5_remove_level_seg.nii.gz|seg": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "c9bbb579cca77ed446efad9045e0e46f4ee903cc4576b6525e72dc750f1a1eec",
+    "dtype": "int64",
+    "integer_labels": true,
+    "path": "corpus/fixtures/mode5_remove_level_seg.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "corpus/fixtures/mode6_crop_at_border_seg.nii.gz|seg": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "9c28fb90af911916fb3ddef796c6f85145971d1c40b255e65ed38a4829339a5a",
+    "dtype": "int64",
+    "integer_labels": true,
+    "path": "corpus/fixtures/mode6_crop_at_border_seg.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "corpus/fixtures/mode7_sequence_break_seg.nii.gz|seg": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "fe51e3bedfd129e7a4d2fe9326138690c0b12c88afa3f549a1531f285f362b62",
+    "dtype": "int64",
+    "integer_labels": true,
+    "path": "corpus/fixtures/mode7_sequence_break_seg.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "corpus/fixtures/mode8_force_overlap_seg.nii.gz|seg": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "ed3ddd4aae78ec5fd857a50583534c406253a6cead0157e594606e2fd78cf2e8",
+    "dtype": "int64",
+    "integer_labels": true,
+    "path": "corpus/fixtures/mode8_force_overlap_seg.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "corpus/intensity/fixtures/clean_hu_scan.nii.gz|scan": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "dd5c0d2336def3f25f1613e3ab9682f9fd50011aed09e8014c9b9975d9441ab6",
+    "dtype": "float64",
+    "integer_labels": false,
+    "path": "corpus/intensity/fixtures/clean_hu_scan.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "corpus/intensity/fixtures/clean_spine_seg.nii.gz|seg": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "74750af3a0299db5bc49af70d5c4db30739bb94efbeb93ae91fd2d734b5e849a",
+    "dtype": "int64",
+    "integer_labels": true,
+    "path": "corpus/intensity/fixtures/clean_spine_seg.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "corpus/intensity/fixtures/degenerate_uniform_scan.nii.gz|scan": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "33fd83be7499cc506ba1cb9e76e54071f31b0565740b59e4ab340e4dee2010d2",
+    "dtype": "float64",
+    "integer_labels": false,
+    "path": "corpus/intensity/fixtures/degenerate_uniform_scan.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "corpus/intensity/fixtures/implausible_metal_scan.nii.gz|scan": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "9817e616a9cbe83566c4816113c341244a3e735ead9f8bbbf679d6a5155fad03",
+    "dtype": "float64",
+    "integer_labels": false,
+    "path": "corpus/intensity/fixtures/implausible_metal_scan.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "corpus/intensity/fixtures/implausible_soft_tissue_scan.nii.gz|scan": {
+    "affine": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "data_sha256": "80482f6361aefc0f967966af5b7103124fee55ad6f10064f681f39ef3bd0c239",
+    "dtype": "float64",
+    "integer_labels": false,
+    "path": "corpus/intensity/fixtures/implausible_soft_tissue_scan.nii.gz",
+    "shape": [
+      215,
+      66,
+      55
+    ],
+    "spacing": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  }
+}
