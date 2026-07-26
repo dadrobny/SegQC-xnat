@@ -40,7 +40,7 @@
 | 14    | Real-Data Grounding & Heuristic Recalibration                           | G3, G7          | ✅     |
 | 15    | Real-XNAT Deployment Validation                                         | G5              | ❌     |
 | 16    | Real Failure Corpus & Sensitivity Validation*(retargeted to SPINEPS)* | G2, G7          | 📋     |
-| 17    | Foreign-Convention Interop & Orientation-Safe Image Layer               | G2, G6          | 📋     |
+| 17    | Foreign-Convention Interop & Orientation-Safe Image Layer               | G2, G6          | 🚧     |
 | 18    | Failure-Mode-Specific Metric Surface                                    | G2, G7          | 📋     |
 | 19    | Generated Feature & Rule Catalogue + Steering Review                    | G7, G8          | 📋     |
 | 20    | Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness      | G2, G7          | 📋     |
@@ -325,7 +325,7 @@ recorded in Stage 12's goal. Real VerSe grounding arrived with Stages 12/13.)*
 
 ---
 
-## Stage 7 — Evaluation, Calibration & Metrics (G3, G7) — ✅ *(Phase 1 complete)*
+## Stage 7 — Evaluation, Calibration & Metrics (G3, G7) — ✅ *(Phase 1 complete)* — ✅
 
 **Goal.** Quantify performance and calibrate thresholds against VerSe GT,
 TotalSegmentator output, and the synthetic corpus.
@@ -444,7 +444,7 @@ Stage 15.)*
 
 ---
 
-## Stage 11 — Extensibility & Abnormality Classification Arm (G8) — ⏸️ Deferred
+## Stage 11 — Extensibility & Abnormality Classification Arm (G8) — ⏸️ Deferred — 📋
 
 > **Deferred 2026-07-17** (explicit user instruction): prioritise the Phase-3
 > real-data validation arm (Stages 14+) ahead of the deferred G8 extensibility
@@ -623,7 +623,7 @@ held-out FPR/sensitivity are re-measured against the bar.
 
 ---
 
-## Stage 15 — Real-XNAT Deployment Validation (G5) — ❌ Excluded
+## Stage 15 — Real-XNAT Deployment Validation (G5) — ❌ Excluded — 📋
 
 > **❌ Excluded (2026-07-25). Reason:** deployment left this project's scope in the
 > [`vision.md`](vision.md) §0 supersession — FACET is a library and CLI, not a deployed
@@ -694,7 +694,7 @@ then measure sensitivity against the calibrated rules).
 
 ---
 
-## Stage 17 — Foreign-Convention Interop & Orientation-Safe Image Layer (G2, G6) — 📋
+## Stage 17 — Foreign-Convention Interop & Orientation-Safe Image Layer (G2, G6) — 🚧
 
 **Goal.** Read another tool's output correctly. `segfacet.labels` currently defines
 **25 = `S`, 26 = `Cocygis`, 29 = `L6`**; the TPTBox convention SPINEPS emits reads
@@ -704,7 +704,7 @@ numbers, wrong. Must land before any real-segmenter number is computed.
 
 **Deliverables.**
 
-- 📋 Adopt the TPTBox vertebra standard as the default (`DEFAULT_LABEL_MAP`,
+- 🚧 Adopt the TPTBox vertebra standard as the default (`DEFAULT_LABEL_MAP`,
   `CANONICAL_ORDER`); retire the legacy table; keep `LabelConvention` overridable. *(Item 093)*
 - 📋 Back `segfacet.io`'s `Volume`/`Case` with TPTBox `NII` (orientation-safe load,
   `reorient`, `rescale`/`resample_from_to`, mm-space, `zoom`/`affine`), replacing the
