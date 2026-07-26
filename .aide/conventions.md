@@ -273,9 +273,12 @@ The rules (runtime-general):
   steps identically and no step is forgotten.
 - **One command per call.** Never chain with `&&` or `;` — separate calls localise
   failures and keep each invocation legible.
-- **No `cd` prefix and no directory-changing wrapper** (`git -C "<path>"`). The
-  tool's working directory is already the repo root; both are redundant and brittle
-  when the repo path contains spaces or apostrophes. Run the bare command.
+- **No `cd` prefix and no directory-changing wrapper** — `git -C "<path>"`,
+  `git --git-dir=<path>`, `git --work-tree=<path>`, or a `GIT_DIR=<path>`/
+  `GIT_WORK_TREE=<path>` prefix all point git at a repo other than cwd, and
+  all four are redundant and brittle the same way `cd` is (a repo path
+  containing spaces or apostrophes breaks quoting). The tool's working
+  directory is already the repo root — run the bare command.
 - **No `2>&1`** or other redirections — the tool already captures stderr.
 - **No command substitution in commits.** Avoid `$(…)`/backticks; use single-line
   `-m "msg"`, repeated `-m` for paragraphs, or `git commit -F <file>`.
