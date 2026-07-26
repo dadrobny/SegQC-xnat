@@ -248,4 +248,53 @@ demonstration:
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`tests/test_097_stage17_validation.py` ran locally as committed**
+  (`.venv/bin/python -m pytest tests/test_097_stage17_validation.py -q`) —
+  12 passed, 1 skipped (`test_ac6_real_spineps_fixture_level_names_correct`,
+  cleanly skipped since `SEGFACET_SPINEPS_FIXTURE` is unset in this
+  environment, confirming AC5's genuine-skipif claim).
+- **One production-code fix was required, not zero, to make AC1 pass as
+  written.** `test_ac1_full_run_human_report_text_names_l6_s1_s2` asserts the
+  plain-text `segfacet_report.txt` names `S1`/`S2` even though neither label
+  has any rule finding. Before this item, `human_report.render_human_report`'s
+  "Per-label findings" section only ever listed labels that had at least one
+  finding — a label with no findings (like S1/S2 in the AC1 fixture) never
+  appeared anywhere in the `.txt` report text, even though the JSON report
+  and the CLI's stdout "Label inventory" table both already showed it. Fixed
+  by adding an optional `features` parameter to `render_human_report`
+  (`src/segfacet/human_report.py`) that, when supplied, lists *every* label
+  present in the features block (not just labels with findings), each
+  annotated with its `level_name`; labels with no findings get a
+  `(no findings)` line instead of being omitted. The parameter defaults to
+  `None`, and every pre-existing call site (all of `test_010_human_report.py`
+  and `test_035_report_integration.py`) omits it, so the "Per-label findings"
+  section is byte-identical to before for every caller except
+  `cli.py::_handle_run`, which was updated to pass `features=features_block`.
+  Verified no golden/byte-identity test covers `segfacet_report.txt` content
+  (`grep` of `tests/` found none — `test_042_golden_determinism.py` only
+  compares JSON), and re-ran `test_010_human_report.py` +
+  `test_035_report_integration.py` + `test_035_cli_e2e.py` +
+  `test_042_golden_determinism.py` (207 passed) to confirm no regression.
+- **AC3 (numpy-major CI matrix green with TPTBox present) was not directly
+  observed in this execution.** This environment has no `gh` CLI
+  (`command -v gh` exits 1) and no other means of querying live GitHub
+  Actions runs, so the builder could not fetch the actual `test-numpy-majors`
+  job status for this branch/PR. Per the spec's own Validation section, this
+  is an honest limitation, not a fabricated "confirmed green" claim — the
+  roadmap checkbox is ticked based on item 095's job already running on
+  every push/PR (structural confirmation) plus the full local suite passing
+  under this host's numpy major, but the live dual-numpy-major CI observation
+  itself is left to the validator, which the item spec explicitly anticipates
+  may have the same limitation ("otherwise record the honest ❓ Unverified
+  outcome without treating it as a validation failure" — applied here to the
+  CI-observation sub-claim of AC3, not to AC6/the real-SPINEPS row, which
+  already has its own explicit ❓ Unverified row).
+- **AC6 / the fourth roadmap acceptance box were left honestly unmet.**
+  `SEGFACET_SPINEPS_FIXTURE` is unset in this environment (confirmed via
+  `env | grep -i spineps`), and no real SPINEPS output is committed to this
+  repo. Per the spec's Assumptions, this is a correct, not a failed,
+  completion of this item — recorded via the new "Real SPINEPS-output
+  label-convention round-trip" row (❓ Unverified) in `progress.md` rather
+  than fabricating a verified status.
+- **`roadmap.md`/`vision.md` were not touched**, per the spec's explicit
+  scope fence (PR-gated, mirrors item 091's closing discipline).

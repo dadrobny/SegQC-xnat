@@ -87,6 +87,7 @@ def render_human_report(
     config: "HeuristicConfig",
     findings: "list | None" = None,
     image_features: "dict | None" = None,
+    features: "dict | None" = None,
 ) -> str:
     """Render a human-readable QC report string.
 
@@ -113,6 +114,18 @@ def render_human_report(
         ``_render_image_features_section`` so an "Intensity features:"
         section is appended. When ``None`` (default), no section is
         appended, preserving byte-identical output.
+    features:
+        Optional features block (item 097, Stage 17), as produced by
+        :func:`~segfacet.feature_report.build_features_block`. When
+        non-``None``, every label present in ``features["per_label"]`` is
+        listed in the "Per-label findings" section with its
+        ``level_name`` in parentheses -- including labels with no
+        findings at all, which previously never appeared in the human
+        report text even though their names were visible in the JSON
+        report and the CLI's stdout "Label inventory" table. When
+        ``None`` (default), the section lists only labels that have
+        findings, exactly as before -- preserving byte-identical output
+        for every existing caller.
 
     Returns
     -------
@@ -146,7 +159,31 @@ def render_human_report(
     # Per-label findings
     # ------------------------------------------------------------------ #
     lines.append("Per-label findings:")
-    if verdict.per_label:
+    if features is not None:
+        # item 097: list every label present in the features block (not just
+        # labels with findings) so the level name is visible end-to-end for
+        # every label, mirroring the CLI's stdout "Label inventory" table.
+        label_names: dict = {}
+        for key, entry in (features.get("per_label") or {}).items():
+            try:
+                label_names[int(key)] = entry.get("level_name")
+            except (TypeError, ValueError):
+                continue
+        all_labels = sorted(set(label_names) | set(verdict.per_label.keys()))
+        if all_labels:
+            for label in all_labels:
+                name = label_names.get(label)
+                header = f"  Label {label} ({name}):" if name else f"  Label {label}:"
+                lines.append(header)
+                label_reasons = verdict.per_label.get(label, [])
+                if label_reasons:
+                    for reason in label_reasons:
+                        lines.append(f"    [{reason.severity.label}] {reason.message}")
+                else:
+                    lines.append("    (no findings)")
+        else:
+            lines.append("  (none)")
+    elif verdict.per_label:
         for label in sorted(verdict.per_label.keys()):
             label_reasons = verdict.per_label[label]
             lines.append(f"  Label {label}:")

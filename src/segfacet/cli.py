@@ -830,6 +830,7 @@ def _handle_run(args: argparse.Namespace) -> int:
         cfg,
         findings=case_result.findings,
         image_features=image_features,
+        features=features_block,
     )
     txt_path = out_path / "segfacet_report.txt"
     txt_path.write_text(txt_str, encoding="utf-8")
