@@ -749,7 +749,7 @@ as a named field, so nothing else can read it.
 
 **Deliverables.**
 
-- 🚧 Promote stray-component metrics to first-class fields in `features/components.py`
+- ✅ Promote stray-component metrics to first-class fields in `features/components.py`
   (stray volume mm³, count, fraction); fragmentation rule reads rather than recomputes. *(Item 098)*
 - 📋 Per-mode metric API, reusing `eval/overlap.py::compute_overlap` for Dice/Jaccard and
   its aggregates — no new overlap code. *(Item 099)*
