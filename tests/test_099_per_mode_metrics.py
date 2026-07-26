@@ -1348,7 +1348,7 @@ def test_ac25_heuristics_package_byte_identical_to_pre_099_state():
 
 
 def test_ac25_committed_goldens_byte_identical_to_pre_099_state():
-    golden_dir = Path("/mnt/data/spine/codes/SegFACET/tests/corpus/golden")
+    golden_dir = Path(__file__).resolve().parent / "corpus" / "golden"
     files = sorted(golden_dir.glob("*.json"))
     h = hashlib.sha256()
     for f in files:
