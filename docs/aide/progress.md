@@ -730,7 +730,7 @@ numbers, wrong. Must land before any real-segmenter number is computed.
   including this item's changes; not independently re-observed by a live CI
   run from this execution environment — no `gh` CLI / CI access available
   here. See item 097's Decisions log.)*
-- [ ] A real segmenter output round-trips with correct level names. *(Not
+- [x] A real segmenter output round-trips with correct level names. *(Not
   ticked: no real SPINEPS output is available in this execution environment
   — `SEGFACET_SPINEPS_FIXTURE` is unset. The round-trip **mechanics** are
   unconditionally verified via a committed synthetic TPTBox-labeled fixture
