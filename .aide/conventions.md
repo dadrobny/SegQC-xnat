@@ -153,6 +153,14 @@ Unverified` until measured, then `✅ Met (date, evidence)` or `❌ Not met
   header carries `Created`, Stage, Queue, Objectives, Suggested branch, and a
   mandatory **Assumptions** block (see the item template). *(spec-author,
   validator)*
+- **`## Dependencies` blocks `aide claim`.** Every item number named in this
+  section (any of the accepted forms in the table above) is read as something
+  this item is blocked on until it is ✅/🚧 — `aide claim` skips a `📋` item
+  while any of its dependencies is still open. Text at or after a literal
+  `**Downstream` marker is excluded from that scan, so a forward-looking aside
+  ("**Downstream:** item 099 depends on this item's CI job") does not register
+  as a backward blocker — put such asides after the marker, never before it.
+  *(aide claim)*
 
 ### `insights.md` (optional, additive — the compound-engineering inbox)
 

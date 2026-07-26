@@ -76,15 +76,26 @@ def _blank_single_quoted(cmd):
 
 
 def _framework_local_path():
-    """``[framework] local_path`` from aide.toml (cwd = repo root), or None.
+    """``[framework] local_path`` from ``.aide/loop/loop.local.toml`` (cwd =
+    repo root), or None.
 
     The documented framework-update workflow operates on a second repo (the
     framework clone), which structurally needs ``git -C`` — the one legitimate
     use. Declaring that clone's path here gives it a narrow carve-out from
     rule 1 instead of leaving the workflow a dead end.
+
+    Read from the **personal, gitignored** loop config, never from the shared
+    ``aide.toml`` — a machine-specific filesystem path has no business in a
+    committed file (the same principle ``aide.toml``'s own ``[validation]``
+    section states for its profiles). Copy
+    ``.aide/loop/loop.local.toml.example`` to ``.aide/loop/loop.local.toml``
+    and add a ``[framework]`` section with ``local_path`` to set this up
+    per-machine; nothing here is shared or committed.
     """
     try:
-        with open("aide.toml", encoding="utf-8") as fh:
+        with open(
+            ".aide/loop/loop.local.toml", encoding="utf-8"
+        ) as fh:
             text = fh.read()
     except OSError:
         return None
@@ -121,6 +132,7 @@ def violations(cmd):
     #    prefix breaks allow-list prefix matching (this repo's path has spaces).
     #    Exception: `git -C <[framework] local_path>` — the documented
     #    framework-update workflow legitimately targets that second repo.
+    #    Sourced from the personal .aide/loop/loop.local.toml, never aide.toml.
     if re.match(r"\s*cd\s", cmd) or (
         re.search(r"\bgit\s+-C\b", bare) and not _git_c_is_declared_framework_repo(cmd)
     ):
@@ -128,7 +140,8 @@ def violations(cmd):
             "Drop the `cd`/`git -C` prefix: the Bash tool's cwd is already the "
             "repo root, and the prefix breaks allow-list matching. Run the bare "
             "command. (Exception: `git -C` targeting the [framework] local_path "
-            "declared in aide.toml.)"
+            "declared in .aide/loop/loop.local.toml — a personal, gitignored "
+            "file; copy loop.local.toml.example to set it up.)"
         )
 
     # 2. One command per Bash call — `&&`, `||`, `;` sequencing isn't

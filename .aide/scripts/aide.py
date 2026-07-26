@@ -1190,8 +1190,28 @@ def _queue_titles(text: str) -> Dict[int, str]:
     return titles
 
 
+#: Marks the start of a **forward-looking** aside inside a Dependencies section
+#: — later items that depend on THIS one, not items this one depends on (e.g.
+#: "**Downstream:** item 099 depends on this item's CI job"). Item numbers
+#: after this marker are never read as blocking dependencies: extracting every
+#: "Item NNN" mention in the section without it would misread "X depends on
+#: this" as "this depends on X" and block on a backward reference to a later,
+#: still-open item. Authors: put such asides after this exact marker so the
+#: parser (and a human skimming the section) can tell the two apart.
+_DEPENDENCIES_DOWNSTREAM_MARKER_RE = re.compile(r"\*\*Downstream\b", re.IGNORECASE)
+
+
 def _item_dependencies(repo_root: Path, config, number: int) -> List[int]:
-    """Item numbers named in the spec's Dependencies section (best effort)."""
+    """Item numbers named in the spec's Dependencies section (best effort).
+
+    Uses the same multi-item/range-aware, case-insensitive extraction as every
+    other "does this reference item NNN" call site (`_referenced_item_numbers`)
+    — a naive first-number-only regex here previously left every number after
+    the first in "Items 093, 094, 095" unrecognised as a blocker. Text at or
+    after a "**Downstream" marker is excluded (see
+    `_DEPENDENCIES_DOWNSTREAM_MARKER_RE`), so a forward-looking "item 099
+    depends on this" aside does not register as a backward blocker.
+    """
     idir = docs_dir(repo_root, config) / "items"
     if not idir.is_dir():
         return []
@@ -1201,7 +1221,10 @@ def _item_dependencies(repo_root: Path, config, number: int) -> List[int]:
     text = specs[0].read_text(encoding=_ENCODING)
     m = re.search(r"^##\s+Dependencies\s*$(.*?)(^##\s|\Z)", text, re.MULTILINE | re.DOTALL)
     section = m.group(1) if m else ""
-    deps = {int(x) for x in re.findall(r"\bItem[s]?\s+0*(\d+)", section)}
+    downstream = _DEPENDENCIES_DOWNSTREAM_MARKER_RE.search(section)
+    if downstream is not None:
+        section = section[: downstream.start()]
+    deps = set(_referenced_item_numbers(section))
     deps.discard(number)
     return sorted(deps)
 

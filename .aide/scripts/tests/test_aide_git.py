@@ -162,6 +162,78 @@ def test_pick_item_respects_dependency(tmp_path: Path):
     assert pick is not None and pick[0] == 28
 
 
+def test_item_dependencies_expands_every_number_in_a_multi_item_list(tmp_path: Path):
+    # Regression: a naive first-number-only regex left every item after the
+    # first in "Items 026, 027, 028" unrecognised as a blocker.
+    # _item_dependencies itself is status-agnostic — it reports every number
+    # the section names; _pick_item is what discards already-✅ dependencies
+    # (see test_pick_item_not_blocked_once_every_multi_item_dependency_is_done
+    # below for that half of the behaviour).
+    root = _init_repo(tmp_path / "r")
+    (root / "docs" / "aide" / "items" / "027-bounds.md").write_text(
+        "# Item 027 — Bounds\n\n## Dependencies\n"
+        "- Items 026, 028 — both must land first.\n\n## End\n",
+        encoding="utf-8",
+    )
+    cfg = aide.load_config(root)
+    assert aide._item_dependencies(root, cfg, 27) == [26, 28]
+
+
+def test_pick_item_not_blocked_once_every_multi_item_dependency_is_done(tmp_path: Path):
+    # The practical regression: with 026 already ✅ (per PROGRESS) and 027
+    # depending on "Items 026, 028", 027 must stay blocked while 028 is still
+    # planned — a naive first-number-only parse would have reported 027 as
+    # unblocked (it only ever saw 026, which is done) the moment 026 landed.
+    root = _init_repo(tmp_path / "r")
+    (root / "docs" / "aide" / "items" / "027-bounds.md").write_text(
+        "# Item 027 — Bounds\n\n## Dependencies\n"
+        "- Items 026, 028 — both must land first.\n\n## End\n",
+        encoding="utf-8",
+    )
+    cfg = aide.load_config(root)
+    pick = aide._pick_item(root, cfg, QUEUE, claim_branches=[])
+    assert pick is not None and pick[0] == 28  # 027 is still blocked by open 028
+
+
+def test_item_dependencies_is_case_insensitive(tmp_path: Path):
+    root = _init_repo(tmp_path / "r")
+    (root / "docs" / "aide" / "items" / "027-bounds.md").write_text(
+        "# Item 027 — Bounds\n\n## Dependencies\n- lowercase item 028 still blocks.\n\n## End\n",
+        encoding="utf-8",
+    )
+    cfg = aide.load_config(root)
+    assert aide._item_dependencies(root, cfg, 27) == [28]
+
+
+def test_item_dependencies_ignores_downstream_forward_reference(tmp_path: Path):
+    # Regression: "**Downstream:** item 028 depends on this item" was
+    # previously misread as item 027 depending ON 028 (backwards) — the exact
+    # bug that let `aide claim` skip an unblocked item in favour of a wrong one.
+    root = _init_repo(tmp_path / "r")
+    (root / "docs" / "aide" / "items" / "027-bounds.md").write_text(
+        "# Item 027 — Bounds\n\n## Dependencies\n"
+        "- Item 026 provides X.\n\n"
+        "**Downstream:** item 028 depends on this item's output.\n\n## End\n",
+        encoding="utf-8",
+    )
+    cfg = aide.load_config(root)
+    assert aide._item_dependencies(root, cfg, 27) == [26]
+
+
+def test_pick_item_not_blocked_by_a_downstream_forward_reference(tmp_path: Path):
+    root = _init_repo(tmp_path / "r")
+    # 027 mentions 028 only as a downstream forward reference -> 027 must be
+    # pickable even though 028 is still planned.
+    (root / "docs" / "aide" / "items" / "027-bounds.md").write_text(
+        "# Item 027 — Bounds\n\n## Dependencies\nNone.\n\n"
+        "**Downstream:** item 028 depends on this item's output.\n\n## End\n",
+        encoding="utf-8",
+    )
+    cfg = aide.load_config(root)
+    pick = aide._pick_item(root, cfg, QUEUE, claim_branches=[])
+    assert pick is not None and pick[0] == 27
+
+
 # --------------------------------------------------------------------------- #
 # claim
 # --------------------------------------------------------------------------- #
