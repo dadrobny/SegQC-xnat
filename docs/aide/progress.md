@@ -41,7 +41,7 @@
 | 15    | Real-XNAT Deployment Validation                                         | G5              | ❌     |
 | 16    | Real Failure Corpus & Sensitivity Validation*(retargeted to SPINEPS)* | G2, G7          | 📋     |
 | 17    | Foreign-Convention Interop & Orientation-Safe Image Layer               | G2, G6          | ✅     |
-| 18    | Failure-Mode-Specific Metric Surface                                    | G2, G7          | 📋     |
+| 18    | Failure-Mode-Specific Metric Surface                                    | G2, G7          | 🚧     |
 | 19    | Generated Feature & Rule Catalogue + Steering Review                    | G7, G8          | 📋     |
 | 20    | Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness      | G2, G7          | 📋     |
 | 21    | Real-GT Perturbation Corpus                                             | G3, G7          | 📋     |
@@ -741,7 +741,7 @@ numbers, wrong. Must land before any real-segmenter number is computed.
 
 ---
 
-## Stage 18 — Failure-Mode-Specific Metric Surface (G2, G7) — 📋
+## Stage 18 — Failure-Mode-Specific Metric Surface (G2, G7) — 🚧
 
 **Goal.** Measure per failure mode. "Foreground beyond the main connected component" is
 currently recomputed privately inside `heuristics/fragmentation.py` rather than existing
@@ -749,7 +749,7 @@ as a named field, so nothing else can read it.
 
 **Deliverables.**
 
-- 📋 Promote stray-component metrics to first-class fields in `features/components.py`
+- 🚧 Promote stray-component metrics to first-class fields in `features/components.py`
   (stray volume mm³, count, fraction); fragmentation rule reads rather than recomputes. *(Item 098)*
 - 📋 Per-mode metric API, reusing `eval/overlap.py::compute_overlap` for Dice/Jaccard and
   its aggregates — no new overlap code. *(Item 099)*
