@@ -180,6 +180,7 @@ def build_evaluation_report(
     provenance: EvaluationProvenance,
     *,
     calibration: "Optional[CalibrationResult]" = None,
+    run_manifest: "Optional[dict]" = None,
 ) -> dict:
     """Assemble + schema-validate the v0 evaluation-report dict.
 
@@ -195,6 +196,12 @@ def build_evaluation_report(
         Optional :class:`~segfacet.eval.calibrate.CalibrationResult`. When
         given, a focused ``"calibration"`` summary block is added. When
         ``None`` (default), no ``"calibration"`` key is emitted.
+    run_manifest:
+        Optional run-manifest provenance block (item 096), as produced by
+        ``segfacet.run_manifest.build_run_manifest(...).to_dict()``. When
+        non-``None`` it is embedded verbatim under the report's
+        ``run_manifest`` key. When ``None`` (default), no ``run_manifest``
+        key is emitted.
 
     Returns
     -------
@@ -217,6 +224,9 @@ def build_evaluation_report(
 
     if calibration is not None:
         report["calibration"] = _calibration_block(calibration)
+
+    if run_manifest is not None:
+        report["run_manifest"] = run_manifest
 
     jsonschema.validate(report, _SCHEMA)
     return report

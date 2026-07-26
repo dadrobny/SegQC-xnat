@@ -95,6 +95,7 @@ def serialize_report(
     findings: "list | None" = None,
     reference_delta: "dict | None" = None,
     image_features: "dict | None" = None,
+    run_manifest: "dict | None" = None,
 ) -> dict:
     """Serialize a :class:`~segfacet.verdict.Verdict` to a v0 report dict.
 
@@ -138,6 +139,13 @@ def serialize_report(
         validated together with the rest of the report. When ``None``
         (default) no ``image_features`` key is emitted, preserving every
         prior report shape (including the item-042 golden snapshots).
+    run_manifest:
+        Optional run-manifest provenance block (item 096), as produced by
+        ``segfacet.run_manifest.build_run_manifest(...).to_dict()``. When
+        non-``None`` it is embedded verbatim under the report's
+        ``run_manifest`` key and validated together with the rest of the
+        report. When ``None`` (default) no ``run_manifest`` key is emitted,
+        preserving every prior report shape.
 
     Returns
     -------
@@ -193,6 +201,12 @@ def serialize_report(
     if image_features is not None:
         report["image_features"] = image_features
 
+    # Optional Stage 17 run_manifest block (item 096) -- added before
+    # validation for the same reason. Omitting it (None) keeps the prior
+    # report shape intact.
+    if run_manifest is not None:
+        report["run_manifest"] = run_manifest
+
     jsonschema.validate(report, _SCHEMA)
     return report
 
@@ -206,6 +220,7 @@ def serialize_report_json(
     findings: "list | None" = None,
     reference_delta: "dict | None" = None,
     image_features: "dict | None" = None,
+    run_manifest: "dict | None" = None,
 ) -> str:
     """Serialize a :class:`~segfacet.verdict.Verdict` to a JSON string.
 
@@ -235,6 +250,9 @@ def serialize_report_json(
     image_features:
         Optional Stage 8 ``image_features`` block (item 061), forwarded to
         :func:`serialize_report`.
+    run_manifest:
+        Optional run-manifest provenance block (item 096), forwarded to
+        :func:`serialize_report`.
 
     Returns
     -------
@@ -249,5 +267,6 @@ def serialize_report_json(
         findings=findings,
         reference_delta=reference_delta,
         image_features=image_features,
+        run_manifest=run_manifest,
     )
     return json.dumps(report, indent=indent)

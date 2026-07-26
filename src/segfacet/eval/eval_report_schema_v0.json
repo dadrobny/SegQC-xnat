@@ -26,6 +26,10 @@
     "calibration": {
       "description": "Optional summary of the chosen calibration outcome (item 055). Absent when the report was built without a CalibrationResult.",
       "$ref": "#/definitions/calibration"
+    },
+    "run_manifest": {
+      "description": "Optional Stage 17 run-manifest provenance block (item 096): segmenter version/SHA, weights hash, seed, dataset id, post-processing toggles, and resolved package versions. Absent when the evaluation was not given any manifest flags.",
+      "$ref": "#/definitions/runManifest"
     }
   },
   "definitions": {
@@ -114,6 +118,51 @@
         }
       },
       "additionalProperties": false
+    },
+    "runManifest": {
+      "type": "object",
+      "description": "Stage 17 run-manifest provenance block (item 096): caller-supplied segmenter/dataset identity plus auto-resolved package versions.",
+      "additionalProperties": false,
+      "required": [
+        "segmenter_version",
+        "segmenter_sha",
+        "weights_hash",
+        "seed",
+        "dataset_id",
+        "postproc_toggles",
+        "resolved_versions"
+      ],
+      "properties": {
+        "segmenter_version": {
+          "type": ["string", "null"],
+          "description": "Caller-supplied segmenter version string, or null when not given."
+        },
+        "segmenter_sha": {
+          "type": ["string", "null"],
+          "description": "Caller-supplied segmenter commit SHA (or similar), or null when not given."
+        },
+        "weights_hash": {
+          "type": ["string", "null"],
+          "description": "Caller-supplied hash of the segmenter's weights, or null when not given."
+        },
+        "seed": {
+          "type": ["integer", "null"],
+          "description": "Caller-supplied integer seed, or null when not given."
+        },
+        "dataset_id": {
+          "type": ["string", "null"],
+          "description": "Caller-supplied dataset identifier, or null when not given."
+        },
+        "postproc_toggles": {
+          "type": ["object", "null"],
+          "description": "Caller-supplied free-form JSON-compatible mapping of post-processing toggles, or null when not given."
+        },
+        "resolved_versions": {
+          "type": "object",
+          "description": "Auto-populated mapping of package name to its resolved installed version string (null per entry when not discoverable).",
+          "additionalProperties": {"type": ["string", "null"]}
+        }
+      }
     }
   }
 }

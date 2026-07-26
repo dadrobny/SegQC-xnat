@@ -16,6 +16,7 @@ Heavy imports (NiBabel, NumPy, ...) are deferred to ``_handle_run`` so that
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import pathlib
@@ -91,6 +92,87 @@ def _add_dataset_schema_args(parser: argparse.ArgumentParser) -> None:
         help="Name of a subset in the descriptor (a folder split / CSV / id-list "
              "/ glob) to restrict to. Only used with --dataset-schema.",
     )
+
+
+_RUN_MANIFEST_HELP = (
+    "Stage 17 run-manifest provenance flags (item 096): each is optional and "
+    "caller-supplied; the resulting 'run_manifest' block is emitted only "
+    "when at least one of them is given (a plain invocation with none of "
+    "these flags omits the block entirely, preserving the report's shape)."
+)
+
+
+def _add_run_manifest_args(parser: argparse.ArgumentParser) -> None:
+    """Add the shared Stage-17 run-manifest provenance flags (item 096) to a
+    subcommand parser."""
+    parser.add_argument(
+        "--segmenter-version", default=None, metavar="<str>",
+        help=f"Version string of the segmenter that produced the input. {_RUN_MANIFEST_HELP}",
+    )
+    parser.add_argument(
+        "--segmenter-sha", default=None, metavar="<str>",
+        help="Commit SHA (or similar) of the segmenter that produced the input.",
+    )
+    parser.add_argument(
+        "--weights-hash", default=None, metavar="<str>",
+        help="Hash of the segmenter's weights.",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=None, metavar="<int>",
+        help="Integer seed used by the segmenter/pipeline. 0 is a meaningful "
+             "value, distinct from omitting the flag.",
+    )
+    parser.add_argument(
+        "--dataset-id", default=None, metavar="<str>",
+        help="Identifier for the dataset the input belongs to.",
+    )
+    parser.add_argument(
+        "--postproc-toggles", default=None, metavar="<json>",
+        help="JSON object of free-form post-processing toggles (e.g. "
+             '\'{"largest_component_only": true}\'). Must parse to a JSON '
+             "object (mapping); malformed JSON or a non-object value exits 1 "
+             "with a clear Error: message.",
+    )
+
+
+def _parse_postproc_toggles(raw: "Optional[str]") -> "Optional[dict]":
+    """Parse ``--postproc-toggles``'s raw JSON string into a dict.
+
+    Returns ``None`` when *raw* is ``None`` (flag omitted). Raises
+    :class:`ValueError` with a clear message when *raw* is not valid JSON, or
+    parses to a JSON value that is not an object (mapping) -- an explicitly
+    empty ``'{}'`` is valid and returns ``{}``.
+    """
+    if raw is None:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"--postproc-toggles is not valid JSON: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(
+            "--postproc-toggles must be a JSON object (mapping), not "
+            f"{type(parsed).__name__}."
+        )
+    return parsed
+
+
+def _build_run_manifest_from_args(args: argparse.Namespace) -> "Optional[dict]":
+    """Build the ``run_manifest`` dict (or ``None``) from the Stage-17 flags
+    on *args*. Raises :class:`ValueError` on malformed ``--postproc-toggles``
+    (caught by the caller and reported as a clean ``Error:`` message)."""
+    from segfacet.run_manifest import build_run_manifest  # noqa: PLC0415
+
+    postproc_toggles = _parse_postproc_toggles(getattr(args, "postproc_toggles", None))
+    manifest = build_run_manifest(
+        segmenter_version=getattr(args, "segmenter_version", None),
+        segmenter_sha=getattr(args, "segmenter_sha", None),
+        weights_hash=getattr(args, "weights_hash", None),
+        seed=getattr(args, "seed", None),
+        dataset_id=getattr(args, "dataset_id", None),
+        postproc_toggles=postproc_toggles,
+    )
+    return None if manifest is None else manifest.to_dict()
 
 
 def _resolve_cohort_from_args(args: argparse.Namespace, *, role: "Optional[str]" = None):
@@ -234,6 +316,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help=_BACKEND_HELP,
     )
     _add_dataset_schema_args(run_parser)
+    _add_run_manifest_args(run_parser)
     run_parser.set_defaults(handler=_handle_run)
 
     build_reference_parser = subparsers.add_parser(
@@ -433,6 +516,7 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     _add_dataset_schema_args(evaluate_parser)
+    _add_run_manifest_args(evaluate_parser)
     evaluate_parser.set_defaults(handler=_handle_evaluate)
 
     return parser
@@ -582,6 +666,13 @@ def _handle_run(args: argparse.Namespace) -> int:
     else:
         cfg = bundled_default_config()
 
+    # --- 0b. Optional run-manifest provenance (item 096) ----------------------- #
+    try:
+        run_manifest = _build_run_manifest_from_args(args)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
     # --- 1. Load inputs ------------------------------------------------------ #
     try:
         case = load_case(args.scan, args.seg)
@@ -728,6 +819,7 @@ def _handle_run(args: argparse.Namespace) -> int:
         findings=findings_dicts,
         reference_delta=reference_delta,
         image_features=image_features,
+        run_manifest=run_manifest,
     )
     json_path = out_path / "segfacet_report.json"
     json_path.write_text(json_str, encoding="utf-8")
@@ -889,6 +981,13 @@ def _handle_evaluate(args: argparse.Namespace) -> int:
     else:
         cfg = bundled_default_config()
 
+    # --- 0b. Optional run-manifest provenance (item 096) ----------------------- #
+    try:
+        run_manifest = _build_run_manifest_from_args(args)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
     # --- 1. Load the cohort (a manifest, or GT-as-expected-pass from an adapter) - #
     try:
         if args.dataset_schema:
@@ -971,7 +1070,9 @@ def _handle_evaluate(args: argparse.Namespace) -> int:
         build_date=args.build_date,
     )
 
-    report = build_evaluation_report(metrics, provenance, calibration=calibration)
+    report = build_evaluation_report(
+        metrics, provenance, calibration=calibration, run_manifest=run_manifest
+    )
 
     out_path = pathlib.Path(args.out)
     json_path = write_evaluation_report(report, out_path / "eval_report.json")

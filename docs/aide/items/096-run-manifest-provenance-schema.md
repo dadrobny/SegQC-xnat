@@ -247,4 +247,22 @@ All under `source_dir = src/segfacet`.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`--postproc-toggles` JSON-shape validation lives in `cli.py`, not
+  `run_manifest.py`.** `RunManifest.postproc_toggles`/`build_run_manifest`'s
+  type is `Optional[dict]` -- an already-parsed Python object -- so the CLI
+  layer owns turning the raw `--postproc-toggles` string into that object
+  (`_parse_postproc_toggles`) and rejecting malformed JSON or a
+  non-object JSON value (array/scalar) with a clean `Error:` message before
+  it ever reaches `build_run_manifest`. This keeps `run_manifest.py` a plain
+  data/build module with no CLI-error-formatting concerns, mirroring how
+  `--dataset-schema`/`--config` errors are handled entirely in `cli.py`.
+- **Manifest building happens right after config loading, before any input
+  is loaded** (step "0b" in both `_handle_run` and `_handle_evaluate`), so a
+  malformed `--postproc-toggles` fails fast and consistently regardless of
+  whether `--scan`/`--seg`/`--cohort` would otherwise succeed or fail.
+- **`_add_run_manifest_args` and `_build_run_manifest_from_args` are shared
+  helpers in `cli.py`**, used identically by both `_handle_run` and
+  `_handle_evaluate`, avoiding duplicating the six-flag parser wiring or the
+  build-and-serialize logic per subcommand.
+- **`build-reference`'s parser and handler were left untouched**, per the
+  item's explicit non-goal.
