@@ -543,7 +543,7 @@ def test_ac12_to_dict_carries_degenerate_flag_true_for_mode_seven_false_otherwis
     flags: dict = {}
     _collect_degenerate_flags(d, flags)
     assert flags.get(7) is True
-    for mode in range(1, 8):
+    for mode in (1, 2, 3, 4, 5, 6, 8):
         assert flags.get(mode) is False, mode
 
 
