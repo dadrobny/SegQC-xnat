@@ -28,7 +28,11 @@
           ],
           "fragmentation_index": 1.0,
           "largest_component_fraction": 1.0,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_fraction": 0.0,
+          "stray_volume_mm3": 0.0
         },
         "geometry": {
           "bbox_physical": {
@@ -85,7 +89,11 @@
           ],
           "fragmentation_index": 1.0,
           "largest_component_fraction": 1.0,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_fraction": 0.0,
+          "stray_volume_mm3": 0.0
         },
         "geometry": {
           "bbox_physical": {
@@ -142,7 +150,11 @@
           ],
           "fragmentation_index": 1.0,
           "largest_component_fraction": 1.0,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_fraction": 0.0,
+          "stray_volume_mm3": 0.0
         },
         "geometry": {
           "bbox_physical": {
@@ -199,7 +211,11 @@
           ],
           "fragmentation_index": 1.0,
           "largest_component_fraction": 1.0,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_fraction": 0.0,
+          "stray_volume_mm3": 0.0
         },
         "geometry": {
           "bbox_physical": {
@@ -256,7 +272,11 @@
           ],
           "fragmentation_index": 1.0,
           "largest_component_fraction": 1.0,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_fraction": 0.0,
+          "stray_volume_mm3": 0.0
         },
         "geometry": {
           "bbox_physical": {
@@ -312,7 +332,7 @@
     "stage3": {
       "curvature": {
         "inter_tangent_angles_deg": [
-          62.29893250816016,
+          62.298932508160156,
           27.46583519993168,
           27.46583519993169,
           62.29893250816018

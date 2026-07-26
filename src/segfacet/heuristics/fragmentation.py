@@ -42,9 +42,14 @@ Design decisions (recorded per item 028 spec, extended by item 090):
   island-free (AC2).
 - ``fragmentation_index`` is the primary key; ``largest_component_fraction`` is
   the fallback alias (AC17 / spec step 2).
-- Does not rely on ``components.small_fragments`` -- that list is recomputed
-  from ``component_sizes`` using the rule's own ``island_min_voxels`` param
-  (hand-set path only).
+- The hand-set island branch reads ``components.stray_component_sizes``
+  (item 098) as its stray population -- primary key, with an absence-only
+  fallback to ``component_sizes[1:]`` for a legacy (pre-098) record shape
+  that carries no ``stray_component_sizes`` key. A present-but-empty value is
+  honoured as-is, not treated as absent. It still does not rely on
+  ``components.small_fragments`` -- that list is a separate, differently
+  thresholded population computed by the feature layer's own
+  ``min_fragment_voxels`` setting (hand-set path only).
 - Unrecognised severity string raises ValueError immediately (AC15). An
   unrecognised ``source``, or a ``reference_lower_pct``/``reference_upper_pct``
   absent from ``reference.percentiles``, also raises ValueError, before/at
@@ -437,9 +442,15 @@ class FragmentationRule(Rule):
                     )
             else:
                 # Hand-set fallback: absolute island_min_voxels floor over
-                # non-dominant components. Only sizes[1:] are island
-                # candidates; a single-component label trivially passes.
-                non_dominant = sizes[1:]
+                # non-dominant components. Primary key: stray_component_sizes
+                # (item 098); fallback (key genuinely absent, e.g. a legacy
+                # pre-098 record shape): component_sizes[1:]. A present but
+                # empty stray_component_sizes is honoured as-is, not treated
+                # as absent (AC10/AC11 boundary).
+                if "stray_component_sizes" in comp:
+                    non_dominant = comp["stray_component_sizes"]
+                else:
+                    non_dominant = sizes[1:]
                 tiny_islands = [s for s in non_dominant if s < island_min]
                 if tiny_islands:
                     index_for_reason = (

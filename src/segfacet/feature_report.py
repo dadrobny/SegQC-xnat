@@ -152,6 +152,11 @@ def components_to_dict(c: "ComponentsInfo") -> dict:
     ``fragmentation_index`` (item 025) is an alias for
     ``largest_component_fraction`` exposed under its public name. It is always
     included so the field is available at every serialisation site.
+
+    ``stray_component_count``, ``stray_component_sizes``, ``stray_volume_mm3``
+    and ``stray_volume_fraction`` (item 098) are emitted verbatim from the
+    dataclass, with ``stray_component_sizes`` shallow-copied per the same
+    no-aliasing contract as ``component_sizes``.
     """
     return {
         "component_count": c.component_count,
@@ -160,6 +165,10 @@ def components_to_dict(c: "ComponentsInfo") -> dict:
         "largest_component_fraction": c.largest_component_fraction,
         "small_fragments": list(c.small_fragments),
         "fragmentation_index": float(c.largest_component_fraction),
+        "stray_component_count": c.stray_component_count,
+        "stray_component_sizes": list(c.stray_component_sizes),
+        "stray_volume_mm3": float(c.stray_volume_mm3),
+        "stray_volume_fraction": float(c.stray_volume_fraction),
     }
 
 

@@ -481,4 +481,32 @@ above. None of these block this item.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implementation notes (builder, 2026-07-26):
+
+- Followed the spec's Implementation Steps directly: the four fields were
+  computed in `compute_components` immediately after the existing
+  `largest_component_fraction` line, and passed positionally into
+  `ComponentsInfo(...)` after `small_fragments`, preserving the dataclass's
+  frozen-ness and the pre-098 field ordering (verified: `dataclasses.fields`
+  order still starts with the five original names).
+- The fragmentation rule's fallback test is `"stray_component_sizes" in comp`
+  (key-presence check) rather than `comp.get(...) is None`, so a present value
+  of any shape (including an explicitly empty list) is always honoured and
+  only genuine key-absence triggers the `sizes[1:]` fallback — this is the
+  literal reading of "absence-only fallback" and matches the AC10/AC11
+  boundary test (`stray_component_sizes=[]` present must NOT fall back).
+- Regenerating the nine goldens via `python -m segfacet.synth.golden`
+  introduced, beyond the four new `stray_*` keys per components block, a
+  handful of ULP-level float diffs in unrelated fields (`eigenvalue_ratio`,
+  `principal_axis` components on a couple of labels) — pre-existing
+  run-to-run floating-point noise from the eigen-decomposition step, not
+  something this item's changes touch. `verdict` and `findings` are
+  unchanged for all nine cases (verified by diffing against the pre-098
+  committed goldens and against the frozen snapshots embedded in
+  `tests/test_098_stray_components.py`), consistent with `CLAUDE.md`'s note
+  that golden comparisons are numeric-tolerance (`reports_close`), not
+  byte-identity, across sessions.
+- No change made to `scripts/aide_status_report.py`'s `FEATURE_CATALOG` or to
+  `reference/ingest.py` / `reference_verse_*.json`, per the spec's explicit
+  scope fence; the `FEATURE_CATALOG` drift was already recorded in
+  `docs/aide/insights.md` by the spec author.

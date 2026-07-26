@@ -28,7 +28,11 @@
           ],
           "fragmentation_index": 1.0,
           "largest_component_fraction": 1.0,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_fraction": 0.0,
+          "stray_volume_mm3": 0.0
         },
         "geometry": {
           "bbox_physical": {
@@ -85,7 +89,11 @@
           ],
           "fragmentation_index": 1.0,
           "largest_component_fraction": 1.0,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_fraction": 0.0,
+          "stray_volume_mm3": 0.0
         },
         "geometry": {
           "bbox_physical": {
@@ -144,7 +152,13 @@
           ],
           "fragmentation_index": 0.9985620706183096,
           "largest_component_fraction": 0.9985620706183096,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 1,
+          "stray_component_sizes": [
+            27
+          ],
+          "stray_volume_fraction": 0.001437929381690406,
+          "stray_volume_mm3": 27.0
         },
         "geometry": {
           "bbox_physical": {
@@ -201,7 +215,11 @@
           ],
           "fragmentation_index": 1.0,
           "largest_component_fraction": 1.0,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_fraction": 0.0,
+          "stray_volume_mm3": 0.0
         },
         "geometry": {
           "bbox_physical": {
@@ -258,7 +276,11 @@
           ],
           "fragmentation_index": 1.0,
           "largest_component_fraction": 1.0,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_fraction": 0.0,
+          "stray_volume_mm3": 0.0
         },
         "geometry": {
           "bbox_physical": {
@@ -413,13 +435,13 @@
           ]
         },
         {
-          "eigenvalue_ratio": 1.4444876537125473,
+          "eigenvalue_ratio": 1.444487653712551,
           "label": 22,
           "level_name": "L3",
           "principal_axis": [
-            -0.011937269659244684,
+            -0.011937269659246349,
             -0.9999287482581358,
-            1.1700769768979944e-16
+            2.3681644160603957e-16
           ]
         },
         {

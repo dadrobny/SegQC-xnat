@@ -28,7 +28,11 @@
           ],
           "fragmentation_index": 1.0,
           "largest_component_fraction": 1.0,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_fraction": 0.0,
+          "stray_volume_mm3": 0.0
         },
         "geometry": {
           "bbox_physical": {
@@ -85,7 +89,11 @@
           ],
           "fragmentation_index": 1.0,
           "largest_component_fraction": 1.0,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_fraction": 0.0,
+          "stray_volume_mm3": 0.0
         },
         "geometry": {
           "bbox_physical": {
@@ -142,7 +150,11 @@
           ],
           "fragmentation_index": 1.0,
           "largest_component_fraction": 1.0,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_fraction": 0.0,
+          "stray_volume_mm3": 0.0
         },
         "geometry": {
           "bbox_physical": {
@@ -199,7 +211,11 @@
           ],
           "fragmentation_index": 1.0,
           "largest_component_fraction": 1.0,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_fraction": 0.0,
+          "stray_volume_mm3": 0.0
         },
         "geometry": {
           "bbox_physical": {
@@ -256,7 +272,11 @@
           ],
           "fragmentation_index": 1.0,
           "largest_component_fraction": 1.0,
-          "small_fragments": []
+          "small_fragments": [],
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_fraction": 0.0,
+          "stray_volume_mm3": 0.0
         },
         "geometry": {
           "bbox_physical": {
@@ -401,13 +421,13 @@
           ]
         },
         {
-          "eigenvalue_ratio": 1.4769321371493291,
+          "eigenvalue_ratio": 1.4769321371493296,
           "label": 21,
           "level_name": "L2",
           "principal_axis": [
-            0.08228716274473975,
+            0.08228716274473999,
             -0.9966086608330377,
-            -4.022855955821741e-17
+            -1.9641002607835544e-16
           ]
         },
         {

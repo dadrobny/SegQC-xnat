@@ -13,6 +13,25 @@ diagonal or edge neighbours) and computes:
 * **small_fragments** — list of component sizes (voxel counts) for components
   strictly below the ``min_fragment_voxels`` threshold from
   :class:`~segfacet.config.HeuristicConfig`. Empty when the threshold is ``0``.
+* **stray_component_count** — number of components other than the dominant one
+  (item 098); ``component_count - 1``.
+* **stray_component_sizes** — ``component_sizes[1:]`` — every component's voxel
+  count except the (largest, index-0) dominant one, same descending order, as
+  a non-aliasing copy (item 098).
+* **stray_volume_mm3** — ``sum(component_volumes_mm3[1:])``, the summed
+  physical volume of the stray population, reusing the already-computed
+  per-component volumes rather than a second ``voxel_volume`` multiply (item
+  098).
+* **stray_volume_fraction** — ``1.0 - largest_component_fraction``, the
+  arithmetic complement of that field so the two are always consistent by
+  construction rather than by a second, independently-rounded computation
+  (item 098).
+
+"Stray" means **every connected component of a label other than its single
+largest (dominant) one** — the exact ``component_sizes[1:]`` population. A
+single-component label reports the stray-population zero case:
+``stray_component_count == 0``, ``stray_component_sizes == []``,
+``stray_volume_mm3 == 0.0``, ``stray_volume_fraction == 0.0``.
 
 Connectivity
 ------------
@@ -89,6 +108,24 @@ class ComponentsInfo:
         Empty when ``min_fragment_voxels == 0`` (threshold of 0 means
         nothing is strictly below it). Contains one entry per fragment —
         if two components have the same sub-threshold size, both appear.
+    stray_component_count:
+        Number of components other than the dominant one — always
+        ``component_count - 1`` (item 098). ``0`` for a single-component
+        label.
+    stray_component_sizes:
+        ``component_sizes[1:]`` — every component's voxel count except the
+        dominant (index-0) one, in the same descending order, as a
+        non-aliasing copy (item 098). ``[]`` for a single-component label.
+    stray_volume_mm3:
+        ``sum(component_volumes_mm3[1:])`` — the summed physical volume of
+        the stray components, derived from the already-computed
+        per-component volumes rather than a second ``voxel_volume``
+        multiplication (item 098). ``0.0`` (a ``float``) for a
+        single-component label.
+    stray_volume_fraction:
+        ``1.0 - largest_component_fraction`` — the arithmetic complement of
+        ``largest_component_fraction``, so the two always sum to ``1.0``
+        by construction (item 098). ``0.0`` for a single-component label.
     """
 
     component_count: int
@@ -96,6 +133,10 @@ class ComponentsInfo:
     component_volumes_mm3: List[float]
     largest_component_fraction: float
     small_fragments: List[int]
+    stray_component_count: int
+    stray_component_sizes: List[int]
+    stray_volume_mm3: float
+    stray_volume_fraction: float
 
 
 # --------------------------------------------------------------------------- #
@@ -195,10 +236,21 @@ def compute_components(
     min_frag = int(config.min_fragment_voxels)
     small_fragments: List[int] = [s for s in component_sizes if s < min_frag]
 
+    # Stray-component metrics (item 098): every component other than the
+    # dominant (index-0) one.
+    stray_component_sizes: List[int] = list(component_sizes[1:])
+    stray_component_count: int = len(stray_component_sizes)
+    stray_volume_mm3: float = float(sum(component_volumes_mm3[1:]))
+    stray_volume_fraction: float = 1.0 - largest_component_fraction
+
     return ComponentsInfo(
         component_count=n_components,
         component_sizes=component_sizes,
         component_volumes_mm3=component_volumes_mm3,
         largest_component_fraction=largest_component_fraction,
         small_fragments=small_fragments,
+        stray_component_count=stray_component_count,
+        stray_component_sizes=stray_component_sizes,
+        stray_volume_mm3=stray_volume_mm3,
+        stray_volume_fraction=stray_volume_fraction,
     )
