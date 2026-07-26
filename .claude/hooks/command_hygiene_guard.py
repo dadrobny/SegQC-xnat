@@ -224,8 +224,8 @@ def violations(cmd):
             "breaks allow-list matching. Run the bare command. (Exception: "
             "every repo-override path in the command targeting the SAME "
             "[framework] local_path, declared in .aide/loop/loop.local.toml — "
-            "a personal, gitignored file; copy loop.local.toml.example to set "
-            "it up.)"
+            "a personal, gitignored file; copy "
+            ".aide/loop/loop.local.toml.example to set it up.)"
         )
 
     # 2. One command per Bash call — `&&`, `||`, `;` sequencing isn't
