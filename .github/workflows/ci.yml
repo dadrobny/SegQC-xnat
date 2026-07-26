@@ -47,6 +47,39 @@ jobs:
       - name: Test
         run: python -m pytest
 
+  # Item 095: numpy-major agnosticism check. pyproject.toml declares a numpy
+  # *range* (`numpy>=1.26,<3`), not a pin, specifically so the identical
+  # segfacet code runs unmodified against both the real `spineps` conda
+  # workstation environment (numpy 1.26.4, forced there by an sm_61 GPU ->
+  # torch 2.4.1 ceiling -> monai<=1.4.0 -> numpy<2.0 chain) and a numpy-2.x
+  # cluster/CI environment, without a fork. This job proves that range is
+  # real, not aspirational, by installing the project once and then re-running
+  # the full suite against each of the two concrete numpy versions this was
+  # directly measured green against: 1.26.4 (the spineps ceiling) and 2.0.2
+  # (constraints.txt's prior pin, the earlier CI baseline). It is additive,
+  # not a restructuring of the `test` job's byte-identity-sensitive OS matrix
+  # above -- see CLAUDE.md's note that the golden-file/reference comparisons
+  # are numeric-tolerance (`reports_close`), not byte-identical against a
+  # pinned numpy, which is what makes running across numpy majors safe here.
+  test-numpy-majors:
+    name: test (numpy ${{ matrix.numpy-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        numpy-version: ["1.26.4", "2.0.2"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install -e .[dev]
+      - name: Pin numpy leg
+        run: pip install numpy==${{ matrix.numpy-version }}
+      - name: Test
+        run: python -m pytest
+
   # This project has two optional capabilities -- pyradiomics (Stage 8) and
   # the Docker container path (Stage 9) -- whose tests skip cleanly when the
   # dependency is absent (see .aide/conventions.md "Environment-gated

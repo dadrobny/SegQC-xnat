@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "segfacet"
 description = "FACET - Failure Analysis, Characterisation & Evaluation Toolkit for instance segmentations of spine imaging."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
     { name = "David Drobny", email = "david.drobny@kcl.ac.uk" },
@@ -18,17 +18,15 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
 ]
-# Core scientific stack. Lower-bound pins are chosen for Python 3.9
-# compatibility; exact reproducibility pins belong in the deployable container's
+# Core scientific stack. Lower-bound pins are chosen for the Python 3.11 floor
+# (item 095); exact reproducibility pins belong in the deployable container's
 # lockfile/constraints (Stage 9), not in library metadata. See item 001.
 dependencies = [
-    "numpy>=1.21",
+    "numpy>=1.26,<3",
     "scipy>=1.7",
     "scikit-image>=0.19",
     "nibabel>=4.0",

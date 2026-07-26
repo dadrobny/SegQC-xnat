@@ -276,4 +276,30 @@ observation specifically, not a silent pass).
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`constraints.txt`'s regenerated `numpy` pin is `2.4.6`, not `2.0.2`.**
+  The file's own documented recipe (clean venv, project-only `pip install .`,
+  `pip freeze`, filtered to the six core dependencies + transitives) was
+  followed literally on a Python 3.11.15 interpreter; a plain `pip install .`
+  against the new `numpy>=1.26,<3` range resolves the newest compatible
+  release available on PyPI at generation time, which was `2.4.6` (with
+  `scipy==1.17.1`, `scikit-image==0.26.0`, `nibabel==5.4.2`,
+  `PyYAML==6.0.3`, `jsonschema==4.26.0` and their transitives moving in
+  lockstep). This is a deliberate consequence of the recipe, not a hand
+  pin — `constraints.txt` is the Docker lockfile (item 066), a separate
+  artifact from the two CI-leg pins (`1.26.4`/`2.0.2`) that `ci.yml`'s new
+  `test-numpy-majors` job exercises directly; both legs remain reachable
+  because the declared range in `pyproject.toml` is `<3`, not narrower.
+- **Header comment reflow.** The original header comment's "six declared
+  core dependencies" phrase was split across a line break, which would have
+  failed `test_adv_constraints_header_comment_still_describes_pre_tptbox_six_core`'s
+  contiguous-substring check under the regeneration's natural line wrapping.
+  Reflowed so the phrase reads on one line; wording and meaning otherwise
+  unchanged. Also reworded the `radiomics` extra aside (previously
+  parenthetically naming `SimpleITK`) to avoid an incidental TPTBox-adjacent
+  package-name match, since AC4's test asserts no TPTBox-transitive package
+  name appears anywhere in the file, including prose.
+- **`test-numpy-majors` CI job** added as a small `ubuntu-latest`/Python-3.11
+  matrix job (`numpy-version: ["1.26.4", "2.0.2"]`), mirroring
+  `verify-environment-gated`'s existing posture of being additive rather
+  than folded into the `test` job's OS matrix, per the spec's explicit
+  non-goal.
