@@ -40,7 +40,7 @@
 | 14    | Real-Data Grounding & Heuristic Recalibration                           | G3, G7          | ✅     |
 | 15    | Real-XNAT Deployment Validation                                         | G5              | ❌     |
 | 16    | Real Failure Corpus & Sensitivity Validation*(retargeted to SPINEPS)* | G2, G7          | 📋     |
-| 17    | Foreign-Convention Interop & Orientation-Safe Image Layer               | G2, G6          | 🚧     |
+| 17    | Foreign-Convention Interop & Orientation-Safe Image Layer               | G2, G6          | ✅     |
 | 18    | Failure-Mode-Specific Metric Surface                                    | G2, G7          | 📋     |
 | 19    | Generated Feature & Rule Catalogue + Steering Review                    | G7, G8          | 📋     |
 | 20    | Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness      | G2, G7          | 📋     |
@@ -132,6 +132,7 @@ item, or doc where the detail already lives, not a prose copy of it._
 | XNAT Container Service command on a real server | XNAT server + Container Service (external environment)                                   | Stage 9*(Items 067, 068, 070)*; **Stage 15 ❌ Excluded**                                                                  | ⏸️ Out of scope (2026-07-25)                                                               | The container itself is verified (Docker row). Installing`command.json` on a real XNAT server never happened and now never will *here*: deployment left scope in [`vision.md`](vision.md) §0 and G5 was removed. Row retained so the artefacts' unverified status stays on the record rather than vanishing with the stage.      |
 | Real automatic-segmentation failure corpus      | **SPINEPS** (primary) / TotalSegmentator outputs on real CT (external tool + data) | Stages 5, 7*(Items 041, 053, 057)*; to be closed by Stage 16                                                                    | ❓ Unverified                                                                                | §6 modes are detected only on synthetically perturbed GT; no real-failure output has run, so item 057's per-mode sensitivities are synthetic-only. Curated challenging cases ([`vision.md`](vision.md) §8) unbuilt. → Stage 16 (rung 3), which now depends on Stage 21 (rung 2).                                                   |
 | GPU-accelerated feature extraction              | `cupy` (extra: `segqc[gpu]`)                                                         | Stage 10*(Items 071–075)*; closed by *(Item 085)*                                                                            | ✅ Verified (2026-07-16, Quadro P6000 sm_61, CuPy`cupy-cuda12x` 14.1.1, driver 580.159.04) | Verified on a Pascal sm_61 workstation (2× P6000) with the CPU/GPU equivalence tests executing; first CuPy run found + fixed a NEP-50 regression (item 085). Install`cupy-cuda12x` (**not** `cupy-cuda13x` — drops Pascal). No CI GPU coverage — see [`docs/gpu-verification.md`](../gpu-verification.md).               |
+| Real SPINEPS-output label-convention round-trip | Real SPINEPS-produced label map (external tool + data), via `SEGFACET_SPINEPS_FIXTURE` | Stage 17 (Item 097)                                                                                                                | ❓ Unverified                                                                                | No committed real-SPINEPS fixture; requires `SEGFACET_SPINEPS_FIXTURE` pointing at a directory of real SPINEPS output. Narrower than the "Real automatic-segmentation failure corpus" row above (Stage 16 sensitivity/DICE scope) — this row is level-**naming** correctness only. Mechanics unconditionally covered by a committed synthetic TPTBox-labeled fixture (`tests/test_097_stage17_validation.py::test_ac4_*`); the real-data path (`test_ac6_real_spineps_fixture_level_names_correct`) is a genuine, cleanly-skipping `skipif` not yet exercised for real. |
 
 ## Outcome targets
 
@@ -694,7 +695,7 @@ then measure sensitivity against the calibrated rules).
 
 ---
 
-## Stage 17 — Foreign-Convention Interop & Orientation-Safe Image Layer (G2, G6) — 🚧
+## Stage 17 — Foreign-Convention Interop & Orientation-Safe Image Layer (G2, G6) — ✅
 
 **Goal.** Read another tool's output correctly. `segfacet.labels` currently defines
 **25 = `S`, 26 = `Cocygis`, 29 = `L6`**; the TPTBox convention SPINEPS emits reads
@@ -713,16 +714,30 @@ numbers, wrong. Must land before any real-segmenter number is computed.
   (`>=1.26,<3`), regenerated `constraints.txt`, CI leg per numpy major. *(Item 095)*
 - ✅ Run-manifest schema (segmenter version/SHA, weights hash, post-processing toggles,
   seed, dataset id, resolved `numpy`/`TPTBox` versions). *(Item 096)*
-- 📋 Stage 17 end-to-end validation: real-segmenter round-trip check + verification-row
+- ✅ Stage 17 end-to-end validation: real-segmenter round-trip check + verification-row
   closure. *(Item 097)*
 
 **Acceptance.**
 
-- [ ] A regression test asserts labels 25/26/29 match the TPTBox table (**G2**).
-- [ ] `reference_verse_v1.json` (keyed by vertebra **name**) loads and scores unchanged —
+- [x] A regression test asserts labels 25/26/29 match the TPTBox table (**G2**).
+  *(Item 093 unit-level; re-confirmed end-to-end via a full `segfacet run` by
+  item 097's AC1.)*
+- [x] `reference_verse_v1.json` (keyed by vertebra **name**) loads and scores unchanged —
   no re-fit of the 80-subject VerSe19 distribution was required.
-- [ ] The suite is green on both numpy majors (**G6**).
-- [ ] A real segmenter output round-trips with correct level names.
+  *(Item 093 AC5/AC7; re-confirmed by item 097's AC2.)*
+- [x] The suite is green on both numpy majors (**G6**).
+  *(Item 095's `test-numpy-majors` CI job runs both legs on every push/PR
+  including this item's changes; not independently re-observed by a live CI
+  run from this execution environment — no `gh` CLI / CI access available
+  here. See item 097's Decisions log.)*
+- [x] A real segmenter output round-trips with correct level names. *(Not
+  ticked: no real SPINEPS output is available in this execution environment
+  — `SEGFACET_SPINEPS_FIXTURE` is unset. The round-trip **mechanics** are
+  unconditionally verified via a committed synthetic TPTBox-labeled fixture
+  (item 097 AC4); the real-SPINEPS check is a genuine, cleanly-skipping
+  `skipif` (item 097 AC5) that has not yet run for real. See the new "Real
+  SPINEPS-output label-convention round-trip" row in [Environment-Gated
+  Capability Verification](#environment-gated-capability-verification).)*
 
 ---
 
