@@ -1,5 +1,10 @@
-# Personal, per-machine config for the AIDE loop supervisor (.aide/loop/loop.py).
-# Copy this file to loop.local.toml (gitignored) and edit. Nothing here is shared.
+# Personal, per-machine config for AIDE. Copy this file to loop.local.toml
+# (gitignored) and edit. Nothing here is shared or committed.
+#
+# Two independent consumers read this file:
+#   [loop]      — the loop supervisor (.aide/loop/loop.py).
+#   [framework] — the Claude adapter's command-hygiene guard (only when that
+#                 adapter is installed). Set both, either, or neither.
 
 [loop]
 # Stop once the 7-day utilization reaches this percent (0 disables).
@@ -48,3 +53,13 @@ credentials_path = ""
 # ERR/re-auth path runs this same plain command — never pass a removed
 # --continuous flag.
 command = ""
+
+[framework]
+# Local checkout of the aide-loop framework repo itself, for the documented
+# framework-update workflow (CLAUDE.md > "Updating the framework"). Declaring
+# it here — not in the shared, committed aide.toml — gives the Claude
+# adapter's command-hygiene guard a narrow `git -C <local_path>` carve-out
+# without putting a machine-specific filesystem path in a committed file.
+# Empty/absent = the workflow's `git -C` step stays blocked (the default,
+# safe posture for anyone not actively developing the framework).
+local_path = ""

@@ -79,7 +79,18 @@ Delete the section if the tests alone genuinely demonstrate the behaviour._
 ## Dependencies
 
 _Other item numbers this relies on (must be ✅/🚧), and what each provides.
-Write "None." if there are none._
+Write "None." if there are none. `aide claim` reads this section to decide
+whether the item is blocked, so every "Item NNN" mentioned here (in any of
+the accepted forms — see conventions.md §1) is read as a blocker UNLESS it
+appears after a literal `**Downstream` marker. If you want to note that a
+*later* item depends on this one (a forward reference, not a blocker), put
+it after that marker, e.g.:_
+
+    **Downstream:** item 099 (stage validation) depends on this item's CI job.
+
+_Item numbers before the marker are blockers; item numbers after it are not
+— never write a forward reference before the marker, or it will incorrectly
+block this item on something that hasn't happened yet._
 
 ## Environment / Hardware Dependencies  <!-- OPTIONAL: delete if not applicable -->
 

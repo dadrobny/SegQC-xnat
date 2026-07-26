@@ -43,6 +43,15 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
    run can stall the whole validation on a permission prompt and never
    resume). A red suite is an automatic FAIL. If the venv is missing/stale,
    `python .aide/scripts/aide.py env --bootstrap` first.
+
+   **This foreground rule applies to every long-running command in this
+   workflow, not only this one** — most consequentially, `aide merge` in the
+   PASS path below, which (under `git.mode = "auto-merge"`) re-runs the
+   entire suite again as its own pre-merge gate and takes just as long.
+   Deferring either command to a background task and ending your turn with a
+   placeholder ("I'll wait for the notification") leaves the orchestrator
+   with no verdict and no reliable way to learn when the real one arrives —
+   wait for each command's actual exit, however long it takes.
 2. **Tests cover all AC.** Every Acceptance Criterion in the spec must have at
    least one test that directly exercises it. An uncovered AC is a FAIL (report
    which).
@@ -91,6 +100,10 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
      ```
      python .aide/scripts/aide.py merge NNN
      ```
+     **Run this synchronously in the foreground too** (see step 1) — under
+     `auto-merge` it re-runs the full suite before merging, so it takes the
+     same several minutes as step 1 did; wait for it to actually exit and
+     report the real output, don't background it.
      If the CLI reports `pr` mode (pushed, awaiting a PR), surface that to the
      orchestrator as a stop — do not attempt to merge by hand.
 

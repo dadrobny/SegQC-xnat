@@ -76,15 +76,28 @@ def _blank_single_quoted(cmd):
 
 
 def _framework_local_path():
-    """``[framework] local_path`` from aide.toml (cwd = repo root), or None.
+    """``[framework] local_path`` from ``.aide/loop/loop.local.toml`` (cwd =
+    repo root), or None.
 
     The documented framework-update workflow operates on a second repo (the
-    framework clone), which structurally needs ``git -C`` — the one legitimate
-    use. Declaring that clone's path here gives it a narrow carve-out from
-    rule 1 instead of leaving the workflow a dead end.
+    framework clone), which structurally needs a directory-targeting git
+    invocation (``-C``, or the ``--git-dir``/``--work-tree``/``GIT_DIR=``/
+    ``GIT_WORK_TREE=`` equivalents) — the one legitimate use. Declaring that
+    clone's path here gives it a narrow carve-out from rule 1 instead of
+    leaving the workflow a dead end.
+
+    Read from the **personal, gitignored** loop config, never from the shared
+    ``aide.toml`` — a machine-specific filesystem path has no business in a
+    committed file (the same principle ``aide.toml``'s own ``[validation]``
+    section states for its profiles). Copy
+    ``.aide/loop/loop.local.toml.example`` to ``.aide/loop/loop.local.toml``
+    and add a ``[framework]`` section with ``local_path`` to set this up
+    per-machine; nothing here is shared or committed.
     """
     try:
-        with open("aide.toml", encoding="utf-8") as fh:
+        with open(
+            ".aide/loop/loop.local.toml", encoding="utf-8"
+        ) as fh:
             text = fh.read()
     except OSError:
         return None
@@ -99,17 +112,92 @@ def _framework_local_path():
     return None
 
 
-def _git_c_is_declared_framework_repo(cmd):
-    m = re.search(r"\bgit\s+-C\s+(\"[^\"]*\"|'[^']*'|\S+)", cmd)
-    if not m:
+#: Every syntax git (or the shell, ahead of git) accepts for "operate on a
+#: repo/working-tree other than cwd" — `-C` is only one of four. A regex that
+#: recognised `-C` alone left `--git-dir`/`--work-tree` (git's own flags) and
+#: the `GIT_DIR=`/`GIT_WORK_TREE=` environment-variable prefixes wide open:
+#: the exact same operation, spelled three other ways, none of them caught.
+#: An agent that hits the `-C` block and reaches for the next thing it knows
+#: achieves the identical effect the exception was built to gate — the guard
+#: must recognise all four forms or it is a lint an agent is rewarded for
+#: evading, not a rule.
+#:
+#: Presence (this regex, no captured value — matched against the
+#: quote-blanked ``bare`` text, same as every other rule here, so an operator
+#: *inside* a commit message never false-positives) is checked separately
+#: from the actual path VALUE (`_git_repo_override_paths`, matched against
+#: the raw, unblanked ``cmd`` — a legitimately quoted path containing a space
+#: would itself be blanked to nothing in ``bare`` and silently vanish from a
+#: value-capturing match, wrongly suppressing the trigger).
+_GIT_REPO_OVERRIDE_TRIGGER_RE = re.compile(
+    r"\bgit\s+-C\b|--git-dir\b|--work-tree\b|\bGIT_DIR=|\bGIT_WORK_TREE="
+)
+
+_GIT_REPO_OVERRIDE_VALUE_RE = re.compile(
+    r"(?:"
+    r"\bgit\s+-C\s+(?P<c>\"[^\"]*\"|'[^']*'|\S+)"
+    r"|--git-dir(?:=|\s+)(?P<gitdir>\"[^\"]*\"|'[^']*'|\S+)"
+    r"|--work-tree(?:=|\s+)(?P<worktree>\"[^\"]*\"|'[^']*'|\S+)"
+    r"|\bGIT_DIR=(?P<envdir>\"[^\"]*\"|'[^']*'|\S+)"
+    r"|\bGIT_WORK_TREE=(?P<envtree>\"[^\"]*\"|'[^']*'|\S+)"
+    r")"
+)
+
+
+#: Which capture groups belong to a `--git-dir`-flavoured flag, whose
+#: conventional value is `<repo>/.git` (or a bare repo's own root) rather than
+#: the repo root `--work-tree`/`-C`/`GIT_WORK_TREE=` expect. Comparing a
+#: `--git-dir=<repo>/.git --work-tree=<repo>` pair against one declared path
+#: with a single normalisation would reject that pairing as "two different
+#: repos" even though it is the standard, correct way to spell `-C <repo>` —
+#: so `--git-dir`/`GIT_DIR=` accept either the declared path itself or
+#: `<declared>/.git`.
+_GIT_DIR_FLAVOURED_GROUPS = frozenset({"gitdir", "envdir"})
+
+
+def _git_repo_override_paths(cmd):
+    """Every ``(group_name, path)`` argument to `-C`/`--git-dir`/`--work-tree`/
+    `GIT_DIR=`/`GIT_WORK_TREE=` in *cmd* (the raw, unblanked command — see
+    `_GIT_REPO_OVERRIDE_TRIGGER_RE`'s docstring for why), in order. Empty if
+    *cmd* uses none of them, or a flag is present with no parseable value."""
+    paths = []
+    for m in _GIT_REPO_OVERRIDE_VALUE_RE.finditer(cmd):
+        group, value = next(
+            (k, v) for k, v in m.groupdict().items() if v is not None
+        )
+        paths.append((group, value.strip("\"'")))
+    return paths
+
+
+def _git_repo_override_all_declared(cmd):
+    """True iff *cmd* names at least one repo-override path and every one of
+    them resolves to the declared `[framework] local_path` (see
+    `_framework_local_path`) — `--git-dir`/`GIT_DIR=` accept `<declared>` or
+    `<declared>/.git` (see `_GIT_DIR_FLAVOURED_GROUPS`); every other form must
+    equal `<declared>` exactly. A command mixing a declared and an undeclared
+    path (e.g. `--git-dir` on one repo, `--work-tree` on another) is NOT
+    declared — that combination is exactly the confusing, dangerous shape
+    (git history read from one repo, applied to another's working tree) the
+    documented workflow never needs, so it stays blocked outright rather than
+    guessing which half the agent meant."""
+    paths = _git_repo_override_paths(cmd)
+    if not paths:
         return False
     declared = _framework_local_path()
     if not declared:
         return False
     import os
-    target = m.group(1).strip("\"'")
     norm = lambda p: os.path.normcase(os.path.normpath(os.path.abspath(p)))
-    return norm(target) == norm(declared)
+    declared_norm = norm(declared)
+    declared_dotgit_norm = norm(os.path.join(declared, ".git"))
+
+    def _matches(group, path):
+        target = norm(path)
+        if group in _GIT_DIR_FLAVOURED_GROUPS:
+            return target in (declared_norm, declared_dotgit_norm)
+        return target == declared_norm
+
+    return all(_matches(group, path) for group, path in paths)
 
 
 def violations(cmd):
@@ -117,18 +205,27 @@ def violations(cmd):
     bare = _blank_quoted(cmd)
     found = []
 
-    # 1. No `cd` prefix / `git -C <path>` — cwd is already the repo root and the
-    #    prefix breaks allow-list prefix matching (this repo's path has spaces).
-    #    Exception: `git -C <[framework] local_path>` — the documented
-    #    framework-update workflow legitimately targets that second repo.
+    # 1. No `cd` prefix, and no `-C`/`--git-dir`/`--work-tree`/`GIT_DIR=`/
+    #    `GIT_WORK_TREE=` pointing git at a repo other than cwd — the Bash
+    #    tool's cwd is already the repo root, and a directory prefix breaks
+    #    allow-list prefix matching (this repo's path has spaces).
+    #    Exception: every repo-override path in the command resolves to the
+    #    declared `[framework] local_path` — the documented framework-update
+    #    workflow legitimately targets that second repo. Sourced from the
+    #    personal .aide/loop/loop.local.toml, never aide.toml.
+    has_override = bool(_GIT_REPO_OVERRIDE_TRIGGER_RE.search(bare))
     if re.match(r"\s*cd\s", cmd) or (
-        re.search(r"\bgit\s+-C\b", bare) and not _git_c_is_declared_framework_repo(cmd)
+        has_override and not _git_repo_override_all_declared(cmd)
     ):
         found.append(
-            "Drop the `cd`/`git -C` prefix: the Bash tool's cwd is already the "
-            "repo root, and the prefix breaks allow-list matching. Run the bare "
-            "command. (Exception: `git -C` targeting the [framework] local_path "
-            "declared in aide.toml.)"
+            "Drop the `cd` prefix, and drop `-C`/`--git-dir`/`--work-tree`/"
+            "`GIT_DIR=`/`GIT_WORK_TREE=` — all four point git at a repo other "
+            "than cwd, which is already the repo root; a directory prefix "
+            "breaks allow-list matching. Run the bare command. (Exception: "
+            "every repo-override path in the command targeting the SAME "
+            "[framework] local_path, declared in .aide/loop/loop.local.toml — "
+            "a personal, gitignored file; copy "
+            ".aide/loop/loop.local.toml.example to set it up.)"
         )
 
     # 2. One command per Bash call — `&&`, `||`, `;` sequencing isn't
