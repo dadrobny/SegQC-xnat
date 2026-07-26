@@ -50,7 +50,11 @@
           ],
           "largest_component_fraction": 1.0,
           "small_fragments": [],
-          "fragmentation_index": 1.0
+          "fragmentation_index": 1.0,
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_mm3": 0.0,
+          "stray_volume_fraction": 0.0
         },
         "centroid": {
           "centroid_voxel": [
@@ -107,7 +111,11 @@
           ],
           "largest_component_fraction": 1.0,
           "small_fragments": [],
-          "fragmentation_index": 1.0
+          "fragmentation_index": 1.0,
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_mm3": 0.0,
+          "stray_volume_fraction": 0.0
         },
         "centroid": {
           "centroid_voxel": [
@@ -164,7 +172,11 @@
           ],
           "largest_component_fraction": 1.0,
           "small_fragments": [],
-          "fragmentation_index": 1.0
+          "fragmentation_index": 1.0,
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_mm3": 0.0,
+          "stray_volume_fraction": 0.0
         },
         "centroid": {
           "centroid_voxel": [
