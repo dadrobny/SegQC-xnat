@@ -798,7 +798,13 @@ def test_ac17_no_new_dependency():
     (Assumptions A1, scope fence). The dependency set is the one timeless,
     re-checkable part of that claim on any branch (a full source-tree diff
     against a moving ``main`` is a one-time merge-time proof, not a durable
-    regression guard -- see item 084's own AC11 for this exact reasoning)."""
+    regression guard -- see item 084's own AC11 for this exact reasoning).
+
+    Item 094 legitimately adds ``tptbox`` as a new required core dependency
+    (an orientation-safe NIfTI loader, unrelated to item 091's scope) -- the
+    set below is updated to include it so this guard continues to check
+    "item 091 didn't touch the dependency set", not "the dependency set is
+    frozen forever"."""
     repo_root = pathlib.Path(__file__).resolve().parent.parent
     pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
 
@@ -810,7 +816,15 @@ def test_ac17_no_new_dependency():
         for line in deps_block.splitlines()
         if line.strip()
     ]
-    expected_deps = {"numpy", "scipy", "scikit-image", "nibabel", "PyYAML", "jsonschema"}
+    expected_deps = {
+        "numpy",
+        "scipy",
+        "scikit-image",
+        "nibabel",
+        "PyYAML",
+        "jsonschema",
+        "tptbox",
+    }
     assert set(dep_names) == expected_deps
 
 

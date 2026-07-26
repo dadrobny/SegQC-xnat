@@ -93,15 +93,19 @@ def test_spacing_anisotropic(tmp_path):
 
 
 def test_affine_preserved(tmp_path):
-    """The loaded affine equals the written affine within float tolerance."""
-    affine = np.array(
-        [
-            [0.0, 0.0, 3.0, -10.0],
-            [0.5, 0.0, 0.0, 20.0],
-            [0.0, 0.5, 0.0, -5.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
-    )
+    """A RAS-resolving affine is preserved as-is (within float tolerance).
+
+    Item 094 made ``load_volume`` reorient every input to canonical
+    ``("R", "A", "S")`` axcodes via TPTBox. This affine already resolves to
+    RAS (its diagonal is positive), so reorientation is a no-op and the
+    original equality check still holds -- see
+    ``test_affine_reoriented_to_ras_for_non_ras_input`` below for the case
+    where the input is *not* RAS-resolving and the affine legitimately
+    changes.
+    """
+    affine = np.diag([0.5, 0.5, 3.0, 1.0]).astype(float)
+    affine[:3, 3] = [-10.0, 20.0, -5.0]
+    assert nib.aff2axcodes(affine) == ("R", "A", "S")
     data = np.zeros((3, 3, 3), dtype=np.float32)
     path = _write_nii(tmp_path, data, None, affine=affine)
 
@@ -111,6 +115,44 @@ def test_affine_preserved(tmp_path):
     assert np.allclose(vol.affine, affine)
     # Spacing derived from the affine (column norms), not assumed isotropic.
     assert vol.spacing == pytest.approx((0.5, 0.5, 3.0))
+
+
+def test_affine_reoriented_to_ras_for_non_ras_input(tmp_path):
+    """A non-RAS-resolving affine is reoriented to canonical RAS (item 094).
+
+    Before item 094, ``load_volume`` passed the affine through unchanged
+    regardless of orientation. Now it reorients to ``("R", "A", "S")`` via
+    TPTBox, so a non-RAS-resolving input's affine legitimately changes on
+    load -- while still describing the same physical geometry (same world
+    coordinate for the same physical voxel, same spacing magnitudes).
+    """
+    affine = np.array(
+        [
+            [0.0, 0.0, 3.0, -10.0],
+            [0.5, 0.0, 0.0, 20.0],
+            [0.0, 0.5, 0.0, -5.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+    assert nib.aff2axcodes(affine) != ("R", "A", "S")
+    data = np.zeros((3, 3, 3), dtype=np.float32)
+    path = _write_nii(tmp_path, data, None, affine=affine)
+
+    vol = load_volume(path)
+
+    assert vol.affine.shape == (4, 4)
+    assert nib.aff2axcodes(vol.affine) == ("R", "A", "S")
+    # The origin voxel's world coordinate is unchanged (pure axis
+    # permutation here, no flips), so the loaded affine still describes the
+    # same physical volume.
+    world_before = affine @ np.array([0.0, 0.0, 0.0, 1.0])
+    world_after = vol.affine @ np.array([0.0, 0.0, 0.0, 1.0])
+    assert np.allclose(world_before, world_after)
+    # Spacing is derived from the (now reoriented) affine's column norms, in
+    # the reoriented (R, A, S) axis order -- the same three magnitudes as
+    # before (0.5, 0.5, 3.0), just permuted to match the new array axis order.
+    assert vol.spacing == pytest.approx((3.0, 0.5, 0.5))
+    assert sorted(vol.spacing) == pytest.approx([0.5, 0.5, 3.0])
 
 
 # --------------------------------------------------------------------------- #

@@ -326,6 +326,7 @@ def test_ac13_core_dependencies_unchanged_no_cupy():
         "nibabel>=4.0",
         "PyYAML>=5.4",
         "jsonschema>=3.2",
+        "tptbox==0.7.5",
     }
     data = _load_pyproject()
     core_deps = set(data["project"].get("dependencies", []))

@@ -19,6 +19,15 @@ does, however, statically check that the ``test-numpy-majors`` CI job exists
 with the expected matrix and that the existing ``test`` job's install-step
 shape is unchanged, since both of those are observable by parsing the
 committed ``ci.yml`` without actually running it.
+
+Note on ``constraints.txt``: per this item's own Assumptions, the file is
+legitimately regenerated *twice* across items 095/094 -- this item's own
+regeneration reflected only the pre-TPTBox six-package core, but item 094
+(TPTBox becoming a required core dependency) regenerates it again to add
+TPTBox and its transitives. On this repo's current state (item 094 landed),
+``constraints.txt`` legitimately contains TPTBox -- so this module no longer
+asserts TPTBox's *absence*, only that item 095's own concerns (the numpy
+pin/range, the Python floor, the other five original pins) still hold.
 """
 
 from __future__ import annotations
@@ -31,16 +40,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 PYPROJECT_PATH = REPO_ROOT / "pyproject.toml"
 CONSTRAINTS_PATH = REPO_ROOT / "constraints.txt"
 CI_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
-
-# TPTBox and its known transitive dependencies (item 094's edit) -- none of
-# these should appear in this item's pre-TPTBox constraints.txt regeneration.
-TPTBOX_PACKAGE_NAMES = (
-    "TPTBox",
-    "SimpleITK",
-    "connected-components-3d",
-    "fill-voids",
-    "pynrrd",
-)
 
 
 # =========================================================================== #
@@ -132,7 +131,11 @@ def test_ac2_other_core_dependency_bounds_unchanged():
 
 
 # =========================================================================== #
-# AC4: constraints.txt regenerated for the new floor, pre-TPTBox only
+# AC4: constraints.txt regenerated for the new floor. This item's own
+# regeneration was pre-TPTBox (TPTBox is item 094's later edit, which
+# legitimately regenerates the file again to add TPTBox and its
+# transitives) -- these checks cover item 095's own concerns only, not
+# TPTBox's absence/presence.
 # =========================================================================== #
 
 
@@ -147,16 +150,6 @@ def test_ac4_constraints_numpy_pin_satisfies_declared_range():
     # >=1.26,<3
     assert (major, minor) >= (1, 26)
     assert major < 3
-
-
-def test_ac4_no_tptbox_package_present_in_constraints():
-    constraints_text = _read_constraints()
-    lower_text = constraints_text.lower()
-    for package_name in TPTBOX_PACKAGE_NAMES:
-        assert package_name.lower() not in lower_text, (
-            f"{package_name!r} found in constraints.txt -- TPTBox is item "
-            "094's edit, not this item's pre-TPTBox regeneration"
-        )
 
 
 def test_ac4_all_six_core_dependencies_still_pinned():
@@ -219,11 +212,19 @@ def test_adv_constraints_numpy_pin_is_exact_not_a_range():
     assert len(numpy_lines) == 1
 
 
-def test_adv_constraints_header_comment_still_describes_pre_tptbox_six_core():
-    # The header comment documents "the six declared core dependencies" --
-    # this item's regeneration must not silently drop that description.
+def test_adv_constraints_header_comment_describes_declared_core_dependencies():
+    # The header comment must describe the declared core dependencies it was
+    # filtered down to. At item 095's own landing this read "six declared
+    # core dependencies" (pre-TPTBox); item 094 legitimately regenerated the
+    # file again to add TPTBox as a seventh core dependency, updating the
+    # count in the same header comment -- so this checks the description
+    # exists and mentions all six of item 095's own core packages by name,
+    # rather than pinning the exact (now superseded) count string.
     constraints_text = _read_constraints()
-    assert "six declared core dependencies" in constraints_text
+    assert "declared core" in constraints_text
+    assert "dependencies" in constraints_text
+    for package_name in ("numpy", "scipy", "scikit-image", "nibabel", "PyYAML", "jsonschema"):
+        assert package_name in constraints_text
 
 
 def test_adv_pyproject_is_still_valid_toml():

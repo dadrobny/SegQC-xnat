@@ -489,7 +489,13 @@ def test_ac11_no_new_dependency():
     against a moving ``main`` include that path, failing a guard about item
     084's own historical scope rather than the current branch's. Narrowed to
     the timeless part -- the dependency set -- which item 084 also never
-    changed and which remains meaningful to re-check on any branch."""
+    changed and which remains meaningful to re-check on any branch.
+
+    Item 094 legitimately adds ``tptbox`` as a new required core dependency
+    (an orientation-safe NIfTI loader, not item 084's concern) -- the set
+    below is updated to include it so this guard continues to check "item
+    084 didn't touch the dependency set", not "the dependency set is frozen
+    forever"."""
     repo_root = pathlib.Path(__file__).resolve().parent.parent
     pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
     import re
@@ -502,7 +508,15 @@ def test_ac11_no_new_dependency():
         for line in deps_block.splitlines()
         if line.strip()
     ]
-    expected_deps = {"numpy", "scipy", "scikit-image", "nibabel", "PyYAML", "jsonschema"}
+    expected_deps = {
+        "numpy",
+        "scipy",
+        "scikit-image",
+        "nibabel",
+        "PyYAML",
+        "jsonschema",
+        "tptbox",
+    }
     assert set(dep_names) == expected_deps
 
 
