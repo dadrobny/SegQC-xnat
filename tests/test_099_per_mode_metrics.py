@@ -562,8 +562,19 @@ def test_ac8_mode3_stray_component_count_is_one_for_both_but_ratio_separates():
 
 
 def test_ac8_mode3_raising_ratio_to_one_makes_mode2_fragment_flag_too():
+    """A stand-in for ``mode2_fragment``'s shape ([9000, 9000], where stray
+    equals -- not strictly less than -- dominant, so it can never flip at
+    ratio 1.0; see the exact-equality boundary test below) with the stray
+    component strictly below the dominant one at ratio 1.0 ([100, 99]):
+    raising the ratio from the default (0.10, which does not count a stray
+    of 99 against a threshold of 10) to 1.0 (threshold 100) flips the count
+    from 0 to 1."""
     pm = _per_mode()
-    result = pm.compute_per_mode_metrics(_RECORDS["mode2_fragment"], island_size_ratio=1.0)
+    comp = _components([100, 99])
+    record = _hand_record([_entry(1, "L1", components=comp)])
+    baseline = pm.compute_per_mode_metrics(record)
+    assert _value(baseline, 3) == pytest.approx(0.0, abs=1e-9)
+    result = pm.compute_per_mode_metrics(record, island_size_ratio=1.0)
     assert _value(result, 3) == pytest.approx(1.0, abs=1e-9)
 
 
@@ -1068,8 +1079,12 @@ def test_ac18_module_calls_compute_overlap():
 
 
 def test_ac18_module_does_not_import_eval_metrics():
+    """AC25 forbids importing ``segfacet.eval.metrics``, not mentioning it --
+    the module's docstring legitimately references
+    ``segfacet.eval.metrics.PerModeSensitivity`` to explain how this API
+    differs from it, so only actual import statements are checked."""
     source = _per_mode_source()
-    assert "segfacet.eval.metrics" not in source
+    assert re.search(r"^(import|from)\s+segfacet\.eval\.metrics", source, re.MULTILINE) is None
 
 
 # =========================================================================== #
