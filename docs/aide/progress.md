@@ -751,7 +751,7 @@ as a named field, so nothing else can read it.
 
 - ✅ Promote stray-component metrics to first-class fields in `features/components.py`
   (stray volume mm³, count, fraction); fragmentation rule reads rather than recomputes. *(Item 098)*
-- 📋 Per-mode metric API, reusing `eval/overlap.py::compute_overlap` for Dice/Jaccard and
+- 🚧 Per-mode metric API, reusing `eval/overlap.py::compute_overlap` for Dice/Jaccard and
   its aggregates — no new overlap code. *(Item 099)*
 - 📋 Severity-ladder monotonicity + cross-mode specificity harness (the **G2** acceptance):
   graded ladders per §6 mode from the existing perturbation-operator constructor knobs. *(Item 100)*
