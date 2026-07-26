@@ -59,15 +59,18 @@ UNKNOWN = "unknown"
 
 
 # --------------------------------------------------------------------------- #
-# Default TotalSegmentator / VerSe convention
+# Default TPTBox vertebra convention
 # --------------------------------------------------------------------------- #
 #
-# The VerSe / TotalSegmentator vertebra numbering (Decision 2). The contiguous
-# 1..26 block is the classic VerSe ordering; the two transitional vertebrae
-# (T13, L6) occupy the high end of the range after the sacrum/coccyx, matching
-# TotalSegmentator's published label scheme. Integer order therefore does *not*
-# equal anatomical order (T13 sits between T12 and L1 anatomically but is value
-# 28); ``CANONICAL_ORDER`` is the source of truth for anatomical ordering.
+# The TPTBox vertebra numbering (``TPTBox.core.vert_constants.v_idx2name``,
+# vertebra range 1-33; item 093). The contiguous 1..24 block covers C1-L5;
+# ``T13`` (a transitional vertebra) occupies value 28, in the middle of the
+# sacral/coccygeal range (25-27, 29-33) rather than at either end. Integer
+# order therefore does *not* equal anatomical order (T13 sits between T12 and
+# L1 anatomically but is value 28, and L6 sits between L5 and S1 anatomically
+# but is value 25); ``CANONICAL_ORDER`` is the source of truth for anatomical
+# ordering. This table is hardcoded as a literal (not imported from TPTBox,
+# which is not a dependency of this item).
 DEFAULT_LABEL_MAP: Dict[int, str] = {
     # Cervical C1-C7
     1: "C1",
@@ -96,12 +99,18 @@ DEFAULT_LABEL_MAP: Dict[int, str] = {
     22: "L3",
     23: "L4",
     24: "L5",
-    # Sacrum / coccyx
-    25: "S",
-    26: "Cocygis",
-    # Transitional vertebrae (high end of the range)
+    # Transitional vertebra / sacrum / coccyx (TPTBox vertebra range)
+    25: "L6",
+    26: "S1",
+    27: "Cocc",
+    # Transitional vertebra (high end of the thoracic range)
     28: "T13",
-    29: "L6",
+    # Sacrum (continued) / coccyx
+    29: "S2",
+    30: "S3",
+    31: "S4",
+    32: "S5",
+    33: "S6",
 }
 
 # Head-to-tail anatomical order (Decision: integer order != anatomical order).
@@ -112,7 +121,8 @@ CANONICAL_ORDER: Tuple[str, ...] = (
     "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12",
     "T13",
     "L1", "L2", "L3", "L4", "L5", "L6",
-    "S", "Cocygis",
+    "S1", "S2", "S3", "S4", "S5", "S6",
+    "Cocc",
 )
 
 # Rank of each canonical name for O(1) ordering of summary entries. Names not in

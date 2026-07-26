@@ -143,15 +143,15 @@ def test_ac5_returns_spine_relationships_instance():
 
 def test_ac1_present_levels_in_canonical_order():
     """AC1: present_levels is in anatomical (head-to-tail) order regardless of input order."""
-    # Supplied in reverse order (S, L5, L1, T12) — should come out T12, L1, L5, S
+    # Supplied in reverse order (S1, L5, L1, T12) — should come out T12, L1, L5, S1
     centroids = [
-        _centroid("S", (0.0, 0.0, 0.0)),
+        _centroid("S1", (0.0, 0.0, 0.0)),
         _centroid("L5", (0.0, 0.0, 10.0)),
         _centroid("L1", (0.0, 0.0, 20.0)),
         _centroid("T12", (0.0, 0.0, 30.0)),
     ]
     result = compute_spine_relationships(centroids)
-    assert result.present_levels == ["T12", "L1", "L5", "S"]
+    assert result.present_levels == ["T12", "L1", "L5", "S1"]
 
 
 def test_ac1_present_levels_exact_match():

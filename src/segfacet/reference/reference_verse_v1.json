@@ -4163,7 +4163,7 @@
         "stratum": "all"
       }
     },
-    "S": {
+    "L6": {
       "all": {
         "feature_stats": {
           "component_count": {
@@ -4503,7 +4503,7 @@
             "std": 0.00012255731482197898
           }
         },
-        "level_name": "S",
+        "level_name": "L6",
         "record_count": 3,
         "stratum": "all"
       }

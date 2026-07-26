@@ -1,6 +1,6 @@
-"""Unit tests for the label-convention module (item 004).
+"""Unit tests for the label-convention module (item 004; TPTBox table per item 093).
 
-Covers the default TotalSegmentator/VerSe mapping (bijection + transitional
+Covers the default TPTBox vertebra mapping (bijection + transitional
 vertebrae), bidirectional lookup, custom overrides, graceful unknown/out-of-range
 handling, and the inventory summariser over the item 002 synthetic fixtures and
 inline mappings.
@@ -45,13 +45,14 @@ def test_default_round_trips():
 
 
 def test_default_covers_transitional_and_ranges():
-    """C1-C7, T1-T13, L1-L6, and the sacrum are all present."""
+    """C1-C7, T1-T13, L1-L6, S1-S6, and the coccyx are all present."""
     names = set(DEFAULT_LABEL_MAP.values())
     expected = (
         {f"C{i}" for i in range(1, 8)}
         | {f"T{i}" for i in range(1, 14)}   # includes T13
         | {f"L{i}" for i in range(1, 7)}    # includes L6
-        | {"S"}
+        | {f"S{i}" for i in range(1, 7)}    # S1-S6
+        | {"Cocc"}
     )
     assert expected <= names
 
@@ -66,7 +67,7 @@ def test_canonical_order_is_anatomical():
     """T13 sits between T12 and L1; integer order would not give this."""
     order = list(CANONICAL_ORDER)
     assert order.index("T12") < order.index("T13") < order.index("L1")
-    assert order.index("L5") < order.index("L6") < order.index("S")
+    assert order.index("L5") < order.index("L6") < order.index("S1")
     assert order.index("C7") < order.index("T1")
 
 
@@ -79,17 +80,17 @@ def test_value_to_name_known():
     assert conv.name_of(1) == "C1"
     assert conv.name_of(19) == "T12"
     assert conv.name_of(20) == "L1"
-    assert conv.name_of(25) == "S"
+    assert conv.name_of(25) == "L6"
     assert conv.name_of(28) == "T13"
-    assert conv.name_of(29) == "L6"
+    assert conv.name_of(29) == "S2"
 
 
 def test_name_to_value_known():
     conv = LabelConvention.default()
     assert conv.value_of("C1") == 1
     assert conv.value_of("T12") == 19
-    assert conv.value_of("S") == 25
-    assert conv.value_of("L6") == 29
+    assert conv.value_of("L6") == 25
+    assert conv.value_of("S2") == 29
 
 
 def test_name_lookup_is_case_and_whitespace_insensitive():
@@ -104,14 +105,14 @@ def test_is_known():
     assert conv.is_known(1) is True
     assert conv.is_known(25) is True
     assert conv.is_known(999) is False
-    assert conv.is_known(27) is False  # 27 intentionally unmapped (no T13 there)
+    assert conv.is_known(34) is False  # 34 intentionally unmapped (range is 1-33)
 
 
 # --------------------------------------------------------------------------- #
 # Unknown / out-of-range handling (never crashes)
 # --------------------------------------------------------------------------- #
 
-@pytest.mark.parametrize("value", [0, 27, 99, 1000, -1, -50])
+@pytest.mark.parametrize("value", [0, 34, 99, 1000, -1, -50])
 def test_value_to_name_unknown_returns_sentinel(value):
     conv = LabelConvention.default()
     assert conv.name_of(value) == UNKNOWN
@@ -231,7 +232,7 @@ def test_custom_override_applies_both_directions():
     assert conv.value_of("L5") == 200
     # Default values no longer resolve under the override.
     assert conv.name_of(1) == UNKNOWN
-    assert conv.value_of("S") is None
+    assert conv.value_of("L6") is None
 
 
 def test_override_round_trips():
@@ -536,7 +537,7 @@ def test_summarise_large_inventory():
     """A large inventory partitions correctly and stays ordered (no crash)."""
     inventory = {i: 1 for i in range(1, 5001)}
     summary = summarise_inventory(inventory)
-    # Default map covers values 1..26, 28, 29 (27 unmapped) -> 28 recognised.
+    # Default map covers the full TPTBox vertebra range 1-33.
     assert summary.n_recognised == len(DEFAULT_LABEL_MAP)
     assert summary.n_unknown == 5000 - len(DEFAULT_LABEL_MAP)
     # Recognised come out in canonical anatomical order.

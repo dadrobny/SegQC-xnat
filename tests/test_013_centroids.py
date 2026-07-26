@@ -229,11 +229,11 @@ def test_ac3_mapped_label_20_yields_l1():
     assert result.level_name == "L1"
 
 
-def test_ac3_mapped_label_25_yields_s():
-    """AC3: Label value 25 (sacrum) maps to 'S' in the default convention."""
+def test_ac3_mapped_label_25_yields_l6():
+    """AC3: Label value 25 (transitional vertebra) maps to 'L6' in the default convention."""
     seg = make_labelmap((10, 10, 10), {25: ((3, 7), (3, 7), (3, 7))})
     result = compute_centroid(seg, label=25)
-    assert result.level_name == "S"
+    assert result.level_name == "L6"
 
 
 def test_ac3_mapped_label_2_yields_c2():

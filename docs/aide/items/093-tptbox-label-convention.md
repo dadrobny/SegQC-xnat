@@ -234,4 +234,55 @@ All under `source_dir = src/segfacet`.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`reference_verse_v1.json` re-key was done by round-tripping through
+  `load_artifact`/`to_json_text`, not a hand-edit.** Loaded the artifact,
+  used `dataclasses.replace` to rename the `LevelDistribution.level_name`
+  field and the `levels` dict key from `"S"` to `"L6"`, then re-serialised via
+  `to_json_text` and wrote the bytes back with `write_bytes`. This guarantees
+  the file matches exactly what `write_artifact` would produce (`sort_keys`,
+  indent, trailing newline) rather than risking hand-edit drift. Verified via
+  `git diff` that only the two intended lines (`"S": {` -> `"L6": {` and
+  `"level_name": "S"` -> `"level_name": "L6"`) changed.
+- **Test fixup (Implementation Step 4) touched four modules beyond the new
+  `test_093_*` file**, each for a genuine (not incidental) hardcoded-name
+  reason:
+  - `tests/test_013_centroids.py`: `test_ac3_mapped_label_25_yields_s` asserted
+    `compute_centroid(..., label=25).level_name == "S"`; renamed the test and
+    updated the expectation to `"L6"`.
+  - `tests/test_014_spine_relationships.py`:
+    `test_ac1_present_levels_in_canonical_order` fed a synthetic centroid named
+    literal `"S"` through `compute_spine_relationships`, which filters
+    centroids to `level_name in CANONICAL_ORDER` (`relationships.py:91`) —
+    since `"S"` is no longer a canonical name, that centroid would now be
+    silently dropped rather than sorted last. Changed the fixture centroid
+    name (and expected `present_levels` entry) to `"S1"`, which preserves the
+    test's intent (an entry ordered after `L5`).
+  - `tests/test_090_reference_derived_defaults.py`: `_VERSE_V1_LEVELS`
+    literally enumerates the bundled `reference_verse_v1.json`'s level set and
+    is compared via `set(reference.levels.keys()) == set(_VERSE_V1_LEVELS)`;
+    updated its trailing `"S"` to `"L6"` to match the re-keyed artifact.
+  - `tests/test_labels.py`: several tests hardcoded old-table literals
+    (`name_of(25) == "S"`, `name_of(29) == "L6"`, `value_of("S") == 25`,
+    `value_of("L6") == 29`, `is_known(27) is False` — 27 was unmapped in the
+    old table but is now `"Cocc"`, `27` in the unknown-value parametrisation,
+    and the covers-transitional-and-ranges expected-name set) — updated each
+    to the new table's actual values (see the diff) and refreshed two stale
+    comments/the module docstring.
+  - Left `tests/test_027_level_aware_bounds.py`,
+    `tests/test_heuristics_bounds_source.py`, and
+    `tests/test_044_reference_ingestion.py` unchanged after inspection: their
+    `"S"`/`"Cocygis"` literals are synthetic level names fed directly into the
+    bounds rule to exercise the *generic* "unbounded group" skip path
+    (`heuristics/bounds.py`'s `_level_group`, derived from `CANONICAL_ORDER`
+    by name prefix) — since neither string is a canonical name before or
+    after this item, the skip behaviour is unchanged and these tests were
+    never actually asserting a convention lookup. `test_044`'s `"L6"`
+    references are fully dynamic (`convention.value_of("L6")`), so they track
+    the table automatically.
+- **`heuristics/bounds.py`'s comments naming `S`/`Cocygis` as the omitted
+  unbounded labels were left untouched** — `_LEVEL_GROUP` is derived
+  generically from `CANONICAL_ORDER` by name prefix (`L*` -> lumbar, etc.),
+  so `S1`-`S6`/`Cocc` are still correctly omitted with zero code change; only
+  the comment text is now stale. Out of this item's scope (Implementation
+  Steps name only `labels.py`, the reference JSON, and test files); logged to
+  `docs/aide/insights.md` instead.
