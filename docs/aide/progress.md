@@ -706,7 +706,7 @@ numbers, wrong. Must land before any real-segmenter number is computed.
 
 - ✅ Adopt the TPTBox vertebra standard as the default (`DEFAULT_LABEL_MAP`,
   `CANONICAL_ORDER`); retire the legacy table; keep `LabelConvention` overridable. *(Item 093)*
-- 🚧 Back `segfacet.io`'s `Volume`/`Case` with TPTBox `NII` (orientation-safe load,
+- ✅ Back `segfacet.io`'s `Volume`/`Case` with TPTBox `NII` (orientation-safe load,
   `reorient`, `rescale`/`resample_from_to`, mm-space, `zoom`/`affine`), replacing the
   hand-rolled `_spacing_from_affine` and keeping the public shape stable. *(Item 094)*
 - ✅ Environment migration: `requires-python = ">=3.11"`, numpy as a **range**
