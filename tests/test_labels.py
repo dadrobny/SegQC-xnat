@@ -351,10 +351,10 @@ def test_summarise_with_unknown_label():
 
 def test_summarise_unknown_includes_negative_and_zero():
     """Negative / unmapped labels are surfaced, never dropped or crashing."""
-    summary = summarise_inventory({-3: 2, 0: 7, 1: 10, 27: 4})
-    # Only 1 -> C1 is recognised; -3, 0, 27 are unknown.
+    summary = summarise_inventory({-3: 2, 0: 7, 1: 10, 34: 4})
+    # Only 1 -> C1 is recognised; -3, 0, 34 are unknown.
     assert summary.recognised == [(1, "C1", 10)]
-    assert summary.unknown == [(-3, 2), (0, 7), (27, 4)]  # sorted by value
+    assert summary.unknown == [(-3, 2), (0, 7), (34, 4)]  # sorted by value
 
 
 def test_summarise_orders_recognised_anatomically_not_by_value():
