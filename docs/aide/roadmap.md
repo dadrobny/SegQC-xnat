@@ -13,8 +13,6 @@
 
 ## Strategy
 
-Per the agreed steering:
-
 1. **MVP first, complete the pipeline, then extend.** Phase 1 builds a thin
    end-to-end slice and grows it into the *complete local QC pipeline*
    (I/O → features → heuristics → verdict → report → evaluation). Phase 2 only
@@ -35,16 +33,16 @@ Per the agreed steering:
 
 ### Objective → stage coverage
 
-| Objective | Delivered by |
-|-----------|--------------|
-| G1 Detect empty / trivially-failed | Stage 1 |
-| G2 Detect catalogued failure modes (§6) | Stages 4, 5 (real failures: **Stage 16**) |
-| G3 Distinguish failure from variation | Stages 6, 7 (real-VerSe grounding: Stage 12; **recalibration: Stage 14**) |
-| G4 Per-case QC report (JSON + human) | Stage 1 (extended by 2–4) |
-| G7 Evaluable & regression-testable | Stages 5, 7 (real-VerSe evaluation: Stage 12; **real data: Stages 14, 16**; corpus rework: **Stages 19–21**) |
-| *(out of scope 2026-07-25)* G5 Deploy on XNAT | Stage 9 shipped the artefacts; **Stage 15 `❌ Excluded`** — see `vision.md` §0 |
-| *(deferred)* G6 Portable / GPU | Stage 10 |
-| *(deferred)* G8 Extensible / classification | Stage 11 |
+| Objective                                       | Delivered by                                                                                                             |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| G1 Detect empty / trivially-failed              | Stage 1                                                                                                                  |
+| G2 Detect catalogued failure modes (§6)        | Stages 4, 5 (real failures:**Stage 16**)                                                                           |
+| G3 Distinguish failure from variation           | Stages 6, 7 (real-VerSe grounding: Stage 12;**recalibration: Stage 14**)                                           |
+| G4 Per-case QC report (JSON + human)            | Stage 1 (extended by 2–4)                                                                                               |
+| G7 Evaluable & regression-testable              | Stages 5, 7 (real-VerSe evaluation: Stage 12;**real data: Stages 14, 16**; corpus rework: **Stages 19–21**) |
+| *(out of scope 2026-07-25)* G5 Deploy on XNAT | Stage 9 shipped the artefacts;**Stage 15 `❌ Excluded`** — see `vision.md` §0                                |
+| *(deferred)* G6 Portable / GPU                | Stage 10                                                                                                                 |
+| *(deferred)* G8 Extensible / classification   | Stage 11                                                                                                                 |
 
 > **Stages 14–16 exist because building ≠ validating.** Stages 0–13 deliver and
 > synthetically verify the whole pipeline, but several objectives' measurable
@@ -62,7 +60,7 @@ Per the agreed steering:
 ```
 0 ─► 1 ─► 2 ─► 3 ─► 4 ─► 5 ─► 7        (Phase 1: complete MVP pipeline)
               └────────► 6 ─┘
-                                
+                              
 Phase 2 (after 7):  8 (img features) · 9 (XNAT) · 10 (GPU) · 11 (extensibility)
                     12 (real-VerSe grounding & reference feature expansion)
                     13 (dataset ingestion adapters & harmonization schema)
@@ -98,6 +96,7 @@ instance label map, normalises labels via a documented convention, and exits
 cleanly. Establishes the skeleton every later stage plugs into.
 
 **Deliverables.**
+
 - Python package `segqc/` targeting **Python 3.9+**; `pyproject.toml` with pinned
   core deps (NumPy, SciPy, scikit-image, NiBabel and/or SimpleITK).
 - CLI entry point: `segqc run --scan <nii> --seg <nii> --out <dir>`.
@@ -112,6 +111,7 @@ cleanly. Establishes the skeleton every later stage plugs into.
 **Dependencies.** None.
 
 **Validation / acceptance.**
+
 - `segqc run` on a fixture loads both volumes, prints the label inventory with
   anatomical names, and writes a stub JSON.
 - Unit tests for the loader and label mapping pass.
@@ -126,6 +126,7 @@ detects empty / trivially-failed segmentations. Proves the full data flow before
 any heavy feature work.
 
 **Deliverables.**
+
 - Empty / near-empty detection: no labels, total foreground < N voxels, or
   < K distinct labels — all configurable.
 - **QC verdict model**: `pass` / `flagged-for-review` / `fail`, carrying per-case
@@ -137,6 +138,7 @@ any heavy feature work.
 **Dependencies.** Stage 0.
 
 **Validation / acceptance.**
+
 - 100% of empty / near-empty fixtures flagged `fail` with an explicit reason
   (**G1**).
 - A non-empty fixture passes the empty check.
@@ -151,6 +153,7 @@ any heavy feature work.
 "image processing" focus of the MVP.
 
 **Deliverables.**
+
 - Per-label features: voxel & physical **volume**; **extent** (x/y/z); **bounding
   box**; image-border-contact flags.
 - **Connected-components** per label: component count + sizes (inputs for
@@ -172,6 +175,7 @@ any heavy feature work.
 **Dependencies.** Stage 0 (extends Stage 1 report model).
 
 **Validation / acceptance.**
+
 - Features computed deterministically on fixtures; values verified against
   hand-computed expectations.
 - An anisotropic-spacing fixture yields correct physical volumes/extents.
@@ -185,6 +189,7 @@ any heavy feature work.
 ordering, and mislabelling heuristics.
 
 **Deliverables.**
+
 - **Spline fit** through the ordered vertebra centroids, robust to missing levels.
 - Per-vertebra **offset from the spline**.
 - **Orientation / rotation** estimate per vertebra + global curvature descriptors.
@@ -200,6 +205,7 @@ ordering, and mislabelling heuristics.
 **Dependencies.** Stage 2.
 
 **Validation / acceptance.**
+
 - Spline fits cleanly on GT fixtures; offsets near-zero for GT, large for
   displaced/mislabelled fixtures.
 - Robust to a deliberately missing level (no crash, sensible fit).
@@ -213,6 +219,7 @@ ordering, and mislabelling heuristics.
 mode — the "simple heuristics" focus of the MVP.
 
 **Deliverables.**
+
 - Config-driven **rule engine**: each rule emits a flag + human-readable reason +
   offending labels.
 - Rule families covering §6:
@@ -229,6 +236,7 @@ mode — the "simple heuristics" focus of the MVP.
 **Dependencies.** Stages 2, 3.
 
 **Validation / acceptance.**
+
 - Each of the 8 failure modes in §6 has ≥1 heuristic that fires on a crafted
   example (**G2**).
 - Every flag carries a reason + offending labels; thresholds live in config.
@@ -241,6 +249,7 @@ mode — the "simple heuristics" focus of the MVP.
 **Goal.** A reproducible corpus and automated tests covering every failure mode.
 
 **Deliverables.**
+
 - **Synthetic-failure generator** that perturbs a GT label map: relabel,
   remove/add segment, inject islands, fuse/fragment, swap order, crop at border,
   overlap.
@@ -252,6 +261,7 @@ mode — the "simple heuristics" focus of the MVP.
 **Dependencies.** Stage 4.
 
 **Validation / acceptance.**
+
 - Every §6 failure mode has ≥1 synthetic case and is detected (**G7**, **G2**).
 - Full-pipeline regression suite green; golden JSON stable across repeated runs.
 
@@ -263,6 +273,7 @@ mode — the "simple heuristics" focus of the MVP.
 than hand-guessed constants.
 
 **Deliverables.**
+
 - VerSe GT ingestion → per-level feature aggregation into **reference
   distributions** (mean/percentiles), stratified by level (and a subject-size
   proxy where feasible).
@@ -275,6 +286,7 @@ than hand-guessed constants.
 **Dependencies.** Stages 2–4 (parallelisable with Stage 5).
 
 **Validation / acceptance.**
+
 - Reference artifact builds reproducibly from VerSe and is versioned.
 - GT fixtures fall within reference ranges; perturbed cases fall outside (**G3**).
 - Tests cover reference loading + delta rules.
@@ -288,6 +300,7 @@ TotalSegmentator output, and the synthetic corpus. Marks the MVP pipeline as
 complete.
 
 **Deliverables.**
+
 - **Evaluation harness** comparing at three levels: QC verdict; DICE vs GT;
   feature-set match by vertebra label.
 - Runs on: VerSe GT (positive control), TotalSegmentator outputs, synthetic
@@ -299,6 +312,7 @@ complete.
 **Dependencies.** Stages 5, 6.
 
 **Validation / acceptance.**
+
 - GT passes at a high rate (low FPR) (**G3**).
 - Injected failures are caught; flag rate / feature divergence correlates with
   DICE (**G7**).
@@ -314,6 +328,7 @@ complete.
 heuristics and seed abnormality detection.
 
 **Deliverables.**
+
 - Intensity features over each labelled region (+ original scan); optional
   **PyRadiomics** integration.
 - Feature fusion into the report + at least one intensity-based heuristic
@@ -332,6 +347,7 @@ based heuristic fires appropriately; tests pass.
 **Goal.** Package the completed pipeline as a Docker image with an XNAT command.
 
 **Deliverables.**
+
 - **Dockerfile** (CPU-only base), pinned deps, bundled/mounted reference data.
 - XNAT Container Service **`command.json`** (inputs: session/scan + segmentation;
   outputs: report resources), per
@@ -353,6 +369,7 @@ documented (**G5**).
 path; GPU never required.
 
 **Deliverables.**
+
 - Runtime backend selection (CuPy/cuCIM when present, NumPy/SciPy fallback).
 - **Equivalence tests**: CPU vs GPU produce identical verdicts.
 - Performance benchmark.
@@ -370,6 +387,7 @@ verdict-equivalence tests pass; the tool runs fully CPU-only (**G6**).
 handled abnormalities are accounted for rather than naively flagged.
 
 **Deliverables.**
+
 - Plugin/registration API for new heuristics + abnormality classes.
 - Ingestion of human abnormality labels (post-op, fracture, implant); a
   classification arm that informs the heuristics.
@@ -395,6 +413,7 @@ this stage closes the gap between "the pipeline can do this" and "the pipeline
 has been grounded in and evaluated on real VerSe."
 
 **Deliverables.**
+
 - **Expanded reference feature vocabulary.** Widen the ingested/aggregated
   per-level feature set beyond the current 5 geometric + 13 intensity scalars
   to include the discriminative Stage-2/3 scalars the engine already computes
@@ -404,8 +423,7 @@ has been grounded in and evaluated on real VerSe."
   aggregation → the delta-to-reference rules → the switchable config.
 - **Real-VerSe acquisition & versioned artifact build recipe.** Documented,
   scripted process to mount a real VerSe GT cohort and produce a separately
-  **versioned** reference artifact (`reference_verse_vN.json`, `provenance.source
-  == "verse-vN"`); commit the *derived distributions artifact*, never the raw
+  **versioned** reference artifact (`reference_verse_vN.json`, `provenance.source == "verse-vN"`); commit the *derived distributions artifact*, never the raw
   VerSe scans (large / licensed). Keep the synthetic default for reproducible
   tests.
 - **One-command refresh wrapper.** A re-runnable script/target that rebuilds
@@ -424,6 +442,7 @@ has been grounded in and evaluated on real VerSe."
 prioritised ahead of them.
 
 **Validation / acceptance.**
+
 - The expanded features appear in a rebuilt reference artifact and are consumed
   by the delta-to-reference rules; existing synthetic tests stay green.
 - The real-VerSe artifact builds reproducibly from a mounted VerSe cohort
@@ -460,6 +479,7 @@ real-GT reference/heuristic knowledge base, and (3) applying the tool to score n
 automatic segmentations (TotalSegmentator, SPINEPS, …).
 
 **Deliverables.**
+
 - **`Cohort` / `Case` interface** (framework side, dataset-agnostic): `Case`
   carries `case_id`, `seg_path`, `scan_path | None`, `role` (`gt` | `candidate`),
   resolved `label_convention`, and optional metadata; `Cohort` is an ordered,
@@ -469,8 +489,7 @@ automatic segmentations (TotalSegmentator, SPINEPS, …).
   (incl. split-subject infixes); `label_convention`; `role`; and optional named
   **`subsets`** (folder / CSV / id-list / glob) — adapter-only, never a framework
   concept.
-- **Resolver** (`segqc.datasets`): `resolve(descriptor, *, data_root, subset, role)
-  -> Cohort`, deterministic ordering; the existing flat `ingest_cohort` /
+- **Resolver** (`segqc.datasets`): `resolve(descriptor, *, data_root, subset, role) -> Cohort`, deterministic ordering; the existing flat `ingest_cohort` /
   `build_gt_pass_manifest` gain a `Cohort`-driven discovery path **alongside** the
   flat one (retained for the synthetic determinism fixtures).
 - **CLI surface:** `run` / `build-reference` / `evaluate` accept
@@ -484,6 +503,7 @@ automatic segmentations (TotalSegmentator, SPINEPS, …).
 Independent of Stages 8–11. **Unblocks the real-data half of Stage 12.**
 
 **Validation / acceptance.**
+
 - The VerSe19 descriptor resolves a mounted cohort to the expected
   `(case_id, seg_path, scan_path)` triples — including split subjects — with **no
   manual staging**; ordering is deterministic.
@@ -522,6 +542,7 @@ One real case passed entirely clean, which is what rules out a systematic bug an
 points at calibration.
 
 **Deliverables.**
+
 - **Reference-derived bounds by default.** Item 048 already built the config
   switch from hand-set to reference-derived bounds; the shipped default is still
   the synthetic-calibrated hand-set one. Ground it on `reference_verse_v1.json`.
@@ -544,6 +565,7 @@ points at calibration.
 **Dependencies.** Stages 12, 13 (✅ — the real artifact and the adapter exist).
 
 **Validation / acceptance.**
+
 - Held-out real VerSe19 GT yields **FPR ≤ 0.10** (**G3**).
 - Per-mode sensitivity ≥ item 057's synthetic baseline (5/8 pipeline-detectable
   modes at 1.0), and those modes still fire on perturbed **real** GT (**G7**).
@@ -570,6 +592,7 @@ validating `command.json`, an entry script, deployment docs, and a CI-verified
 install steps were written from the XNAT documentation and never executed.
 
 **Deliverables.**
+
 - A reachable XNAT instance with the Container Service enabled (test/staging is
   fine). **This is an external prerequisite the project does not currently
   have** — the stage is blocked on access, not on engineering.
@@ -604,6 +627,7 @@ when they do.
 > per-mode metrics and the specificity harness this stage's sensitivity claims rest on.
 
 **Deliverables.**
+
 - **Real candidate cohort**: run **SPINEPS** (primary; TotalSegmentator optional as a
   second opinion) over real VerSe CT, ingested as `role: candidate` through the
   Stage-13 adapter and scored against real GT.
@@ -647,6 +671,7 @@ downstream measurement would be quietly invalid, so this stage must land before 
 real-segmenter number is computed.
 
 **Deliverables.**
+
 - **Adopt the TPTBox vertebra standard as the default** (`DEFAULT_LABEL_MAP`,
   `CANONICAL_ORDER`), retiring the legacy table. `LabelConvention` stays overridable for
   genuinely foreign inputs. Note TPTBox's `v_idx2name` also carries subregion names from
@@ -682,6 +707,7 @@ connected component" is calculated inside `heuristics/fragmentation.py` rather t
 existing as a named field anything else can read.
 
 **Deliverables.**
+
 - **Promote stray-component metrics to first-class fields** in `features/components.py`
   (stray volume mm³, count, fraction) and have the fragmentation rule *read* them instead
   of recomputing.
@@ -711,6 +737,7 @@ record has **185 distinct leaf paths**. Those count different things (an entry s
 verifies the two agree, and no document records *which failure mode each feature is for*.
 
 **Deliverables.**
+
 - **A generated catalogue** — realised record shape from `extract_feature_record` plus
   extractor docstrings — replacing the hand-maintained table. Columns: feature ·
   module/item · what it measures · **how it is computed** · units · spacing/scale
@@ -756,6 +783,7 @@ assertion is free to adopt *now*; once cases become realistic it is expensive to
 introduce retroactively.
 
 **Deliverables.**
+
 - The **traceability matrix**: 8 failure modes × features × 10 rules, gaps visible rather
   than implied.
 - **The specificity assertion** — no unintended rule may fire — adopted as a ratchet.
@@ -783,13 +811,14 @@ take label maps, so the change is largely one of input sourcing.
 
 Make the **three rungs of realism** explicit, and stop conflating them:
 
-| Rung | Corpus | Role |
-|---|---|---|
-| 1 | hand-crafted fixtures (`synth/clean_gt.py`, `tests/synthetic.py`) | fast unit-test scaffolding **only** |
-| 2 | **real GT + scripted perturbation** *(this stage)* | threshold calibration, regression, sensitivity |
-| 3 | real segmenter failures (**Stage 16**) | validation |
+| Rung | Corpus                                                                | Role                                           |
+| ---- | --------------------------------------------------------------------- | ---------------------------------------------- |
+| 1    | hand-crafted fixtures (`synth/clean_gt.py`, `tests/synthetic.py`) | fast unit-test scaffolding**only**       |
+| 2    | **real GT + scripted perturbation** *(this stage)*            | threshold calibration, regression, sensitivity |
+| 3    | real segmenter failures (**Stage 16**)                          | validation                                     |
 
 **Deliverables.**
+
 - The existing `Perturbation` operators re-sourced from **real VerSe GT**, with a manifest
   recording subject IDs, seeds and operator parameters so the corpus is reproducible
   without committing bulk data.
