@@ -709,7 +709,7 @@ numbers, wrong. Must land before any real-segmenter number is computed.
 - 📋 Back `segfacet.io`'s `Volume`/`Case` with TPTBox `NII` (orientation-safe load,
   `reorient`, `rescale`/`resample_from_to`, mm-space, `zoom`/`affine`), replacing the
   hand-rolled `_spacing_from_affine` and keeping the public shape stable. *(Item 094)*
-- 🚧 Environment migration: `requires-python = ">=3.11"`, numpy as a **range**
+- ✅ Environment migration: `requires-python = ">=3.11"`, numpy as a **range**
   (`>=1.26,<3`), regenerated `constraints.txt`, CI leg per numpy major. *(Item 095)*
 - ✅ Run-manifest schema (segmenter version/SHA, weights hash, post-processing toggles,
   seed, dataset id, resolved `numpy`/`TPTBox` versions). *(Item 096)*
