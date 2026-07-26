@@ -27,7 +27,13 @@ stdlib-only plain-text rendering, and a byte-reproducible calibrated
 surface** (item 099; see :mod:`segfacet.eval.per_mode`) that maps each of the
 eight §6 failure modes to one named scalar metric measuring *how much* of the
 mode is present in a single case, complementing item 054's per-mode
-*sensitivity* (a cohort-wide *detection-rate*, not a per-case magnitude).
+*sensitivity* (a cohort-wide *detection-rate*, not a per-case magnitude), and
+the **severity-ladder monotonicity & cross-mode specificity harness** (item
+100; see :mod:`segfacet.eval.severity_ladder`) that runs item 099's eight
+metrics over a *graded* synthetic-severity stimulus per mode, proving each
+metric moves monotonically with its own mode's severity and is comparatively
+insensitive to the others -- the graded-stimulus counterpart to item 099's
+per-case isolation surface.
 """
 
 from __future__ import annotations
@@ -84,6 +90,26 @@ from .report import (
     serialize_evaluation_report_json,
     write_evaluation_report,
 )
+from .severity_ladder import (
+    COUPLING_THRESHOLD,
+    DEGENERATE_LADDER_MODES,
+    KNOWN_CROSS_MODE_COUPLINGS,
+    LADDER_SEED,
+    RECORDED_MARGINS,
+    SEVERITY_LADDERS,
+    SUPPLEMENTARY_LADDERS,
+    CrossModeCoupling,
+    HarnessResult,
+    HarnessVerdict,
+    LadderPoint,
+    LadderResult,
+    LadderRungSpec,
+    LadderSpec,
+    LadderVerdict,
+    evaluate_ladder,
+    run_severity_harness,
+    score_harness,
+)
 
 __all__ = [
     "EVAL_COHORT_MANIFEST_VERSION",
@@ -128,4 +154,22 @@ __all__ = [
     "write_evaluation_report",
     "render_evaluation_report",
     "record_calibrated_config",
+    "LadderRungSpec",
+    "LadderSpec",
+    "LadderPoint",
+    "LadderResult",
+    "HarnessResult",
+    "LadderVerdict",
+    "HarnessVerdict",
+    "CrossModeCoupling",
+    "SEVERITY_LADDERS",
+    "SUPPLEMENTARY_LADDERS",
+    "DEGENERATE_LADDER_MODES",
+    "KNOWN_CROSS_MODE_COUPLINGS",
+    "RECORDED_MARGINS",
+    "COUPLING_THRESHOLD",
+    "LADDER_SEED",
+    "evaluate_ladder",
+    "run_severity_harness",
+    "score_harness",
 ]

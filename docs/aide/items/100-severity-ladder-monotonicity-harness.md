@@ -731,4 +731,103 @@ when ticking Stage 18's G2 acceptance. Neither blocks this item.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implemented `src/segfacet/eval/severity_ladder.py` and re-exported its public
+surface from `eval/__init__.py`, exactly as specced. Notes on choices made
+during implementation, and the actual measured numbers:
+
+- **Mode 4/5/6 severity values are literal `n_affected_labels` counts, not
+  `n swaps`/`n crops`.** The queue table's "Rung severities: 1, 2 swaps" etc.
+  is a shorthand for the *operation* count; AC11 pins the field name
+  `severity_parameter == "n_affected_labels"`. Since one `relabel_swap`
+  affects **two** labels at once, mode 4's rungs carry `severity = 2.0, 4.0`
+  (not `1.0, 2.0`) so the stored `severity` value literally equals the count
+  of affected labels, matching the field's own name. Modes 5 and 6 remove/
+  crop one label per cumulative step, so their `severity` values (`1.0, 2.0,
+  3.0`) already coincide with both readings.
+
+- **`_measure` always passes `candidate`/`gt` (the perturbed array vs. the
+  clean base array) to `compute_per_mode_metrics`, for every ladder** —
+  simpler than routing per-mode as item 099's Assumptions describe (modes
+  1/4/5 need the pair, others don't), and harmless: the metrics that don't
+  use `candidate`/`gt` (2, 3, 6, 7, 8) simply ignore the extra kwargs. This
+  keeps `_measure` a single, uniform function instead of a per-mode dispatch,
+  with no observable difference in results.
+
+- **Rung 0 is computed once and shared across all nine ladders** (the eight
+  primary plus the supplementary `fuse` ladder), per the Implementation
+  Steps' explicit instruction — `run_severity_harness` builds it once via a
+  private helper and reuses the same `LadderPoint` object for every ladder's
+  `points[0]`. `evaluate_ladder` (the standalone, per-ladder entry point used
+  directly by AC23/AC25's adversarial tests) does **not** share rung 0 across
+  calls — it always computes its own, keeping that function's contract
+  simple and independent of the harness's internal caching.
+
+- **A second cross-mode coupling was measured beyond the one item 099
+  anticipated.** The Assumptions log named only `{(6, 1)}` as anticipated,
+  while noting "whatever the builder measures goes in the table ... any
+  coupling outside `{(6, 1)}` is called out here." The actual measured
+  8x8 response surface (via `run_severity_harness()` + a script recomputing
+  `span`/`response`/`margin` independently) found **two** entries with
+  `response >= COUPLING_THRESHOLD (0.25)`:
+  - `(ladder_mode=6, foreign_mode=1)`: response **2.789** (rounded up to
+    4 sig figs: `2.79`) — matches the anticipated direction and even exceeds
+    the strict bar, exactly as item 099 predicted (`crop_at_border` rigidly
+    translates a body like `displace`/`force_overlap`, and mode 1's own
+    ladder is FOV-capped at ~19.8mm `displacement_mm` on this base while
+    mode 6 scales linearly with the number of cropped labels).
+  - `(ladder_mode=8, foreign_mode=1)`: response **0.9629** (rounded up:
+    `0.9629`), **not** anticipated by item 099. Cause: `force_overlap`
+    shifts the whole target body by `gap + overlap_depth` voxels along the
+    stacking axis; the constant 15mm inter-body gap dominates that shift
+    (only the small `overlap_depth` term, 1-4 voxels, actually varies per
+    rung), so most of `unanchored_foreground_fraction`'s response on the
+    mode-8 ladder is a rigid-translation artefact largely independent of
+    `overlap_depth`, and its span (0.1243) nearly matches mode 1's own full
+    swing (0.1291). Mode 8's own designated metric
+    (`overlapping_voxel_count`) remains a clean, strictly specific isolator
+    (`response(8,8)==1.0`, all its other foreign responses are 0 except a
+    small 0.0347 to mode 4) — only its cross-check against metric 1 is
+    coupled. Both entries are recorded in `KNOWN_CROSS_MODE_COUPLINGS` with
+    their measured `cause`; `RECORDED_MARGINS[8] == 1.038` (measured
+    `1.0387`, rounded down) reflects that this margin is real but thin.
+
+- **All other measured margins are `math.inf`** (modes 1, 2, 4, 5, 7): the
+  strongest possible specificity bar, because every foreign ladder's span on
+  that mode's own metric was measured as exactly `0.0` — no foreign
+  perturbation moved that metric at all. Mode 3's measured margin is `112.0`
+  (rounded down from `112.037`) — strict, driven almost entirely by tiny
+  real side-effects of `crop_at_border`/`inject_islands` on
+  `rogue_island_count`'s own foreign readings, three orders of magnitude
+  below its own ladder's full swing.
+
+- **`score_harness`'s failure criteria for a non-identity `assignment`
+  needed one more check beyond monotonicity/strict-change.** The negative
+  control (AC18, ladder 2 scored against metric 3 and vice versa) initially
+  passed for ladder 3 alone: `inject_islands` produces a tiny but genuinely
+  monotonic, strictly-changing decrease in `min_dominant_component_fraction`
+  (`1.0 -> 0.9986 -> 0.9971 -> 0.9957 -> 0.9943`, a real deterministic
+  side-effect of extra disconnected voxels on the target label's
+  `components` block), which trivially satisfies a bare monotone +
+  strictly-changed check. Added a third criterion: the assigned ladder's
+  `response` to its designated metric must be `>= 1.0` — i.e. this ladder
+  must be at least as strong a driver of the assigned metric as that
+  metric's own true ladder is for itself (`response(m, m) == 1.0` always,
+  by construction, for an honest/identity assignment). Under the swap,
+  `response(2, 3) == 0.0` and `response(3, 2) == 0.00752`, both far below
+  `1.0`, so both ladders now correctly fail. This criterion is a no-op for
+  every identity-assignment ladder (`responses[m] == 1.0` exactly, never
+  `< 1.0`), so it does not affect AC13/AC14/AC17's identity-assignment
+  assertions.
+
+- **`_BASE_PARAMS` is declared locally** (`levels=("L1".."L5")`,
+  `spacing=(1.0,1.0,1.0)`, `curve_amplitude_mm=6.0`) rather than importing
+  `synth/corpus.py`'s private `_DEFAULT_BASE_PARAMS`, to avoid depending on
+  another module's underscore-prefixed name across a package boundary; the
+  values are identical (verified by AC19's `1950.0` cross-check passing) and
+  `DEFAULT_LEVELS` (public) is imported from `synth/clean_gt.py` rather than
+  hard-coding the level-name strings twice.
+
+All values above were measured by running `run_severity_harness()` +
+`score_harness()` against this implementation on 2026-07-26 (CPU venv, no
+optional dependencies) and are reproducible via the module's `LADDER_SEED`
+and pure/deterministic contract.
