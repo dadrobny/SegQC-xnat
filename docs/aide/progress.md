@@ -711,7 +711,7 @@ numbers, wrong. Must land before any real-segmenter number is computed.
   hand-rolled `_spacing_from_affine` and keeping the public shape stable. *(Item 094)*
 - 📋 Environment migration: `requires-python = ">=3.11"`, numpy as a **range**
   (`>=1.26,<3`), regenerated `constraints.txt`, CI leg per numpy major. *(Item 095)*
-- 📋 Run-manifest schema (segmenter version/SHA, weights hash, post-processing toggles,
+- 🚧 Run-manifest schema (segmenter version/SHA, weights hash, post-processing toggles,
   seed, dataset id, resolved `numpy`/`TPTBox` versions). *(Item 096)*
 - 📋 Stage 17 end-to-end validation: real-segmenter round-trip check + verification-row
   closure. *(Item 097)*
