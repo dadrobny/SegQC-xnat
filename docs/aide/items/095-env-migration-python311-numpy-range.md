@@ -199,10 +199,12 @@ resolves a **substantive** ambiguity that *was* raised and answered:
 3. **`.github/workflows/ci.yml`**:
    - No structural change to the `test` job (it already targets Python
      3.11; only `constraints.txt`'s resolved versions move under it).
-   - Add a new job `test-numpy-majors`: `ubuntu-latest`, Python 3.11,
-     `strategy: matrix: numpy-version: ["1.26.4", "2.0.2"]`,
-     `pip install -e .[dev]` then `pip install "numpy==${{ matrix.numpy-version }}"`
-     then `python -m pytest`. Comment the job explaining why it exists
+   - Add a new job `test-numpy-majors`: `ubuntu-latest`, Python 3.11, a
+     matrix axis over the two numpy versions `1.26.4` and `2.0.2`; each leg
+     runs `pip install -e .[dev]`, then `pip install numpy==<that leg's
+     pinned version>` (interpolated from the matrix axis via the workflow's
+     normal expression syntax), then `python -m pytest`. Comment the job
+     explaining why it exists
      (numpy-major agnosticism, item 095; the two pinned versions are the
      ones directly measured green — the real `spineps` environment's
      monai-forced 1.26.4 ceiling, and the prior `constraints.txt` 2.0.2
