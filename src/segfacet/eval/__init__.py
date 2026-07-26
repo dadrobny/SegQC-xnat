@@ -23,7 +23,11 @@ and the **evaluation report (JSON + human) and calibrated-config recorder**
 (item 056; see :mod:`segfacet.eval.report`) that renders 054's metrics + 055's
 chosen calibration into a versioned, schema-validated JSON report, a
 stdlib-only plain-text rendering, and a byte-reproducible calibrated
-``HeuristicConfig`` YAML writer.
+``HeuristicConfig`` YAML writer, and the **per-mode failure-magnitude metric
+surface** (item 099; see :mod:`segfacet.eval.per_mode`) that maps each of the
+eight §6 failure modes to one named scalar metric measuring *how much* of the
+mode is present in a single case, complementing item 054's per-mode
+*sensitivity* (a cohort-wide *detection-rate*, not a per-case magnitude).
 """
 
 from __future__ import annotations
@@ -64,6 +68,13 @@ from .metrics import (
 )
 from .outcome import CaseOutcome, Outcome, classify_outcome
 from .overlap import LabelOverlap, OverlapResult, compute_overlap
+from .per_mode import (
+    MetricSpec,
+    PerModeMetric,
+    PerModeMetrics,
+    PER_MODE_METRIC_SPECS,
+    compute_per_mode_metrics,
+)
 from .report import (
     EVAL_REPORT_SCHEMA_VERSION,
     EvaluationProvenance,
@@ -98,6 +109,11 @@ __all__ = [
     "PerModeSensitivity",
     "CorrelationResult",
     "CohortMetrics",
+    "MetricSpec",
+    "PerModeMetric",
+    "PerModeMetrics",
+    "PER_MODE_METRIC_SPECS",
+    "compute_per_mode_metrics",
     "ThresholdAxis",
     "apply_assignment",
     "CalibrationObjective",

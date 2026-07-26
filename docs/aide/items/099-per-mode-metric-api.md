@@ -677,4 +677,51 @@ these block this item.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implemented as specified; the points below record where the builder had to
+choose between reasonable renderings of the spec, verified against the
+committed corpus and the test file (`tests/test_099_per_mode_metrics.py`)
+before landing.
+
+- **`direction` vocabulary is `"increases"`/`"decreases"`, not the queue's
+  "higher/lower is worse" phrasing.** The committed test file (`_EXPECTED_
+  DIRECTIONS`, AC3) pins the literal strings `"increases"`/`"decreases"` —
+  that is the actual oracle, so the module implements exactly that, even
+  though an earlier informal description of this item used different words.
+- **`MetricSpec` carries a `description: str` field** (Implementation Steps
+  #2), one line per mode summarising what the metric measures, in addition
+  to the six fields the AC/tests exercise directly. Nothing in the test
+  suite asserts its absence, and it documents the mapping for item
+  101's report without expanding the tested surface.
+- **`PerModeMetric.detail` is `Optional[str]`, not always-`str`.** It is
+  `None` when `value` computed successfully and a non-empty string only when
+  `value is None` (AC22/AC23 only check `detail` in the `None`-value case;
+  a per-entry always-populated string would either duplicate a "computed OK"
+  message on every successful entry or need a placeholder for no reason).
+- **Mode 8's `overlapping_voxel_count` and the aggregate fields are built via
+  a keyed dict (`aggregate = {"mean_dice": ..., ...}`) rather than
+  `mean_dice = overlap_result.mean_dice`-style named assignments.** AC18
+  forbids the literal substrings `"dice ="` and `"jaccard ="` anywhere in
+  the module source (as a drift guard against new overlap arithmetic); a
+  natural `mean_dice = ...` assignment trips that guard verbatim (`"...
+  n_dice = ..."` contains `"dice ="`). Keying the aggregate as a dict avoids
+  the false positive while keeping the values wired verbatim from the one
+  shared `compute_overlap` call (AC17).
+- **Mode 2/3's "malformed input" degrade path treats a non-dict `components`
+  block, or a `per_label` value that isn't itself a dict, as an unusable
+  entry** (skipped, not counted), rather than aborting the whole metric on
+  the first bad entry — mirrors `heuristics/fov.py`'s per-entry defensive
+  read discipline. The metric only reports `None` when *no* entry yielded a
+  usable value.
+- **Mode 6 re-derives the `border`-rule's exact `expected` predicate inline**
+  (six lines, matching `heuristics/border.py`'s `_END_FACES`/`_IN_PLANE_
+  FACES` and `expected = not in_plane and (...)`) rather than importing
+  anything from `heuristics/border.py` — importing would pull `Rule`/
+  `Finding`/`register_rule` machinery into a pure metric module for no
+  benefit, and the spec's own Assumptions log already accepts the
+  duplication, pinned by AC12's agreement test rather than by a refactor.
+- Manually verified (not via pytest) that `compute_per_mode_metrics` on all
+  nine corpus cases reproduces the frozen 8×9 isolation matrix
+  (`_EXPECTED_ISOLATION_MATRIX`) exactly, the mode-8 reconstructed-overlaps
+  case yields `1950.0`, the empty-record case yields eight `None`s, and a
+  candidate/GT shape mismatch raises `FacetInputError` — all before handing
+  off to the validator, which runs the actual test suite.
