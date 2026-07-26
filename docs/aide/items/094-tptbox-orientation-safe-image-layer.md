@@ -312,12 +312,58 @@ which are already testable on synthetic fixtures alone.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation. One forward-looking note to capture as
-an `insights.md` `gap` entry once this item lands (not this item's own
-scope): `geometry.py`'s face-mapping table's anatomical mislabelling for
-real, arbitrarily-oriented data (documented in its own docstring as a
-"pragmatic convention... downstream callers that have orientation
-information can remap as needed") is now genuinely *remappable*, since this
-item guarantees a consistent RAS array layout — but the remap itself
-(making `touches_superior` etc. anatomically correct, and auditing every
-rule that consumes them) is deliberately not attempted here.
+- **TPTBox's actual API matched the spec's description closely**, with a few
+  concrete details discovered by inspecting the installed 0.7.5 package
+  (import name is `TPTBox`, not `tptbox`; the pip distribution name
+  `tptbox==0.7.5` is unaffected):
+  - `NII.load(path, seg: bool, c_val=None)` — `seg` is a required positional
+    bool (not a keyword defaulting to `False`), so `load_volume` passes
+    `seg=integer_labels` explicitly for both call sites.
+  - `NII.reorient(axcodes_to=..., inplace=False)` returns a **new** `NII`
+    (default `inplace=False`), so `nii = nii.reorient(axcodes_to=...)` is the
+    correct call shape (no separate mutation step needed).
+  - `.get_seg_array()` returns TPTBox's own dtype choice (it coerces to the
+    smallest unsigned integer type that fits the label values, e.g.
+    `uint8`), not `int64`. `load_volume` still casts the result to `int64`
+    itself (same as the pre-migration `_spacing_from_affine`-era code did
+    from nibabel's native dtype) so `Volume.data.dtype` for
+    `integer_labels=True` is unchanged from before this item (confirmed by
+    AC3's snapshot, which records `int64`).
+  - `.get_array()` (the intensity path) preserves the file's original
+    on-disk float dtype (e.g. `float32`) rather than always producing
+    `float64` the way nibabel's `get_fdata(dtype=np.float64)` did.
+    `load_volume` explicitly casts to `float64` after the TPTBox read to
+    preserve this module's documented `Volume.data` contract for scans.
+  - Malformed/corrupt files raise `nibabel.filebasedimages.ImageFileError`
+    from inside `NII.load` (TPTBox delegates to nibabel under the hood for
+    file parsing) — already caught by the existing broad `except Exception`
+    wrap into `FacetInputError`, so no TPTBox-specific exception type needed
+    adding to the catch clause.
+- **`_spacing_from_affine` was removed** (not kept as a fallback) — TPTBox's
+  `.zoom` property covers every case the old `nib.affines.voxel_sizes`-based
+  helper did, and no edge case requiring the old path was found.
+- **`nibabel` is no longer imported in `io.py`** (the module's only nibabel
+  usage was `nib.load` and `nib.affines.voxel_sizes`, both replaced). The
+  package remains a core dependency (`tests/test_094_*` asserts it stays in
+  `pyproject.toml`'s `dependencies`) since ~21 other modules still import it
+  directly (explicitly out of scope for this item; see Description).
+- **`constraints.txt` regeneration surfaced one categorisation nuance**:
+  `matplotlib`, previously included only via the `dev` extra, is now also a
+  direct transitive of TPTBox's own core dependencies — it is documented in
+  the regenerated file's header comment rather than silently reclassified.
+- **AC8's wheel**: TPTBox 0.7.5 ships as a pure-Python wheel
+  (`tptbox-0.7.5-py3-none-any.whl`, no compiled extensions), so there is no
+  numpy ABI baked into the artifact — `pip download tptbox==0.7.5 --no-deps`
+  (equivalent to a from-source wheel build for this pinned release) plus
+  `pip install --no-deps <wheel>` is sufficient and was used as the
+  documented procedure in `docs/tptbox-install-numpy1.md`, rather than
+  requiring an actual `git clone` + `python -m build` round-trip.
+
+One forward-looking note captured as an `insights.md` `gap` entry (not this
+item's own scope): `geometry.py`'s face-mapping table's anatomical
+mislabelling for real, arbitrarily-oriented data (documented in its own
+docstring as a "pragmatic convention... downstream callers that have
+orientation information can remap as needed") is now genuinely *remappable*,
+since this item guarantees a consistent RAS array layout — but the remap
+itself (making `touches_superior` etc. anatomically correct, and auditing
+every rule that consumes them) is deliberately not attempted here.

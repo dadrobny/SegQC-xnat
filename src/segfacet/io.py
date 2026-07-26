@@ -26,8 +26,18 @@ import os
 from dataclasses import dataclass
 from typing import Dict, Tuple, Union
 
-import nibabel as nib
 import numpy as np
+
+# Orientation-normalisation target (item 094): every loaded volume's array
+# storage order is reoriented to this axcode triple before its data/spacing/
+# affine are read, so that two files of the same physical anatomy stored in
+# different orientations (RAS, LPS, or any other) load to the same array
+# layout. Pinned as a load-bearing decision -- see the item spec's
+# Assumptions for why RAS (rather than, say, a target that would make
+# segfacet.features.geometry's face-mapping table anatomically correct) was
+# chosen: it is a byte-identical no-op on every existing synthetic fixture's
+# already-RAS-resolving diagonal affine.
+_TARGET_AXCODES = ("R", "A", "S")
 
 __all__ = [
     "FacetInputError",
@@ -106,28 +116,26 @@ class Case:
     foreground_voxels: int
 
 
-def _spacing_from_affine(affine: np.ndarray) -> Tuple[float, float, float]:
-    """Derive physical voxel sizes from the 4x4 affine.
-
-    Uses the column norms of the 3x3 direction/scale block, which equals
-    ``nibabel.affines.voxel_sizes``. Returns plain Python floats.
-    """
-    sizes = nib.affines.voxel_sizes(affine)
-    return (float(sizes[0]), float(sizes[1]), float(sizes[2]))
-
-
 def load_volume(path: PathLike, *, integer_labels: bool = False) -> Volume:
     """Load a single NIfTI volume into an immutable :class:`Volume`.
+
+    Backed by TPTBox's ``NII`` class (item 094): the volume is loaded via
+    ``NII.load``, then reoriented to a fixed, load-bearing target axcode
+    triple (``("R", "A", "S")``) via ``NII.reorient`` before its array,
+    spacing, and affine are read. This is an axis permutation/flip only —
+    never a resampling/interpolation — so two files of the same physical
+    anatomy stored in different orientations load to the *same* array
+    layout, while every existing fixture (whose affine already resolves to
+    RAS) is unaffected (the reorientation is a byte-identical no-op on it).
 
     Parameters
     ----------
     path:
         Path to a NIfTI file (``.nii`` or ``.nii.gz``).
     integer_labels:
-        When ``True``, read the array in the header's native (integer) dtype,
-        suitable for label maps — label values are **not** silently cast to
-        float. When ``False`` (default), read intensity data as float64 via
-        :meth:`nibabel.Nifti1Image.get_fdata`.
+        When ``True``, read the array as a label map — label values are
+        **not** silently cast to float. When ``False`` (default), read
+        intensity data as float64.
 
     Returns
     -------
@@ -141,6 +149,11 @@ def load_volume(path: PathLike, *, integer_labels: bool = False) -> Volume:
         If the path does not exist, is a directory, or cannot be read as a
         NIfTI image (the underlying error is wrapped, never leaked).
     """
+    # Deferred import: TPTBox pulls in a non-trivial dependency chain
+    # (SimpleITK, scikit-learn, ...) that need not slow down every
+    # segfacet import (e.g. `segfacet --help`).
+    from TPTBox import NII
+
     path_str = os.fspath(path)
 
     if not os.path.exists(path_str):
@@ -149,35 +162,40 @@ def load_volume(path: PathLike, *, integer_labels: bool = False) -> Volume:
         raise FacetInputError(f'Input path is a directory, not a file: "{path_str}"')
 
     try:
-        img = nib.load(path_str)
-    except Exception as exc:  # nibabel raises ImageFileError, OSError, etc.
+        nii = NII.load(path_str, seg=integer_labels)
+        nii = nii.reorient(axcodes_to=_TARGET_AXCODES)
+    except Exception as exc:  # TPTBox/nibabel raise ImageFileError, OSError, etc.
         raise FacetInputError(
             f'Failed to read NIfTI file "{path_str}": {exc}'
         ) from exc
 
-    affine = np.asarray(img.affine, dtype=float)
-    spacing = _spacing_from_affine(affine)
+    affine = np.asarray(nii.affine, dtype=float)
+    zoom = nii.zoom
+    spacing = (float(zoom[0]), float(zoom[1]), float(zoom[2]))
 
     try:
         if integer_labels:
-            # Preserve the header's native dtype; round defensively in case the
-            # stored dtype is float-typed but holds integral label values, then
-            # cast to a signed integer type. Avoids get_fdata()'s float cast.
-            raw = np.asarray(img.dataobj)
+            # Preserve label identity; round defensively in case the stored
+            # dtype is float-typed but holds integral label values, then cast
+            # to a signed integer type. TPTBox's segmentation path itself
+            # coerces to the smallest unsigned integer type that fits, so
+            # this normalises to the same int64 dtype the pre-migration
+            # loader produced.
+            raw = np.asarray(nii.get_seg_array())
             if np.issubdtype(raw.dtype, np.floating):
                 data = np.rint(raw).astype(np.int64)
             else:
                 data = raw.astype(np.int64, copy=True)
         else:
-            data = img.get_fdata(dtype=np.float64)
+            data = np.asarray(nii.get_array()).astype(np.float64, copy=True)
     except Exception as exc:
         raise FacetInputError(
             f'Failed to read voxel data from "{path_str}": {exc}'
         ) from exc
 
     # Ensure the returned array is a standalone copy: the caller's arrays must
-    # never be mutated, and the data must not be a memmap/view onto the file
-    # object. np.array copies a non-owning view.
+    # never be mutated, and the data must not be a memmap/view onto the
+    # underlying NII object. np.array copies a non-owning view.
     if not data.flags.owndata:
         data = np.array(data)
 
