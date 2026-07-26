@@ -606,7 +606,7 @@ def test_ac11_legacy_dict_findings_identical_to_hand_set_module_baseline():
         "Rogue island(s): Label 17: 1 non-dominant component(s) strictly "
         "below island_min_voxels=50. Tiny island sizes: [10]. "
         "component_count=2, component_sizes=[900, 10], "
-        "fragmentation_index=0.9"
+        "fragmentation_index=0.989010989010989"
     )
 
 

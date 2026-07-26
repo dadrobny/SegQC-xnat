@@ -370,6 +370,8 @@ def _features_block():
                     "component_volumes_mm3": [500.0],
                     "largest_component_fraction": 1.0, "small_fragments": [],
                     "fragmentation_index": 1.0,
+                    "stray_component_count": 0, "stray_component_sizes": [],
+                    "stray_volume_mm3": 0.0, "stray_volume_fraction": 0.0,
                 },
                 "centroid": {"centroid_voxel": [1, 2, 3], "centroid_mm": [1.0, 2.0, 3.0]},
             },
