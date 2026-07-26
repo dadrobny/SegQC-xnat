@@ -704,7 +704,7 @@ numbers, wrong. Must land before any real-segmenter number is computed.
 
 **Deliverables.**
 
-- 🚧 Adopt the TPTBox vertebra standard as the default (`DEFAULT_LABEL_MAP`,
+- ✅ Adopt the TPTBox vertebra standard as the default (`DEFAULT_LABEL_MAP`,
   `CANONICAL_ORDER`); retire the legacy table; keep `LabelConvention` overridable. *(Item 093)*
 - 📋 Back `segfacet.io`'s `Volume`/`Case` with TPTBox `NII` (orientation-safe load,
   `reorient`, `rescale`/`resample_from_to`, mm-space, `zoom`/`affine`), replacing the
