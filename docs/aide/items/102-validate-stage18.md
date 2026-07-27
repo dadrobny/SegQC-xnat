@@ -627,4 +627,74 @@ backlog. Neither blocks this item.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+**Scope fence held.** Ran the full replay per the spec's Implementation Steps
+and Validation section on this checkout (Linux, CPU venv, no optional
+dependencies, 2026-07-27). All 24 acceptance criteria pass as specified,
+including AC24's combined-hash scope-fence over `src/segfacet/**`; no
+production file needed a change. The only edits made were the new test module
+`tests/test_102_stage18_validation.py` (already committed by the test-writer)
+and this item's `docs/aide/progress.md` section (Stage 18 heading, item-102
+deliverable bullet, stage-summary table row, both acceptance boxes, and the
+new Environment-Gated Capability Verification row). This confirms AC24's
+scope-fence assertion and the Assumptions section's expectation that any
+production-code need would be a hand-back signal — none arose.
+
+**Observed harness margins (item 100's `run_severity_harness()` replayed by
+this item, `score_harness(...).passed is True`), transcribed verbatim from the
+Description/AC16 into this log per AC16's requirement:**
+
+| mode | rungs | severity kind | status | measured margin |
+|---|---|---|---|---|
+| 1 | 5 | continuous | strict | `inf` |
+| 2 | 5 | continuous | strict | `inf` |
+| 3 | 5 | continuous | strict | `112.037` |
+| 4 | 3 | affected-label-count | strict | `inf` |
+| 5 | 4 | affected-label-count | strict | `inf` |
+| 6 | 4 | affected-label-count | **coupled → mode 1** | **`0.3585`** |
+| 7 | **2** | **degenerate** | strict | `inf` |
+| 8 | 5 | continuous | coupled → mode 1 | `1.0386` |
+
+Mode 6 does not clear the specificity bar (`margin(6) = 0.3585 < 1.0`):
+`crop_at_border`'s ladder drives mode 1's own metric
+(`unanchored_foreground_fraction`) through 2.79× more of its own full swing
+than mode 1's own `displace` ladder does, because a crop rigidly translates
+the body the same way `displace` does while mode 1's own ladder is FOV-capped
+at ~19.8 mm on this base — a recorded, caused, ratcheted coupling
+(`KNOWN_CROSS_MODE_COUPLINGS`), not a silent pass. Mode 7's ladder is
+degenerate (two rungs): `out_of_order_label_count` is structurally capped at 1
+by the label convention, so "moves monotonically with injected severity" is
+true only in the absent/present sense (`severity_kind == "degenerate"`). Mode
+8's margin is thin but real (`1.0386 > 1.0`): its own metric
+(`overlapping_voxel_count`) remains a clean isolator; only its cross-check
+against metric 1 is coupled, for the same rigid-translation reason. Neither
+shortfall was fixed here — both are recorded in `progress.md`'s G2 acceptance
+annotation (AC18) and in `insights.md` (mode 7, from item 100), matching this
+item's explicit non-goal.
+
+**Run-vs-run attribution replay (AC7-AC13), measured on this tree:**
+`compare-runs` attributes to `attributed_mode == 3`
+(`rogue_island_count`), mode 3 `normalised_delta == -1.0`, mode 1
+`-0.0109`, mode 2 `0.0`, modes 4-8 `0.0`, `mean_dice_delta == 0.00043` — all
+matching the spec's Validation section exactly.
+
+**Discrepancies found vs. the spec's pre-measured expectations: none.** Every
+numeric value in AC1-AC17/AC24 (stray-component fields, the nine-case G7
+report-level replay, the run-vs-run attribution numbers, the harness rung
+counts/severity kinds/statuses/margins) reproduced exactly as the spec's
+Validation section recorded them, on the same Linux/CPU/no-optional-deps
+configuration the spec's author used. This is consistent with the spec having
+been written directly against the merged tree rather than drafted ahead of
+verification.
+
+**CI observation (AC23).** No live re-observation of GitHub Actions was made
+during this execution session (no `gh` CLI / network access to the GitHub
+Actions REST API available in this environment, matching item 097's
+precedent). This item therefore does **not** independently confirm the spec's
+own claim (a green run on `main` observed via the unauthenticated GitHub
+Actions REST API — `/actions/runs`, `/actions/jobs`,
+`/check-runs/{id}/annotations` — covering item 101's merge plus hotfixes
+`694d955` and `3e218cd`, made during the spec-authoring session). That claim
+stands as recorded in the spec's Validation section, at the strength stated
+there (job/check-run conclusions via the REST API, not raw pytest logs); this
+item adds no new CI observation of its own, and does not upgrade the prior
+claim's strength.
