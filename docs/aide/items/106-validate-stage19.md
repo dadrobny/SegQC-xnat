@@ -11,7 +11,9 @@
 > *reviewable and verifiable*, demonstrated by replay rather than asserted),
 > G8 (every feature carries a status and a named §6 failure mode, or is
 > explicitly `unwired` — measured here on the committed artifact, with the
-> shortfall named rather than smoothed over)
+> shortfall named rather than smoothed over; and, per the maintainer's
+> **2026-07-27 amendment**, *judged* here as well — the steering review's real
+> keep/retune/retire calls are recorded in `STATUS_OVERRIDES` by this item)
 > **Suggested branch:** `aide/106-validate-stage19`
 
 ---
@@ -80,7 +82,7 @@ item that built it.
    (AC17/AC18), partitioned three ways, with the counts written into both this
    item's Decisions log and `progress.md`'s checkbox-2 annotation.
 
-### The two honest shortfalls this item must record, not paper over
+### The honest shortfalls this item must record, not paper over
 
 Both follow from item 103's own committed spec, and both are *expected*
 outcomes of a correctly-built Stage 19 — not defects introduced here:
@@ -97,25 +99,99 @@ outcomes of a correctly-built Stage 19 — not defects introduced here:
   rather than absorbed. Recording it is the point; closing it is Stage 20's job
   (the traceability matrix is exactly the mechanism that would map those rules
   to modes).
-- **`STATUS_OVERRIDES` ships and stays empty, so no feature carries `retune` or
-  `retire`.** Item 103 deliberately ships an empty override map (its
-  Assumptions: *"`retune` and `retire` are judgments, and Stage 19's whole point
-  is that a human makes them at the checkpoint"*), so every wired path is `keep`
-  and every unread path is `unwired` — both derived, both honest, and the
-  judgment half of the four-value vocabulary is **unexercised**. Populating it
-  means editing `src/segfacet/feature_docs.py`, which is production code this
-  item may not touch (AC23). The steering review still happens — it is
-  Validation step 4, reading the rendered catalogue — but its output here is a
-  recorded observation and, where warranted, an `insights.md` line, not an
-  override map. AC19 requires this to be stated on checkbox 2.
+- **~~`STATUS_OVERRIDES` ships and stays empty…~~ — SUPERSEDED by the
+  2026-07-27 amendment.** As originally authored, this item left item 103's
+  empty override map untouched, so the judgment half of the four-value
+  vocabulary would have shipped **unexercised**. The maintainer overturned that:
+  *"Populate now — fold real judgments into item 106."* Stage 19 must leave
+  behind not only the mechanism (catalogue + drift test + decision table) but a
+  genuinely **reviewed** feature set. The override map is now in scope — see
+  *The steering review's output* below and **Block F (AC25–AC31)**. The residual
+  honest shortfall is narrower and different in kind: **the review's coverage is
+  as good as one live walkthrough of the generated catalogue, and no more**, and
+  if the maintainer's call is that everything stays at its derived status then
+  `STATUS_OVERRIDES` legitimately stays empty — that outcome is a *result*, not
+  a skipped step, and AC25 makes the difference between the two visible.
+
+### The steering review's output — the 2026-07-27 amendment
+
+**Maintainer's ruling, settled, do not re-litigate:** *"Populate now — fold real
+judgments into item 106."* Stage 19's whole point is the human steering review;
+the override map **is that review's output artifact**, not incidental code. A
+stage that shipped the mechanism and deferred every judgment to a hypothetical
+follow-up item would have reviewed nothing.
+
+**The scope fence is therefore widened by exactly one file and one name.** This
+item may edit **`src/segfacet/feature_docs.py`, and within it only the
+`STATUS_OVERRIDES` mapping** (plus that mapping's own adjacent comment or
+docstring), writing real `(status, rationale)` entries. **This is the one and
+only exception to the "no production code" rule a stage-validation item would
+normally carry**, and it is justified on exactly one ground: `feature_docs.py`
+is item 103's *authored-data* module — pure, stdlib-only, imports nothing from
+`segfacet` (item 103 AC2) — and `STATUS_OVERRIDES` is the slot item 103
+deliberately left empty *for this review to fill* (item 103's Assumptions:
+*"item 105/106's review populates the map"*). Writing into it is recording a
+human judgment in the place the design put for it; it is not implementing
+behaviour. Everything else in `src/segfacet/**` and everything in `scripts/**`
+remains **hard out of bounds** (AC31), and the widening does **not** extend to
+`FeatureDoc`, `FEATURE_DOCS`, `BLOCK_OWNERS`, `PATH_ALIASES`,
+`MODE_ANCHOR_PATHS`, the module's imports, or any other module.
+
+Two consequences follow mechanically and are specified in Block F: the two
+committed artifacts must be **regenerated and committed** after the edit so item
+103's AC19 byte-reproducibility holds at the new content (AC30), and item 104's
+drift check must still be green — **an override may not create drift**, because
+it changes a status, never a path set (AC30).
+
+**Which features get overridden is decided at execution, not here.** The
+judgments require a human reading `docs/aide/feature_catalogue.generated.md` line
+by line, and that has not happened. This spec therefore pins the *procedure*
+(Validation step 4b: a live walkthrough with the maintainer, their calls
+recorded verbatim) and **fabricates no disposition**. A spec-author-invented
+`retune`/`retire` list would be precisely the self-granted judgment the rest of
+this item exists to prevent.
+
+**How this interacts with G8's acceptance bar.** G8's mechanical bar is
+**unchanged**: *"every feature carries a status and a named failure mode, or is
+marked `unwired`"*, measured on the committed artifact by AC17/AC18. The
+overrides are **additive value beyond that minimum**, not a new hurdle. Three
+reasons. (a) Making the tick conditional on "at least one feature was judged
+`retune`/`retire`" would make the honest outcome — a reviewer who correctly
+concludes nothing needs retuning — the *failing* one, the exact inversion this
+spec already refuses in the AC3/AC12 sign-off design; the honest outcome must
+never be the failing one. (b) The number of overrides is a property of the
+feature set's *health*, not of its *documentedness*, and G8 measures the latter.
+(c) The load-bearing fact — that a human actually looked — is not lost by
+leaving the bar alone, because the **evidentiary** bar is raised instead:
+checkbox 2's annotation must now state how many entries were presented and what
+the review returned (AC19(c) as amended), so a tick can never be read as "nobody
+reviewed this". Bar unchanged, evidence strengthened.
+
+**This is not item 105's review, and item 105's scope does not move.** The two
+share a pattern — a human judgment recorded where the loop can see it — and
+nothing else. Item 105 judges **golden files** (keep/retire per committed
+snapshot), writes `docs/aide/golden-decision-table.md`, and ticks `progress.md`'s
+Stage-19 **checkbox 3**, which is about that table and is entirely unrelated to
+`STATUS_OVERRIDES`. This item judges **features** (retune/retire per catalogue
+path) and writes `feature_docs.py`. Different objects, different documents,
+different attestations. In particular: item 105 remains **golden-only**, still
+adds nothing under `src/segfacet/`, and still owns checkbox 3 alone; this item
+still never writes checkbox 3 (AC2, unchanged), and the feature review gets **no
+sign-off checkbox of its own** — its attestation is AC25's transcript plus
+checkbox 2's annotation. Conflating the two — e.g. treating checkbox 3's
+sign-off as covering the feature judgments, or gating the overrides on it — is a
+spec error.
 
 ### What this item is NOT
 
-- **Not new production code.** `src/segfacet/**` and `scripts/**` are untouched.
-  This item adds one test module and edits `progress.md` (AC23). Item 097 (the
-  Stage-17 closer) did end up changing production code because one of its ACs
-  could not otherwise pass; here that would be a **hand-back signal**, not a
-  licence to widen scope.
+- **Not new production code, with exactly one named exception.**
+  `scripts/**` is untouched, and `src/segfacet/**` is untouched **except** for
+  `feature_docs.py`'s `STATUS_OVERRIDES` mapping (AC23/AC31, and the amendment
+  section above). Otherwise this item adds one test module, edits `progress.md`,
+  and commits the regenerated catalogue artifacts. Item 097 (the Stage-17
+  closer) did end up changing production code because one of its ACs could not
+  otherwise pass; **that** remains a **hand-back signal** here — the widening
+  authorises one mapping, not a precedent for widening again.
 - **Not the sign-off.** It reads box 3; it never writes it (AC2).
 - **Not acting on item 105's retire decisions.** No golden file is deleted,
   regenerated, moved or replaced, and no test that consumes one is edited.
@@ -124,8 +200,11 @@ outcomes of a correctly-built Stage 19 — not defects introduced here:
   bullet). AC22 makes this mechanical, following item 102's precedent of being
   careful that a stage-closing edit cannot be read as claiming a later stage's
   work is done.
-- **Not a fix for the two shortfalls above**, and not Stage 20's traceability /
-  specificity harness.
+- **Not a fix for the shortfalls above**, and not Stage 20's traceability /
+  specificity harness. In particular, recording a `retune`/`retire` judgment is
+  **not** acting on it: no threshold is retuned, no extractor is deleted, no
+  feature stops being computed. The override records the call; Stage 20/21
+  execute it, exactly as Stage 19 decides and Stage 21 executes for the goldens.
 - **Not a real-data claim.** Every path set, catalogue entry, status and mode
   attribution in Stage 19 is derived from **in-package synthetic driver
   records** and from committed artifacts. Nothing here touches the "Real
@@ -293,9 +372,14 @@ outcomes of a correctly-built Stage 19 — not defects introduced here:
   `status == "unwired"`; **(iii) statused-but-mode-unmapped** —
   `status != "unwired"` and `failure_modes` empty. The three counts are
   non-negative, sum to `N`, and no entry matches two buckets. All three counts,
-  plus the count of entries whose status is `retune` or `retire` (expected `0`
-  while `STATUS_OVERRIDES` is empty), are written verbatim into this item's
-  Decisions log and into checkbox 2's annotation.
+  plus the count of entries whose status is `retune` and the count whose status
+  is `retire`, are written verbatim into this item's Decisions log and into
+  checkbox 2's annotation. **Amended 2026-07-27:** those last two counts are no
+  longer expected to be `0`; their sum must equal `len(STATUS_OVERRIDES)`
+  exactly (AC26 restricts overrides to those two values, so nothing else can
+  produce them), and the `keep` bucket is correspondingly reduced. A
+  `retune`/`retire` count that disagrees with `len(STATUS_OVERRIDES)` means the
+  committed artifact was not regenerated after the override edit — see AC29.
 
 - [ ] **AC19: checkbox 2, if ticked, carries the honest partition.** If
   `progress.md`'s Stage-19 acceptance item containing `Every feature carries a
@@ -304,11 +388,19 @@ outcomes of a correctly-built Stage 19 — not defects introduced here:
   three bucket counts from AC18, naming bucket (iii) **explicitly as a shortfall
   against the criterion's literal wording** whenever its count is `> 0`, with
   `mode_evidence == ("rule_unmapped",)` as its cause and Stage 20 as its closer;
-  (c) that `STATUS_OVERRIDES` is empty, so no feature carries `retune` or
-  `retire` and the judgment half of the vocabulary is unexercised; (d) that all
+  (c) **[amended 2026-07-27]** the steering review's outcome — how many `keep`
+  and `unwired` entries were presented to the maintainer at Validation step 4b,
+  and either the `retune` and `retire` counts now carried by
+  `STATUS_OVERRIDES` **or**, when that map is empty, the explicit statement that
+  the walkthrough was performed and the maintainer's call was that every entry
+  stays at its derived status (never silence; and the pre-amendment wording
+  *"the judgment half of the vocabulary is unexercised"* may be used **only** if
+  the walkthrough genuinely did not happen, with the reason); (d) that all
   of it is measured on in-package synthetic driver records and the committed
-  artifact, not on real data. (Written as tick-implies-evidence so it composes
-  with AC3 rather than becoming a landmine on an unticked tree.)
+  artifact, not on real data — and that a `retune`/`retire` status **records** a
+  judgment rather than executing it (Stage 20/21 execute). (Written as
+  tick-implies-evidence so it composes with AC3 rather than becoming a landmine
+  on an unticked tree.)
 
 - [ ] **AC20: checkbox 1, if ticked, carries the generated-and-can-fail
   evidence.** If the Stage-19 acceptance item containing `The catalogue is
@@ -337,18 +429,45 @@ outcomes of a correctly-built Stage 19 — not defects introduced here:
   whose text contains `Stage 19's golden decision acted on` still begins `📋`;
   and every annotation this item writes into `progress.md`'s Stage-19 section
   contains a sentence stating that **Stage 19 decides and Stage 21 executes**,
-  naming Stage 21 as the closer of the retire dispositions.
+  naming Stage 21 as the closer of the retire dispositions. **[Amendment note,
+  2026-07-27 — the fence itself is unchanged; only its wording is disambiguated:]**
+  that sentence is about the **golden-file** retire dispositions item 105
+  recorded, which is what `roadmap.md`'s Stage-21 deliverable names. Any
+  **feature** `retire` this item records in `STATUS_OVERRIDES` must **not** be
+  attributed to Stage 21 in the same breath — no document assigns it a closer
+  yet, and inventing one would be exactly the "claiming a later stage's work is
+  done" failure this AC exists to prevent. If both are mentioned, they are
+  mentioned as two distinct dispositions with two distinct (one absent) closers.
 
-- [ ] **AC23: the scope fence holds — no production code, one new test module.**
-  `git diff --name-only <merge-base>..HEAD` lists only
-  `docs/aide/items/106-validate-stage19.md`,
-  `tests/test_106_stage19_validation.py`, `docs/aide/progress.md`, and
-  optionally `docs/aide/insights.md` — nothing under `src/segfacet/**`,
-  `scripts/**`, any other file under `tests/**`, `tests/corpus/**`,
-  `docs/aide/feature_catalogue.generated.*`, `docs/aide/golden-decision-table.md`,
-  `docs/aide/roadmap.md`, `docs/aide/vision.md`, `.github/**` or
-  `.gitattributes`. Verified by the validator from that diff, **not** by a
-  byte-hash pytest — see Decisions & Trade-offs.
+- [ ] **AC23: the scope fence holds — one new test module, one named production
+  mapping, nothing else.** *(File list widened by the 2026-07-27 amendment; the
+  narrowing clauses are unchanged.)* `git diff --name-only <merge-base>..HEAD`
+  lists **only** these paths:
+  1. `docs/aide/items/106-validate-stage19.md`
+  2. `tests/test_106_stage19_validation.py`
+  3. `docs/aide/progress.md`
+  4. **`src/segfacet/feature_docs.py`** — *the one production file, restricted
+     to `STATUS_OVERRIDES` by AC31.* Absent from the diff **iff** the review
+     recorded no override (AC25's honest-empty branch).
+  5. **`docs/aide/feature_catalogue.generated.json`** and
+     **`docs/aide/feature_catalogue.generated.md`** — the regenerated artifacts
+     (AC30). Present **iff** (4) is present; a diff carrying (4) without these,
+     or these without (4), is a fail.
+  6. optionally `docs/aide/insights.md`
+  7. optionally, and **only** if item 105's AC14 shipped a whole-tree
+     `src/segfacet/**` digest that (4) invalidates: the single pinned-digest
+     constant in `tests/test_105_golden_decision_table.py` — see the Testing
+     Strategy's "existing tests to reconcile" entry and Assumptions. No other
+     line of that module may move, and the re-pin must carry a comment naming
+     item 106's authorisation, following the `_PRE_100_HASHES` precedent
+     (`tests/test_100_severity_ladder.py:947-949`).
+
+  **Nothing else.** In particular: no other file under `src/segfacet/**`,
+  nothing under `scripts/**`, no other file under `tests/**`, nothing under
+  `tests/corpus/**`, and none of `docs/aide/golden-decision-table.md`,
+  `docs/aide/roadmap.md`, `docs/aide/vision.md`, `.github/**`, `.gitattributes`.
+  Verified by the validator from that diff, **not** by a byte-hash pytest — see
+  Decisions & Trade-offs.
 
 - [ ] **AC24: closing Stage 19 moves no objective and no outcome row.**
   `progress.md`'s Objective-coverage rows for **G7** (`🚧`) and **G8** (`📋`)
@@ -357,6 +476,110 @@ outcomes of a correctly-built Stage 19 — not defects introduced here:
   reads `❓ Unverified` and still names Stage 16 as its closer; and no sentence
   this item adds anywhere in `progress.md` asserts real-data coverage for
   anything Stage 19 delivers.
+
+### Block F — the steering review's judgments (added by the 2026-07-27 amendment)
+
+> Block F is what turns Stage 19 from "the mechanism shipped" into "the feature
+> set was reviewed". It is the only part of this item authorised to touch
+> production code, and the authorisation is exactly one mapping (AC31).
+> **No minimum number of overrides is required** — see AC25.
+
+- [ ] **AC25: the steering review is performed live and transcribed at its true
+  strength.** This spec's Decisions & Trade-offs section contains a heading
+  `### Stage-19 steering review` under which is recorded: the date; the number
+  of committed-catalogue entries presented to the maintainer, split `keep` /
+  `unwired`; and **either** (a) one line per recorded override — the catalogue
+  `path`, the chosen status (`retune` or `retire`), and the rationale string
+  verbatim — **or** (b) the literal words `no override recorded`, together with
+  the maintainer's stated reason (e.g. every entry's derived status was
+  confirmed correct). A test asserts the heading exists and that, when
+  `STATUS_OVERRIDES` is non-empty, the text below it contains **every** override
+  key verbatim; and when `STATUS_OVERRIDES` is empty, that it contains the
+  literal `no override recorded`. **No minimum override count is imposed:** a
+  review that legitimately concludes everything stays `keep`/`unwired` passes
+  this AC, because making a non-empty map mandatory would reward inventing a
+  judgment. What fails this AC is skipping the walkthrough, or recording a
+  disposition the maintainer did not make — the same discipline AC16 applies to
+  the drift rehearsal.
+
+- [ ] **AC26: every override is well-formed and carries a real rationale.** For
+  every `(path, value)` in `segfacet.feature_docs.STATUS_OVERRIDES`: `value` is a
+  2-tuple `(status, rationale)`; `status` is exactly `"retune"` or `"retire"` —
+  **never** `"keep"`, **never** `"unwired"`, never any other string; `rationale`
+  is a `str` whose `.strip()` is non-empty and at least 20 characters, and which
+  is not merely a restatement of the status (it does not equal `status`, and it
+  is not one of `"retune"`, `"retire"`, `"n/a"`, `"TBD"`, `"see review"`).
+  Restricting the vocabulary to the two *judgment* values is load-bearing, not
+  fussiness: an `unwired` override would break item 103's AC8 biconditional
+  outright (*`status == "unwired"` **iff** no consuming rules, no consumers
+  **and** no override* — an override forces the right-hand side false while the
+  left stays true), and a `keep` override is at best a no-op and at worst masks
+  the derived `unwired` signal that Stage 20 exists to act on. Both are
+  therefore forbidden rather than merely discouraged.
+
+- [ ] **AC27: every override key names a real catalogue path.** Every key of
+  `STATUS_OVERRIDES` is present in `FEATURE_DOCS`, and appears as the `path` of
+  **exactly one** entry of `build_catalogue()` **and** of exactly one entry of
+  the committed `docs/aide/feature_catalogue.generated.json`. A key matching no
+  entry fails this AC naming that key, rather than silently applying to nothing.
+  (Item 103's AC17 guards `FEATURE_DOCS` against staleness in both directions;
+  nothing in item 103 guards `STATUS_OVERRIDES`, so this item does — otherwise a
+  path renamed by a later item would quietly discard a human judgment.)
+
+- [ ] **AC28: an override changes `status` and nothing else — derived facts stay
+  derived.** Demonstrated hermetically, with `STATUS_OVERRIDES` monkeypatched (a
+  `MappingProxyType` over a test-local dict; the shipped mapping is never
+  mutated) to `{p: ("retire", "<test-only probe rationale, ≥20 chars>")}` for
+  two separately-parametrised choices of `p` — one path whose committed status is
+  `keep` and one whose committed status is `unwired`. In each case
+  `build_catalogue()`'s entry for `p` has `status == "retire"` while **every
+  other field** of that entry — `consuming_rules`, `rule_evidence`,
+  `failure_modes`, `mode_evidence`, `consumers`, `origin`, `documented`, and all
+  four `FeatureDoc` prose fields — is **equal to the un-overridden build's**, and
+  **every other entry in the catalogue** is equal to its un-overridden
+  counterpart field-for-field. `consuming_rules`, `failure_modes` and the
+  evidence tuples are *measurements*; `status` (with its rationale) is the
+  *human judgment*. An override that rewrote a measurement would make the
+  catalogue lie about what the code does, which is the one thing item 103's whole
+  derivation exists to prevent.
+
+- [ ] **AC29: the mechanism is demonstrably live, whether or not the review
+  produced an override.** AC28's injection runs **unconditionally** — it is the
+  proof that `build_catalogue()` actually reads `STATUS_OVERRIDES`, and it must
+  fail if the map is ignored, so the mechanism is exercised in the suite even on
+  the honest-empty branch of AC25. **Additionally**, if `STATUS_OVERRIDES` is
+  non-empty on the committed tree, then for every key: the entry for that path
+  in the **committed** `feature_catalogue.generated.json` carries exactly the
+  override's status, and the corresponding row's `status` column in the committed
+  `.md` reads the same — proving the shipped artifacts were regenerated *after*
+  the edit rather than left stale.
+
+- [ ] **AC30: the artifacts are regenerated after the override edit, and neither
+  reproducibility nor drift-freedom regresses.** After the `feature_docs.py`
+  edit, `python -m segfacet.catalogue` is run and both regenerated artifacts are
+  committed. On the resulting tree: **AC5, AC6 and AC7 hold** (item 103's AC19
+  byte-reproducibility re-established at the new content — the *committed*
+  artifacts equal a fresh regeneration and a live `build_catalogue()`); **AC11
+  holds** — all four of item 104's drift directions report `None` and
+  `strict_build_message(functools.partial(build_catalogue, strict=True))`
+  returns `None`, because an override changes a status and never a path set, so
+  **an override that creates drift is a bug, not an expected cost**; `AC8`'s
+  entry count `N` is **unchanged** by the override edit; and
+  `git status --short docs/aide/` is empty when the item finishes.
+
+- [ ] **AC31: the production-code widening is exactly one mapping, and the
+  validator proves it.** From `git diff <merge-base>..HEAD --
+  src/segfacet/feature_docs.py`: every hunk falls inside the `STATUS_OVERRIDES`
+  assignment or its immediately adjacent comment/docstring; the source text of
+  `FeatureDoc`, `FEATURE_DOCS`, `BLOCK_OWNERS`, `PATH_ALIASES` and
+  `MODE_ANCHOR_PATHS` is byte-unchanged; the module's import statements are
+  unchanged, so item 103's AC2 stdlib-only contract still holds (re-asserted in
+  this item's suite by the same AST import scan item 103 uses); and
+  `STATUS_OVERRIDES` is still wrapped in `types.MappingProxyType`. No other file
+  under `src/segfacet/**` and no file under `scripts/**` appears in the diff at
+  all. A git-diff obligation on the validator, **not** a byte-hash pytest — for
+  the reason in Decisions & Trade-offs, which this very amendment demonstrates
+  once more.
 
 ## Assumptions
 
@@ -394,8 +617,14 @@ worth the maintainer's attention before execution is flagged at the end.
   entry consumed only by mode-unmapped rules has `failure_modes == ()` with
   `mode_evidence == ("rule_unmapped",)`. AC17/AC18's three-bucket partition is a
   direct consequence and is not an invention of this item.
-- *[103 Assumptions]* **`STATUS_OVERRIDES` ships empty**, so `retune`/`retire`
-  counts are expected to be `0`; and **a large `unwired` tail is the correct
+- *[103 Assumptions]* **`STATUS_OVERRIDES` ships empty** from item 103 — but
+  **[amended 2026-07-27]** this item is now the one that fills it, so
+  `retune`/`retire` counts are **not** expected to be `0`; they equal
+  `len(STATUS_OVERRIDES)` after the steering review (AC18/AC26), which may
+  legitimately still be `0` if the maintainer's call is that nothing needs
+  retuning. Item 103's own wording anticipates this exactly (*"item 105/106's
+  review populates the map"*), so filling it is completing item 103's design,
+  not overriding it. Also **a large `unwired` tail is the correct
   output of this stage** (~34 of 67 record-tier paths on item 103's prototype).
   A near-empty `unwired` bucket at execution time means the attribution is
   over-matching, not that the feature surface is healthy — say so rather than
@@ -472,9 +701,13 @@ worth the maintainer's attention before execution is flagged at the end.
   environment, and the human checkpoint is already recorded by checkbox 3. AC21
   pins the table unchanged rather than adding a decorative row.
 - **Boxes 1 and 2 are ticked *with* their qualifications rather than left open.**
-  Stage 19's planned work ships and is verified; the shortfalls are in the
-  *measured outcome* for one entry class and in an unexercised half of a
-  vocabulary. This tracker's "Two kinds of done" rule (`progress.md:58-77`) says
+  Stage 19's planned work ships and is verified; the residual shortfall is in the
+  *measured outcome* for one entry class (bucket (iii), the mode-unmapped rules)
+  and in the review's coverage being one live walkthrough and no more.
+  **[Amended 2026-07-27:]** the second shortfall as originally written — *"an
+  unexercised half of the vocabulary"* — no longer applies, because the judgment
+  half is now exercised by a real review (AC25) and by the unconditional
+  mechanism test (AC28/AC29). This tracker's "Two kinds of done" rule (`progress.md:58-77`) says
   a stage's ✅ is a claim about code, with unmet outcomes recorded rather than
   blocking the stage. **G7 stays 🚧 and G8 stays 📋 regardless** (AC24), so
   nothing is over-claimed by ticking a box with the shortfall written on the
@@ -486,19 +719,59 @@ worth the maintainer's attention before execution is flagged at the end.
   (2026-07-27) — so if any of them differs at execution, the correct response is
   a hand-back to the owning item, not a silent adaptation here.
 
-**Flagged for the maintainer, resolvable at execution rather than now:** whether
-the Stage-19 steering review (Validation step 4 — reading the rendered catalogue
-and sanity-checking the `unwired` tail) should be permitted to produce
-`STATUS_OVERRIDES` entries. This spec says **no** — that edit is production code
-outside this item's fence — and routes any resulting judgment to `insights.md`
-for queue-boundary triage. If the maintainer wants the review's output captured
-as actual `retune`/`retire` statuses, that is a **new item**, and this item's
-checkbox-2 annotation should name it.
+**Settled by the maintainer on 2026-07-27 — the one question this spec flagged,
+now answered:** *may the Stage-19 steering review populate `STATUS_OVERRIDES`?*
+**Yes — "Populate now — fold real judgments into item 106."** The maintainer's
+stated reasoning: Stage 19 should leave behind not just the mechanism
+(catalogue + drift test + decision table) but a genuinely reviewed feature set —
+real keep/retune/retire judgments, not an empty override map deferred to a
+hypothetical follow-up item. The pre-amendment answer (*no; route judgments to
+`insights.md`; a new item if the maintainer wants otherwise*) is **superseded and
+must not be reinstated by a downstream agent reading a stale copy.**
+
+Consequences, all now specified rather than assumed:
+
+- The scope fence is widened by **exactly one file and one name** —
+  `src/segfacet/feature_docs.py`'s `STATUS_OVERRIDES` (AC23 item 4, AC31). It is
+  the single exception to a stage-validation item's normal "no production code"
+  rule, justified because that mapping is the review's *output artifact*, not
+  incidental code, and item 103 left it empty expressly for this review.
+- **Which** paths get overridden is **not decided in this spec** and must not be.
+  It is an execution-time step: Validation step 4b walks the committed
+  catalogue's `keep` and `unwired` entries with the maintainer live (via
+  `AskUserQuestion` or equivalent) and records their calls verbatim (AC25). A
+  spec-author-invented disposition list would be a fabricated human judgment.
+- **G8's mechanical acceptance bar is unchanged**; the overrides are additive
+  value and the *evidentiary* bar on checkbox 2 is raised instead (AC19(c)).
+  Reasoning in Description § *The steering review's output*, and in Decisions.
+- **Item 105's scope does not move.** Golden files vs. features; different
+  objects, same review pattern. Checkbox 3 remains item 105's alone and remains
+  unrelated to `STATUS_OVERRIDES`; this item still never writes it (AC2).
+- **Item 105's AC14 fence may need one re-pin.** Item 105's AC14 asserts pinned
+  digests over the **`src/segfacet/**` tree**. If it lands as a whole-tree
+  digest, this item's authorised `feature_docs.py` edit breaks it — the third
+  recurrence of the pattern `insights.md`'s standing entry describes (*"breaks by
+  design the moment a later item is legitimately authorised to touch that same
+  file"*), and one item 104's own Decisions section predicted by name. The
+  resolution, following the in-repo `_PRE_100_HASHES` precedent, is a **narrow,
+  commented re-pin of that one constant** (AC23 item 7) — never a silent edit,
+  never a deletion of the test, and never a widening of this item's production
+  fence to "un-break" it. If item 105 instead lands a per-file or exclusionary
+  digest that survives the edit, no re-pin is needed and `tests/**` stays at one
+  new file. Confirm which at execution; do not assume.
+- The other `_PRE_NNN_*` fences (items 099/100/101) hash `eval/`, `heuristics/`,
+  `features/`, `synth/`, `tests/corpus/` and a short named-file list — **none of
+  which includes `feature_docs.py`**, a module that did not exist when they were
+  pinned. Verified at authoring time (2026-07-27) by reading their constants;
+  they are expected to stay green unmodified. Re-confirm, do not assume.
 
 ## Implementation Steps
 
-No changes under `source_dir = src/segfacet`. The work is one new test module
-plus `docs/aide/progress.md`.
+**[Amended 2026-07-27.]** Exactly **one** change under
+`source_dir = src/segfacet` is authorised — `feature_docs.py`'s
+`STATUS_OVERRIDES` mapping, and nothing else in that file or that package
+(AC31). The rest of the work is one new test module, the two regenerated
+catalogue artifacts, and `docs/aide/progress.md`.
 
 0. **Read the gate before doing anything else.** Open `docs/aide/progress.md`,
    find the Stage-19 acceptance item containing *"golden decision table is
@@ -538,9 +811,40 @@ plus `docs/aide/progress.md`.
      two tick-implies-evidence annotation checks.
    - **Block E (AC21–AC24):** the tables-unchanged checks (row counts, Status
      cells, the Stage-21 bullet, the nine goldens' presence, the G7/G8 rows).
+   - **Block F (AC25–AC31):** the override well-formedness and key-liveness
+     checks (AC26/AC27), the unconditional hermetic injection proving the
+     mechanism is live and touches only `status` (AC28/AC29), the
+     committed-artifact agreement (AC29), the post-regeneration
+     reproducibility + drift re-check (AC30, reusing Block B/C's fixtures), and
+     the `### Stage-19 steering review` transcript check (AC25).
 
-2. **`docs/aide/progress.md`** — the only non-test edit, made only after step 0
-   passed:
+2. **The steering review and the `STATUS_OVERRIDES` edit** *(added by the
+   2026-07-27 amendment)* — done at Validation
+   step 4b, *before* the `progress.md` edit, and only after step 0 passed:
+   - Walk the committed `docs/aide/feature_catalogue.generated.md`'s `keep` and
+     `unwired` entries with the maintainer and record their calls (Validation
+     step 4b). **Record only what they say.**
+   - For each `retune`/`retire` call, add one `STATUS_OVERRIDES` entry —
+     `"<catalogue path>": ("retune"|"retire", "<rationale ≥20 chars>")` — keeping
+     the mapping's existing `MappingProxyType` wrapper and key ordering
+     convention. **Touch nothing else in `feature_docs.py`** (AC31). If the
+     review produces no call, leave the mapping empty and say so in the
+     transcript (AC25's branch (b)); do **not** invent an entry to exercise the
+     mechanism — AC28's hermetic injection already does that.
+   - Regenerate and stage both artifacts (AC30):
+     `.venv/bin/python -m segfacet.catalogue`, then confirm
+     `git status --short docs/aide/` shows exactly the two generated files
+     changed (or nothing at all, if the map stayed empty).
+   - Re-run `tests/test_103_feature_catalogue.py` and
+     `tests/test_104_feature_catalogue_drift.py` — both must be green
+     **unmodified**; a drift failure here means the override changed a path set,
+     which it cannot legitimately do (AC30).
+   - If item 105's AC14 whole-tree digest now fails, re-pin **only** that one
+     constant with a comment naming item 106's authorisation (AC23 item 7) — see
+     Assumptions. Anything larger is a hand-back, not a fix.
+
+3. **`docs/aide/progress.md`** — the last edit, made only after step 0 passed
+   and after step 2's review is recorded:
    - Stage 19 section heading → `— ✅` (AC3).
    - Item 106's deliverable bullet `📋` → `✅` (the validator reconciles this via
      `python .aide/scripts/aide.py progress set 106 done`; do not hand-edit it if
@@ -553,17 +857,26 @@ plus `docs/aide/progress.md`.
    - **Do not** touch the Environment-Gated table (AC21), the Outcome-targets
      table, the Objective-coverage table, or the Stage-21 section (AC22/AC24).
 
-3. **Record the measurements in this spec's Decisions & Trade-offs** as they are
-   observed: `N` (AC8), the three bucket counts and the `retune`/`retire` count
-   (AC18), the `aide env --profile pyradiomics` result (AC21), and the
-   `### Real-source drift rehearsal` transcript (AC16).
+4. **Record the measurements in this spec's Decisions & Trade-offs** as they are
+   observed: `N` (AC8), the three bucket counts and the `retune`/`retire` counts
+   (AC18), the `aide env --profile pyradiomics` result (AC21), the
+   `### Real-source drift rehearsal` transcript (AC16), and the
+   `### Stage-19 steering review` transcript (AC25).
 
-4. **Do NOT touch** `src/segfacet/**`, `scripts/**`, any other file under
-   `tests/**`, `tests/corpus/**`, `docs/aide/feature_catalogue.generated.*`,
+5. **Do NOT touch** — *(list narrowed by the 2026-07-27 amendment only where
+   AC23 explicitly widens it; everything below is unchanged and hard)*
+   `scripts/**`, **any file under `src/segfacet/**` other than
+   `feature_docs.py`**, **any part of `feature_docs.py` other than the
+   `STATUS_OVERRIDES` mapping** (AC31), any file under `tests/**` other than the
+   new module and — conditionally, per AC23 item 7 — item 105's single pinned
+   digest constant, `tests/corpus/**`,
    `docs/aide/golden-decision-table.md`, `docs/aide/roadmap.md`,
    `docs/aide/vision.md`, `.github/**`, `.gitattributes` (AC23). In particular:
-   do not delete, regenerate, move or replace any golden, and do not populate
-   `STATUS_OVERRIDES`.
+   do not delete, regenerate, move or replace any golden; do not retune a
+   threshold or delete an extractor because a review said `retune`/`retire`
+   (recording the call is this item's job, executing it is Stage 20/21's); and
+   do not hand-edit `docs/aide/feature_catalogue.generated.*` — they are only
+   ever rewritten by `python -m segfacet.catalogue` (AC7/AC30).
 
 ## Testing Strategy
 
@@ -573,9 +886,15 @@ plus `docs/aide/progress.md`.
   `tests/test_104_feature_catalogue_drift.py` and
   `tests/test_105_golden_decision_table.py` must all stay green **unmodified**;
   an edit to any of them is a red flag for the validator, since this item
-  changes no behaviour.
+  changes no *behaviour*. **[Amended 2026-07-27 — the one exception:]** item
+  105's AC14 pinned-digest constant may be re-pinned if, and only if, it shipped
+  as a whole-tree `src/segfacet/**` digest that this item's authorised
+  `feature_docs.py` edit invalidates (AC23 item 7). That is a **constant
+  re-pin with an explanatory comment**, not a change to any assertion; no other
+  line of that module moves, and it is the *only* circumstance in which an
+  existing test module may be touched.
 
-- **One focused test per AC**, AC1–AC24. The load-bearing ones:
+- **One focused test per AC**, AC1–AC31. The load-bearing ones:
   - **AC3** — the biconditional. If written as `if signed_off: assert …` it
     silently passes on the branch it exists to guard. It must compute all five
     booleans and assert they agree, with a message naming the disagreement.
@@ -588,6 +907,47 @@ plus `docs/aide/progress.md`.
     a red test into a *dirty working tree* that the merge step then commits.
   - **AC18** — the partition. Bucket (iii) is the honest shortfall; a test that
     only asserts "every entry has a status" (AC17) would let it disappear.
+  - **AC28/AC29 — the hermetic override injection.** This is Block F's
+    equivalent of AC13/AC14: the proof that the override *mechanism* is live,
+    written so it **does not depend on what the live review decided**. Shape it
+    exactly so:
+    - `monkeypatch.setattr(segfacet.feature_docs, "STATUS_OVERRIDES",
+      types.MappingProxyType({p: ("retire", "<≥20-char probe rationale>")}))`,
+      and — because `catalogue.py` may have bound the name at import — also
+      patch `segfacet.catalogue.STATUS_OVERRIDES` if the module re-exports it.
+      **Read how `build_catalogue` resolves the mapping before writing this**,
+      the same discipline AC13 applies to item 103's AC16 seam; if it is inlined
+      with no patchable seam, that is a **hand-back to item 103**, not a licence
+      to widen this item's production edit.
+    - Parametrise `p` over **two** paths taken from the *un-overridden* build at
+      runtime — the first `keep` entry and the first `unwired` entry in
+      catalogue order — never a hard-coded path literal, which would rot the
+      moment the feature surface changes.
+    - Assert three things, in this order: (i) the target entry's `status`
+      becomes `"retire"` — **this is the assertion that fails if
+      `build_catalogue` ignores the map**, and it is the whole point of the
+      test; (ii) every *other* field of that entry equals the un-overridden
+      build's; (iii) every other entry compares equal field-for-field. (ii) and
+      (iii) are what pin "derived facts stay derived".
+    - Snapshot `dict(STATUS_OVERRIDES)` before and compare after teardown, as
+      AC15 does for `FEATURE_DOCS` — a leaked override would silently
+      contaminate every later assertion in the session, including AC17/AC18's
+      partition counts.
+    - **This test runs unconditionally.** It must not be skipped, xfailed or
+      made conditional on `STATUS_OVERRIDES` being non-empty; the honest-empty
+      review outcome (AC25 branch (b)) is exactly the case in which it is the
+      only evidence the mechanism works at all.
+  - **AC26/AC27 — the well-formedness checks.** Both iterate the *shipped*
+    `STATUS_OVERRIDES` and are **vacuously true on an empty map**. That is
+    correct and deliberate: no minimum count is required. Write them as plain
+    loops over `STATUS_OVERRIDES.items()`, never with an `assert
+    STATUS_OVERRIDES` precondition, which would turn a legitimate all-`keep`
+    review into a red suite.
+  - **AC30 — the post-edit re-check.** Reuse Block B's and Block C's fixtures
+    rather than duplicating them; the point is that AC5/AC6/AC7/AC11 are
+    *re-evaluated on the post-override tree*, not that new equivalents are
+    written. If they are duplicated, a later divergence between the two copies
+    is invisible.
 
 - **Adversarial / edge cases:**
   - `stage19_signoff_state()` against synthetic `progress.md` fragments: box
@@ -620,6 +980,36 @@ plus `docs/aide/progress.md`.
     and given a path with **both** an integer `per_label` key and an `extended`
     key → AC12's collapse still yields exactly one path, with no bare-integer
     segment.
+  - **Block F's adversarial set** (each fed to the AC26/AC27/AC28 checks as a
+    *synthetic* override map, never written into the shipped one):
+    - An override whose status is `"unwired"` → AC26 fails naming the path. This
+      is the case that would break item 103's AC8 biconditional, so it must be
+      caught by AC26 rather than surfacing as a confusing AC8 failure in item
+      103's own module.
+    - An override whose status is `"keep"` → AC26 fails. (A no-op at best; at
+      worst it masks a derived `unwired` that Stage 20 needs to see.)
+    - An override whose rationale is `""`, `"   "`, `"retire"`, `"TBD"`, or a
+      19-character string → AC26 fails naming the path and the offending value.
+    - An override value that is a bare string rather than a 2-tuple, or a
+      3-tuple → AC26 fails with a message naming the path, never a `ValueError`
+      from tuple unpacking escaping the test.
+    - An override key naming a path absent from `FEATURE_DOCS`, and one naming a
+      path present in `FEATURE_DOCS` but absent from the committed JSON → AC27
+      fails naming the key in both directions, rather than silently applying to
+      nothing.
+    - **An empty `STATUS_OVERRIDES`** → AC26 and AC27 pass vacuously, AC28/AC29's
+      injection still passes, and AC25 requires the literal `no override
+      recorded` in the transcript. This is the honest-review branch and must be
+      **green end to end**; a suite that goes red when the reviewer changes
+      nothing has inverted the incentive the whole item is built around.
+    - The same override applied twice in one session, and `build_catalogue()`
+      called twice under it → identical entries both times (idempotence; catches
+      an override applied cumulatively or a cached catalogue).
+    - An override on a path whose entry is `keep` **with** non-empty
+      `consuming_rules` → AC28 still shows `consuming_rules` unchanged. The
+      judgment "retire this feature" must not erase the record that a rule
+      currently reads it — that record is precisely what makes the retirement
+      actionable in Stage 20/21.
 
 - **Determinism / platform hygiene.** This module performs **no** byte-hash
   scope fence and hard-codes **no** absolute path. The only `read_bytes()` in it
@@ -632,10 +1022,52 @@ plus `docs/aide/progress.md`.
   every gate in this loop; two of the three reached `main`.
 
 - **Existing tests to reconcile** (grep sweep for assumptions this item could
-  invalidate). This item changes no default, threshold or behaviour, and edits
-  only `progress.md`, so the sweep is expected to be inert — but **confirm
-  rather than assume**, since a stale assertion here costs a guaranteed extra
-  validation round:
+  invalidate). **[Materially amended 2026-07-27.]** As originally authored this
+  sweep was expected to be inert, because the item edited only `progress.md`.
+  It is **no longer inert**: this item now edits `src/segfacet/feature_docs.py`
+  and rewrites both committed catalogue artifacts, so **any test that pins
+  either is live**. Run `grep -rn "STATUS_OVERRIDES\|feature_docs\|
+  feature_catalogue.generated" tests/` **before** making the override edit, and
+  reconcile before rather than after — a stale assertion here costs a guaranteed
+  extra validation round:
+  - **`tests/test_105_golden_decision_table.py` — the one genuinely at risk.**
+    Its AC14 asserts *"pinned digests … of the `tests/corpus/**` and
+    `src/segfacet/**` trees"*. If that lands as a **whole-tree** digest, this
+    item's authorised `feature_docs.py` edit breaks it by construction — the
+    third recurrence of the pattern `insights.md`'s standing entry describes,
+    and one item 104's own Decisions section predicted **by name** (*"exactly
+    what item 105/106 will do to `feature_docs.py`'s `STATUS_OVERRIDES`"*). The
+    sanctioned resolution is the narrow commented re-pin of AC23 item 7,
+    following `tests/test_100_severity_ladder.py:947-949`'s in-repo precedent
+    where item 101 re-pinned item 100's `cli.py` hash with a comment naming its
+    own authorisation. **Not** sanctioned: deleting the test, weakening its
+    assertion, or abandoning the override edit to keep a hash green.
+  - **`tests/test_103_feature_catalogue.py` — recheck four ACs specifically.**
+    Its **AC7** (every entry's status is in the four-value vocabulary) and
+    **AC8** (`unwired` **iff** no consuming rules, no consumers **and** no
+    override) are the two the override edit touches. AC8 is a biconditional that
+    a `keep`- or `unwired`-valued override would break — which is exactly why
+    AC26 restricts overrides to `retune`/`retire`; confirm AC8's realised
+    implementation matches its spec's wording before relying on that. Its
+    **AC17** (`FEATURE_DOCS`'s key set equals the realised set) and **AC19**
+    (committed artifacts equal a fresh regeneration) must both be green after
+    the regeneration — AC17 is unaffected (overrides are a separate mapping),
+    AC19 is re-established by AC30.
+  - **`tests/test_104_feature_catalogue_drift.py`** — its module-level helpers
+    are **imported** here, not copied; confirm they are module-level functions
+    (not fixtures) and that importing has no side effects (a second copy of
+    `drift_report` would be exactly the drift item 103's spec warns about).
+    **Additionally now:** it must be green *after* the override edit and
+    regeneration, unmodified. An override changes a status, never a path set, so
+    a drift failure there is a real bug — investigate it, do not re-pin it.
+  - **`scripts/aide_status_report.py`'s consumers** —
+    `tests/test_aide_status_report.py` renders from the committed catalogue
+    JSON, whose content this item changes. Confirm nothing there asserts a
+    literal status string, a `keep`/`unwired` count, or a specific entry's
+    rendered text; if it does, that assertion moves with the override edit and
+    must be reconciled first.
+  - Everything below was surveyed at authoring time and is expected to stay
+    green **unmodified** — confirm, do not assume:
   - **Any test that parses or asserts on `docs/aide/progress.md`.** This is the
     one file this item edits, and it is the highest-risk sweep. `grep -rn
     "progress.md" tests/` — at authoring time
@@ -647,28 +1079,33 @@ plus `docs/aide/progress.md`.
     of stages in a given status, it will move and must be reconciled **before**
     the edit, not after. Item 105's AC12 also reads that same Stage-19
     acceptance list — this item must not disturb the line it reads (AC2).
-  - `tests/test_103_feature_catalogue.py` — owns the generator AC-by-AC; this
-    item replays AC19/AC21/AC23/AC24 at artifact level and imports its AC16
+  - `tests/test_103_feature_catalogue.py` — *(also listed above; the four ACs
+    the override edit touches are named there)* — owns the generator AC-by-AC;
+    this item replays AC19/AC21/AC23/AC24 at artifact level and imports its AC16
     injection seam read-only.
-  - `tests/test_104_feature_catalogue_drift.py` — its module-level helpers are
-    **imported** here, not copied. Confirm they are module-level functions (not
-    fixtures) and that importing the module has no side effects; a second copy
-    of `drift_report` would be exactly the drift item 103's spec warns about.
-  - `tests/test_105_golden_decision_table.py` — its AC12 three-branch test on
-    the sign-off checkbox and this item's AC1/AC3 read the same lines from
-    opposite sides. Both must be green simultaneously in the signed-off state.
+  - `tests/test_105_golden_decision_table.py` — *(also listed above as the one
+    module genuinely at risk)* — its AC12 three-branch test on the sign-off
+    checkbox and this item's AC1/AC3 read the same lines from opposite sides.
+    Both must be green simultaneously in the signed-off state, and this item's
+    override edit must not disturb any assertion of that module **other than**
+    AC14's pinned digest, and then only per AC23 item 7.
   - `tests/test_042_golden_determinism.py`, `tests/test_089_*`,
     `tests/test_090_*`, `tests/test_094_*`, `tests/test_098_*` — the nine
     goldens' consumers. AC22 asserts the goldens still exist; nothing here may
     require an edit to any of them.
   - `tests/test_099_per_mode_metrics.py`, `tests/test_100_severity_ladder.py`,
     `tests/test_101_*.py`, `tests/test_102_stage18_validation.py` — each carries
-    a `_PRE_NNN_*` scope fence over `src/segfacet/**`. Because AC23 asserts no
-    production file is touched, **all** of them must continue to match; a
-    failure there means this item went out of scope. (The standing
+    a `_PRE_NNN_*` scope fence over parts of `src/segfacet/**`. **[Rechecked
+    2026-07-27 under the amendment.]** Those fences hash `eval/`, `heuristics/`,
+    `features/`, `synth/`, `tests/corpus/` and a short named-file list
+    (`cli.py`, `report_schema_v0.json`, the two eval schemas) — **none of them
+    covers `feature_docs.py`**, a top-level module that did not exist when they
+    were pinned. So all of them are still expected to match, and a failure there
+    still means this item went out of scope. This is confirmed by reading their
+    constants, **not** assumed: re-verify at execution, because the standing
     `insights.md` entry about these fences breaking when a later item is
-    *legitimately* authorised to edit a pinned file does not apply here — this
-    item is authorised to edit nothing under `src/segfacet/**`.)
+    *legitimately* authorised to edit a pinned file **now does apply to this
+    item** — just to item 105's whole-tree fence rather than to these five.
   - `tests/test_aide_status_report.py` — AC9/AC10 exercise the same by-path
     module load and `render_html`; no change expected there.
 
@@ -703,6 +1140,15 @@ match a fresh regeneration (AC5 in its live form). Any diff here means the
 committed artifacts and the code disagree and the stage is not closeable;
 regenerating and committing the difference is **item 103's** business, not a
 tidy-up to do inside this item.
+
+> **[Amended 2026-07-27 — ordering.]** This step runs **before** the steering
+> review, on the *pre-override* tree, and its "no output" expectation is
+> unconditional here. The override edit at step 4c then *legitimately* produces
+> a diff, which that step regenerates and commits; step 6a re-runs this exact
+> check on the post-override tree, where "no output" is required again (AC30).
+> The distinction matters: a diff at **step 1** means the tree was already
+> inconsistent and is item 103's problem; a diff at **step 6a** means the
+> artifacts were not regenerated after the override and is this item's problem.
 
 **2. The three sibling modules are green with zero skips.**
 
@@ -742,7 +1188,9 @@ executed, record the literal words `not executed` under that heading with the
 reason, and say so on checkbox 1 — never upgrade an unexecuted rehearsal to an
 observed one.
 
-**4. The steering review itself.** Regenerate the status report and read it:
+**4a. Reading the rendered catalogue — the agent's own pass, which *prepares*
+the walkthrough rather than substituting for it.** Regenerate the status report
+and read it:
 
 ```
 .venv/bin/python scripts/aide_status_report.py --out <tmp>/status.html
@@ -757,10 +1205,82 @@ sanity-check that each entry really is unread — this is the Stage-19 human
 review in its final form, and the measured expectation is a **substantial**
 unwired tail (~34 of 67 record-tier paths on item 103's prototype). A near-empty
 unwired list means the attribution is over-matching, not that the feature set is
-healthy; record that as a finding rather than as a pass. Any keep/retune/retire
-judgment this reading produces goes to `docs/aide/insights.md` for
-queue-boundary triage — **not** into `STATUS_OVERRIDES`, which is production
-code outside this item's fence.
+healthy; record that as a finding rather than as a pass.
+
+> **[Amended 2026-07-27.]** The step's last sentence as originally written —
+> *"any keep/retune/retire judgment this reading produces goes to `insights.md`
+> … not into `STATUS_OVERRIDES`"* — is **superseded**. Step 4a is the agent's
+> own read, which prepares the walkthrough; step 4b is where the judgments are
+> made, by the maintainer, and they go into `STATUS_OVERRIDES`. `insights.md`
+> remains the right home only for findings that are **not** a feature status —
+> e.g. "the attribution looks over-matching", or a defect noticed in passing.
+
+**4b. The steering review proper — the live walkthrough. This is the human
+checkpoint Stage 19 exists for, and the agent does not have standing to skip it
+or to answer for the maintainer.** Present the committed
+`docs/aide/feature_catalogue.generated.md`'s entries to the maintainer — via
+`AskUserQuestion` or equivalent, in batches small enough to answer (group by
+catalogue group, not one 60-way question) — covering **every** `keep` entry and
+**every** `unwired` entry. For each, show the path, its derived status, its
+`consuming_rules` and its `§6 mode(s)`, and ask whether it stays as derived or
+should be marked `retune` or `retire`.
+
+Rules for this step, all load-bearing:
+
+- **Record only what the maintainer says.** A `retune`/`retire` disposition the
+  agent inferred, extrapolated, or thought obvious is a fabricated human
+  judgment — the same failure mode the sign-off gate exists to prevent (AC25).
+- **Ask for a rationale with every non-derived call**, in the maintainer's own
+  words, ≥20 characters (AC26). "Looks wrong" is not a rationale; *"z-scored
+  against a 12-case reference, so the threshold is noise-dominated"* is.
+- **No minimum, and no nudging toward one.** *"Everything stays as derived"* is
+  a complete and valid answer, and the agent must not press for an override to
+  make the stage look better-reviewed. Record it as AC25 branch (b), literally
+  `no override recorded`, with the maintainer's reason.
+- **If the maintainer is unavailable**, this step cannot be faked. Record
+  `no override recorded` with the reason *"maintainer unavailable at execution;
+  walkthrough not performed"*, say exactly that on checkbox 2 (AC19(c)'s
+  never-upgrade clause), and hand back for a decision on whether to close the
+  stage on that basis — the same discipline AC16 applies to an unexecuted drift
+  rehearsal.
+
+Then write the recorded calls into `src/segfacet/feature_docs.py`'s
+`STATUS_OVERRIDES` — that mapping and nothing else in that file (AC31) — and
+transcribe the whole step into this spec's `### Stage-19 steering review`
+heading: date, counts presented (split `keep` / `unwired`), and one line per
+override or the literal `no override recorded` (AC25).
+
+**4c. Regenerate and re-verify after the override edit.**
+
+```
+.venv/bin/python -m segfacet.catalogue
+```
+```
+git status --short docs/aide/
+```
+
+Expected: **exactly** `docs/aide/feature_catalogue.generated.json` and
+`docs/aide/feature_catalogue.generated.md` modified — and **nothing** if the
+review recorded no override. Any third file here is out of scope. Commit both
+alongside the `feature_docs.py` edit (AC30; AC23 items 4–5 require them to
+appear together — one without the other is a fail). Then:
+
+```
+.venv/bin/python -m pytest tests/test_103_feature_catalogue.py tests/test_104_feature_catalogue_drift.py -ra
+```
+
+Expected: green, **unmodified**. Item 104 going red here means the override
+changed a path set, which it cannot legitimately do — that is a bug to
+investigate, never a hash to re-pin (AC30). Item 103's AC8 going red means an
+override used `keep` or `unwired`, which AC26 forbids for exactly this reason.
+Finally, confirm the override actually reached the artifacts:
+
+```
+grep -n "retune\|retire" docs/aide/feature_catalogue.generated.md
+```
+
+Expected: one row per `STATUS_OVERRIDES` entry, and no rows at all when the map
+is empty (AC29).
 
 **5. The environment observation.**
 
@@ -791,6 +1311,30 @@ Expected: green, and a consistent tracker after the `progress.md` edits — in
 particular no objective rolled up to ✅ over an unmet outcome target (G7 and G8
 must remain 🚧 and 📋 respectively).
 
+**6a. Byte-reproducibility re-established on the post-override tree** (AC30 —
+step 1 repeated, now with the override in place):
+
+```
+.venv/bin/python -m segfacet.catalogue
+```
+```
+git status --short
+```
+
+Expected: **no output** — the committed artifacts match a fresh regeneration
+again, item 103's AC19 restored at the new content, and the whole tree clean.
+Unlike step 1, a diff here is **this item's** defect: the override edit landed
+without its regeneration.
+
+**6b. The checkbox-2 annotation carries the review, not just the counts**
+(AC19(c)). Re-read the annotation just written and confirm it states, in the
+maintainer's terms rather than the agent's: how many entries were presented
+(split `keep` / `unwired`), how many `retune` and how many `retire` calls were
+recorded, and — when none were — that the walkthrough happened and returned
+nothing rather than that it was skipped. **G8's mechanical bar is unchanged by
+the amendment; this annotation is where the strengthened evidentiary bar lives**,
+so an annotation that reports counts but not whether a human looked fails AC19.
+
 **CI observation.** If a live GitHub Actions run can be observed for this
 stage's merged tree, record it naming the **observation channel** and the
 commits covered, exactly as item 102's AC23 requires (job/check-run conclusions
@@ -807,24 +1351,55 @@ neither case is a green CI run asserted without a named channel.
   `FEATURE_DOCS` and `STATUS_OVERRIDES`, the two committed
   `docs/aide/feature_catalogue.generated.*` artifacts, and the rewritten
   `scripts/aide_status_report.py` render path) — must be ✅. Blocks AC5–AC10,
-  AC12, AC17, AC18.
+  AC12, AC17, AC18. **[Amended 2026-07-27:]** `STATUS_OVERRIDES` is now a
+  **write** target of this item, not only a read one — it also blocks
+  AC25–AC31. Two of item 103's realised details become load-bearing here and
+  must be **read, not assumed**, at execution: (a) how `build_catalogue`
+  resolves the mapping (a module global that `monkeypatch.setattr` can reach, or
+  an inlined read with no seam — the latter is a hand-back to item 103, since
+  AC28 cannot otherwise be written); and (b) whether `CatalogueEntry` /
+  `catalogue_to_dict` / `render_markdown` surface the override's **rationale**
+  anywhere. Item 103's AC24 fixes the Markdown columns as exactly nine, with no
+  rationale column, and none of its ACs require the rationale in the JSON — so
+  the likely realised answer is **no**, and the rationale then lives only in
+  `feature_docs.py`'s source. That is acceptable (it is the authored-data module,
+  which is where authored prose belongs by item 103's design) and AC26 asserts it
+  there. If it *is* surfaced, AC26 additionally checks it round-trips. Either
+  way, record which at execution, and if it is not surfaced append one
+  `insights.md` line — a human judgment readable only by opening a source file
+  is weaker than one printed in the generated catalogue, and closing that gap is
+  a Stage-20-shaped follow-on, **not** a licence to widen this item's edit
+  beyond `STATUS_OVERRIDES`.
 - **Item 104** (`tests/test_104_feature_catalogue_drift.py`'s module-level
   helpers `covered_paths` / `drift_report` / `strict_build_message` /
   `load_committed_catalogue` / `iter_committed_entries`) — must be ✅. Blocks
-  AC11, AC13–AC15.
+  AC11, AC13–AC15, and AC30's post-override drift re-check.
 - **Item 105** (`docs/aide/golden-decision-table.md` and, decisively, the
   Stage-19 sign-off checkbox it ticks on explicit human approval) — must be ✅,
   **and its sign-off must be recorded**. A merged-but-unsigned item 105 is
   precisely the state in which this item halts (Implementation Step 0).
+  **[Amended 2026-07-27:]** a second, purely mechanical coupling now exists —
+  item 105's AC14 pinned digest over the `src/segfacet/**` tree, which this
+  item's authorised `feature_docs.py` edit may invalidate (AC23 item 7). This
+  changes **nothing** about item 105's own scope: it remains golden-only, adds
+  nothing under `src/segfacet/`, and still owns checkbox 3 alone — a checkbox
+  about the golden decision table that has no relationship to
+  `STATUS_OVERRIDES`. Do not conflate the two reviews.
 - **Item 102** (the Stage-18 closer whose structure, honest-shortfall
   annotation style, verification-row discipline and CI-observation strength rule
   this item follows) — ✅.
 
 **Downstream:** Stage 20's traceability/specificity harness inherits this item's
 measured `unwired` count and its bucket-(iii) mode-unmapped count as its
-starting backlog, and is the stage that would close both. Stage 21
-(`roadmap.md`'s *"Act on Stage 19's golden decision"*) is what actually executes
-the `retire` dispositions item 105 recorded. Neither blocks this item.
+starting backlog, and — **new under the 2026-07-27 amendment** — inherits the
+recorded `retune`/`retire` judgments as a second, sharper backlog: a feature the
+maintainer marked `retire` with a stated reason is a stronger Stage-20 input
+than an `unwired` count, because a human has already agreed it should go. Stage
+21 (`roadmap.md`'s *"Act on Stage 19's golden decision"*) is what actually
+executes the `retire` dispositions item 105 recorded **for goldens**; the
+*feature* `retire` dispositions this item records have no assigned executor yet
+and must not be assumed to be Stage 21's — name that gap on checkbox 2 rather
+than implying a closer that no document commits to. Neither blocks this item.
 
 ## Decisions & Trade-offs
 
@@ -866,12 +1441,83 @@ or a sibling spec left the choice open:
   observed opportunistically (Validation step 5). Adding a decorative
   `❓ Unverified` row for a capability the stage does not actually gate on would
   dilute a table whose value is that every row means something.
-- **`STATUS_OVERRIDES` is left empty and the review's judgments go to
-  `insights.md`.** Populating it is a production-code edit, and the honest
-  reading of item 103's spec is that the override map is a *mechanism* Stage 19
-  delivers rather than a map Stage 19 must fill. Flagged in Assumptions for the
-  maintainer to overturn with a follow-up item if they want the judgments
-  captured as statuses.
+- **~~`STATUS_OVERRIDES` is left empty…~~ — OVERTURNED by the maintainer,
+  2026-07-27.** The original decision was that populating the map is a
+  production-code edit and that the honest reading of item 103's spec makes the
+  override map a *mechanism* Stage 19 delivers rather than a map Stage 19 must
+  fill; judgments were routed to `insights.md` and a follow-up item was flagged.
+  The maintainer's ruling, verbatim: **"Populate now — fold real judgments into
+  item 106."** Their stated reasoning: *Stage 19 should leave behind not just the
+  mechanism (catalogue + drift test + decision table) but a genuinely reviewed
+  feature set — real keep/retune/retire judgments, not just an empty override map
+  deferred to a hypothetical follow-up item.* Recorded here in full because a
+  downstream agent reading a stale summary must be able to see that the
+  restrictive framing was considered, decided against, and by whom.
+
+- **The scope fence is widened by exactly one file and one name, and the
+  justification is narrow on purpose.** A stage-validation item touching
+  production code is normally a hand-back signal (this spec still says so for
+  every other case, following item 097's precedent). The exception holds only
+  because `src/segfacet/feature_docs.py` is item 103's **authored-data** module —
+  pure, stdlib-only, importing nothing from `segfacet` (item 103 AC2) — and
+  `STATUS_OVERRIDES` is the slot item 103 deliberately shipped empty *for this
+  review to fill* (*"item 105/106's review populates the map"*). Writing a
+  judgment into it is **recording a human decision in the place the design made
+  for it**, not implementing behaviour: no extractor, rule, threshold, schema,
+  report or CLI path changes, and AC28 proves mechanically that an override
+  moves `status` and nothing else. The alternatives were both worse: a separate
+  follow-up item would have shipped Stage 19 with its central deliverable —
+  the review — unperformed; and a non-code home for the judgments (a fourth
+  Markdown document) would have put them where neither `build_catalogue()` nor
+  the drift test can see them, guaranteeing they rot. AC31 keeps the widening
+  auditable at one mapping, verified from the diff.
+
+- **G8's mechanical bar is left unchanged; the evidentiary bar is raised
+  instead.** The alternative considered and rejected: redefine checkbox 2 as
+  *"every feature carries a status **and**, where a human judged retune/retire,
+  that judgment is captured with rationale"*. Three reasons for leaving it
+  alone. (a) It would make the honest outcome the failing one — a reviewer who
+  correctly concludes nothing needs retuning would be unable to tick the box —
+  which is the exact inversion this spec refuses everywhere else (the AC3/AC12
+  sign-off design is built on "the honest outcome must never be the failing
+  one"). (b) The override count measures the feature set's *health*; G8 measures
+  its *documentedness*. Folding one into the other would make a future clean
+  review indistinguishable from a skipped one. (c) The thing genuinely worth
+  guaranteeing — that a human actually looked — is captured without touching the
+  bar, by AC25's transcript and AC19(c)'s annotation requirement. So: overrides
+  are **additive value beyond the minimum**, the tick still means what it meant,
+  and the tick can no longer be read as "nobody reviewed this". A future
+  maintainer who wants the stronger bar can raise it in the roadmap; this item
+  does not raise it unilaterally at the moment it becomes convenient.
+
+- **No minimum override count, deliberately.** Requiring `len(STATUS_OVERRIDES)
+  > 0` would create a standing incentive to manufacture a judgment to close a
+  stage — the precise failure this item's whole design (AC1–AC4, AC16, AC25) is
+  built to prevent. AC26/AC27 are therefore written to pass vacuously on an
+  empty map, and the mechanism is instead proven by AC28's **unconditional**
+  hermetic injection, which does not depend on what the live review decided.
+  Mechanism exercised in CI; judgment left to the human.
+
+- **This review and item 105's are kept structurally separate.** Same pattern
+  (a human judgment recorded where the loop can see it), different objects:
+  item 105 judges **golden files** into `golden-decision-table.md` and attests
+  via checkbox 3; this item judges **features** into `STATUS_OVERRIDES` and
+  attests via AC25's transcript plus checkbox 2. The feature review deliberately
+  gets **no checkbox of its own** — inventing a fourth acceptance box would
+  change Stage 19's roadmap-defined acceptance list, which a stage-*validation*
+  item has no standing to do. Item 105's scope is untouched by this amendment;
+  the only coupling is the mechanical one at AC23 item 7.
+
+### Stage-19 steering review
+
+To be recorded during Validation step 4b. Required content: the date; the number
+of committed-catalogue entries presented to the maintainer, split `keep` /
+`unwired`; and **either** one line per recorded override —
+`` `<path>` · `retune`|`retire` · "<rationale verbatim>" `` — **or** the literal
+words `no override recorded` with the maintainer's stated reason. **Do not write
+a predicted or plausible-looking review here.** An invented disposition is a
+fabricated human judgment and fails AC25; an honest `no override recorded`
+passes it.
 
 ### Real-source drift rehearsal
 
