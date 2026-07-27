@@ -46,9 +46,7 @@ from segfacet import cli
 from segfacet.synth.corpus import load_manifest
 from segfacet.synth.perturbation import FAILURE_MODE_NAMES, get_perturbation
 from segfacet.synth.clean_gt import build_clean_spine
-from tests.test_098_stray_components import (
-    _PRE_098_GOLDEN_VERDICT_AND_FINDINGS,
-)
+from test_098_stray_components import _PRE_098_GOLDEN_VERDICT_AND_FINDINGS
 
 _TESTS_DIR = Path(__file__).resolve().parent
 _CORPUS_FIXTURES = _TESTS_DIR / "corpus" / "fixtures"
