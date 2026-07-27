@@ -30,6 +30,10 @@
     "run_manifest": {
       "description": "Optional Stage 17 run-manifest provenance block (item 096): segmenter version/SHA, weights hash, seed, dataset id, post-processing toggles, and resolved package versions. Absent when the evaluation was not given any manifest flags.",
       "$ref": "#/definitions/runManifest"
+    },
+    "per_mode_magnitude": {
+      "description": "Optional Stage 18 cohort-level per-mode magnitude surface (item 101): the RunPerModeSummary.to_dict() bundle -- eight per-Section-6-failure-mode aggregate statistics plus the aggregate Dice context, read verbatim from item 099's per-case magnitudes. Absent when the evaluation was run without --per-mode.",
+      "$ref": "#/definitions/perModeMagnitude"
     }
   },
   "definitions": {
@@ -163,6 +167,29 @@
           "additionalProperties": {"type": ["string", "null"]}
         }
       }
+    },
+    "perModeMagnitude": {
+      "type": "object",
+      "description": "The RunPerModeSummary.to_dict() bundle (item 101). Nested shapes (per_mode entries) are already guaranteed by RunPerModeSummary.to_dict() and are not enumerated leaf-by-leaf here.",
+      "required": [
+        "run_id",
+        "case_ids",
+        "n_cases",
+        "per_mode",
+        "mean_dice",
+        "volume_weighted_dice",
+        "run_manifest"
+      ],
+      "properties": {
+        "run_id": {"type": "string"},
+        "case_ids": {"type": "array", "items": {"type": "string"}},
+        "n_cases": {"type": "integer", "minimum": 0},
+        "per_mode": {"type": "array"},
+        "mean_dice": {"type": ["number", "null"]},
+        "volume_weighted_dice": {"type": ["number", "null"]},
+        "run_manifest": {"type": ["object", "null"]}
+      },
+      "additionalProperties": false
     }
   }
 }

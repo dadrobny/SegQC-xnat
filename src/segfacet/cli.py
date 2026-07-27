@@ -515,9 +515,98 @@ def _build_parser() -> argparse.ArgumentParser:
             "artifact (bundled_production_reference(), verse-v1) is used."
         ),
     )
+    evaluate_parser.add_argument(
+        "--per-mode",
+        action="store_true",
+        default=False,
+        help=(
+            "Attach a cohort-level per-mode magnitude summary (item 101): "
+            "compute_per_mode_metrics is run once per case (item 099) and "
+            "aggregated into a 'per_mode_magnitude' block in both "
+            "eval_report.json and eval_report.txt. OFF by default -- "
+            "with the flag omitted, the written report is byte-identical "
+            "to the pre-101 output."
+        ),
+    )
+    evaluate_parser.add_argument(
+        "--run-id",
+        default=None,
+        metavar="<label>",
+        help=(
+            "Free-text label stamped into 'per_mode_magnitude.run_id' when "
+            "--per-mode is given (default: the report's cohort id). Ignored "
+            "without --per-mode."
+        ),
+    )
     _add_dataset_schema_args(evaluate_parser)
     _add_run_manifest_args(evaluate_parser)
     evaluate_parser.set_defaults(handler=_handle_evaluate)
+
+    compare_runs_parser = subparsers.add_parser(
+        "compare-runs",
+        help="Diff two --per-mode evaluation reports into a run-vs-run comparison (item 101).",
+        description=(
+            "Read two eval_report.json files written by 'segfacet evaluate "
+            "--per-mode', rehydrate their 'per_mode_magnitude' blocks, and "
+            "diff them into a schema-validated run-vs-run comparison "
+            "artifact: <out>/per_mode_comparison.json + "
+            "<out>/per_mode_comparison.txt, naming the failure mode the "
+            "change is attributed to. No array computation is performed "
+            "here (two JSON documents and float arithmetic only), so this "
+            "subcommand has no --backend flag."
+        ),
+    )
+    compare_runs_parser.add_argument(
+        "--run-a",
+        required=True,
+        metavar="<eval_report.json>",
+        help="Path to run A's eval_report.json, written with --per-mode.",
+    )
+    compare_runs_parser.add_argument(
+        "--run-b",
+        required=True,
+        metavar="<eval_report.json>",
+        help="Path to run B's eval_report.json, written with --per-mode.",
+    )
+    compare_runs_parser.add_argument(
+        "--out",
+        required=True,
+        metavar="<dir>",
+        help="Output directory for the comparison report(s).",
+    )
+    compare_runs_parser.add_argument(
+        "--run-a-id",
+        default=None,
+        metavar="<label>",
+        help="Override label for run A in the comparison report (default: its own per_mode_magnitude.run_id).",
+    )
+    compare_runs_parser.add_argument(
+        "--run-b-id",
+        default=None,
+        metavar="<label>",
+        help="Override label for run B in the comparison report (default: its own per_mode_magnitude.run_id).",
+    )
+    compare_runs_parser.add_argument(
+        "--build-date",
+        default="2026-07-27",
+        metavar="<YYYY-MM-DD>",
+        help=(
+            "Fixed ISO build-date stamped into the comparison report's "
+            "provenance blocks (default: %(default)s -- a fixed value, not "
+            "'today', to keep repeated comparisons byte-reproducible)."
+        ),
+    )
+    compare_runs_parser.add_argument(
+        "--log-level",
+        default="WARNING",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        metavar="<level>",
+        help=(
+            "Log level for the segfacet logger hierarchy "
+            "(DEBUG/INFO/WARNING/ERROR/CRITICAL; default: WARNING)."
+        ),
+    )
+    compare_runs_parser.set_defaults(handler=_handle_compare_runs)
 
     return parser
 
@@ -950,6 +1039,7 @@ def _handle_evaluate(args: argparse.Namespace) -> int:
     from segfacet.eval.cohort import load_cohort_manifest  # noqa: PLC0415
     from segfacet.eval.harness import EvaluationCase, evaluate_cohort  # noqa: PLC0415
     from segfacet.eval.metrics import compute_cohort_metrics  # noqa: PLC0415
+    from segfacet.eval.per_mode_cohort import summarise_run_per_mode  # noqa: PLC0415
     from segfacet.eval.report import (  # noqa: PLC0415
         EvaluationProvenance,
         build_evaluation_report,
@@ -1042,6 +1132,7 @@ def _handle_evaluate(args: argparse.Namespace) -> int:
         stratum=stratum,
         lower_pct=lower_pct,
         upper_pct=upper_pct,
+        per_mode=args.per_mode,
     )
     metrics = compute_cohort_metrics(cohort)
 
@@ -1071,14 +1162,30 @@ def _handle_evaluate(args: argparse.Namespace) -> int:
         build_date=args.build_date,
     )
 
+    # --- 4b. Optional cohort-level per-mode summary (item 101) ------------------ #
+    per_mode_summary = None
+    if args.per_mode:
+        per_mode_summary = summarise_run_per_mode(
+            cohort,
+            run_id=args.run_id or cohort_id,
+            metrics=metrics,
+            run_manifest=run_manifest,
+        )
+
     report = build_evaluation_report(
-        metrics, provenance, calibration=calibration, run_manifest=run_manifest
+        metrics,
+        provenance,
+        calibration=calibration,
+        run_manifest=run_manifest,
+        per_mode_summary=per_mode_summary,
     )
 
     out_path = pathlib.Path(args.out)
     json_path = write_evaluation_report(report, out_path / "eval_report.json")
 
-    txt_str = render_evaluation_report(metrics, provenance, calibration=calibration)
+    txt_str = render_evaluation_report(
+        metrics, provenance, calibration=calibration, per_mode_summary=per_mode_summary
+    )
     txt_path = out_path / "eval_report.txt"
     txt_path.write_text(txt_str, encoding="utf-8")
 
@@ -1095,6 +1202,135 @@ def _handle_evaluate(args: argparse.Namespace) -> int:
         f"fpr={metrics.false_positive_rate} calibration={calibration_status} "
         f"-> {json_path}"
     )
+    return 0
+
+
+def _read_eval_report_json(path: str, label: str) -> dict:
+    """Read + parse *path* as a JSON object for ``compare-runs``.
+
+    Raises :class:`segfacet.io.FacetInputError` (never a bare ``OSError``/
+    ``json.JSONDecodeError``) with a message naming *label* (``"--run-a"``
+    or ``"--run-b"``) on any failure -- a nonexistent path, an unreadable
+    file, malformed JSON, or a JSON value that is not an object.
+    """
+    from segfacet.io import FacetInputError  # noqa: PLC0415
+
+    p = pathlib.Path(path)
+    try:
+        text = p.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise FacetInputError(f"compare-runs: cannot read {label} ({p}): {exc}") from exc
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise FacetInputError(
+            f"compare-runs: {label} ({p}) is not valid JSON: {exc}"
+        ) from exc
+    if not isinstance(data, dict):
+        raise FacetInputError(
+            f"compare-runs: {label} ({p}) is not a JSON object (mapping)."
+        )
+    return data
+
+
+def _rehydrate_per_mode_summary(report: dict, path: str, label: str):
+    """Rehydrate a ``RunPerModeSummary`` from *report*'s ``per_mode_magnitude``
+    block, raising :class:`segfacet.io.FacetInputError` naming *label* when
+    the block is absent or malformed."""
+    from segfacet.eval.per_mode_cohort import RunPerModeSummary  # noqa: PLC0415
+    from segfacet.io import FacetInputError  # noqa: PLC0415
+
+    block = report.get("per_mode_magnitude")
+    if block is None:
+        raise FacetInputError(
+            f"compare-runs: {label} ({path}) has no 'per_mode_magnitude' block -- "
+            "was it written with 'segfacet evaluate --per-mode'?"
+        )
+    return RunPerModeSummary.from_dict(block)
+
+
+def _provenance_from_report(report: dict, build_date: str):
+    """Build an ``EvaluationProvenance`` for the comparison artifact from one
+    side's original evaluation report's ``provenance`` block, restamped with
+    *build_date* (the comparator's own, caller-supplied build date -- never
+    the wall clock)."""
+    from segfacet.eval.report import EvaluationProvenance  # noqa: PLC0415
+
+    prov = report.get("provenance") if isinstance(report.get("provenance"), dict) else {}
+    return EvaluationProvenance(
+        cohort_id=prov.get("cohort_id", ""),
+        cohort_size=prov.get("cohort_size", 0),
+        config_version=prov.get("config_version", ""),
+        build_date=build_date,
+        reference_schema_version=prov.get("reference_schema_version"),
+        segfacet_version=prov.get("segfacet_version"),
+    )
+
+
+def _handle_compare_runs(args: argparse.Namespace) -> int:
+    """Handler for ``segfacet compare-runs`` (item 101).
+
+    Reads two ``eval_report.json`` files written by ``segfacet evaluate
+    --per-mode``, rehydrates their ``per_mode_magnitude`` blocks into
+    ``RunPerModeSummary``\\ s, diffs them via
+    :func:`segfacet.eval.per_mode_cohort.compare_runs`, and writes
+    ``<out>/per_mode_comparison.json`` (schema-validated) +
+    ``<out>/per_mode_comparison.txt``. Every failure -- a missing/unreadable
+    path, malformed JSON, a report with no ``per_mode_magnitude`` block, or
+    mismatched cohorts -- is reported as a clean ``Error:`` message on
+    stderr and returns ``1`` without writing any output file; no exception
+    escapes this handler.
+    """
+    from segfacet._logging import setup_logging  # noqa: PLC0415
+
+    setup_logging(args.log_level)
+
+    import dataclasses  # noqa: PLC0415
+
+    from segfacet.eval.per_mode_cohort import compare_runs  # noqa: PLC0415
+    from segfacet.eval.report import (  # noqa: PLC0415
+        build_run_comparison_report,
+        render_run_comparison,
+        write_evaluation_report,
+    )
+    from segfacet.io import FacetInputError  # noqa: PLC0415
+
+    try:
+        report_a = _read_eval_report_json(args.run_a, "--run-a")
+        report_b = _read_eval_report_json(args.run_b, "--run-b")
+
+        summary_a = _rehydrate_per_mode_summary(report_a, args.run_a, "--run-a")
+        summary_b = _rehydrate_per_mode_summary(report_b, args.run_b, "--run-b")
+
+        if args.run_a_id:
+            summary_a = dataclasses.replace(summary_a, run_id=args.run_a_id)
+        if args.run_b_id:
+            summary_b = dataclasses.replace(summary_b, run_id=args.run_b_id)
+
+        comparison = compare_runs(summary_a, summary_b)
+
+        provenance_a = _provenance_from_report(report_a, args.build_date)
+        provenance_b = _provenance_from_report(report_b, args.build_date)
+
+        comparison_report = build_run_comparison_report(
+            comparison, provenance_a, provenance_b
+        )
+        txt_str = render_run_comparison(comparison)
+    except FacetInputError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    except Exception as exc:  # pragma: no cover - defensive: no traceback ever escapes
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    out_path = pathlib.Path(args.out)
+    json_path = write_evaluation_report(
+        comparison_report, out_path / "per_mode_comparison.json"
+    )
+    txt_path = out_path / "per_mode_comparison.txt"
+    txt_path.write_text(txt_str, encoding="utf-8")
+
+    print(comparison.summary())
     return 0
 
 

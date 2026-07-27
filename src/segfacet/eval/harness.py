@@ -37,22 +37,27 @@ Public API
     ``candidate``, ``expected``, ``spacing``, ``metadata``).
 ``CaseEvaluation``
     Frozen dataclass: the per-case output record (``outcome``, ``overlap``,
-    ``feature_match``, ``candidate_present``, ``subject``, ``metadata``), with
-    a JSON-serialisable ``to_dict()``.
+    ``feature_match``, ``candidate_present``, ``subject``, ``metadata``,
+    ``per_mode``), with a JSON-serialisable ``to_dict()``.
 ``CohortEvaluation``
     Frozen dataclass wrapping a tuple of :class:`CaseEvaluation` records, with
     ``n_cases`` and a JSON-serialisable ``to_dict()``.
 ``evaluate_case(case, config, *, positive_severity=Severity.FLAG,
-reference=None, stratum="all", lower_pct=1, upper_pct=99) -> CaseEvaluation``
+reference=None, stratum="all", lower_pct=1, upper_pct=99, per_mode=False) ->
+CaseEvaluation``
     Drive one case through the pipeline and the three comparison primitives.
     ``reference=None`` (default) calls plain ``run_qc``; a given
     ``ReferenceDistribution`` calls ``run_qc_with_reference`` instead (item
     092), so the reference-derived rule defaults (item 090) actually engage.
+    ``per_mode=True`` (item 101, default ``False``) additionally attaches a
+    :class:`~segfacet.eval.per_mode.PerModeMetrics` computed from the same
+    subject-block/candidate/GT/spacing already derived for this case -- no
+    second pipeline pass.
 ``evaluate_cohort(cases, config, *, positive_severity=Severity.FLAG,
-reference=None, stratum="all", lower_pct=1, upper_pct=99) ->
+reference=None, stratum="all", lower_pct=1, upper_pct=99, per_mode=False) ->
 CohortEvaluation``
-    Drive many cases, in order, into a cohort; *reference* forwarded to every
-    case unchanged.
+    Drive many cases, in order, into a cohort; *reference* and *per_mode*
+    forwarded to every case unchanged.
 """
 
 from __future__ import annotations
@@ -73,6 +78,7 @@ if TYPE_CHECKING:
     import numpy as np
 
     from segfacet.config import HeuristicConfig
+    from segfacet.eval.per_mode import PerModeMetrics
     from segfacet.reference.schema import ReferenceDistribution
 
 __all__ = [
@@ -248,6 +254,12 @@ class CaseEvaluation:
         ``"candidate"`` when a candidate was supplied, else ``"gt"``.
     metadata:
         Carried through from :class:`EvaluationCase`, unchanged.
+    per_mode:
+        Item 101's opt-in per-mode magnitude hook: a
+        :class:`~segfacet.eval.per_mode.PerModeMetrics` computed from this
+        case's already-derived subject block/candidate/GT/spacing when
+        :func:`evaluate_case` was called with ``per_mode=True``; ``None``
+        otherwise (the default).
     """
 
     case_id: str
@@ -257,13 +269,15 @@ class CaseEvaluation:
     candidate_present: bool
     subject: str
     metadata: Optional[Mapping[str, Any]] = None
+    per_mode: "Optional[PerModeMetrics]" = None
 
     def to_dict(self) -> dict:
         """Return a JSON-serialisable nested dict for this record.
 
         The ``Outcome`` enum is reduced to its plain string ``.value``; the
         primitive dataclasses (``CaseOutcome``, ``OverlapResult``,
-        ``FeatureMatchResult``) are reduced to nested plain dicts.
+        ``FeatureMatchResult``, ``PerModeMetrics``) are reduced to nested
+        plain dicts.
         """
         return {
             "case_id": self.case_id,
@@ -273,6 +287,7 @@ class CaseEvaluation:
             "candidate_present": self.candidate_present,
             "subject": self.subject,
             "metadata": dict(self.metadata) if self.metadata is not None else None,
+            "per_mode": None if self.per_mode is None else self.per_mode.to_dict(),
         }
 
 
@@ -318,6 +333,7 @@ def evaluate_case(
     stratum: str = "all",
     lower_pct: float = 1,
     upper_pct: float = 99,
+    per_mode: bool = False,
 ) -> CaseEvaluation:
     """Drive one :class:`EvaluationCase` through the pipeline and comparisons.
 
@@ -356,6 +372,14 @@ def evaluate_case(
     stratum, lower_pct, upper_pct:
         Forwarded to ``run_qc_with_reference`` when *reference* is given
         (item 046's delta-computation parameters); ignored otherwise.
+    per_mode:
+        Keyword-only, default ``False`` (item 101). When ``True``, calls
+        :func:`segfacet.eval.per_mode.compute_per_mode_metrics` exactly once,
+        using the subject block, candidate array, GT array and spacing this
+        function already derives -- no second pipeline pass -- and attaches
+        the result to the returned record's ``per_mode`` field. A
+        candidate-less case degrades explicitly (modes 1/4/5 ``None``, the
+        rest computed from the GT-as-subject record) rather than raising.
 
     Returns
     -------
@@ -409,6 +433,20 @@ def evaluate_case(
         gt_block = extract_feature_record(gt_img, config)
         feature_match = compute_feature_match(subject_block, gt_block)
 
+    per_mode_metrics: "Optional[PerModeMetrics]" = None
+    if per_mode:
+        from segfacet.eval.per_mode import compute_per_mode_metrics
+
+        if candidate_present:
+            per_mode_metrics = compute_per_mode_metrics(
+                subject_block, candidate=candidate_arr, gt=gt_arr, spacing=gt_spacing
+            )
+        else:
+            pm_spacing = tuple(float(z) for z in gt_img.header.get_zooms()[:3])
+            per_mode_metrics = compute_per_mode_metrics(
+                subject_block, candidate=None, gt=None, spacing=pm_spacing
+            )
+
     return CaseEvaluation(
         case_id=case.case_id,
         outcome=outcome,
@@ -417,6 +455,7 @@ def evaluate_case(
         candidate_present=candidate_present,
         subject=subject,
         metadata=case.metadata,
+        per_mode=per_mode_metrics,
     )
 
 
@@ -434,6 +473,7 @@ def evaluate_cohort(
     stratum: str = "all",
     lower_pct: float = 1,
     upper_pct: float = 99,
+    per_mode: bool = False,
 ) -> CohortEvaluation:
     """Drive many :class:`EvaluationCase`\\ s, in order, into a :class:`CohortEvaluation`.
 
@@ -452,6 +492,10 @@ def evaluate_cohort(
         Forwarded unchanged to :func:`evaluate_case` for every case (item
         092). ``reference=None`` (the default) preserves the original
         reference-blind ``run_qc`` behaviour for every existing caller.
+    per_mode:
+        Forwarded unchanged to :func:`evaluate_case` for every case (item
+        101). ``per_mode=False`` (the default) preserves the original
+        behaviour -- every record's ``per_mode`` is ``None``.
 
     Returns
     -------
@@ -481,6 +525,7 @@ def evaluate_cohort(
             stratum=stratum,
             lower_pct=lower_pct,
             upper_pct=upper_pct,
+            per_mode=per_mode,
         )
         for case in cases
     )

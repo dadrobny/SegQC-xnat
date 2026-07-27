@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FACET Run-vs-Run Per-Mode Comparison Report v0",
+  "description": "Machine-readable Stage-18 run-vs-run per-mode comparison schema v0 for segfacet.eval.report (item 101). Bundles two runs' provenance/run-manifest identity plus the full RunComparison.to_dict() diff.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_a",
+    "run_b",
+    "comparison"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Version discriminator for this comparison-report schema. Always '0.1' for v0.",
+      "const": "0.1"
+    },
+    "run_a": {
+      "description": "Run A's identity: provenance plus optional run-manifest.",
+      "$ref": "#/definitions/runSide"
+    },
+    "run_b": {
+      "description": "Run B's identity: provenance plus optional run-manifest.",
+      "$ref": "#/definitions/runSide"
+    },
+    "comparison": {
+      "description": "The RunComparison.to_dict() bundle (item 101): eight per-Section-6-failure-mode deltas plus the aggregate Dice deltas and the attributed mode. Nested shapes (per_mode entries) are already guaranteed by RunComparison.to_dict() and are not enumerated leaf-by-leaf here.",
+      "$ref": "#/definitions/comparison"
+    }
+  },
+  "definitions": {
+    "runSide": {
+      "type": "object",
+      "description": "One side's report identity: the EvaluationProvenance block plus an optional run_manifest block, embedded verbatim from that run's own eval_report.json.",
+      "additionalProperties": false,
+      "required": ["provenance"],
+      "properties": {
+        "provenance": {"type": "object"},
+        "run_manifest": {"type": ["object", "null"]}
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "description": "The RunComparison.to_dict() bundle (item 101).",
+      "required": [
+        "run_a_id",
+        "run_b_id",
+        "n_cases",
+        "case_ids",
+        "per_mode",
+        "mean_dice_a",
+        "mean_dice_b",
+        "mean_dice_delta",
+        "volume_weighted_dice_a",
+        "volume_weighted_dice_b",
+        "volume_weighted_dice_delta",
+        "attributed_mode",
+        "attributed_mode_name",
+        "attributed_metric_name",
+        "run_manifest_a",
+        "run_manifest_b"
+      ],
+      "properties": {
+        "run_a_id": {"type": "string"},
+        "run_b_id": {"type": "string"},
+        "n_cases": {"type": "integer", "minimum": 0},
+        "case_ids": {"type": "array", "items": {"type": "string"}},
+        "per_mode": {"type": "array"},
+        "mean_dice_a": {"type": ["number", "null"]},
+        "mean_dice_b": {"type": ["number", "null"]},
+        "mean_dice_delta": {"type": ["number", "null"]},
+        "volume_weighted_dice_a": {"type": ["number", "null"]},
+        "volume_weighted_dice_b": {"type": ["number", "null"]},
+        "volume_weighted_dice_delta": {"type": ["number", "null"]},
+        "attributed_mode": {"type": ["integer", "null"]},
+        "attributed_mode_name": {"type": ["string", "null"]},
+        "attributed_metric_name": {"type": ["string", "null"]},
+        "run_manifest_a": {"type": ["object", "null"]},
+        "run_manifest_b": {"type": ["object", "null"]}
+      },
+      "additionalProperties": false
+    }
+  }
+}

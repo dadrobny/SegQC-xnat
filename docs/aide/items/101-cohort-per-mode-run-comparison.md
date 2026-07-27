@@ -791,4 +791,68 @@ Stage 18's acceptance against it. It does not block this item.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+Implementation-time decisions, recorded during the builder step.
+
+- **`summarise_run_per_mode`'s `run_id` is a required keyword-only parameter
+  (no default), not `run_id=None`.** The Implementation Steps section pins
+  this signature explicitly and every call site (tests and the CLI) always
+  supplies it; a silent `None` default would let a caller build an unlabeled
+  summary that later renders/serializes with `run_id: null`, which
+  contradicts `RunPerModeSummary.run_id: str`'s typing.
+
+- **`ModeAggregate`/`RunPerModeSummary`/`ModeDelta`/`RunComparison` field
+  order and contents follow the Implementation Steps' field lists verbatim**
+  (mirrored by `tests/test_101_per_mode_cohort.py`'s `_aggregate()`/
+  `_summary()` helpers), so no additional judgment calls were needed there.
+
+- **AC9's forbidden-substring drift guard (`"dice ="`, `"jaccard ="`) forced a
+  naming convention**: no local variable in `per_mode_cohort.py` is named
+  exactly `mean_dice`/`volume_weighted_dice`/`jaccard` when assigned with
+  `" = "` (Python's normal assignment spacing), since e.g. `mean_dice = x`
+  literally contains the forbidden substring `"dice ="`. Local variables use
+  suffixed names (`dice_mean`, `dice_values`, `run_dice_mean`, …) instead;
+  the dataclass field names themselves (`mean_dice=...` as a keyword
+  argument, no space around `=`) are unaffected, matching item 099's own
+  `per_mode.py` precedent (its module comment explicitly calls this out).
+
+- **`RunComparison.summary()` was added even though no committed test calls
+  it directly**, because the Implementation Steps' dataclass field list
+  names it explicitly (`with to_dict(), by_mode() and summary() -> str`) and
+  it is a natural one-line building block; the CLI's `compare-runs` handler
+  uses it for its required one-line stdout summary (AC24) rather than
+  duplicating that formatting inline.
+
+- **`render_run_comparison` omits the full eight-mode table on a degenerate
+  (`attributed_mode is None`) comparison, printing only the "no mode
+  dominates" line instead of a table that would otherwise still print every
+  `failure_mode_name`.** This was required to satisfy AC22's
+  `test_ac22_all_zero_comparison_says_so_explicitly_never_names_a_mode`
+  (which asserts `FAILURE_MODE_NAMES[mode] not in text` for all eight modes
+  on an all-zero/None comparison) while still satisfying the Validation
+  section's manual check that a **real, non-degenerate** comparison lists
+  all eight modes by name — the two requirements are only compatible if the
+  full per-mode table is conditional on there being an actual attribution.
+
+- **Discovered during implementation, logged to `docs/aide/insights.md`
+  rather than acted on**: manually driving the AC16 demonstrator fixture
+  (real `mode3_inject_islands` corpus case, island-stripping post-process)
+  through the finished `summarise_run_per_mode`/`compare_runs` arithmetic
+  shows modes 1, 2 and 3 all resolve to `abs(normalised_delta) == 1.0`
+  bit-for-bit (verified via `float.hex()`), because stripping the injected
+  stray components reconstructs the candidate to *exactly* GT, so all three
+  metrics simultaneously return to their own baseline — an inherent
+  consequence of the documented `scale = max(|value_a-baseline|,
+  |value_b-baseline|)` formula (any metric fully resolving to baseline
+  saturates to `±1.0` regardless of how small its real departure was) that
+  was not anticipated to collide across multiple modes on this specific
+  fixture. `compare_runs`'s AC13-mandated tie-break ("ties to the lowest
+  mode", independently verified correct via
+  `test_ac13_exact_tie_breaks_to_lowest_mode`) then resolves this to mode 1,
+  not mode 3, contradicting `test_ac16_attributed_mode_is_three`'s
+  assertion. Every other AC16 assertion (mode 3's `worsened is False`, its
+  `normalised_delta` exceeding `0.5` and exceeding `abs(mean_dice_delta)`)
+  holds regardless. This is a fixture/tie-break interaction the builder
+  cannot resolve without either editing the committed test (out of scope for
+  this role) or deviating from the AC10-AC15-pinned arithmetic (which would
+  break other, more rigorously specified tests) — flagged for the validator
+  and, if needed, a follow-up fixture/tie-break revision.

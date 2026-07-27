@@ -33,7 +33,12 @@ the **severity-ladder monotonicity & cross-mode specificity harness** (item
 metrics over a *graded* synthetic-severity stimulus per mode, proving each
 metric moves monotonically with its own mode's severity and is comparatively
 insensitive to the others -- the graded-stimulus counterpart to item 099's
-per-case isolation surface.
+per-case isolation surface, and the **cohort-level per-mode report with
+run-vs-run comparison** (item 101; see :mod:`segfacet.eval.per_mode_cohort`)
+that aggregates item 099's per-case magnitudes over a cohort and diffs two
+runs' summaries into a normalised, direction-aware, schema-validated
+comparison artifact -- reachable via ``segfacet evaluate --per-mode`` and the
+new ``segfacet compare-runs`` subcommand.
 """
 
 from __future__ import annotations
@@ -81,12 +86,23 @@ from .per_mode import (
     PER_MODE_METRIC_SPECS,
     compute_per_mode_metrics,
 )
+from .per_mode_cohort import (
+    ModeAggregate,
+    ModeDelta,
+    RunComparison,
+    RunPerModeSummary,
+    compare_runs,
+    summarise_run_per_mode,
+)
 from .report import (
     EVAL_REPORT_SCHEMA_VERSION,
+    PER_MODE_COMPARISON_SCHEMA_VERSION,
     EvaluationProvenance,
     build_evaluation_report,
+    build_run_comparison_report,
     record_calibrated_config,
     render_evaluation_report,
+    render_run_comparison,
     serialize_evaluation_report_json,
     write_evaluation_report,
 )
@@ -140,6 +156,15 @@ __all__ = [
     "PerModeMetrics",
     "PER_MODE_METRIC_SPECS",
     "compute_per_mode_metrics",
+    "ModeAggregate",
+    "RunPerModeSummary",
+    "ModeDelta",
+    "RunComparison",
+    "summarise_run_per_mode",
+    "compare_runs",
+    "PER_MODE_COMPARISON_SCHEMA_VERSION",
+    "build_run_comparison_report",
+    "render_run_comparison",
     "ThresholdAxis",
     "apply_assignment",
     "CalibrationObjective",

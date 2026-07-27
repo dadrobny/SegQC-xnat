@@ -25,27 +25,47 @@ item 057's job at Stage-7 close) and never touches the bundled
 ``src/segfacet/default_config.yaml``; every write goes to the caller-supplied
 ``path`` argument only.
 
+``build_evaluation_report`` also accepts an optional keyword-only
+``per_mode_summary`` (item 101): a
+:class:`~segfacet.eval.per_mode_cohort.RunPerModeSummary`, embedded verbatim
+under the report's additive, optional ``per_mode_magnitude`` key when given.
+This module additionally bundles a **second, independently versioned**
+schema and reporting pair for item 101's run-vs-run comparison artifact --
+a different document (two runs, deltas, an attribution), not a third
+optional block of the evaluation report.
+
 Public API
 ----------
 ``EvaluationProvenance``
     Frozen dataclass: caller-supplied report identity/reproducibility
     metadata (``cohort_id``, ``cohort_size``, ``config_version``,
     ``build_date``, optional ``reference_schema_version``/``segfacet_version``).
-``build_evaluation_report(metrics, provenance, *, calibration=None) -> dict``
+``build_evaluation_report(metrics, provenance, *, calibration=None,
+run_manifest=None, per_mode_summary=None) -> dict``
     Assemble + schema-validate the report dict.
 ``serialize_evaluation_report_json(report, indent=2) -> str``
     Deterministic JSON string (sorted keys).
 ``write_evaluation_report(report, path) -> Path``
     Byte-reproducible JSON write (``Path.write_bytes``, single trailing
-    ``"\\n"``).
-``render_evaluation_report(metrics, provenance, *, calibration=None) -> str``
+    ``"\\n"``). Reused, unmodified, for the comparison artifact (item 101).
+``render_evaluation_report(metrics, provenance, *, calibration=None,
+per_mode_summary=None) -> str``
     Stdlib-only plain-text rendering of the same numbers.
 ``record_calibrated_config(base_config, calibration_result, axes, path) -> Path``
     Apply a calibration's chosen assignment onto a config and write it as a
     byte-reproducible YAML file that round-trips through ``load_config``.
+``PER_MODE_COMPARISON_SCHEMA_VERSION``
+    Version discriminator ("0.1") for the item-101 comparison-artifact schema.
+``build_run_comparison_report(comparison, provenance_a, provenance_b) -> dict``
+    Assemble + schema-validate the item-101 run-vs-run comparison report dict.
+``render_run_comparison(comparison) -> str``
+    Stdlib-only plain-text rendering of a
+    :class:`~segfacet.eval.per_mode_cohort.RunComparison`, naming the
+    attributed mode in words.
 
 Dependencies: :mod:`segfacet.eval.metrics` (item 054), :mod:`segfacet.eval.calibrate`
-(item 055), :mod:`segfacet.config` (items 005/035), ``jsonschema``, ``PyYAML``.
+(item 055), :mod:`segfacet.eval.per_mode_cohort` (item 101),
+:mod:`segfacet.config` (items 005/035), ``jsonschema``, ``PyYAML``.
 """
 
 from __future__ import annotations
@@ -64,6 +84,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from segfacet.config import HeuristicConfig
     from segfacet.eval.calibrate import CalibrationResult, ThresholdAxis
     from segfacet.eval.metrics import CohortMetrics
+    from segfacet.eval.per_mode_cohort import RunComparison, RunPerModeSummary
 
 __all__ = [
     "EVAL_REPORT_SCHEMA_VERSION",
@@ -73,6 +94,9 @@ __all__ = [
     "write_evaluation_report",
     "render_evaluation_report",
     "record_calibrated_config",
+    "PER_MODE_COMPARISON_SCHEMA_VERSION",
+    "build_run_comparison_report",
+    "render_run_comparison",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -93,6 +117,22 @@ _SCHEMA: dict = _load_eval_schema()
 
 #: Evaluation-report schema version discriminator -- always "0.1" for v0.
 EVAL_REPORT_SCHEMA_VERSION: str = "0.1"
+
+
+def _load_comparison_schema() -> dict:
+    """Load and parse ``per_mode_comparison_schema_v0.json`` via
+    ``importlib.resources`` (mirrors :func:`_load_eval_schema`; item 101)."""
+    import segfacet.eval as _eval_pkg  # local import to avoid circular deps at module level
+
+    ref = _pkg_resources.files(_eval_pkg).joinpath("per_mode_comparison_schema_v0.json")
+    return json.loads(ref.read_text(encoding="utf-8"))
+
+
+_COMPARISON_SCHEMA: dict = _load_comparison_schema()
+
+#: Run-vs-run comparison-report schema version discriminator -- always "0.1"
+#: for v0 (item 101; independent of ``EVAL_REPORT_SCHEMA_VERSION``).
+PER_MODE_COMPARISON_SCHEMA_VERSION: str = "0.1"
 
 
 # --------------------------------------------------------------------------- #
@@ -181,6 +221,7 @@ def build_evaluation_report(
     *,
     calibration: "Optional[CalibrationResult]" = None,
     run_manifest: "Optional[dict]" = None,
+    per_mode_summary: "Optional[RunPerModeSummary]" = None,
 ) -> dict:
     """Assemble + schema-validate the v0 evaluation-report dict.
 
@@ -202,6 +243,12 @@ def build_evaluation_report(
         non-``None`` it is embedded verbatim under the report's
         ``run_manifest`` key. When ``None`` (default), no ``run_manifest``
         key is emitted.
+    per_mode_summary:
+        Optional :class:`~segfacet.eval.per_mode_cohort.RunPerModeSummary`
+        (item 101). When given, embedded verbatim (via ``to_dict()``) under
+        the report's additive, optional ``per_mode_magnitude`` key. When
+        ``None`` (default), no ``per_mode_magnitude`` key is emitted and the
+        report is byte-identical to the pre-101 output for the same inputs.
 
     Returns
     -------
@@ -227,6 +274,9 @@ def build_evaluation_report(
 
     if run_manifest is not None:
         report["run_manifest"] = run_manifest
+
+    if per_mode_summary is not None:
+        report["per_mode_magnitude"] = per_mode_summary.to_dict()
 
     jsonschema.validate(report, _SCHEMA)
     return report
@@ -278,6 +328,7 @@ def render_evaluation_report(
     provenance: EvaluationProvenance,
     *,
     calibration: "Optional[CalibrationResult]" = None,
+    per_mode_summary: "Optional[RunPerModeSummary]" = None,
 ) -> str:
     """Render a human-readable plain-text evaluation report.
 
@@ -298,6 +349,10 @@ def render_evaluation_report(
         Optional :class:`~segfacet.eval.calibrate.CalibrationResult`. When
         ``None`` (default), a "(not calibrated)" marker is rendered instead
         of a calibration block.
+    per_mode_summary:
+        Optional :class:`~segfacet.eval.per_mode_cohort.RunPerModeSummary`
+        (item 101). When given, an additional "Per-mode magnitudes" section
+        is appended; when ``None`` (default), nothing is appended.
 
     Returns
     -------
@@ -369,6 +424,20 @@ def render_evaluation_report(
             lines.append(f"  Achieved FPR: {_fmt_metric(best.metrics.false_positive_rate)}")
             lines.append(f"  Achieved sensitivity: {_fmt_metric(best.metrics.sensitivity)}")
     lines.append("")
+
+    if per_mode_summary is not None:
+        lines.append(f"Per-mode magnitudes ({per_mode_summary.run_id}):")
+        for agg in per_mode_summary.per_mode:
+            lines.append(
+                f"  {agg.failure_mode_name} ({agg.metric_name}): "
+                f"mean={_fmt_metric(agg.mean)}, n_with_value={agg.n_with_value}, "
+                f"detection_rate={_fmt_metric(agg.detection_rate)}"
+            )
+        lines.append(
+            f"  Aggregate Dice: mean_dice={_fmt_metric(per_mode_summary.mean_dice)}, "
+            f"volume_weighted_dice={_fmt_metric(per_mode_summary.volume_weighted_dice)}"
+        )
+        lines.append("")
 
     return "\n".join(lines)
 
@@ -443,3 +512,144 @@ def record_calibrated_config(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_bytes(text.encode("utf-8"))
     return out_path
+
+
+# --------------------------------------------------------------------------- #
+# Run-vs-run comparison artifact (item 101) -- its own bundled, versioned
+# schema; a different document from the evaluation report above (two runs,
+# deltas, an attribution), not a third optional block of it.
+# --------------------------------------------------------------------------- #
+
+
+def _run_side_block(provenance: EvaluationProvenance, run_manifest: "Optional[dict]") -> dict:
+    """Build one side's ``run_a``/``run_b`` block: provenance plus an optional
+    verbatim run-manifest."""
+    block: dict = {"provenance": provenance.to_dict()}
+    if run_manifest is not None:
+        block["run_manifest"] = run_manifest
+    return block
+
+
+def build_run_comparison_report(
+    comparison: "RunComparison",
+    provenance_a: EvaluationProvenance,
+    provenance_b: EvaluationProvenance,
+) -> dict:
+    """Assemble + schema-validate the v0 run-vs-run comparison-report dict.
+
+    Parameters
+    ----------
+    comparison:
+        The :class:`~segfacet.eval.per_mode_cohort.RunComparison` to embed
+        (via ``to_dict()``) under ``"comparison"``. Its
+        ``run_manifest_a``/``run_manifest_b`` fields (embedded verbatim from
+        each side's own ``eval_report.json``) are folded into the matching
+        ``run_a``/``run_b`` block.
+    provenance_a, provenance_b:
+        Each side's :class:`EvaluationProvenance`, embedded (via
+        ``to_dict()``) under ``run_a``/``run_b``'s ``"provenance"`` key.
+
+    Returns
+    -------
+    dict
+        A fresh, schema-valid comparison-report dict.
+
+    Raises
+    ------
+    jsonschema.ValidationError
+        If the assembled report does not conform to the bundled v0
+        comparison schema (should never happen in normal use -- indicates a
+        serialiser bug).
+    """
+    import jsonschema  # lazy: only imported when actually building
+
+    report: dict = {
+        "schema_version": PER_MODE_COMPARISON_SCHEMA_VERSION,
+        "run_a": _run_side_block(provenance_a, comparison.run_manifest_a),
+        "run_b": _run_side_block(provenance_b, comparison.run_manifest_b),
+        "comparison": comparison.to_dict(),
+    }
+
+    jsonschema.validate(report, _COMPARISON_SCHEMA)
+    return report
+
+
+def render_run_comparison(comparison: "RunComparison") -> str:
+    """Render a human-readable plain-text run-vs-run comparison report.
+
+    Stdlib-only and deterministic: every value is formatted explicitly, so
+    the literal string ``"None"`` never appears -- ``None`` renders as
+    ``"n/a"`` (mirrors :func:`render_evaluation_report`'s ``_fmt_metric``
+    discipline). Names the attributed mode's ``failure_mode_name`` and
+    ``metric_name`` in words; an all-zero/None comparison says so explicitly
+    instead of naming a mode.
+
+    Parameters
+    ----------
+    comparison:
+        The :class:`~segfacet.eval.per_mode_cohort.RunComparison` to render.
+
+    Returns
+    -------
+    str
+        A non-empty plain-text report string.
+    """
+    lines: list = []
+
+    title = f"FACET Run-vs-Run Per-Mode Comparison -- {comparison.run_a_id} vs {comparison.run_b_id}"
+    lines.append(title)
+    lines.append("=" * len(title))
+    lines.append(f"Cases compared: {comparison.n_cases}")
+    lines.append("")
+
+    lines.append("Aggregate Dice:")
+    lines.append(
+        f"  mean_dice: {_fmt_metric(comparison.mean_dice_a)} -> "
+        f"{_fmt_metric(comparison.mean_dice_b)} "
+        f"(delta={_fmt_metric(comparison.mean_dice_delta)})"
+    )
+    lines.append(
+        f"  volume_weighted_dice: {_fmt_metric(comparison.volume_weighted_dice_a)} -> "
+        f"{_fmt_metric(comparison.volume_weighted_dice_b)} "
+        f"(delta={_fmt_metric(comparison.volume_weighted_dice_delta)})"
+    )
+    lines.append("")
+
+    if comparison.attributed_mode is None:
+        # Degenerate (all-zero/None) comparison: say so explicitly rather
+        # than printing a per-mode table that would name every mode without
+        # any of them actually being implicated (AC22).
+        lines.append(
+            "Attribution: no single mode dominates this comparison "
+            "(every mode's normalised delta is zero or unavailable)."
+        )
+        lines.append("")
+        return "\n".join(lines)
+
+    lines.append("Per-mode deltas:")
+    for entry in comparison.per_mode:
+        if entry.worsened is None:
+            worsened_label = "n/a"
+        elif entry.worsened:
+            worsened_label = "worsened"
+        else:
+            worsened_label = "improved/unchanged"
+        lines.append(
+            f"  {entry.failure_mode_name} ({entry.metric_name}): "
+            f"{_fmt_metric(entry.value_a)} -> {_fmt_metric(entry.value_b)}, "
+            f"delta={_fmt_metric(entry.delta)}, "
+            f"normalised_delta={_fmt_metric(entry.normalised_delta)}, "
+            f"{worsened_label}"
+        )
+    lines.append("")
+
+    top = comparison.by_mode(comparison.attributed_mode)
+    lines.append(
+        f"Attribution: mode {comparison.attributed_mode} "
+        f"({comparison.attributed_mode_name}, {comparison.attributed_metric_name}) "
+        f"accounts for the largest normalised move "
+        f"(normalised_delta={_fmt_metric(top.normalised_delta)})."
+    )
+    lines.append("")
+
+    return "\n".join(lines)
