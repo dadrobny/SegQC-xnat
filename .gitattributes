@@ -5,3 +5,15 @@ src/segfacet/reference/reference_default.json text eol=lf
 src/segfacet/reference/reference_verse_*.json text eol=lf
 tests/corpus/intensity/manifest.json text eol=lf
 tests/corpus/intensity/fixtures/*.nii.gz binary
+tests/corpus/094_pre_migration_snapshot.json text eol=lf
+
+# Items 099-101 introduced "scope fence" tests that hash committed source
+# files verbatim (read_bytes()) to prove later items didn't touch them.
+# Those files were never pinned, so a Windows checkout's default
+# core.autocrlf rewrites their committed LF to CRLF and the pinned hash
+# never matches -- the same class of bug as the fixtures above, just
+# applied to plain source instead of generated fixtures. Pin the whole
+# tree these tests draw from, not just the currently-hashed files, so a
+# future item adding another such test doesn't reopen this on a new path.
+src/segfacet/**/*.py text eol=lf
+src/segfacet/**/*.json text eol=lf
