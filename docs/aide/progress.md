@@ -41,7 +41,7 @@
 | 15    | Real-XNAT Deployment Validation                                         | G5              | ❌     |
 | 16    | Real Failure Corpus & Sensitivity Validation*(retargeted to SPINEPS)* | G2, G7          | 📋     |
 | 17    | Foreign-Convention Interop & Orientation-Safe Image Layer               | G2, G6          | ✅     |
-| 18    | Failure-Mode-Specific Metric Surface                                    | G2, G7          | 🚧     |
+| 18    | Failure-Mode-Specific Metric Surface                                    | G2, G7          | ✅     |
 | 19    | Generated Feature & Rule Catalogue + Steering Review                    | G7, G8          | 📋     |
 | 20    | Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness      | G2, G7          | 📋     |
 | 21    | Real-GT Perturbation Corpus                                             | G3, G7          | 📋     |
@@ -133,6 +133,7 @@ item, or doc where the detail already lives, not a prose copy of it._
 | Real automatic-segmentation failure corpus      | **SPINEPS** (primary) / TotalSegmentator outputs on real CT (external tool + data) | Stages 5, 7*(Items 041, 053, 057)*; to be closed by Stage 16                                                                    | ❓ Unverified                                                                                | §6 modes are detected only on synthetically perturbed GT; no real-failure output has run, so item 057's per-mode sensitivities are synthetic-only. Curated challenging cases ([`vision.md`](vision.md) §8) unbuilt. → Stage 16 (rung 3), which now depends on Stage 21 (rung 2).                                                   |
 | GPU-accelerated feature extraction              | `cupy` (extra: `segqc[gpu]`)                                                         | Stage 10*(Items 071–075)*; closed by *(Item 085)*                                                                            | ✅ Verified (2026-07-16, Quadro P6000 sm_61, CuPy`cupy-cuda12x` 14.1.1, driver 580.159.04) | Verified on a Pascal sm_61 workstation (2× P6000) with the CPU/GPU equivalence tests executing; first CuPy run found + fixed a NEP-50 regression (item 085). Install`cupy-cuda12x` (**not** `cupy-cuda13x` — drops Pascal). No CI GPU coverage — see [`docs/gpu-verification.md`](../gpu-verification.md).               |
 | Real SPINEPS-output label-convention round-trip | Real SPINEPS-produced label map (external tool + data), via `SEGFACET_SPINEPS_FIXTURE` | Stage 17 (Item 097)                                                                                                                | ❓ Unverified                                                                                | No committed real-SPINEPS fixture; requires `SEGFACET_SPINEPS_FIXTURE` pointing at a directory of real SPINEPS output. Narrower than the "Real automatic-segmentation failure corpus" row above (Stage 16 sensitivity/DICE scope) — this row is level-**naming** correctness only. Mechanics unconditionally covered by a committed synthetic TPTBox-labeled fixture (`tests/test_097_stage17_validation.py::test_ac4_*`); the real-data path (`test_ac6_real_spineps_fixture_level_names_correct`) is a genuine, cleanly-skipping `skipif` not yet exercised for real. |
+| Real segmentation-tool run-vs-run per-mode comparison | Two real runs of a real segmenter over the same cohort (e.g. a post-processing step on vs. off), external tool + data | Stage 18 *(Items 101, 102)*                                                                                                       | ❓ Unverified                                                                                | Only ever exercised on the synthetic corpus and on in-memory perturbed clean spines (item 101's API tests, item 102's CLI replay); no two real segmenter runs exist in this repo. Narrower than the "Real automatic-segmentation failure corpus" row above (that row is Stage 16's per-mode **sensitivity** scope; this row is run-vs-run **attribution** scope). |
 
 ## Outcome targets
 
@@ -741,7 +742,7 @@ numbers, wrong. Must land before any real-segmenter number is computed.
 
 ---
 
-## Stage 18 — Failure-Mode-Specific Metric Surface (G2, G7) — 🚧
+## Stage 18 — Failure-Mode-Specific Metric Surface (G2, G7) — ✅
 
 **Goal.** Measure per failure mode. "Foreground beyond the main connected component" is
 currently recomputed privately inside `heuristics/fragmentation.py` rather than existing
@@ -756,13 +757,23 @@ as a named field, so nothing else can read it.
 - ✅ Severity-ladder monotonicity + cross-mode specificity harness (the **G2** acceptance):
   graded ladders per §6 mode from the existing perturbation-operator constructor knobs. *(Item 100)*
 - ✅ Cohort-level per-mode report supporting run-vs-run comparison of a segmentation tool. *(Item 101)*
-- 📋 Stage 18 end-to-end validation: CLI-level replay + verification-row closure. *(Item 102)*
+- ✅ Stage 18 end-to-end validation: CLI-level replay + verification-row closure. *(Item 102)*
 
 **Acceptance.**
 
-- [ ] Each §6 mode has ≥1 named metric moving monotonically with injected severity of that
-  mode, and comparatively insensitive to the others (**G2**).
-- [ ] The fragmentation rule's behaviour is unchanged by the refactor (**G7**).
+- [x] Each §6 mode has ≥1 named metric moving monotonically with injected severity of that
+  mode, and comparatively insensitive to the others (**G2**). *(a) All eight modes have a
+  named metric that is monotone and strictly changing across its own ladder (item 100,
+  replayed by item 102). (b) Seven of eight ladders clear the strict-specificity bar
+  (`margin > 1.0`); **mode 6** does not — measured margin `0.3585`, its ladder driving
+  mode 1's `unanchored_foreground_fraction` `2.79×` harder than mode 1's own FOV-capped
+  ladder, recorded in `KNOWN_CROSS_MODE_COUPLINGS`. (c) **Mode 7** carries a declared
+  two-rung degenerate ladder (metric structurally capped at 1 by the label convention).
+  (d) All of it is measured on synthetic ladders only.*
+- [x] The fragmentation rule's behaviour is unchanged by the refactor (**G7**). *Evidenced
+  at report level by item 102's AC5: nine CLI `segfacet run --no-reference` invocations
+  whose `verdict` + `findings` equal the frozen pre-098 snapshot — above item 098's
+  rule-level regression.*
 
 ---
 
