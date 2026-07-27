@@ -242,9 +242,12 @@ item 103's prototype number as an estimate.
 ## Assumptions
 
 Clarify mode for this item was **`interactive`** (Stage 19 carries the human
-steering checkpoint). Two questions were answered directly by the maintainer
-before authoring and are recorded here as **settled decisions, not
-assumptions**; the rest are spec-author defaults.
+steering checkpoint). **Five** questions were answered directly by the
+maintainer — two before authoring, and three at spec review on 2026-07-27, each
+of which confirmed the spec-author default verbatim — and all five are recorded
+here as **settled decisions, not assumptions**. Nothing in this section is
+awaiting a human answer; the remaining bullets are spec-author defaults the
+maintainer did not need to arbitrate.
 
 **Settled by the maintainer (do not re-litigate):**
 
@@ -267,12 +270,9 @@ assumptions**; the rest are spec-author defaults.
   (`in-progress|done`), not acceptance checkboxes, so the tick is a plain edit
   to that one line with an italic evidence note, exactly as Stage 18's ticked
   acceptance items are annotated.)
-
-**Spec-author defaults:**
-
-- **Who ticks the box, and what happens if the human does not approve.** The
-  tick happens **within item 105's execution**, immediately after the maintainer
-  gives explicit approval at the Validation step — not in item 106. Item 106's
+- **Item 105 ticks the box, only on explicit approval.** The tick happens
+  **within item 105's execution**, immediately after the maintainer gives
+  explicit approval at the Validation step — not in item 106. Item 106's
   own spec text requires it to *confirm sign-off was recorded before it
   proceeds* and to stop if it is pending, which is only non-circular if the
   record predates it. If approval is **not** granted, the item still lands: the
@@ -281,12 +281,30 @@ assumptions**; the rest are spec-author defaults.
   spec requires. **Nothing may tick that box without an explicit human
   statement of approval in the session transcript.** AC12 is written to pass in
   both states precisely so the honest outcome is never the failing one.
-- **"Committed golden" is scoped to committed *non-`.py` files under `tests/`.**
-  That is the mechanically checkable definition (AC3) and it matches
-  `git ls-files tests/` exactly on this tree (29 files). Artifacts outside
-  `tests/` that are nonetheless compared against a fixed committed value get
-  Section 2 by enumeration (AC9) rather than by walk, so the completeness check
-  stays deterministic and does not couple to unrelated trees.
+- **Table scope: `tests/` is walked, the adjacent artifacts are Section 2.**
+  "Committed golden" is scoped to committed *non-`.py` files under `tests/`
+  — the mechanically checkable definition (AC3), matching `git ls-files tests/`
+  exactly on this tree (29 files). The seven adjacent exact-match artifacts
+  outside `tests/` **are** in scope for the document, but as an enumerated
+  Section 2 (AC9) rather than by walk, so AC3's completeness check stays scoped
+  to `tests/` only, stays deterministic, and does not couple to unrelated trees.
+- **The two survey defects are logged to `insights.md` and left unfixed here.**
+  (i) `tests/golden/*.json` are absent from `.gitattributes` while every other
+  committed text fixture is LF-pinned; they are compared with `read_text`
+  (universal newlines), so this is latent rather than live — but it is exactly
+  the bug class this repo has been burnt by three times (`insights.md`, items
+  099-101). (ii) `tests/test_022_stage3_serialisation.py::test_ac8_golden_snapshot`
+  *writes the golden and skips* when `tests/golden/022_stage3_report.json` is
+  absent, so deleting that golden makes the check pass rather than fail; the
+  honest "what it asserts today" cell for that row is therefore "drift, but only
+  while the file happens to exist". Both are recorded as caveats in the Group D
+  rows and appended to `insights.md` for queue-boundary triage. **Neither is
+  fixed in this item** — the first would require editing `.gitattributes` and the
+  second editing an existing test, both forbidden by AC14. A builder that fixes
+  either has broken the scope fence.
+
+**Spec-author defaults:**
+
 - **AC3 walks the filesystem, not `git ls-files`.** No subprocess, no git
   dependency, no skip path. The cost is that an untracked scratch `.json`
   someone leaves under `tests/` fails the test — which is the correct alarm,
@@ -300,21 +318,6 @@ assumptions**; the rest are spec-author defaults.
   `build_catalogue()` and reads `entry.path` / `entry.status` directly. If the
   builder finds that surface differs from item 103's spec, **hand back** rather
   than adapting silently.
-- **Group D's missing LF pin is noted, not fixed.** `tests/golden/*.json` are
-  absent from `.gitattributes` while every other committed text fixture is
-  pinned. They are compared with `read_text` (universal newlines), so this is
-  latent rather than live — but it is exactly the bug class this repo has been
-  burnt by three times (`insights.md`, items 099-101). Fixing it would mean
-  editing `.gitattributes`, which AC14 forbids; it is recorded in the table's
-  Group D rows as a caveat and logged to `insights.md` for the queue-boundary
-  triage instead.
-- **`tests/test_022_stage3_serialisation.py::test_ac8_golden_snapshot` self-heals
-  and that weakens its own golden.** If `tests/golden/022_stage3_report.json` is
-  absent the test *writes it and skips* — so deleting that golden makes the
-  check pass rather than fail. This materially affects that row's "what it
-  asserts today" cell (the honest answer is "drift, but only while the file
-  happens to exist") and it is logged to `insights.md`. Fixing the test is out
-  of scope (AC14 forbids editing it).
 - **Item 103 has landed and its catalogue artifacts are committed.** AC7 and
   Section 2's last two rows both require `docs/aide/feature_catalogue.generated.json`
   and `.md` to exist. Item 103 is a hard blocker; if its artifacts are absent
@@ -589,7 +592,9 @@ delegated the choice:
   the only place this item touches production code, and it exists so that the
   single number the retire decision leans on cannot be a stale estimate copied
   from item 103's spec.
-- **Section 2 is enumerated, Section 1 is walked.** A walk of `tests/` is
+- **Section 2 is enumerated, Section 1 is walked** (maintainer-confirmed at spec
+  review, 2026-07-27 — the seven adjacent artifacts stay in the document as
+  Section 2, and AC3's completeness check stays scoped to `tests/`). A walk of `tests/` is
   deterministic and self-maintaining; a walk of the whole repo for
   "exact-match-compared artifacts" is not decidable without executing the suite.
   Enumerating the seven adjacent artifacts keeps the table honest without making
@@ -604,8 +609,15 @@ delegated the choice:
 - **The attestation lives in exactly one place.** Putting a `Signed off by / on`
   block in the table too would create two records that can disagree, and the
   first time they did, neither would be trustworthy. AC11 actively forbids it.
-- **Two survey findings are logged, not fixed** — the missing
-  `tests/golden/*.json` LF pin and `test_022_stage3_serialisation.py`'s
-  self-healing golden branch. Both are real, both are one-line fixes, and both
-  are outside a fence the maintainer set deliberately. They go to
-  `insights.md` for triage at the queue boundary.
+- **Two survey findings are logged, not fixed** (maintainer-confirmed at spec
+  review, 2026-07-27) — the missing `tests/golden/*.json` LF pin and
+  `test_022_stage3_serialisation.py`'s self-healing golden branch. Both are real,
+  both are one-line fixes, and both are outside a fence the maintainer set
+  deliberately. They go to `insights.md` for triage at the queue boundary; an
+  opportunistic fix here is a scope violation, not a courtesy.
+- **Item 105 itself ticks the sign-off checkbox, and only on explicit human
+  approval** (maintainer-confirmed at spec review, 2026-07-27). Deferring the
+  tick to item 106 would make item 106's own "stop if sign-off is pending" guard
+  circular; leaving the item unlanded on non-approval would lose the table. So
+  the item always lands, and the checkbox state — ticked with evidence, or
+  honestly unticked — is what carries the decision forward to item 106.
