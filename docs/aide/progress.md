@@ -755,7 +755,7 @@ as a named field, so nothing else can read it.
   its aggregates — no new overlap code. *(Item 099)*
 - ✅ Severity-ladder monotonicity + cross-mode specificity harness (the **G2** acceptance):
   graded ladders per §6 mode from the existing perturbation-operator constructor knobs. *(Item 100)*
-- 📋 Cohort-level per-mode report supporting run-vs-run comparison of a segmentation tool. *(Item 101)*
+- 🚧 Cohort-level per-mode report supporting run-vs-run comparison of a segmentation tool. *(Item 101)*
 - 📋 Stage 18 end-to-end validation: CLI-level replay + verification-row closure. *(Item 102)*
 
 **Acceptance.**
