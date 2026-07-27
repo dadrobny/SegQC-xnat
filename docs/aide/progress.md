@@ -788,12 +788,14 @@ verifies they agree, and no document records which failure mode each feature ser
 
 - 📋 Catalogue **generated** from the realised record shape + extractor docstrings, with
   columns for computation, units, scale sensitivity, targeted §6 mode, consuming rules,
-  and a keep / retune / retire / unwired status.
+  and a keep / retune / retire / unwired status. *(Item 103)*
 - 📋 Drift test: every leaf path covered; CI fails on an undocumented feature.
+  *(Item 104)*
 - 📋 Golden-file decision table — one row per committed golden: what it asserts, keep or
   retire, what replaces it. Working assumption **retire most** (whole-record snapshots of
   a corpus Stage 21 replaces). Byte reproducibility is guarded by the independent
-  intra-run `dest1 == dest2` determinism assertions, not by the goldens.
+  intra-run `dest1 == dest2` determinism assertions, not by the goldens. *(Item 105)*
+- 📋 Stage validation + verification-row closure. *(Item 106)*
 
 **Acceptance.**
 
