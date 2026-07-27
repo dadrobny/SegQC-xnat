@@ -1520,7 +1520,7 @@ _PRE_101_CORPUS_HASH = "aad04c1b0e42074a11342b24dc94c7f2ec896cda1664efeee7c5fc5b
 def _combined_hash(files, base: Path) -> str:
     h = hashlib.sha256()
     for f in sorted(files):
-        h.update(str(f.relative_to(base)).encode())
+        h.update(f.relative_to(base).as_posix().encode())
         h.update(f.read_bytes())
     return h.hexdigest()
 

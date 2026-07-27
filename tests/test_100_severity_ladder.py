@@ -186,7 +186,7 @@ _CORPUS_DIR = _REPO_ROOT / "tests" / "corpus"
 def _combined_hash(files, base: Path) -> str:
     h = hashlib.sha256()
     for f in files:
-        h.update(str(f.relative_to(base)).encode())
+        h.update(f.relative_to(base).as_posix().encode())
         h.update(f.read_bytes())
     return h.hexdigest()
 

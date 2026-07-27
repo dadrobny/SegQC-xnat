@@ -1344,7 +1344,7 @@ def test_ac25_heuristics_package_byte_identical_to_pre_099_state():
     heur_files = sorted((_SEGFACET_SRC / "heuristics").rglob("*.py"))
     h = hashlib.sha256()
     for f in heur_files:
-        h.update(str(f.relative_to(_SEGFACET_SRC)).encode())
+        h.update(f.relative_to(_SEGFACET_SRC).as_posix().encode())
         h.update(f.read_bytes())
     assert h.hexdigest() == _PRE_099_HEURISTICS_COMBINED_HASH
 
