@@ -470,7 +470,10 @@ def test_adv_compare_runs_has_no_backend_flag():
 def test_adv_smoke_help_still_exits_0_and_mentions_run(capsys):
     from segfacet.cli import main
 
-    exit_code = main(["--help"])
-    assert exit_code == 0
+    # argparse's --help prints and raises SystemExit(0) directly rather than
+    # returning -- mirrors tests/test_smoke.py::test_cli_help_exits_zero.
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--help"])
+    assert exc_info.value.code == 0
     captured = capsys.readouterr()
     assert "run" in captured.out

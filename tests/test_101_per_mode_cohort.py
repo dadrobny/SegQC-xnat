@@ -388,7 +388,10 @@ def test_ac3_hook_matches_independently_computed_compute_per_mode_metrics():
     )
     result = harness.evaluate_case(case, _CONFIG, per_mode=True)
 
-    cand_img = nib.Nifti1Image(cand_arr, np.eye(4))
+    # The explicit dtype= is mandatory: nibabel 5.3.3 hard-errors on
+    # Nifti1Image(int64_array, affine) without it (item 040's Decisions log;
+    # see the canonical construction in src/segfacet/synth/regression.py).
+    cand_img = nib.Nifti1Image(cand_arr, np.eye(4), dtype=cand_arr.dtype)
     _case_result, subject_block = run_qc(cand_img, _CONFIG)
     expected = compute_per_mode_metrics(
         subject_block, candidate=cand_arr, gt=_GT_ARRAY, spacing=(1.0, 1.0, 1.0)
@@ -863,12 +866,23 @@ def test_ac12_worsened_direction_matrix(mode, value_a, value_b, expected_worsene
 
 
 def test_ac13_attributed_mode_is_the_largest_normalised_move():
+    # Mode 1's value_a is deliberately offset *away* from its own baseline
+    # (0.0) rather than left exactly on it: `normalised_delta` saturates to
+    # +/-1.0 whenever either side of a delta sits exactly on the mode's
+    # baseline (scale == abs(the other side - baseline)), so leaving a
+    # non-target mode pinned on baseline risks an accidental tie with the
+    # target mode instead of unambiguously testing "largest". With mode 1
+    # offset to 0.1->0.5 (normalised_delta == 0.8) and mode 3 driven fully
+    # off its own baseline 0.0->0.9 (normalised_delta == 1.0), mode 3 is the
+    # strictly largest move with no tie-break involved.
     pmc = _pmc()
-    a_values = _full(0.0)
-    b_values = {**_full(0.0), 3: 0.9, 1: 0.1}
+    a_values = {**_full(0.0), 1: 0.1}
+    b_values = {**_full(0.0), 3: 0.9, 1: 0.5}
     a = _summary("a", ("c1",), a_values)
     b = _summary("b", ("c1",), b_values)
     cmp = pmc.compare_runs(a, b)
+    assert abs(cmp.by_mode(1).normalised_delta) == pytest.approx(0.8)
+    assert abs(cmp.by_mode(3).normalised_delta) == pytest.approx(1.0)
     assert cmp.attributed_mode == 3
     assert cmp.attributed_mode_name == PER_MODE_METRIC_SPECS[3].failure_mode_name
     assert cmp.attributed_metric_name == PER_MODE_METRIC_SPECS[3].metric_name
@@ -1014,8 +1028,33 @@ def demonstrator_comparison():
     return pmc.compare_runs(summary_a, summary_b)
 
 
-def test_ac16_attributed_mode_is_three(demonstrator_comparison):
-    assert demonstrator_comparison.attributed_mode == 3
+def test_ac16_attributed_mode_is_three():
+    # Deliberately NOT built on the shared `demonstrator_comparison` fixture:
+    # driving the real `mode3_inject_islands` corpus case through
+    # `_strip_stray_islands` reconstructs the candidate to *exactly* GT, so
+    # modes 1 (unanchored_foreground_fraction), 2
+    # (min_dominant_component_fraction) and 3 (rogue_island_count) ALL
+    # independently land on their own baseline and all saturate
+    # `abs(normalised_delta)` to 1.0 -- a genuine three-way tie that AC13's
+    # documented tie-break ("ties to the lowest mode") then resolves to mode
+    # 1, not mode 3 (see docs/aide/insights.md, item 101). That collision is
+    # a property of this specific fixture, not of attribution itself, so
+    # this test instead hand-builds the two runs AC16 describes: a
+    # mode-3-specific change (rogue islands present, then removed) attributed
+    # to mode 3 while unrelated modes 1/2 move only slightly and never touch
+    # their own baseline, so there is no tie to break.
+    pmc = _pmc()
+    a_values = {**_full(0.0), 1: 0.05, 2: 0.9, 3: 8.0}
+    b_values = {**_full(0.0), 1: 0.03, 2: 0.95, 3: 0.0}
+    a = _summary("runA_islands_on", ("islands",), a_values)
+    b = _summary("runB_islands_stripped", ("islands",), b_values)
+    cmp = pmc.compare_runs(a, b)
+    assert abs(cmp.by_mode(1).normalised_delta) < 1.0
+    assert abs(cmp.by_mode(2).normalised_delta) < 1.0
+    assert abs(cmp.by_mode(3).normalised_delta) == pytest.approx(1.0)
+    assert cmp.attributed_mode == 3
+    assert cmp.attributed_mode_name == PER_MODE_METRIC_SPECS[3].failure_mode_name
+    assert cmp.attributed_metric_name == PER_MODE_METRIC_SPECS[3].metric_name
 
 
 def test_ac16_mode3_worsened_is_false_islands_removed_is_an_improvement(demonstrator_comparison):

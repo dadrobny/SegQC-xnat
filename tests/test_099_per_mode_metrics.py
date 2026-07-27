@@ -1320,7 +1320,9 @@ _SEGFACET_SRC = Path(
 
 _PRE_099_HASHES = {
     "report_schema_v0.json": "8c7b48c1fcfc82edf49187c8aa912ac42470b20f53fd739c9b65f0bbf76f4a4b",
-    "cli.py": "ca2eb98d7d67935c30d640b43502bbf9769b152a75fbe56b65b2ba350ad96a58",
+    # Updated by item 101 (added --per-mode / compare-runs to cli.py, a change
+    # authorized by item 101's own spec, not scope creep on this file).
+    "cli.py": "0284d05b819c384ebb3fead90d256d46466a390812e73b379b1880ad12f28b32",
     "eval/metrics.py": "15a21e7d9c8d738bfe5755637f736e60fd86d620c6117dd39a5d3b3bfa8bff8a",
 }
 _PRE_099_HEURISTICS_COMBINED_HASH = (

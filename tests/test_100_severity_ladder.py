@@ -943,9 +943,12 @@ def test_ac25_unregistered_operator_raises_key_error_not_skipped():
 _PRE_100_HASHES = {
     "eval/per_mode.py": "5fd77f74b33dccbe32c3b899a9d2a4e1f051df03a5deb9a3a0cda7058ff0d9c6",
     "eval/metrics.py": "15a21e7d9c8d738bfe5755637f736e60fd86d620c6117dd39a5d3b3bfa8bff8a",
-    "cli.py": "ca2eb98d7d67935c30d640b43502bbf9769b152a75fbe56b65b2ba350ad96a58",
+    # cli.py and eval/eval_report_schema_v0.json updated by item 101 (added
+    # --per-mode / compare-runs to cli.py and the additive per_mode_magnitude
+    # block to the schema, both authorized by item 101's own spec).
+    "cli.py": "0284d05b819c384ebb3fead90d256d46466a390812e73b379b1880ad12f28b32",
     "report_schema_v0.json": "8c7b48c1fcfc82edf49187c8aa912ac42470b20f53fd739c9b65f0bbf76f4a4b",
-    "eval/eval_report_schema_v0.json": "88d0483262abc4d4317b4dfb6354c81c37dc405f9c77af30fb37d0545a1d7b70",
+    "eval/eval_report_schema_v0.json": "1e76d8153dc854dc4a308c7df5861d0f130ee1633a0d7b66b18572562504c8aa",
 }
 _PRE_100_SYNTH_HASH = "8ed4d4d5d1d26c36077eef2a35569d8db6687d51d7551e94f38e76f8d7323205"
 _PRE_100_HEURISTICS_HASH = "92cdc63e9a9bcef3c4ebd6c9b5567e80c30a3077bd3613d635c443bf055d19c4"
