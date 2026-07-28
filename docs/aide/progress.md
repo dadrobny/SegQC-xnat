@@ -786,7 +786,7 @@ verifies they agree, and no document records which failure mode each feature ser
 
 **Deliverables.**
 
-- 🚧 Catalogue **generated** from the realised record shape + extractor docstrings, with
+- ✅ Catalogue **generated** from the realised record shape + extractor docstrings, with
   columns for computation, units, scale sensitivity, targeted §6 mode, consuming rules,
   and a keep / retune / retire / unwired status. *(Item 103)*
 - 📋 Drift test: every leaf path covered; CI fails on an undocumented feature.
