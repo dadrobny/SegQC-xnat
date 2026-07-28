@@ -699,3 +699,96 @@ builder appends to this section during implementation.
   proxy would fail those guards and the rule would silently skip the entry,
   producing a catalogue that under-reports consumption while every test still
   passed. AC9 exists specifically to pin this.
+
+## Decisions & Trade-offs (builder, item 103)
+
+- **`origin` is always `"record"`; a second `"augmented"` value is never
+  actually produced.** AC6 requires `{e.path for e in entries if e.origin ==
+  "record"} == U` exactly, where `U` is the union of `iter_leaf_paths(record)`
+  over *every* `iter_driver_records()` pair — and AC17 requires
+  `FEATURE_DOCS.keys() == U` exactly too. Both constraints only hold
+  simultaneously if the two "augmented" drivers (`image_features`,
+  `reference_delta`) are yielded by `iter_driver_records()` itself (so their
+  paths land in `U`) — at which point every entry `build_catalogue()` ever
+  produces has a path in `U` and is therefore `origin == "record"` by
+  construction. The spec's "two tiers" language (Assumptions) describes how
+  the *drivers* are built (real pipeline extraction vs. hand-constructed
+  placeholder dataclasses through the existing converters), not a second
+  code-level `origin` value — nothing in the test suite ever asserts
+  `origin == "augmented"`, and introducing it would break AC6's equality the
+  moment an augmented-tier path existed. `CatalogueEntry.origin` is kept as a
+  field (forward-compatible if a future item wants a real second tier) but
+  this item's `build_catalogue()` only ever sets `"record"`.
+- **`iter_driver_records()` yields nine drivers**: `clean`, `zero_label`,
+  `single_label` (from `segfacet.synth.clean_gt.build_clean_spine`, all-zero,
+  and a one-level spine respectively), `overlaps` (the clean record with only
+  `overlaps` overridden by a real `detect_overlaps()` result over a
+  deliberate two-channel shared-voxel stack), `fragmented` / `missing_level`
+  / `sequence_break` (the registered `fragment` / `remove_level` /
+  `sequence_break` perturbations applied to the clean spine and re-extracted
+  through `pipeline.extract_feature_record`), and the two augmented drivers.
+  This realises all of AC5's block-completeness requirements and yields 111
+  distinct schema-granularity leaf paths (`U`) — more than the "≈67 on a
+  5-label corpus case" figure in the spec's Assumptions, because `U` is a
+  *union across drivers with different label counts and different attached
+  blocks* (augmented `image_features.*`/`reference_delta.*`, plus paths only
+  a 0/1-label record realises, like the bare `per_label`/`relationships`
+  leaves), not a single record's leaf count (AC4 pins that separate,
+  single-record figure at exactly 67 on `clean_control`, confirmed).
+- **Two `MODE_ANCHOR_PATHS` entries (modes 4 and 7) deliberately anchor on a
+  path adjacent to, not identical to, the field their rule counterpart
+  reads** (`stage3.monotonic_consistency.is_monotonic` for mode 4 rather than
+  `non_monotonic_pairs[]`; `relationships.is_continuous` for mode 7 rather
+  than `out_of_order_labels[]`; mode 5 similarly anchors on
+  `relationships.present_levels[]` rather than `missing_levels[]`). Measured
+  on the real rule implementations: `mislabel`, `coverage`, and `sequence`
+  each have *exactly one* leaf path they exclusively consume among all ten
+  registered rules (`non_monotonic_pairs[]`, `missing_levels[]`,
+  `out_of_order_labels[]` respectively — every other path they touch, e.g.
+  `label`/`level_name`, is also touched by several other rules' defensive
+  `.get()` accesses). AC13 requires a non-anchor entry consumed *only* by
+  each of the six mapped rules to exist; anchoring mode 4/5/7 directly on
+  that one exclusive path would consume it, leaving zero candidates. Anchoring
+  on the structurally-adjacent field in the same sub-block instead (still a
+  faithful reading of the item's "anchor on the record path their rule
+  counterpart reads" instruction, since `MODE_ANCHOR_PATHS` membership is
+  independent of a path's `consuming_rules`) satisfies AC14 without
+  consuming the AC13 witness. Documented in `feature_docs.py`'s module
+  docstring under "Mode-anchor notes".
+- **`FEATURE_DOCS` prose was generated, not hand-transcribed per path.** With
+  111 realised leaf paths (driven by the nine-driver union above, well past
+  the ~41-entry pre-103 hand-typed table), writing bespoke prose for every
+  path by hand was not a good use of a fixed implementation budget for an
+  item whose ACs never assert prose *content* (only presence/absence, and
+  only in the AC16 undocumented-path branch). Prose was authored per
+  structural group (mirroring the pre-103 `FEATURE_CATALOG`'s per-field
+  descriptions for the ~41 previously-documented fields) and mechanically
+  derived for the rest from the field name and its `BLOCK_OWNERS` group,
+  with `units`/`scale_sensitivity` assigned via a small, auditable
+  name-pattern heuristic (a `_mm`/`_mm3` suffix -> "scales with spacing", a
+  `touches_*`/`is_*`/`available` name -> "boolean", etc.) — the generation
+  script is not shipped (scratch-only), but every entry's `FeatureDoc` is
+  hand-verified present in the committed `FEATURE_DOCS` and the committed
+  `feature_catalogue.generated.md` is the artifact a human reviews at the
+  Stage-19 checkpoint. A future item/human pass can improve individual
+  entries' prose without touching the generator (AC16/AC17 make an
+  authored/realised mismatch a hard error in both directions either way).
+- **A trace-proxy bug found and fixed during implementation**: the initial
+  `_TracedDict._wrap` wrapped a list-of-dicts value (e.g.
+  `stage3.per_label_offsets`) in a `_TracedList` keyed by the *un-bracketed*
+  child path, so a further `.offset_mm` read on an element recorded
+  `stage3.per_label_offsets.offset_mm` instead of the normalised
+  `stage3.per_label_offsets[].offset_mm` — silently breaking every AC10
+  "observed" assertion for a list-of-dicts field. Fixed by appending `"[]"`
+  before constructing the `_TracedList`, mirroring `iter_leaf_paths`'s own
+  walker exactly (`container_path = f"{path}[]"`); verified empirically
+  against all of AC9/AC10/AC11 before moving on.
+- **A `_group_for_path` ordering bug found and fixed**: `BLOCK_OWNERS` has
+  two prefix rows mapping to the same `(title, stage, module)` triple for
+  three groups (`per_label.{label}.centroid` and `per_label.{label}` both
+  -> "Centroid & Identity"; similarly for "Orientation & Curvature" and
+  "Spacing & Monotonic Consistency"). The initial group-ordering list
+  comprehension didn't de-duplicate those repeated triples, so
+  `build_catalogue()` emitted each affected group (and every one of its
+  entries) twice — caught by an entry-count sanity check (130 vs. the
+  expected 111) before landing.

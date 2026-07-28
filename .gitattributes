@@ -17,3 +17,8 @@ tests/corpus/094_pre_migration_snapshot.json text eol=lf
 # future item adding another such test doesn't reopen this on a new path.
 src/segfacet/**/*.py text eol=lf
 src/segfacet/**/*.json text eol=lf
+
+# Item 103's generated feature & rule catalogue -- byte-reproducible fixtures
+# (AC19) subject to the same Windows core.autocrlf gotcha as the pins above.
+docs/aide/feature_catalogue.generated.json text eol=lf
+docs/aide/feature_catalogue.generated.md text eol=lf

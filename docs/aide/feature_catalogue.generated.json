@@ -1,0 +1,2932 @@
+{
+  "groups": [
+    {
+      "entries": [
+        {
+          "computation": "bbox_voxel index x spacing, voxel-centre convention (diagonal affine assumed).",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Axis-aligned bounding box in mm, x maximum.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.bbox_physical.x_max",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "bbox_voxel index x spacing, voxel-centre convention (diagonal affine assumed).",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Axis-aligned bounding box in mm, x minimum.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.bbox_physical.x_min",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "bbox_voxel index x spacing, voxel-centre convention (diagonal affine assumed).",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Axis-aligned bounding box in mm, y maximum.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.bbox_physical.y_max",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "bbox_voxel index x spacing, voxel-centre convention (diagonal affine assumed).",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Axis-aligned bounding box in mm, y minimum.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.bbox_physical.y_min",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "bbox_voxel index x spacing, voxel-centre convention (diagonal affine assumed).",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Axis-aligned bounding box in mm, z maximum.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.bbox_physical.z_max",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "bbox_voxel index x spacing, voxel-centre convention (diagonal affine assumed).",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Axis-aligned bounding box in mm, z minimum.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.bbox_physical.z_min",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Maximum voxel-coordinate index over the label's voxel array, inclusive.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Axis-aligned bounding-box maximum voxel index, x.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.bbox_voxel.x_max",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Minimum voxel-coordinate index over the label's voxel array, inclusive.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Axis-aligned bounding-box minimum voxel index, x.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.bbox_voxel.x_min",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Maximum voxel-coordinate index over the label's voxel array, inclusive.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Axis-aligned bounding-box maximum voxel index, y.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.bbox_voxel.y_max",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Minimum voxel-coordinate index over the label's voxel array, inclusive.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Axis-aligned bounding-box minimum voxel index, y.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.bbox_voxel.y_min",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Maximum voxel-coordinate index over the label's voxel array, inclusive.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Axis-aligned bounding-box maximum voxel index, z.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.bbox_voxel.z_max",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Minimum voxel-coordinate index over the label's voxel array, inclusive.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Axis-aligned bounding-box minimum voxel index, z.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.bbox_voxel.z_min",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "(max_voxel_index - min_voxel_index + 1) x spacing for that axis.",
+          "consumers": [
+            "vocabulary"
+          ],
+          "consuming_rules": [
+            "bounds"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Physical span of the label along image axis x.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.extent_x_mm",
+          "rule_evidence": [
+            [
+              "bounds",
+              "observed"
+            ]
+          ],
+          "scale_sensitivity": "scales with spacing",
+          "status": "keep",
+          "units": "mm"
+        },
+        {
+          "computation": "(max_voxel_index - min_voxel_index + 1) x spacing for that axis.",
+          "consumers": [
+            "vocabulary"
+          ],
+          "consuming_rules": [
+            "bounds"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Physical span of the label along image axis y.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.extent_y_mm",
+          "rule_evidence": [
+            [
+              "bounds",
+              "observed"
+            ]
+          ],
+          "scale_sensitivity": "scales with spacing",
+          "status": "keep",
+          "units": "mm"
+        },
+        {
+          "computation": "(max_voxel_index - min_voxel_index + 1) x spacing for that axis.",
+          "consumers": [
+            "vocabulary"
+          ],
+          "consuming_rules": [
+            "bounds"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Physical span of the label along image axis z.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.extent_z_mm",
+          "rule_evidence": [
+            [
+              "bounds",
+              "observed"
+            ]
+          ],
+          "scale_sensitivity": "scales with spacing",
+          "status": "keep",
+          "units": "mm"
+        },
+        {
+          "computation": "voxel_count x (sx . sy . sz), the product of the three header voxel spacings.",
+          "consumers": [
+            "render_feature_table",
+            "vocabulary"
+          ],
+          "consuming_rules": [
+            "bounds"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Physical volume of the label.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.physical_volume_mm3",
+          "rule_evidence": [
+            [
+              "bounds",
+              "observed"
+            ]
+          ],
+          "scale_sensitivity": "scales with spacing",
+          "status": "keep",
+          "units": "mm3"
+        },
+        {
+          "computation": "True when bbox_voxel's index equals 0 on the anterior-mapped axis (z=0).",
+          "consumers": [
+            "compute_per_mode_metrics"
+          ],
+          "consuming_rules": [
+            "border"
+          ],
+          "documented": true,
+          "failure_modes": [
+            6
+          ],
+          "measures": "Whether the label touches the anterior image face.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.touches_anterior",
+          "rule_evidence": [
+            [
+              "border",
+              "observed"
+            ]
+          ],
+          "scale_sensitivity": "boolean",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "True when bbox_voxel's index equals 0 on the inferior-mapped axis (x=0).",
+          "consumers": [
+            "compute_per_mode_metrics"
+          ],
+          "consuming_rules": [
+            "border"
+          ],
+          "documented": true,
+          "failure_modes": [
+            6
+          ],
+          "measures": "Whether the label touches the inferior image face.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.touches_inferior",
+          "rule_evidence": [
+            [
+              "border",
+              "observed"
+            ]
+          ],
+          "scale_sensitivity": "boolean",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "True when bbox_voxel's index equals 0 on the left-mapped axis (y=0).",
+          "consumers": [
+            "compute_per_mode_metrics"
+          ],
+          "consuming_rules": [
+            "border"
+          ],
+          "documented": true,
+          "failure_modes": [
+            6
+          ],
+          "measures": "Whether the label touches the left image face.",
+          "mode_evidence": [
+            "per_mode_metric",
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.touches_left",
+          "rule_evidence": [
+            [
+              "border",
+              "observed"
+            ]
+          ],
+          "scale_sensitivity": "boolean",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "True when bbox_voxel's index equals shape[axis]-1 on the posterior-mapped axis (z=max).",
+          "consumers": [
+            "compute_per_mode_metrics"
+          ],
+          "consuming_rules": [
+            "border"
+          ],
+          "documented": true,
+          "failure_modes": [
+            6
+          ],
+          "measures": "Whether the label touches the posterior image face.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.touches_posterior",
+          "rule_evidence": [
+            [
+              "border",
+              "observed"
+            ]
+          ],
+          "scale_sensitivity": "boolean",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "True when bbox_voxel's index equals shape[axis]-1 on the right-mapped axis (y=max).",
+          "consumers": [
+            "compute_per_mode_metrics"
+          ],
+          "consuming_rules": [
+            "border"
+          ],
+          "documented": true,
+          "failure_modes": [
+            6
+          ],
+          "measures": "Whether the label touches the right image face.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.touches_right",
+          "rule_evidence": [
+            [
+              "border",
+              "observed"
+            ]
+          ],
+          "scale_sensitivity": "boolean",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "True when bbox_voxel's index equals shape[axis]-1 on the superior-mapped axis (x=max).",
+          "consumers": [
+            "compute_per_mode_metrics"
+          ],
+          "consuming_rules": [
+            "border"
+          ],
+          "documented": true,
+          "failure_modes": [
+            6
+          ],
+          "measures": "Whether the label touches the superior image face.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.touches_superior",
+          "rule_evidence": [
+            [
+              "border",
+              "observed"
+            ]
+          ],
+          "scale_sensitivity": "boolean",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "len(argwhere(data == label)) -- a direct voxel count.",
+          "consumers": [
+            "render_feature_table"
+          ],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Number of voxels carrying the label value.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.geometry.voxel_count",
+          "rule_evidence": [],
+          "scale_sensitivity": "voxel count",
+          "status": "keep",
+          "units": "voxels"
+        }
+      ],
+      "intro": "",
+      "module": "segfacet.features.geometry",
+      "stage": "Stage 2 · item 011",
+      "title": "Per-Label Geometry"
+    },
+    {
+      "entries": [
+        {
+          "computation": "Direct output of scipy.ndimage.label's component count (6-connectivity).",
+          "consumers": [
+            "render_feature_table",
+            "vocabulary"
+          ],
+          "consuming_rules": [
+            "fragmentation"
+          ],
+          "documented": true,
+          "failure_modes": [
+            2,
+            3
+          ],
+          "measures": "Number of distinct connected pieces the label is split into.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.components.component_count",
+          "rule_evidence": [
+            [
+              "fragmentation",
+              "observed"
+            ],
+            [
+              "fragmentation",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "voxel count",
+          "status": "keep",
+          "units": "voxels"
+        },
+        {
+          "computation": "np.bincount over the labelled array, sorted descending.",
+          "consumers": [
+            "compute_per_mode_metrics"
+          ],
+          "consuming_rules": [
+            "fragmentation"
+          ],
+          "documented": true,
+          "failure_modes": [
+            2,
+            3
+          ],
+          "measures": "Voxel count of each connected component, largest first.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.components.component_sizes[]",
+          "rule_evidence": [
+            [
+              "fragmentation",
+              "observed"
+            ],
+            [
+              "fragmentation",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "component_sizes[i] x product of voxel spacings, same order as component_sizes.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Physical volume of each connected component.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.components.component_volumes_mm3[]",
+          "rule_evidence": [],
+          "scale_sensitivity": "scales with spacing",
+          "status": "unwired",
+          "units": "mm3"
+        },
+        {
+          "computation": "Same value as largest_component_fraction, always present so callers need not know the alias history.",
+          "consumers": [
+            "compute_per_mode_metrics",
+            "render_feature_table"
+          ],
+          "consuming_rules": [
+            "fragmentation"
+          ],
+          "documented": true,
+          "failure_modes": [
+            2,
+            3
+          ],
+          "measures": "Alias of largest_component_fraction, exposed under its item-025 public name.",
+          "mode_evidence": [
+            "per_mode_metric",
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.components.fragmentation_index",
+          "rule_evidence": [
+            [
+              "fragmentation",
+              "observed"
+            ],
+            [
+              "fragmentation",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "component_sizes[0] / sum(component_sizes); range (0, 1].",
+          "consumers": [
+            "vocabulary"
+          ],
+          "consuming_rules": [
+            "fragmentation"
+          ],
+          "documented": true,
+          "failure_modes": [
+            2,
+            3
+          ],
+          "measures": "Fraction of the label's voxels belonging to its single largest piece.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.components.largest_component_fraction",
+          "rule_evidence": [
+            [
+              "fragmentation",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Every component_sizes entry strictly below HeuristicConfig.min_fragment_voxels.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Sizes of components below the configured noise threshold.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.components.small_fragments[]",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "len(component_sizes) - 1, i.e. every component except the dominant one.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Number of non-dominant (item-098 \"stray\") components.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.components.stray_component_count",
+          "rule_evidence": [],
+          "scale_sensitivity": "voxel count",
+          "status": "unwired",
+          "units": "voxels"
+        },
+        {
+          "computation": "component_sizes[1:], the item-098 stray population fragmentation/rogue-island checks read.",
+          "consumers": [
+            "compute_per_mode_metrics"
+          ],
+          "consuming_rules": [
+            "fragmentation"
+          ],
+          "documented": true,
+          "failure_modes": [
+            2,
+            3
+          ],
+          "measures": "Voxel sizes of every non-dominant component.",
+          "mode_evidence": [
+            "per_mode_metric",
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.components.stray_component_sizes[]",
+          "rule_evidence": [
+            [
+              "fragmentation",
+              "observed"
+            ],
+            [
+              "fragmentation",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "stray_volume_mm3 / total physical_volume_mm3.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Fraction of the label's total volume that is non-dominant.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.components.stray_volume_fraction",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "sum(component_volumes_mm3[1:]).",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Total physical volume of every non-dominant component.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.components.stray_volume_mm3",
+          "rule_evidence": [],
+          "scale_sensitivity": "scales with spacing",
+          "status": "unwired",
+          "units": "mm3"
+        }
+      ],
+      "intro": "",
+      "module": "segfacet.features.components",
+      "stage": "Stage 2 · items 012, 025, 098",
+      "title": "Connected Components & Fragmentation"
+    },
+    {
+      "entries": [
+        {
+          "computation": "centroid_voxel[i] x spacing[i] per axis -- correct under anisotropic spacing.",
+          "consumers": [
+            "render_feature_table"
+          ],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Physical-space centroid.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.centroid.centroid_mm[]",
+          "rule_evidence": [],
+          "scale_sensitivity": "scales with spacing",
+          "status": "keep",
+          "units": "mm"
+        },
+        {
+          "computation": "np.mean(coords, axis=0) over the label's voxel-coordinate array.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Mean (x, y, z) voxel-index position of the label's voxels.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "per_label.{label}.centroid.centroid_voxel[]",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Promoted from the label's LabelCentroid record.",
+          "consumers": [
+            "render_feature_table"
+          ],
+          "consuming_rules": [
+            "border",
+            "intensity",
+            "intensity_reference_delta",
+            "mislabel",
+            "reference_delta",
+            "sequence"
+          ],
+          "documented": true,
+          "failure_modes": [
+            1,
+            4,
+            6,
+            7
+          ],
+          "measures": "The integer vertebra label this per_label entry describes.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.label",
+          "rule_evidence": [
+            [
+              "border",
+              "static-ambiguous"
+            ],
+            [
+              "intensity",
+              "static-ambiguous"
+            ],
+            [
+              "intensity_reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "mislabel",
+              "static-ambiguous"
+            ],
+            [
+              "reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "sequence",
+              "observed"
+            ],
+            [
+              "sequence",
+              "static-ambiguous"
+            ]
+          ],
+          "scale_sensitivity": "identifier",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Looked up from the integer label via the active LabelConvention; an unmapped integer falls back to \"unknown\".",
+          "consumers": [
+            "compute_per_mode_metrics",
+            "render_feature_table"
+          ],
+          "consuming_rules": [
+            "border",
+            "bounds",
+            "coverage",
+            "fragmentation",
+            "intensity_reference_delta",
+            "mislabel",
+            "reference_delta",
+            "sequence"
+          ],
+          "documented": true,
+          "failure_modes": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "measures": "Anatomical vertebra name, e.g. \"T8\", \"L3\".",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "per_label.{label}.level_name",
+          "rule_evidence": [
+            [
+              "border",
+              "observed"
+            ],
+            [
+              "border",
+              "static-ambiguous"
+            ],
+            [
+              "bounds",
+              "observed"
+            ],
+            [
+              "bounds",
+              "static-ambiguous"
+            ],
+            [
+              "coverage",
+              "static-ambiguous"
+            ],
+            [
+              "fragmentation",
+              "observed"
+            ],
+            [
+              "fragmentation",
+              "static-ambiguous"
+            ],
+            [
+              "intensity_reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "mislabel",
+              "static-ambiguous"
+            ],
+            [
+              "reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "sequence",
+              "observed"
+            ],
+            [
+              "sequence",
+              "static-ambiguous"
+            ]
+          ],
+          "scale_sensitivity": "categorical",
+          "status": "keep",
+          "units": ""
+        }
+      ],
+      "intro": "",
+      "module": "segfacet.features.centroids",
+      "stage": "Stage 2 · item 013",
+      "title": "Centroid & Identity"
+    },
+    {
+      "entries": [
+        {
+          "computation": "None when no labels are present; otherwise a nested object (see the individual relationships.* fields).",
+          "consumers": [
+            "compute_per_mode_metrics",
+            "render_feature_table"
+          ],
+          "consuming_rules": [
+            "coverage",
+            "sequence"
+          ],
+          "documented": true,
+          "failure_modes": [
+            5,
+            7
+          ],
+          "measures": "Case-level spine relationships, or null for a 0-label map.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "relationships",
+          "rule_evidence": [
+            [
+              "coverage",
+              "observed"
+            ],
+            [
+              "coverage",
+              "static"
+            ],
+            [
+              "sequence",
+              "observed"
+            ],
+            [
+              "sequence",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "True iff each level's canonical rank is >= the previous one, walking the labels in their input order.",
+          "consumers": [
+            "render_feature_table"
+          ],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [
+            7
+          ],
+          "measures": "Whether the levels were labelled in a head-to-tail-consistent order.",
+          "mode_evidence": [
+            "per_mode_metric"
+          ],
+          "origin": "record",
+          "path": "relationships.is_continuous",
+          "rule_evidence": [],
+          "scale_sensitivity": "boolean",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Set difference between the canonical-order slice [first_present..last_present] and the present-levels set.",
+          "consumers": [
+            "render_feature_table"
+          ],
+          "consuming_rules": [
+            "coverage"
+          ],
+          "documented": true,
+          "failure_modes": [
+            5
+          ],
+          "measures": "Canonical levels absent within the observed present-level span.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "relationships.missing_levels[]",
+          "rule_evidence": [
+            [
+              "coverage",
+              "observed"
+            ],
+            [
+              "coverage",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Euclidean distance (mm) between each consecutive pair in canonical order.",
+          "consumers": [
+            "render_feature_table"
+          ],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Centroid-to-centroid distance between anatomically adjacent levels.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "relationships.neighbour_spacings_mm[]",
+          "rule_evidence": [],
+          "scale_sensitivity": "scales with spacing",
+          "status": "keep",
+          "units": "mm"
+        },
+        {
+          "computation": "Every level, in input order, whose canonical rank is lower than the running maximum.",
+          "consumers": [
+            "compute_per_mode_metrics",
+            "render_feature_table"
+          ],
+          "consuming_rules": [
+            "sequence"
+          ],
+          "documented": true,
+          "failure_modes": [
+            7
+          ],
+          "measures": "Level names that broke the monotonic canonical-rank check.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "relationships.out_of_order_labels[]",
+          "rule_evidence": [
+            [
+              "sequence",
+              "observed"
+            ],
+            [
+              "sequence",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Every centroid whose level_name is in the canonical vocabulary, sorted by canonical rank.",
+          "consumers": [
+            "compute_per_mode_metrics",
+            "render_feature_table"
+          ],
+          "consuming_rules": [
+            "border",
+            "coverage"
+          ],
+          "documented": true,
+          "failure_modes": [
+            5,
+            6
+          ],
+          "measures": "Recognised anatomical levels, in canonical head-to-tail order.",
+          "mode_evidence": [
+            "per_mode_metric",
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "relationships.present_levels[]",
+          "rule_evidence": [
+            [
+              "border",
+              "observed"
+            ],
+            [
+              "coverage",
+              "observed"
+            ],
+            [
+              "coverage",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        }
+      ],
+      "intro": "",
+      "module": "segfacet.features.relationships",
+      "stage": "Stage 2 · item 014",
+      "title": "Case-Level Relationships"
+    },
+    {
+      "entries": [
+        {
+          "computation": "Empty when no two labels' voxel masks share a voxel; feature_report.build_features_block sorts non-empty entries by (label_a, label_b).",
+          "consumers": [
+            "compute_per_mode_metrics",
+            "render_feature_table"
+          ],
+          "consuming_rules": [
+            "overlap"
+          ],
+          "documented": true,
+          "failure_modes": [
+            8
+          ],
+          "measures": "The list of overlapping label pairs for this case.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "overlaps[]",
+          "rule_evidence": [
+            [
+              "overlap",
+              "observed"
+            ],
+            [
+              "overlap",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "features.overlap.detect_overlaps enforces label_a < label_b.",
+          "consumers": [
+            "render_feature_table"
+          ],
+          "consuming_rules": [
+            "overlap"
+          ],
+          "documented": true,
+          "failure_modes": [
+            8
+          ],
+          "measures": "The lower integer label of an overlapping pair.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "overlaps[].label_a",
+          "rule_evidence": [
+            [
+              "overlap",
+              "observed"
+            ],
+            [
+              "overlap",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "features.overlap.detect_overlaps enforces label_a < label_b.",
+          "consumers": [
+            "render_feature_table"
+          ],
+          "consuming_rules": [
+            "overlap"
+          ],
+          "documented": true,
+          "failure_modes": [
+            8
+          ],
+          "measures": "The higher integer label of an overlapping pair.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "overlaps[].label_b",
+          "rule_evidence": [
+            [
+              "overlap",
+              "observed"
+            ],
+            [
+              "overlap",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Looked up via the active LabelConvention; \"unknown\" for an unmapped integer.",
+          "consumers": [
+            "render_feature_table"
+          ],
+          "consuming_rules": [
+            "overlap"
+          ],
+          "documented": true,
+          "failure_modes": [
+            8
+          ],
+          "measures": "Anatomical vertebra name for label_a.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "overlaps[].name_a",
+          "rule_evidence": [
+            [
+              "overlap",
+              "observed"
+            ],
+            [
+              "overlap",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "categorical",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Looked up via the active LabelConvention; \"unknown\" for an unmapped integer.",
+          "consumers": [
+            "render_feature_table"
+          ],
+          "consuming_rules": [
+            "overlap"
+          ],
+          "documented": true,
+          "failure_modes": [
+            8
+          ],
+          "measures": "Anatomical vertebra name for label_b.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "overlaps[].name_b",
+          "rule_evidence": [
+            [
+              "overlap",
+              "observed"
+            ],
+            [
+              "overlap",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "categorical",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Bitwise AND of the two labels' boolean mask channels, counted with count_nonzero.",
+          "consumers": [
+            "compute_per_mode_metrics",
+            "render_feature_table"
+          ],
+          "consuming_rules": [
+            "overlap"
+          ],
+          "documented": true,
+          "failure_modes": [
+            8
+          ],
+          "measures": "Number of voxels claimed by both labels of the pair.",
+          "mode_evidence": [
+            "per_mode_metric",
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "overlaps[].overlap_voxels",
+          "rule_evidence": [
+            [
+              "overlap",
+              "observed"
+            ],
+            [
+              "overlap",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        }
+      ],
+      "intro": "",
+      "module": "segfacet.features.overlap",
+      "stage": "Stage 2 · item 015",
+      "title": "Voxel Overlap"
+    },
+    {
+      "entries": [
+        {
+          "computation": "Coarse 500-point scan over u, refined with a bounded scipy.optimize.minimize_scalar (xatol 1e-6).",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Spline parameter (0-1) of the point on the curve nearest this vertebra's centroid.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.per_label_offsets[].closest_u",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "centroid_mm - closest spline point, x component.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Signed x-axis displacement from the fitted spline.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.per_label_offsets[].dx_mm",
+          "rule_evidence": [],
+          "scale_sensitivity": "scales with spacing",
+          "status": "unwired",
+          "units": "mm"
+        },
+        {
+          "computation": "centroid_mm - closest spline point, y component.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Signed y-axis displacement from the fitted spline.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.per_label_offsets[].dy_mm",
+          "rule_evidence": [],
+          "scale_sensitivity": "scales with spacing",
+          "status": "unwired",
+          "units": "mm"
+        },
+        {
+          "computation": "centroid_mm - closest spline point, z component.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Signed z-axis displacement from the fitted spline.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.per_label_offsets[].dz_mm",
+          "rule_evidence": [],
+          "scale_sensitivity": "scales with spacing",
+          "status": "unwired",
+          "units": "mm"
+        },
+        {
+          "computation": "Copied from the source VertebralSplineOffset dataclass.",
+          "consumers": [],
+          "consuming_rules": [
+            "border",
+            "intensity",
+            "intensity_reference_delta",
+            "mislabel",
+            "reference_delta",
+            "sequence"
+          ],
+          "documented": true,
+          "failure_modes": [
+            1,
+            4,
+            6,
+            7
+          ],
+          "measures": "The integer label this spline-offset entry describes.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "stage3.per_label_offsets[].label",
+          "rule_evidence": [
+            [
+              "border",
+              "static-ambiguous"
+            ],
+            [
+              "intensity",
+              "static-ambiguous"
+            ],
+            [
+              "intensity_reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "mislabel",
+              "observed"
+            ],
+            [
+              "mislabel",
+              "static-ambiguous"
+            ],
+            [
+              "reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "sequence",
+              "static-ambiguous"
+            ]
+          ],
+          "scale_sensitivity": "identifier",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Copied from the source VertebralSplineOffset dataclass.",
+          "consumers": [],
+          "consuming_rules": [
+            "border",
+            "bounds",
+            "coverage",
+            "fragmentation",
+            "intensity_reference_delta",
+            "mislabel",
+            "reference_delta",
+            "sequence"
+          ],
+          "documented": true,
+          "failure_modes": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "measures": "Anatomical vertebra name for this spline-offset entry.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "stage3.per_label_offsets[].level_name",
+          "rule_evidence": [
+            [
+              "border",
+              "static-ambiguous"
+            ],
+            [
+              "bounds",
+              "static-ambiguous"
+            ],
+            [
+              "coverage",
+              "static-ambiguous"
+            ],
+            [
+              "fragmentation",
+              "static-ambiguous"
+            ],
+            [
+              "intensity_reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "mislabel",
+              "observed"
+            ],
+            [
+              "mislabel",
+              "static-ambiguous"
+            ],
+            [
+              "reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "sequence",
+              "static-ambiguous"
+            ]
+          ],
+          "scale_sensitivity": "categorical",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Euclidean distance (mm) to the closest spline point at closest_u.",
+          "consumers": [
+            "vocabulary"
+          ],
+          "consuming_rules": [
+            "mislabel"
+          ],
+          "documented": true,
+          "failure_modes": [
+            1,
+            4
+          ],
+          "measures": "Perpendicular distance from the vertebra's centroid to the fitted spline.",
+          "mode_evidence": [
+            "per_mode_metric",
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "stage3.per_label_offsets[].offset_mm",
+          "rule_evidence": [
+            [
+              "mislabel",
+              "observed"
+            ],
+            [
+              "mislabel",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "scales with spacing",
+          "status": "keep",
+          "units": "mm"
+        },
+        {
+          "computation": "Same as offset_mm but with each axis scaled by 1/spacing before taking the norm.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Anisotropic-aware perpendicular offset.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.per_label_offsets[].offset_voxel",
+          "rule_evidence": [],
+          "scale_sensitivity": "voxel count",
+          "status": "unwired",
+          "units": "voxels"
+        }
+      ],
+      "intro": "",
+      "module": "segfacet.features.spline_offset",
+      "stage": "Stage 3 · item 018",
+      "title": "Spline Offset"
+    },
+    {
+      "entries": [
+        {
+          "computation": "Angle between each pair of adjacent unit tangent vectors along the spine.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Angle between consecutive vertebrae's tangent vectors.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.curvature.inter_tangent_angles_deg[]",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": "degrees"
+        },
+        {
+          "computation": "Evaluated at each vertebra's stored u via the spline's first derivative (splev, der=1).",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Angle between the spline's local tangent and the superior-inferior axis, per vertebra.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.curvature.tangent_angles_deg[]",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": "degrees"
+        },
+        {
+          "computation": "max(tangent_angles_deg) - min(tangent_angles_deg) across the whole spine; 0 for a perfectly straight column.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Cobb-angle-like global curvature proxy.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.curvature.total_curvature_deg",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": "degrees"
+        },
+        {
+          "computation": "lambda_max / lambda_second of the PCA covariance; infinite for a degenerate flat cloud, 0 for a single-voxel label.",
+          "consumers": [
+            "vocabulary"
+          ],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Anisotropy of the per-vertebra voxel cloud.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.per_label_orientations[].eigenvalue_ratio",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Copied from the source VertebralOrientation dataclass.",
+          "consumers": [],
+          "consuming_rules": [
+            "border",
+            "intensity",
+            "intensity_reference_delta",
+            "mislabel",
+            "reference_delta",
+            "sequence"
+          ],
+          "documented": true,
+          "failure_modes": [
+            1,
+            4,
+            6,
+            7
+          ],
+          "measures": "The integer label this orientation entry describes.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "stage3.per_label_orientations[].label",
+          "rule_evidence": [
+            [
+              "border",
+              "static-ambiguous"
+            ],
+            [
+              "intensity",
+              "static-ambiguous"
+            ],
+            [
+              "intensity_reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "mislabel",
+              "static-ambiguous"
+            ],
+            [
+              "reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "sequence",
+              "static-ambiguous"
+            ]
+          ],
+          "scale_sensitivity": "identifier",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Copied from the source VertebralOrientation dataclass.",
+          "consumers": [],
+          "consuming_rules": [
+            "border",
+            "bounds",
+            "coverage",
+            "fragmentation",
+            "intensity_reference_delta",
+            "mislabel",
+            "reference_delta",
+            "sequence"
+          ],
+          "documented": true,
+          "failure_modes": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "measures": "Anatomical vertebra name for this orientation entry.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "stage3.per_label_orientations[].level_name",
+          "rule_evidence": [
+            [
+              "border",
+              "static-ambiguous"
+            ],
+            [
+              "bounds",
+              "static-ambiguous"
+            ],
+            [
+              "coverage",
+              "static-ambiguous"
+            ],
+            [
+              "fragmentation",
+              "static-ambiguous"
+            ],
+            [
+              "intensity_reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "mislabel",
+              "static-ambiguous"
+            ],
+            [
+              "reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "sequence",
+              "static-ambiguous"
+            ]
+          ],
+          "scale_sensitivity": "categorical",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Eigenvector of the largest eigenvalue of the 3x3 covariance of the mean-centred, spacing-scaled voxel coordinates.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Per-vertebra orientation via PCA of its voxel cloud.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.per_label_orientations[].principal_axis[]",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        }
+      ],
+      "intro": "",
+      "module": "segfacet.features.orientation",
+      "stage": "Stage 3 · item 019",
+      "title": "Orientation & Curvature"
+    },
+    {
+      "entries": [
+        {
+          "computation": "False as soon as u[i] >= u[i+1] anywhere in the ordered sequence.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [
+            4
+          ],
+          "measures": "Whether every vertebra's closest-spline-parameter u increases along the anatomical order.",
+          "mode_evidence": [
+            "per_mode_metric"
+          ],
+          "origin": "record",
+          "path": "stage3.monotonic_consistency.is_monotonic",
+          "rule_evidence": [],
+          "scale_sensitivity": "boolean",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Consecutive (level_a, level_b) pairs where u[i] >= u[i+1]; equal u values count as a violation too.",
+          "consumers": [],
+          "consuming_rules": [
+            "mislabel"
+          ],
+          "documented": true,
+          "failure_modes": [
+            1,
+            4
+          ],
+          "measures": "Level-name pairs whose spline parameter does not advance.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "stage3.monotonic_consistency.non_monotonic_pairs[]",
+          "rule_evidence": [
+            [
+              "mislabel",
+              "observed"
+            ],
+            [
+              "mislabel",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "The closest_u value computed for every vertebra in the ordered centroid sequence.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Each vertebra's closest-spline-parameter u, in input order.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.monotonic_consistency.u_values[]",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "population-std(spacings) / mean(spacings); 0.0 when there is only one spacing.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Regularity of inter-vertebra spacing.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.spacing_consistency.cv_spacing",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "spacings_mm[i] - mean_spacing_mm.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Per-pair spacing's signed deviation from the mean.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.spacing_consistency.deviations_mm[]",
+          "rule_evidence": [],
+          "scale_sensitivity": "scales with spacing",
+          "status": "unwired",
+          "units": "mm"
+        },
+        {
+          "computation": "Arithmetic mean of the neighbour-to-neighbour centroid distances.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Mean inter-vertebra centroid spacing.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.spacing_consistency.mean_spacing_mm",
+          "rule_evidence": [],
+          "scale_sensitivity": "scales with spacing",
+          "status": "unwired",
+          "units": "mm"
+        },
+        {
+          "computation": "A pair is an outlier when its spacing is >= 2.0x or <= 0.3x the mean spacing (both thresholds configurable).",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Level-name pairs whose spacing is an outlier.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.spacing_consistency.outlier_pairs[]",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Euclidean centroid-to-centroid distance for each adjacent pair, in input order.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Per-pair inter-vertebra centroid spacing.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.spacing_consistency.spacings_mm[]",
+          "rule_evidence": [],
+          "scale_sensitivity": "scales with spacing",
+          "status": "unwired",
+          "units": "mm"
+        }
+      ],
+      "intro": "",
+      "module": "segfacet.features.consistency",
+      "stage": "Stage 3 · item 020",
+      "title": "Spacing & Monotonic Consistency"
+    },
+    {
+      "entries": [
+        {
+          "computation": "Fixed 32-bin histogram spanning [min, max], base-2 (bits); a uniform/constant region is defined as entropy 0.0.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Shannon entropy of the intensity distribution.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.entropy",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "p75 - p25 of the finite voxel values.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Spread summary: interquartile range.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.iqr",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Maximum of the finite voxel values.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Maximum scan intensity under the label mask.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.max",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Arithmetic mean over the finite voxel values.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Mean scan intensity under the label mask.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.mean",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "50th percentile of the finite voxel values; equals p50 exactly.",
+          "consumers": [],
+          "consuming_rules": [
+            "intensity"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Median scan intensity under the label mask.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.median",
+          "rule_evidence": [
+            [
+              "intensity",
+              "observed"
+            ],
+            [
+              "intensity",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Minimum of the finite voxel values.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Minimum scan intensity under the label mask.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.min",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Bookkeeping only -- excluded voxels never enter any statistic.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Count of masked voxels dropped for being NaN/+-inf.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.n_nonfinite_excluded",
+          "rule_evidence": [],
+          "scale_sensitivity": "voxel count",
+          "status": "unwired",
+          "units": "voxels"
+        },
+        {
+          "computation": "NumPy's default linear interpolation.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "5th percentile of scan intensity under the label mask.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.p05",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "NumPy's default linear interpolation.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "25th percentile of scan intensity under the label mask.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.p25",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "NumPy's default linear interpolation; equals median exactly.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "50th percentile of scan intensity under the label mask.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.p50",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "NumPy's default linear interpolation.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "75th percentile of scan intensity under the label mask.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.p75",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "NumPy's default linear interpolation.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "95th percentile of scan intensity under the label mask.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.p95",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "max - min of the finite voxel values.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Spread summary: max - min.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.range",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Population (ddof=0) standard deviation of the finite voxel values.",
+          "consumers": [],
+          "consuming_rules": [
+            "intensity"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Spread of scan intensity under the label mask.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.std",
+          "rule_evidence": [
+            [
+              "intensity",
+              "observed"
+            ],
+            [
+              "intensity",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Count after excluding NaN/inf scan voxels.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Number of finite scan voxels sampled under the label mask.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.first_order.voxel_count",
+          "rule_evidence": [],
+          "scale_sensitivity": "voxel count",
+          "status": "unwired",
+          "units": "voxels"
+        }
+      ],
+      "intro": "",
+      "module": "segfacet.features.intensity",
+      "stage": "Stage 8 · item 059",
+      "title": "Intensity — First-Order"
+    },
+    {
+      "entries": [
+        {
+          "computation": "binWidth fixed at 25.0, no resampling; keyed under PyRadiomics' own dotted names (e.g. original_glcm_Contrast).",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "PyRadiomics' own GLCM texture and shape feature families.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.extended.{radiomic}",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        }
+      ],
+      "intro": "",
+      "module": "segfacet.features.radiomics",
+      "stage": "Stage 8 · item 060",
+      "title": "Intensity — Extended Radiomics"
+    },
+    {
+      "entries": [
+        {
+          "computation": "False only when intensity extraction could not run at all (no scan / no backend); per_label is empty in that case.",
+          "consumers": [],
+          "consuming_rules": [
+            "intensity",
+            "intensity_reference_delta",
+            "reference_delta"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Whether intensity/radiomics features were attempted and succeeded for this case.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "image_features.available",
+          "rule_evidence": [
+            [
+              "intensity",
+              "observed"
+            ],
+            [
+              "intensity",
+              "static-ambiguous"
+            ],
+            [
+              "intensity_reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "reference_delta",
+              "static-ambiguous"
+            ]
+          ],
+          "scale_sensitivity": "boolean",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "\"builtin\" (first-order only) or \"pyradiomics\".",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Which backend computed the extended radiomics features.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.backend",
+          "rule_evidence": [],
+          "scale_sensitivity": "categorical",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Literal \"1.0\" (item 061), independent of features_version.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Schema-version discriminator for the image_features block.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.image_features_version",
+          "rule_evidence": [],
+          "scale_sensitivity": "categorical",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Copied verbatim from the intensity extraction's label key.",
+          "consumers": [],
+          "consuming_rules": [
+            "border",
+            "intensity",
+            "intensity_reference_delta",
+            "mislabel",
+            "reference_delta",
+            "sequence"
+          ],
+          "documented": true,
+          "failure_modes": [
+            1,
+            4,
+            6,
+            7
+          ],
+          "measures": "The integer label this image_features entry describes.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "image_features.per_label.{label}.label",
+          "rule_evidence": [
+            [
+              "border",
+              "static-ambiguous"
+            ],
+            [
+              "intensity",
+              "observed"
+            ],
+            [
+              "intensity",
+              "static-ambiguous"
+            ],
+            [
+              "intensity_reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "mislabel",
+              "static-ambiguous"
+            ],
+            [
+              "reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "sequence",
+              "static-ambiguous"
+            ]
+          ],
+          "scale_sensitivity": "identifier",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "True only when PyRadiomics is installed, enabled, and ran without error for at least one label.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Whether the PyRadiomics backend produced any extended features.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "image_features.radiomics_available",
+          "rule_evidence": [],
+          "scale_sensitivity": "boolean",
+          "status": "unwired",
+          "units": ""
+        }
+      ],
+      "intro": "",
+      "module": "segfacet.feature_report",
+      "stage": "Stage 8 · items 059, 061",
+      "title": "Intensity — First-Order"
+    },
+    {
+      "entries": [
+        {
+          "computation": "Default 1 (segfacet.reference.delta.DEFAULT_LOWER_PCT).",
+          "consumers": [],
+          "consuming_rules": [
+            "intensity_reference_delta",
+            "reference_delta"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "The lower percentile bound defining the reference in-range band.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "reference_delta.lower_pct",
+          "rule_evidence": [
+            [
+              "intensity_reference_delta",
+              "static"
+            ],
+            [
+              "reference_delta",
+              "observed"
+            ],
+            [
+              "reference_delta",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Literal \"1.0\" (item 046), independent of the reference artifact's own schema_version.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Schema-version discriminator for the reference_delta block.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "reference_delta.reference_delta_version",
+          "rule_evidence": [],
+          "scale_sensitivity": "categorical",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Copied verbatim from the loaded ReferenceDistribution.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "The reference artifact's own schema version, echoed for provenance.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "reference_delta.reference_schema_version",
+          "rule_evidence": [],
+          "scale_sensitivity": "categorical",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Copied verbatim from the loaded ReferenceDistribution's provenance.source.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Provenance string naming the reference cohort/build.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "reference_delta.reference_source",
+          "rule_evidence": [],
+          "scale_sensitivity": "categorical",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "e.g. \"all\" (segfacet.reference.schema.ALL_STRATUM).",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Which reference stratum this delta was scored against.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "reference_delta.stratum",
+          "rule_evidence": [],
+          "scale_sensitivity": "categorical",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Default 99 (segfacet.reference.delta.DEFAULT_UPPER_PCT).",
+          "consumers": [],
+          "consuming_rules": [
+            "intensity_reference_delta",
+            "reference_delta"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "The upper percentile bound defining the reference in-range band.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "reference_delta.upper_pct",
+          "rule_evidence": [
+            [
+              "intensity_reference_delta",
+              "static"
+            ],
+            [
+              "reference_delta",
+              "observed"
+            ],
+            [
+              "reference_delta",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "False when the level or requested stratum is absent from the loaded ReferenceDistribution.",
+          "consumers": [],
+          "consuming_rules": [
+            "intensity",
+            "intensity_reference_delta",
+            "reference_delta"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Whether this label's level (and stratum) is covered by the reference.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "reference_delta.{label}.available",
+          "rule_evidence": [
+            [
+              "intensity",
+              "static-ambiguous"
+            ],
+            [
+              "intensity_reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "reference_delta",
+              "observed"
+            ],
+            [
+              "reference_delta",
+              "static-ambiguous"
+            ]
+          ],
+          "scale_sensitivity": "boolean",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "RMS of the defined robust_z values across that label's tracked-and-present features.",
+          "consumers": [],
+          "consuming_rules": [
+            "intensity_reference_delta",
+            "reference_delta"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Per-label aggregate anomaly score against the reference.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "reference_delta.{label}.distribution_distance",
+          "rule_evidence": [
+            [
+              "intensity_reference_delta",
+              "static"
+            ],
+            [
+              "reference_delta",
+              "observed"
+            ],
+            [
+              "reference_delta",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "value < percentiles[p{lower_pct}] or value > percentiles[p{upper_pct}].",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Whether the value falls outside the configured percentile band.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "reference_delta.{label}.features.physical_volume_mm3.out_of_range",
+          "rule_evidence": [],
+          "scale_sensitivity": "boolean",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Piecewise-linear interpolation over the reference's stored percentile grid, anchored at min/max.",
+          "consumers": [],
+          "consuming_rules": [
+            "intensity_reference_delta",
+            "reference_delta"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Where the case's value falls in the reference's percentile grid.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "reference_delta.{label}.features.physical_volume_mm3.percentile_rank",
+          "rule_evidence": [
+            [
+              "intensity_reference_delta",
+              "static"
+            ],
+            [
+              "reference_delta",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "(value - p50) / (IQR / 1.349), IQR = p75 - p25 from the reference; None when the reference IQR is 0.",
+          "consumers": [],
+          "consuming_rules": [
+            "intensity_reference_delta",
+            "reference_delta"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Outlier-resistant z-score against the reference.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "reference_delta.{label}.features.physical_volume_mm3.robust_z",
+          "rule_evidence": [
+            [
+              "intensity_reference_delta",
+              "static"
+            ],
+            [
+              "reference_delta",
+              "observed"
+            ],
+            [
+              "reference_delta",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Read directly from the case's features_block for this label.",
+          "consumers": [],
+          "consuming_rules": [
+            "intensity_reference_delta",
+            "reference_delta"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "The case's own value for this tracked feature.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "reference_delta.{label}.features.physical_volume_mm3.value",
+          "rule_evidence": [
+            [
+              "intensity_reference_delta",
+              "static"
+            ],
+            [
+              "reference_delta",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "(value - mean) / std; None when the reference std is 0 for this feature/level.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Standard z-score against the reference.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "reference_delta.{label}.features.physical_volume_mm3.z_score",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": ""
+        },
+        {
+          "computation": "Copied from the source LabelDelta dataclass.",
+          "consumers": [],
+          "consuming_rules": [
+            "border",
+            "intensity",
+            "intensity_reference_delta",
+            "mislabel",
+            "reference_delta",
+            "sequence"
+          ],
+          "documented": true,
+          "failure_modes": [
+            1,
+            4,
+            6,
+            7
+          ],
+          "measures": "The integer label this reference-delta entry describes.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "reference_delta.{label}.label",
+          "rule_evidence": [
+            [
+              "border",
+              "static-ambiguous"
+            ],
+            [
+              "intensity",
+              "static-ambiguous"
+            ],
+            [
+              "intensity_reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "mislabel",
+              "static-ambiguous"
+            ],
+            [
+              "reference_delta",
+              "observed"
+            ],
+            [
+              "reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "sequence",
+              "static-ambiguous"
+            ]
+          ],
+          "scale_sensitivity": "identifier",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Copied from the source LabelDelta dataclass.",
+          "consumers": [],
+          "consuming_rules": [
+            "border",
+            "bounds",
+            "coverage",
+            "fragmentation",
+            "intensity_reference_delta",
+            "mislabel",
+            "reference_delta",
+            "sequence"
+          ],
+          "documented": true,
+          "failure_modes": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "measures": "Anatomical vertebra name for this reference-delta entry.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "reference_delta.{label}.level_name",
+          "rule_evidence": [
+            [
+              "border",
+              "static-ambiguous"
+            ],
+            [
+              "bounds",
+              "static-ambiguous"
+            ],
+            [
+              "coverage",
+              "static-ambiguous"
+            ],
+            [
+              "fragmentation",
+              "static-ambiguous"
+            ],
+            [
+              "intensity_reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "mislabel",
+              "static-ambiguous"
+            ],
+            [
+              "reference_delta",
+              "observed"
+            ],
+            [
+              "reference_delta",
+              "static-ambiguous"
+            ],
+            [
+              "sequence",
+              "static-ambiguous"
+            ]
+          ],
+          "scale_sensitivity": "categorical",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Every FeatureDelta with out_of_range True, sorted by feature name.",
+          "consumers": [],
+          "consuming_rules": [
+            "intensity_reference_delta",
+            "reference_delta"
+          ],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Feature names whose case value falls outside the reference's percentile band.",
+          "mode_evidence": [
+            "rule_unmapped"
+          ],
+          "origin": "record",
+          "path": "reference_delta.{label}.out_of_range_features[]",
+          "rule_evidence": [
+            [
+              "intensity_reference_delta",
+              "static"
+            ],
+            [
+              "reference_delta",
+              "observed"
+            ],
+            [
+              "reference_delta",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        }
+      ],
+      "intro": "",
+      "module": "segfacet.reference.delta",
+      "stage": "Stage 6/8 · items 046, 064",
+      "title": "Reference-Distribution Deltas"
+    },
+    {
+      "entries": [
+        {
+          "computation": "Literal \"0.1\" (Stage-2-only) or \"0.2\" (Stage 3 present), stamped by build_features_block.",
+          "consumers": [
+            "render_feature_table"
+          ],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Schema-version discriminator for this features block.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "features_version",
+          "rule_evidence": [],
+          "scale_sensitivity": "categorical",
+          "status": "keep",
+          "units": ""
+        },
+        {
+          "computation": "Empty for a 0-label map -- present as a leaf in that degenerate case, not silently dropped.",
+          "consumers": [],
+          "consuming_rules": [
+            "border",
+            "bounds",
+            "coverage",
+            "fragmentation",
+            "intensity",
+            "intensity_reference_delta",
+            "mislabel",
+            "reference_delta",
+            "sequence"
+          ],
+          "documented": true,
+          "failure_modes": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "measures": "The per-label feature map, keyed by integer label.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "per_label",
+          "rule_evidence": [
+            [
+              "border",
+              "static"
+            ],
+            [
+              "bounds",
+              "static"
+            ],
+            [
+              "coverage",
+              "static"
+            ],
+            [
+              "fragmentation",
+              "static"
+            ],
+            [
+              "intensity",
+              "static"
+            ],
+            [
+              "intensity_reference_delta",
+              "static"
+            ],
+            [
+              "mislabel",
+              "static"
+            ],
+            [
+              "reference_delta",
+              "static"
+            ],
+            [
+              "sequence",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "dimensionless",
+          "status": "keep",
+          "units": ""
+        }
+      ],
+      "intro": "",
+      "module": "segfacet.feature_report",
+      "stage": "Stage 2 · item 016",
+      "title": "Record Envelope"
+    }
+  ],
+  "note": "Generated by `python -m segfacet.catalogue` (item 103). Do not hand-edit this document -- edit `src/segfacet/feature_docs.py` (prose / owners / mode anchors / status overrides) and regenerate. `record[\"reference\"]` is deliberately excluded: the `bounds` and `fragmentation` rules read it, but it is a `ReferenceDistribution` object handle, not serialised feature data with a leaf path.",
+  "schema_version": "1.0"
+}
