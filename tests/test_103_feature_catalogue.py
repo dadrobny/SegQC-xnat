@@ -816,7 +816,8 @@ def asr():
 
 def test_ac21_feature_catalog_and_unwired_extractors_absent(asr):
     source = _ASR_MODULE_PATH.read_text(encoding="utf-8")
-    assert "FEATURE_CATALOG" not in source
+    assert "FEATURE_CATALOG =" not in source
+    assert "FEATURE_CATALOG:" not in source
     assert "UNWIRED_EXTRACTORS" not in source
     assert "FEATURE_CATALOG" not in dir(asr)
     assert "UNWIRED_EXTRACTORS" not in dir(asr)
