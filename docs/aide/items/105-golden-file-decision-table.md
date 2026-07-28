@@ -621,3 +621,60 @@ delegated the choice:
   circular; leaving the item unlanded on non-approval would lose the table. So
   the item always lands, and the checkbox state — ticked with evidence, or
   honestly unticked — is what carries the decision forward to item 106.
+
+**Builder's implementation notes (2026-07-28):**
+
+- **AC7 evidence recomputed directly, not transcribed.** Ran
+  `segfacet.catalogue.build_catalogue()` plus `iter_leaf_paths` over each of
+  the nine committed goldens' `features` blocks and got `34/67 leaf paths
+  unwired` for all nine cases — the same figures for every case because the
+  nine corpus segmentations share one label vocabulary and record shape, so
+  the *set* of leaf paths present (and their catalogue status) does not vary
+  case to case even though the *values* do. This matches item 103's ~34/67
+  prototype measurement almost exactly, which is the expected sanity check
+  per the spec's Implementation Steps (a near-zero `N` would have signalled
+  over-matching attribution; it did not).
+- **Every retire row's replacement-guarantee cell cites the AC8 determinism
+  ids by fully-qualified `module.py::function` name and names "Stage 21" /
+  "Stage 20" explicitly**, satisfying AC5's concrete-artifact requirement via
+  the `stage\s*\d+` pattern even where the inline `module::func` mentions
+  omit the `tests/` prefix in running prose — verified against the test
+  module's own `_names_concrete_artifact` helper rather than assumed.
+- **Section 2's `asserted by` cells were corrected against the real on-disk
+  module names**, not the item numbers implied by their subject matter:
+  `reference_default.json` is asserted by `test_045_reference_artifact.py`,
+  `test_081_reference_morphology.py` (not a nonexistent
+  `test_081_reference_default_regen.py`) and
+  `test_093_tptbox_label_convention.py` (not a nonexistent
+  `test_093_verse_reference_pipeline.py`); `reference_verse_v1.json`'s sha256
+  pin is `test_098_stray_components.py::test_ac18_reference_verse_v1_bytes_unchanged`;
+  `per_mode_comparison_schema_v0.json` is asserted by
+  `test_101_per_mode_cohort.py`, `test_101_compare_runs_cli.py` and
+  `test_102_stage18_validation.py` (not a nonexistent
+  `test_101_per_mode_comparison_report.py`). Found these by grepping each
+  artifact's literal path/filename across `tests/` rather than guessing from
+  the Description's prose summaries, since AC6 requires every named module to
+  exist and every `::`-qualified function to be real.
+- **One AC11 regression required a rewrite, not just wording.** An early
+  draft's intro paragraph, wrapped at the column width `Write` produced,
+  happened to break a sentence such that a physical line began with "signed
+  off by the human reviewer" — tripping AC11's line-start signoff-field
+  regex even though the sentence was legitimately *describing* the
+  `progress.md` checkbox's text, not asserting a sign-off field of its own.
+  Fixed by paraphrasing the checkbox's content instead of quoting it
+  verbatim, which is more robust than reflowing line breaks (any future edit
+  could reintroduce the same wrap-dependent collision). Verified by manually
+  invoking `test_105_golden_decision_table.py`'s own `_SIGNOFF_LINE_RE`
+  against the final document text rather than assuming the fix worked.
+- **All AC1-AC13 verified via the test module's own helper functions**,
+  imported and driven directly with a standalone `.venv/bin/python` snippet
+  (never `pytest`, per this item's builder-role constraint), and AC14's five
+  scope-fence hashes (`tests/corpus/**`, `src/segfacet/**`,
+  `tests/golden/**` name+text digest, `.gitattributes`) were independently
+  recomputed and confirmed to equal the test module's pinned
+  `_PRE_105_*_HASH` constants — this document is the only file this item
+  wrote or modified, plus this Decisions section and the `progress.md`
+  in-progress row (`aide progress set`); `progress.md`'s Stage-19 sign-off
+  checkbox itself was left untouched (`- [ ]`, no evidence note) since no
+  explicit human approval was given during this build — that happens at the
+  Validation step, not here.
