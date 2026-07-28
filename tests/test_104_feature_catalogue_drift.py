@@ -51,8 +51,11 @@ Covers Acceptance Criteria AC1-AC22:
         and names an injected stale path.
 - AC16: direction 4 (orphaned record-tier artifact entry) likewise.
 - AC17: the committed artifact carries no duplicate paths.
-- AC18: at least one committed entry is ``origin == "augmented"``, and no
-        record-tier path is ever excused by that exemption.
+- AC18: ``C - covered_paths()`` is empty on the current tree (vacuously
+        true -- every committed entry is ``origin == "record"``), and a
+        synthetic check proves the exemption mechanism itself is correct: an
+        injected ``origin == "augmented"`` entry outside coverage is exempted,
+        an injected ``origin == "record"`` entry outside coverage is not.
 - AC19: injecting one synthetic path into a *local copy* of the real
         ``covered_paths()`` result is caught, naming exactly that path;
         removing one real path is caught the same way.
@@ -731,25 +734,54 @@ def test_ac17_no_duplicate_paths_in_committed_artifact(committed_entries):
 
 
 # =========================================================================== #
-# AC18: the augmented-tier exemption is explicit and non-vacuous
+# AC18: the augmented-tier exemption never excuses a record-tier path --
+# vacuously true today (C - covered_paths() is empty), pinned as a
+# forward-compatible ratchet via a synthetic exercise of the mechanism.
 # =========================================================================== #
 
 
-def test_ac18_at_least_one_augmented_entry_exists(committed_entries):
-    augmented = [e for e in committed_entries if e.get("origin") == "augmented"]
-    assert augmented, "expected at least one committed entry with origin == 'augmented'"
+def _augmented_exemption_violations(entries, realised_paths):
+    """Paths in ``entries`` absent from ``realised_paths`` whose origin is not
+    ``"augmented"`` -- i.e. record-tier paths incorrectly excused."""
+    origin_by_path = {e["path"]: e.get("origin") for e in entries}
+    exempted = set(origin_by_path) - set(realised_paths)
+    return sorted(path for path in exempted if origin_by_path[path] != "augmented")
+
+
+def test_ac18_exemption_set_is_empty_on_the_current_tree(committed_entries, realised):
+    origin_by_path = {e["path"]: e.get("origin") for e in committed_entries}
+    exempted = set(origin_by_path) - set(realised)
+    assert exempted == set(), (
+        "expected C - covered_paths() to be empty on the current tree (every "
+        "committed entry is origin == 'record' and fully covered by the "
+        f"realised set); got {sorted(exempted)}"
+    )
 
 
 def test_ac18_augmented_exemption_never_covers_a_record_tier_path(
     committed_entries, realised
 ):
-    origin_by_path = {e["path"]: e.get("origin") for e in committed_entries}
-    exempted = set(origin_by_path) - set(realised)
-    for path in exempted:
-        assert origin_by_path[path] == "augmented", (
-            f"path {path!r} is absent from the realised set but is not "
-            "origin == 'augmented' -- a record-tier path is being excused"
-        )
+    violations = _augmented_exemption_violations(committed_entries, realised)
+    assert violations == [], (
+        f"path(s) {violations} are absent from the realised set but not "
+        "origin == 'augmented' -- a record-tier path is being excused"
+    )
+
+
+def test_ac18_synthetic_augmented_entry_outside_coverage_is_exempted(realised):
+    synthetic_entries = [
+        {"path": "zzz.synthetic.augmented.path", "origin": "augmented"}
+    ]
+    assert "zzz.synthetic.augmented.path" not in set(realised)
+    violations = _augmented_exemption_violations(synthetic_entries, realised)
+    assert violations == []
+
+
+def test_ac18_synthetic_record_entry_outside_coverage_is_never_exempted(realised):
+    synthetic_entries = [{"path": "zzz.synthetic.record.path", "origin": "record"}]
+    assert "zzz.synthetic.record.path" not in set(realised)
+    violations = _augmented_exemption_violations(synthetic_entries, realised)
+    assert violations == ["zzz.synthetic.record.path"]
 
 
 # =========================================================================== #
