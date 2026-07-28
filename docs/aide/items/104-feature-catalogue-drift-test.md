@@ -214,11 +214,19 @@ widen or vacate it.
   entries yielded by `iter_committed_entries` equals the size of their path set;
   on failure the message names each repeated path.
 
-- [ ] **AC18: the augmented-tier exemption is explicit and non-vacuous.** At
-  least one committed entry has `origin == "augmented"`, and **every** path in
-  `C - covered_paths()` (which may legitimately be empty) belongs to an entry with
-  `origin == "augmented"` — i.e. no record-tier path is ever excused by the
-  exemption.
+- [ ] **AC18: the augmented-tier exemption never excuses a record-tier path
+  — vacuously true today, and this item asserts that fact rather than assuming
+  it.** **Every** path in `C - covered_paths()` (which is empty on the current
+  tree per item 103's builder decision — see Assumptions) belongs to an entry
+  with `origin == "augmented"`. This item does **not** require at least one
+  `origin == "augmented"` entry to exist: item 103's committed implementation
+  tags every entry `"record"` (a documented, AC6/AC17-forced consequence of
+  folding the augmented drivers into `iter_driver_records()`'s union rather
+  than a second code-level tier), so `C - covered_paths()` is empty and the
+  exemption is exercised zero times today. The AC stays meaningful as a
+  forward-compatible ratchet: if a future item introduces a real
+  `origin == "augmented"` entry, this AC still catches one that isn't excused
+  correctly.
 
 - [ ] **AC19: injected drift is detected end-to-end from real inputs.** Starting
   from the real `covered_paths()` result: adding one synthetic path
@@ -282,11 +290,20 @@ default.
 - *[103 AC2]* **`segfacet.feature_docs` is stdlib-only and importable without
   NumPy/SciPy/NiBabel**, and its public mappings are `MappingProxyType`-wrapped
   (AC20's immutability assertion relies on this).
-- *[103 AC6 / AC16]* **Two origin tiers.** `origin == "record"` entries are
-  covered by strict both-directions equality; `origin == "augmented"`
-  (`image_features.*`, `reference_delta.*`, realised through converters from
-  placeholder objects) are not. Direction 4 is therefore taken over record-tier
-  entries only, and AC18 pins that the exemption never covers a record-tier path.
+- *[103 Decisions & Trade-offs, builder]* **In the shipped implementation,
+  `origin` is always `"record"` — the "two tiers" language in item 103's
+  Assumptions describes how the *drivers* are built (real pipeline extraction
+  vs. hand-constructed placeholder dataclasses through the existing
+  converters), not a second code-level `origin` value. Both `image_features.*`
+  and `reference_delta.*` paths are yielded by `iter_driver_records()` (via its
+  two augmented drivers) and therefore land in `U`, so under AC6/AC17's literal
+  equality every entry `build_catalogue()` produces has `origin == "record"` by
+  construction — introducing a real `"augmented"` value would break that
+  equality the moment such a path existed. `CatalogueEntry.origin` remains a
+  field (forward-compatible), but no entry in the committed artifact carries
+  `"augmented"` today. Direction 4 and AC18 are still phrased in terms of the
+  exemption (never vacuously dropped) so a future real second tier is still
+  caught correctly, but this item asserts no entry currently uses it.
 - *[CI]* **`.github/workflows/ci.yml` already runs the bare `python -m pytest`**
   on every push/PR across four legs (ubuntu, windows, numpy 1.26.4, numpy 2.0.2),
   and `pyproject.toml` sets `testpaths = ["tests"]`. "Fails CI" therefore requires
