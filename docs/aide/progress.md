@@ -42,7 +42,7 @@
 | 16    | Real Failure Corpus & Sensitivity Validation*(retargeted to SPINEPS)* | G2, G7          | 📋     |
 | 17    | Foreign-Convention Interop & Orientation-Safe Image Layer               | G2, G6          | ✅     |
 | 18    | Failure-Mode-Specific Metric Surface                                    | G2, G7          | ✅     |
-| 19    | Generated Feature & Rule Catalogue + Steering Review                    | G7, G8          | 📋     |
+| 19    | Generated Feature & Rule Catalogue + Steering Review                    | G7, G8          | 🚧     |
 | 20    | Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness      | G2, G7          | 📋     |
 | 21    | Real-GT Perturbation Corpus                                             | G3, G7          | 📋     |
 | 22    | *(placeholder)* Unified `(scan, seg)` Extraction                    | —              | 📋     |
@@ -777,7 +777,7 @@ as a named field, so nothing else can read it.
 
 ---
 
-## Stage 19 — Generated Feature & Rule Catalogue + Steering Review (G7, G8) — 📋
+## Stage 19 — Generated Feature & Rule Catalogue + Steering Review (G7, G8) — 🚧
 
 **Goal.** Make the feature set reviewable, then review it. `FEATURE_CATALOG` in
 `scripts/aide_status_report.py` is hand-maintained (9 groups / 41 entries, commented
@@ -786,7 +786,7 @@ verifies they agree, and no document records which failure mode each feature ser
 
 **Deliverables.**
 
-- 📋 Catalogue **generated** from the realised record shape + extractor docstrings, with
+- 🚧 Catalogue **generated** from the realised record shape + extractor docstrings, with
   columns for computation, units, scale sensitivity, targeted §6 mode, consuming rules,
   and a keep / retune / retire / unwired status. *(Item 103)*
 - 📋 Drift test: every leaf path covered; CI fails on an undocumented feature.
