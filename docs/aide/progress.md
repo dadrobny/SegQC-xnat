@@ -791,7 +791,7 @@ verifies they agree, and no document records which failure mode each feature ser
   and a keep / retune / retire / unwired status. *(Item 103)*
 - ✅ Drift test: every leaf path covered; CI fails on an undocumented feature.
   *(Item 104)*
-- 📋 Golden-file decision table — one row per committed golden: what it asserts, keep or
+- 🚧 Golden-file decision table — one row per committed golden: what it asserts, keep or
   retire, what replaces it. Working assumption **retire most** (whole-record snapshots of
   a corpus Stage 21 replaces). Byte reproducibility is guarded by the independent
   intra-run `dest1 == dest2` determinism assertions, not by the goldens. *(Item 105)*
