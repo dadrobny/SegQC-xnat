@@ -10,16 +10,19 @@ assert it, the measured evidence behind that assertion where one exists, and
 a `keep` or `retire` disposition.
 
 **Who decides, and where the decision is recorded.** The dispositions below
-are a draft populated mechanically from the survey performed for this item
-(2026-07-27) plus the maintainer's roadmap working assumption. The actual
-call is made by the human maintainer when this item is *executed*, against
-this populated table. The record of that decision is `progress.md`'s Stage 19
-acceptance list, third box — the one stating that the golden decision table
-is complete and has the human reviewer's approval attached — and nothing
-else. This document carries no approval field of its own; see the "Not about
-byte reproducibility" section's neighbour, `## Divergences...`, for where a
-`keep` call is explained, and `progress.md` for whether that box has
-actually been ratified.
+were populated as a mechanical draft from the survey performed for this item
+(2026-07-27), then reviewed and decided row by row by the human maintainer
+(2026-07-28) — every one of the 36 rows across both sections was presented
+individually, with two overturned from their drafted disposition (see
+Section 1's `tests/golden/016_features_report.json` and
+`022_stage3_report.json`, both moved from the draft's `keep` to `retire`) and
+the rest confirmed as drafted. The record of that review is `progress.md`'s
+Stage 19 acceptance list, third box — the one stating that the golden
+decision table is complete and has the human reviewer's approval attached —
+and nothing else. This document carries no approval field of its own; see the
+"Not about byte reproducibility" section's neighbour, `## Divergences...`,
+for where a `keep` call is explained, and `progress.md` for whether that box
+has actually been ratified.
 
 **Stage 19 decides, Stage 21 executes.** This item does not delete, move or
 regenerate any fixture, and does not edit any test that consumes one — acting
@@ -58,8 +61,8 @@ document should be read as having already happened.
 | tests/corpus/intensity/fixtures/implausible_metal_scan.nii.gz | The implausible metal-HU intensity fixture scan is byte-identical to a fresh regeneration (regenerated-vs-committed and regenerated-twice). | tests/test_058_intensity_fixtures.py | n/a | keep | — |
 | tests/corpus/intensity/fixtures/implausible_soft_tissue_scan.nii.gz | The implausible soft-tissue-HU intensity fixture scan is byte-identical to a fresh regeneration (regenerated-vs-committed and regenerated-twice). | tests/test_058_intensity_fixtures.py | n/a | keep | — |
 | tests/corpus/094_pre_migration_snapshot.json | Per corpus fixture, `{shape, dtype, sha256(data.tobytes()), spacing, affine}` as produced by the pre-TPTBox `io.load_volume`, compared against the same quantities recomputed through the post-migration loader. | tests/test_094_tptbox_image_layer.py | n/a | keep | — |
-| tests/golden/016_features_report.json | `serialize_report_json(...)`'s output for the Stage-2/3 feature report is compared, as text (`read_text`, universal-newline translation applies), against this committed file. | tests/test_016_features_json.py::test_ac5_golden_snapshot | n/a | keep | — |
-| tests/golden/022_stage3_report.json | `serialize_report_json(...)`'s output for the Stage-3 report is compared, as text (`read_text`, universal-newline translation applies), against this committed file — but the consuming test writes the golden and skips if the file is absent, so deletion currently makes the check pass rather than fail (a logged, unfixed defect; see insights.md). | tests/test_022_stage3_serialisation.py::test_ac8_golden_snapshot | n/a | keep | — |
+| tests/golden/016_features_report.json | `serialize_report_json(...)`'s output for the Stage-2/3 feature report is compared, as text (`read_text`, universal-newline translation applies), against this committed file. | tests/test_016_features_json.py::test_ac5_golden_snapshot | n/a | retire | Overturned from the initial "keep" draft by the human reviewer (2026-07-28): although named a "formatting golden," this fixture is built from a real computed `features` block (`_features_for_case`), so a legitimate feature retune regenerates it too — the same reasoning Group A is retired for. Reviewer's stated principle: computed-feature correctness and report-*format* correctness should be checked by two separate, purpose-built fixtures, not conflated in one whole-record snapshot. Replacement: (i) intra-run determinism is already independent — `test_ac5_deterministic_repeated_serialisation` — and is unaffected by this retirement; (ii) report-format guarantees (key ordering, key set, float formatting) move to a small, hand-constructed, feature-value-free fixture built specifically to exercise `serialize_report_json`'s formatting, so it is immune to feature retunes; (iii) computed-feature correctness for the Stage-2/3 blocks stays covered by this module's many direct value-level assertions (AC1-AC4, AC6-AC8), which do not depend on the golden file at all. Acting on this (building the replacement fixture, deleting this file) is Stage 21's job, not this item's. |
+| tests/golden/022_stage3_report.json | `serialize_report_json(...)`'s output for the Stage-3 report is compared, as text (`read_text`, universal-newline translation applies), against this committed file — but the consuming test writes the golden and skips if the file is absent, so deletion currently makes the check pass rather than fail (a logged, unfixed defect; see insights.md). | tests/test_022_stage3_serialisation.py::test_ac8_golden_snapshot | n/a | retire | Same reviewer principle and disposition as `016_features_report.json` (2026-07-28): built from a real computed `stage3` block, so retired on the same "separate feature-correctness from format-correctness" grounds. Replacement: (i) intra-run determinism is already independent — `test_ac8_determinism_two_calls_equal` and `test_ac8_determinism_report_level` — and is unaffected; (ii) report-format guarantees move to the same kind of dedicated, feature-value-free formatting fixture as `016_features_report.json`'s replacement, ideally shared between the two rather than duplicated; (iii) computed Stage-3 correctness stays covered by this module's extensive direct value-level assertions (AC1-AC7, AC9-AC10), independent of the golden file. **Building the replacement must also fix the write-and-skip defect** (`test_ac8_golden_snapshot` self-heals instead of failing on a missing file, logged in insights.md) — the new fixture should not inherit that bug. Acting on this is Stage 21's job, not this item's. |
 
 ## Section 2 — Adjacent exact-match artifacts (outside tests/)
 
@@ -174,15 +177,6 @@ with the reason it earns its keep rather than following Group A:
   is invariant under every retune this stage or Stage 20 authorises, and it
   remains a live ratchet on any future `io.load_volume` change rather than a
   discharged one-shot migration fence.
-- `tests/golden/016_features_report.json` — built from a computed features
-  block, so it is only partly a formatting golden; the caveat is recorded in
-  its Section-1 row. Its surviving value is `serialize_report_json`'s key
-  ordering / key set / float formatting, kept for now pending a more
-  structural expression of that guarantee.
-- `tests/golden/022_stage3_report.json` — same reasoning as
-  `016_features_report.json`, plus the logged self-healing-skip caveat in its
-  Section-1 row (`test_022_stage3_serialisation.py::test_ac8_golden_snapshot`
-  writes-and-skips when the file is absent).
 - `src/segfacet/reference/reference_default.json` — shipped default data with
   a live regenerated-vs-committed guarantee, not a corpus-case snapshot.
 - `src/segfacet/reference/reference_verse_v1.json` — unregenerable in CI (built

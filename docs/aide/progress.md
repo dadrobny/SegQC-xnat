@@ -803,7 +803,12 @@ verifies they agree, and no document records which failure mode each feature ser
   undocumented feature (**G7**).
 - [ ] Every feature carries a status and a named failure mode, or is marked `unwired`
   (**G8**).
-- [ ] The golden decision table is complete and signed off by the human reviewer.
+- [x] The golden decision table is complete and signed off by the human reviewer.
+  *(Signed off 2026-07-28: all 36 rows of `docs/aide/golden-decision-table.md`
+  reviewed individually — 11 retire (the 9 corpus-golden whole-record
+  snapshots plus, overturning the initial draft, the two report-formatting
+  goldens `tests/golden/016_features_report.json`/`022_stage3_report.json`),
+  25 keep. See item 105.)*
 
 ---
 
