@@ -818,12 +818,15 @@ def _render_corpus_section(model: ReportModel) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Feature catalog (static — grouped documentation of every computed feature,
-# item numbers, source module, and the calculation itself, drawn from the
-# extractor module docstrings under src/segfacet/features/ and
-# src/segfacet/reference/delta.py). Not derived from a filesystem scan: keep in
-# sync by hand when a feature module changes shape.
+# Feature catalog (item 103) — loaded from the generated, code-derived
+# docs/aide/feature_catalogue.generated.json (segfacet.catalogue), never from
+# a hand-typed literal. This script stays stdlib-only / import-clean of
+# segfacet (AIDE-process-tool contract, see the module docstring) — it reads
+# the committed JSON with the stdlib json module only.
 # --------------------------------------------------------------------------- #
+
+FEATURE_CATALOGUE_PATH = AIDE_DIR / "feature_catalogue.generated.json"
+_FEATURE_CATALOGUE_SCHEMA_VERSION = "1.0"
 
 
 @dataclass(frozen=True)
@@ -842,236 +845,133 @@ class FeatureGroupSpec:
     items: Tuple[FeatureItem, ...]
 
 
-FEATURE_CATALOG: Tuple[FeatureGroupSpec, ...] = (
-    FeatureGroupSpec(
-        title="Per-Label Geometry",
-        stage="Stage 2 · item 011",
-        module="segfacet.features.geometry",
-        intro="For every present integer label, computed directly from the voxel "
-        "mask (NumPy/CuPy) with spacing read from the NIfTI header.",
-        items=(
-            FeatureItem("voxel_count", "Number of voxels carrying the label value.",
-                        "len(argwhere(data == label)) — a direct voxel count."),
-            FeatureItem("physical_volume_mm3", "Physical volume of the label.",
-                        "voxel_count × (sx · sy · sz), the product of the three header voxel spacings."),
-            FeatureItem("extent_x_mm / extent_y_mm / extent_z_mm",
-                        "Physical span of the label along each image axis.",
-                        "(max_voxel_index − min_voxel_index + 1) × spacing for that axis — the "
-                        "inclusive voxel span, not just the raw coordinate difference."),
-            FeatureItem("bbox_voxel", "Axis-aligned bounding box in voxel-index coordinates.",
-                        "Per-axis min/max voxel index (inclusive) over the label's voxel-coordinate array."),
-            FeatureItem("bbox_physical", "Axis-aligned bounding box in mm.",
-                        "bbox_voxel index × spacing per axis, using the voxel-centre convention "
-                        "(assumes a diagonal affine)."),
-            FeatureItem("touches_inferior / superior / left / right / anterior / posterior",
-                        "Whether the label touches a given face of the image volume (6 booleans).",
-                        "True when the label's bbox_voxel min/max index equals 0 or shape[axis]-1 "
-                        "on that axis. Face↔direction mapping: x=0→inferior, x=max→superior, "
-                        "y=0→left, y=max→right, z=0→anterior, z=max→posterior — a pragmatic "
-                        "orientation-free convention, not derived from the NIfTI header's RAS info."),
-        ),
-    ),
-    FeatureGroupSpec(
-        title="Connected Components & Fragmentation",
-        stage="Stage 2 · items 012, 025",
-        module="segfacet.features.components / segfacet.features.fragmentation",
-        intro="6-connectivity (face-neighbour only) connected-components analysis of "
-        "each label's voxel mask via scipy.ndimage.label (or the CuPy equivalent on GPU).",
-        items=(
-            FeatureItem("component_count", "Number of distinct connected pieces the label is split into.",
-                        "Direct output of ndimage.label's component count."),
-            FeatureItem("component_sizes", "Voxel count of each component, largest first.",
-                        "np.bincount over the labelled array, sorted descending."),
-            FeatureItem("component_volumes_mm3", "Physical volume of each component.",
-                        "component_sizes[i] × product of voxel spacings, same order as component_sizes."),
-            FeatureItem("largest_component_fraction (alias: fragmentation_index)",
-                        "Fraction of the label's voxels belonging to its single largest piece.",
-                        "component_sizes[0] / sum(component_sizes). Range (0, 1]; 1.0 = fully "
-                        "connected. Re-exposed under the name fragmentation_index (item 025) — "
-                        "same value, second public name, for JSON-schema discoverability."),
-            FeatureItem("small_fragments", "Sizes of components below the configured noise threshold.",
-                        "Every component_sizes entry strictly below HeuristicConfig.min_fragment_voxels."),
-        ),
-    ),
-    FeatureGroupSpec(
-        title="Centroid",
-        stage="Stage 2 · item 013",
-        module="segfacet.features.centroids",
-        intro="Centre of mass of each label's voxel mask.",
-        items=(
-            FeatureItem("centroid_voxel", "Mean (x, y, z) voxel-index position of the label's voxels.",
-                        "np.mean(coords, axis=0) over the label's voxel-coordinate array."),
-            FeatureItem("centroid_mm", "Physical-space centroid.",
-                        "centroid_voxel[i] × spacing[i] per axis — correct under anisotropic spacing."),
-            FeatureItem("level_name", "Anatomical vertebra name, e.g. \"T8\", \"L3\".",
-                        "Looked up from the integer label via the TotalSegmentator/VerSe "
-                        "LabelConvention; an unmapped integer falls back to the \"unknown\" sentinel."),
-        ),
-    ),
-    FeatureGroupSpec(
-        title="Case-Level Relationships",
-        stage="Stage 2 · item 014",
-        module="segfacet.features.relationships",
-        intro="Computed once per case from the full ordered set of centroids "
-        "(ascending integer-label order).",
-        items=(
-            FeatureItem("present_levels", "Recognised anatomical levels, reordered into canonical head-to-tail order.",
-                        "Every centroid whose level_name is in the canonical vocabulary, sorted by canonical rank."),
-            FeatureItem("missing_levels", "Canonical levels absent within the observed span.",
-                        "Set difference between the canonical order slice [first_present..last_present] "
-                        "and the present-levels set."),
-            FeatureItem("neighbour_spacings_mm", "Centroid-to-centroid distance between anatomically adjacent levels.",
-                        "Euclidean distance (mm) between each consecutive pair in canonical order."),
-            FeatureItem("is_continuous", "Whether the levels were labelled in a head-to-tail-consistent order.",
-                        "True iff each level's canonical rank is ≥ the previous one, walking the "
-                        "labels in their *input* order (not re-sorted)."),
-            FeatureItem("out_of_order_labels", "Level names that broke the monotonic-rank check.",
-                        "Every level, in input order, whose canonical rank is lower than the running maximum."),
-        ),
-    ),
-    FeatureGroupSpec(
-        title="Voxel Overlap",
-        stage="Stage 2 · item 015",
-        module="segfacet.features.overlap",
-        intro="Requires a boolean per-label mask stack (a single integer label map "
-        "cannot represent a voxel claimed by two labels at once).",
-        items=(
-            FeatureItem("overlap_voxels (per label pair)", "Number of voxels claimed by both labels.",
-                        "Bitwise AND of the two labels' boolean mask channels, counted with "
-                        "count_nonzero. Only pairs with ≥1 shared voxel are reported, sorted by "
-                        "(label_a, label_b)."),
-        ),
-    ),
-    FeatureGroupSpec(
-        title="Spinal Curve & Alignment",
-        stage="Stage 3 · items 017–020 (needs ≥ 2 labelled vertebrae)",
-        module="segfacet.features.spline / spline_offset / orientation / consistency",
-        intro="A cubic (degree clamped to n_points−1 when the sequence is short) "
-        "B-spline is fit through the ordered centroids' mm-coordinates "
-        "(scipy.interpolate.splprep, s=0 → passes exactly through every centroid); "
-        "this spline underlies every feature below.",
-        items=(
-            FeatureItem("closest_u", "Spline parameter (0–1) of the point on the curve nearest a vertebra's centroid.",
-                        "Coarse 500-point scan over u, refined with a bounded "
-                        "scipy.optimize.minimize_scalar (xatol 1e-6)."),
-            FeatureItem("offset_mm / offset_voxel", "Perpendicular distance from a vertebra's centroid to the fitted spline.",
-                        "Euclidean distance (mm) to the closest spline point at closest_u; "
-                        "offset_voxel is the anisotropic-aware version (each axis scaled by 1/spacing "
-                        "before taking the norm)."),
-            FeatureItem("dx_mm / dy_mm / dz_mm", "Signed per-axis displacement vector.",
-                        "centroid_mm − closest spline point, component-wise."),
-            FeatureItem("principal_axis / eigenvalue_ratio", "Per-vertebra orientation via PCA of its voxel cloud.",
-                        "3×3 covariance of the mean-centred, spacing-scaled (mm-space) voxel "
-                        "coordinates; principal_axis is the eigenvector of the largest eigenvalue, "
-                        "eigenvalue_ratio is λ_max/λ_second (∞ for a degenerate flat cloud, 0 for a "
-                        "single-voxel label)."),
-            FeatureItem("tangent_angles_deg", "Angle between the spline's local tangent and the superior–inferior (z) axis.",
-                        "Evaluated at each vertebra's stored u via the spline's first derivative (splev, der=1)."),
-            FeatureItem("inter_tangent_angles_deg", "Angle between consecutive vertebrae's tangent vectors.",
-                        "Angle between each pair of adjacent unit tangent vectors along the spine."),
-            FeatureItem("total_curvature_deg", "Cobb-angle-like global curvature proxy.",
-                        "max(tangent_angles_deg) − min(tangent_angles_deg) across the whole spine; "
-                        "0° for a perfectly straight column."),
-            FeatureItem("mean_spacing_mm / cv_spacing", "Regularity of inter-vertebra spacing.",
-                        "cv_spacing = population-std(spacings) / mean(spacings); 0.0 when there is "
-                        "only one spacing (no variance possible)."),
-            FeatureItem("spacings_mm / deviations_mm / outlier_pairs",
-                        "Per-pair spacing, its signed deviation from the mean, and outlier flags.",
-                        "A pair is an outlier when its spacing is ≥ 2.0× or ≤ 0.3× the mean spacing "
-                        "(both thresholds configurable)."),
-            FeatureItem("is_monotonic / non_monotonic_pairs / u_values",
-                        "Whether each vertebra's closest-spline-parameter u increases along the anatomical order.",
-                        "u[i] ≥ u[i+1] anywhere flags that consecutive pair as non-monotonic — equal "
-                        "u values (near-coincident vertebrae) count as a violation too."),
-        ),
-    ),
-    FeatureGroupSpec(
-        title="Intensity — First-Order",
-        stage="Stage 8 · item 059 (requires a co-registered scan)",
-        module="segfacet.features.intensity",
-        intro="The first feature family to read scan intensities rather than only "
-        "the label map; computed over the finite (non-NaN/inf) scan voxels under each label's mask.",
-        items=(
-            FeatureItem("mean / median / std / min / max", "Standard location/spread statistics over the label's finite intensity values.",
-                        "std is the population (ddof=0) standard deviation."),
-            FeatureItem("p05 / p25 / p50 / p75 / p95", "Percentiles of the finite intensity values.",
-                        "NumPy's default linear interpolation; p50 always equals median exactly."),
-            FeatureItem("range / iqr", "Spread summaries.", "range = max − min; iqr = p75 − p25."),
-            FeatureItem("entropy", "Shannon entropy (bits) of the intensity distribution.",
-                        "Fixed 32-bin histogram spanning [min, max]; a uniform/constant region "
-                        "(min == max) is defined as entropy 0.0."),
-            FeatureItem("n_nonfinite_excluded", "Count of masked voxels dropped for being NaN/±inf.",
-                        "Bookkeeping only, not a statistic — excluded voxels never enter any "
-                        "statistic above."),
-        ),
-    ),
-    FeatureGroupSpec(
-        title="Intensity — Extended Radiomics",
-        stage="Stage 8 · item 060 (optional, environment-gated)",
-        module="segfacet.features.radiomics",
-        intro="Populated only when the optional PyRadiomics dependency is installed "
-        "and enabled; degrades to an empty dict otherwise without failing the pipeline.",
-        items=(
-            FeatureItem("extended (GLCM texture + shape feature classes)",
-                        "PyRadiomics' own Gray-Level Co-occurrence Matrix (texture) and shape "
-                        "feature families, run with a pinned, deterministic configuration.",
-                        "binWidth fixed at 25.0, no resampling/interpolation; first-order is left "
-                        "disabled on the PyRadiomics side (item 059 already owns first-order). Only "
-                        "finite float values are kept, under PyRadiomics' own dotted key names, e.g. "
-                        "original_glcm_Contrast, original_shape_Sphericity."),
-        ),
-    ),
-    FeatureGroupSpec(
-        title="Reference-Distribution Deltas",
-        stage="Stage 6 / 8 · items 046, 064 (requires a built reference artifact)",
-        module="segfacet.reference.delta",
-        intro="Not new extraction — scores a case's already-computed per-label "
-        "features against a versioned cohort ReferenceDistribution (item 045), for the "
-        "geometric/morphology vocabulary (physical_volume_mm3, extent_x/y/z_mm, "
-        "spline_offset_mm, largest_component_fraction, component_count, eigenvalue_ratio) "
-        "and, when the reference has intensity strata, the 13 intensity_* first-order features too.",
-        items=(
-            FeatureItem("z_score", "Standard z-score against the reference.",
-                        "(value − mean) / std; None when the reference std is 0 for that feature/level."),
-            FeatureItem("robust_z", "Outlier-resistant z-score.",
-                        "(value − p50) / (IQR / 1.349), IQR = p75 − p25 from the reference; None "
-                        "when the reference IQR is 0."),
-            FeatureItem("percentile_rank", "Where the case's value falls in the reference's percentile grid.",
-                        "Piecewise-linear interpolation over the reference's stored percentile grid, "
-                        "anchored at the reference's min/max."),
-            FeatureItem("out_of_range", "Whether the value falls outside a configurable percentile band.",
-                        "Default band is [p1, p99] of the reference distribution."),
-            FeatureItem("distribution_distance", "Per-label aggregate anomaly score.",
-                        "RMS of the defined robust_z values across that label's tracked-and-present features."),
-        ),
-    ),
-)
+def _feature_item_detail(entry: dict) -> str:
+    """Fold one catalogue entry's mode/rule/consumer/status metadata into a
+    single detail string for the existing <p class="feature-detail"> body."""
+    parts: List[str] = []
+    computation = entry.get("computation")
+    if computation:
+        parts.append(str(computation))
 
-# Extractor functions that exist, are tested, and are documented, but that
-# pipeline.extract_feature_record does not yet call — so today they never
-# appear in a produced QC report or feed a rule. Surfaced explicitly (rather
-# than silently omitted) per the honesty principle applied elsewhere in this
-# report (see the "Note — this is a synthetic cohort" panel above).
-UNWIRED_EXTRACTORS: Tuple[Tuple[str, str, str], ...] = (
-    (
-        "EDT-based centroid variants & centroid depth",
-        "item 023 · segfacet.features.centroids.compute_edt_centroids",
-        "Smoothed/strict interior centroids and their depth-to-surface, derived "
-        "from a Euclidean distance transform of the label mask.",
-    ),
-    (
-        "Local neighbourhood deviation score",
-        "item 024 · segfacet.features.neighbourhood.compute_neighbourhood_features",
-        "Sliding-window comparison of a vertebra's offset/spacing/volume against "
-        "its immediate neighbours, with a leave-one-out z-score outlier flag.",
-    ),
-)
+    meta_bits: List[str] = []
+    units = entry.get("units")
+    if units:
+        meta_bits.append(f"units: {units}")
+    scale = entry.get("scale_sensitivity")
+    if scale:
+        meta_bits.append(f"scale sensitivity: {scale}")
+    modes = entry.get("failure_modes") or []
+    if modes:
+        meta_bits.append("§6 mode(s): " + ", ".join(str(m) for m in modes))
+    rules = entry.get("consuming_rules") or []
+    if rules:
+        meta_bits.append("consuming rules: " + ", ".join(str(r) for r in rules))
+    consumers = entry.get("consumers") or []
+    if consumers:
+        meta_bits.append("consumers: " + ", ".join(str(cn) for cn in consumers))
+    status = entry.get("status")
+    if status:
+        meta_bits.append(f"status: {status}")
+
+    if meta_bits:
+        parts.append("(" + "; ".join(meta_bits) + ")")
+    return " ".join(parts)
 
 
-def _render_feature_catalog_section() -> str:
-    """Grouped, collapsible catalogue of every feature the pipeline computes."""
+def _str_field(mapping: dict, key: str) -> str:
+    """Return ``mapping[key]`` if it is a ``str``, else ``""``.
+
+    A partially-corrupt but still-parseable document can carry ``None`` (or
+    any other JSON type) under a key a well-formed catalogue would always
+    populate with a string. Plain ``str(mapping.get(key, ""))`` would turn
+    that into the literal text ``"None"`` and render it as if it were real
+    content; this treats anything that isn't already a string as absent.
+    """
+    value = mapping.get(key, "")
+    return value if isinstance(value, str) else ""
+
+
+def load_feature_catalog(path: Path) -> Tuple[FeatureGroupSpec, ...]:
+    """Load the generated feature catalogue JSON at *path* into render-ready
+    ``FeatureGroupSpec`` tuples.
+
+    Degrades to ``()`` — never raises — for a missing file, a directory, an
+    unparseable/truncated JSON document, or a document whose
+    ``schema_version`` this loader does not recognise (AC23).
+    """
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+        data = json.loads(text)
+    except (OSError, ValueError):
+        return ()
+
+    if not isinstance(data, dict):
+        return ()
+    if data.get("schema_version") != _FEATURE_CATALOGUE_SCHEMA_VERSION:
+        return ()
+
+    raw_groups = data.get("groups")
+    if not isinstance(raw_groups, list):
+        return ()
+
+    groups: List[FeatureGroupSpec] = []
+    for raw_group in raw_groups:
+        if not isinstance(raw_group, dict):
+            continue
+        raw_entries = raw_group.get("entries")
+        items: List[FeatureItem] = []
+        if isinstance(raw_entries, list):
+            for raw_entry in raw_entries:
+                if not isinstance(raw_entry, dict):
+                    continue
+                # A malformed/missing "path" would otherwise render as the
+                # literal string "None" (or some other stringified garbage)
+                # for a partially-corrupt but still-parseable document — skip
+                # the entry rather than fabricate a feature name for it.
+                path = raw_entry.get("path")
+                if not isinstance(path, str) or not path:
+                    continue
+                items.append(
+                    FeatureItem(
+                        name=path,
+                        summary=_str_field(raw_entry, "measures"),
+                        detail=_feature_item_detail(raw_entry),
+                    )
+                )
+        groups.append(
+            FeatureGroupSpec(
+                title=_str_field(raw_group, "title"),
+                stage=_str_field(raw_group, "stage"),
+                module=_str_field(raw_group, "module"),
+                intro=_str_field(raw_group, "intro"),
+                items=tuple(items),
+            )
+        )
+    return tuple(groups)
+
+
+def _render_feature_catalog_section(groups: Sequence[FeatureGroupSpec]) -> str:
+    """Grouped, collapsible catalogue of every feature the pipeline realises.
+
+    *groups* is normally ``load_feature_catalog(FEATURE_CATALOGUE_PATH)``'s
+    result. An empty tuple (missing/corrupt catalogue, AC23) renders a
+    placeholder naming the expected path and how to regenerate it, mirroring
+    the report's existing "not yet available" extension-point pattern.
+    """
+    if not groups:
+        return f"""
+<section id="features">
+  <h2>Feature Catalog</h2>
+  <div class="placeholder">
+    <strong>Not yet available.</strong> The generated feature catalogue
+    (<code>{_esc(str(FEATURE_CATALOGUE_PATH))}</code>) is missing or could not
+    be parsed. Regenerate it with <code>python -m segfacet.catalogue</code>
+    from the repo root, then re-run this report.
+  </div>
+</section>"""
+
     blocks = []
-    for group in FEATURE_CATALOG:
+    for group in groups:
         items_html = "".join(
             f'<details class="fold mini"><summary>{_esc(item.name)}'
             f"<span class=\"muted\"> — {_esc(item.summary)}</span></summary>"
@@ -1086,27 +986,15 @@ def _render_feature_catalog_section() -> str:
             f"</div>"
         )
 
-    unwired_rows = "".join(
-        f"<tr><td>{_esc(name)}</td><td>{_esc(ref)}</td><td>{_esc(note)}</td></tr>"
-        for name, ref, note in UNWIRED_EXTRACTORS
-    )
-    unwired_block = (
-        '<details class="fold"><summary>Implemented but not yet wired into a case\'s '
-        "features block — click to expand</summary>"
-        '<p class="note">These extractors are complete and tested but '
-        "<code>pipeline.extract_feature_record</code> does not call them, so they never "
-        "appear in a produced QC report or feed a rule today.</p>"
-        "<table><tr><th>Feature</th><th>Source</th><th>What it would compute</th></tr>"
-        f"{unwired_rows}</table></details>"
-    )
-
     return f"""
-<section id="feature-catalog">
+<section id="features">
   <h2>Feature Catalog</h2>
-  <p>Every feature family the pipeline currently extracts, grouped by roadmap stage.
-  Click a feature to see how it is calculated.</p>
+  <p>Every feature the pipeline realises, grouped by roadmap stage and generated
+  from <code>{_esc(FEATURE_CATALOGUE_PATH.name)}</code> (item 103 —
+  regenerate with <code>python -m segfacet.catalogue</code>). Click a feature to
+  see how it is calculated, which Stage-4 rule(s)/consumers read it, its §6
+  failure mode(s), and its current keep/retune/retire/unwired status.</p>
   {''.join(blocks)}
-  {unwired_block}
 </section>"""
 
 
@@ -1279,7 +1167,7 @@ def render_html(model: ReportModel) -> str:
             _render_objectives_section(model),
             _render_corpus_section(model),
             _render_reference_section(model),
-            _render_feature_catalog_section(),
+            _render_feature_catalog_section(load_feature_catalog(FEATURE_CATALOGUE_PATH)),
             _render_tests_section(model),
             _render_highlights_section(model),
         ]

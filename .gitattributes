@@ -1,3 +1,8 @@
+# Windows CI failure (2026-08-11, PR #48): this file itself is a plain text
+# file and was subject to the exact core.autocrlf gotcha it exists to guard
+# against -- self-pin so its own bytes don't shift on a Windows checkout.
+.gitattributes text eol=lf
+
 tests/corpus/manifest.json text eol=lf
 tests/corpus/golden/*.json text eol=lf
 tests/corpus/fixtures/*.nii.gz binary
@@ -17,3 +22,17 @@ tests/corpus/094_pre_migration_snapshot.json text eol=lf
 # future item adding another such test doesn't reopen this on a new path.
 src/segfacet/**/*.py text eol=lf
 src/segfacet/**/*.json text eol=lf
+# Windows CI failure (2026-08-11, PR #48): the two whole-tree-hash tests
+# (items 099-101, item 105's AC14) walk *every* file under src/segfacet/**,
+# not just *.py/*.json -- these two .yaml files fell outside both globs
+# above and broke the hash on a Windows checkout the same way.
+src/segfacet/**/*.yaml text eol=lf
+
+# Item 103's generated feature & rule catalogue -- byte-reproducible fixtures
+# (AC19) subject to the same Windows core.autocrlf gotcha as the pins above.
+docs/aide/feature_catalogue.generated.json text eol=lf
+docs/aide/feature_catalogue.generated.md text eol=lf
+
+# Item 105's golden-file decision table (AC1: must be write_bytes with \n
+# newlines) -- same Windows core.autocrlf gotcha as everything else here.
+docs/aide/golden-decision-table.md text eol=lf
