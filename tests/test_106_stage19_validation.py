@@ -546,6 +546,20 @@ def full_catalogue():
 
 
 @pytest.fixture(scope="module")
+def empty_overrides_catalogue():
+    """The catalogue as it would be with STATUS_OVERRIDES = {} -- the correct
+    "un-overridden counterpart" baseline for AC28/AC29's hermetic single-key
+    override, as opposed to `full_catalogue`, which reflects the real,
+    currently-shipped (non-empty) STATUS_OVERRIDES map."""
+    empty_map = types.MappingProxyType({})
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(feature_docs_module, "STATUS_OVERRIDES", empty_map)
+        if hasattr(catalogue_module, "STATUS_OVERRIDES"):
+            mp.setattr(catalogue_module, "STATUS_OVERRIDES", empty_map)
+        return catalogue_module.build_catalogue()
+
+
+@pytest.fixture(scope="module")
 def committed_json_doc():
     return load_committed_catalogue()
 
@@ -1184,9 +1198,13 @@ def test_ac24_no_annotation_asserts_real_data_coverage():
 
 def test_ac25_steering_review_heading_present_and_honest():
     text = _read_spec()
+    decisions_heading = "## Decisions & Trade-offs"
+    decisions_idx = text.find(decisions_heading)
+    assert decisions_idx != -1, "spec is missing the '## Decisions & Trade-offs' heading"
     heading = "### Stage-19 steering review"
-    idx = text.find(heading)
+    idx = text.find(heading, decisions_idx)
     assert idx != -1, "spec is missing the '### Stage-19 steering review' heading"
+    assert idx > decisions_idx
     nxt_h3 = text.find("\n### ", idx + 1)
     nxt_h2 = text.find("\n## ", idx + 1)
     ends = [e for e in (nxt_h3, nxt_h2) if e != -1]
@@ -1325,11 +1343,18 @@ _AC28_KEEP_PATH, _AC28_UNWIRED_PATH = _first_keep_and_unwired_paths()
 
 
 @pytest.mark.parametrize("target_path", [_AC28_KEEP_PATH, _AC28_UNWIRED_PATH], ids=["keep", "unwired"])
-def test_ac28_ac29_hermetic_override_changes_only_status(target_path, full_catalogue):
+def test_ac28_ac29_hermetic_override_changes_only_status(target_path, empty_overrides_catalogue):
     """AC28/AC29: runs unconditionally, regardless of what the live steering
     review decided -- it is the proof that build_catalogue() actually reads
-    STATUS_OVERRIDES."""
-    baseline_by_path = {e.path: e for e in full_catalogue.entries}
+    STATUS_OVERRIDES.
+
+    The baseline for "every other entry equals its un-overridden counterpart"
+    is the catalogue built with STATUS_OVERRIDES = {} (empty_overrides_catalogue),
+    not full_catalogue -- full_catalogue reflects the real, currently-shipped
+    overrides, so comparing against it would spuriously fail for every path
+    that carries a real override other than target_path.
+    """
+    baseline_by_path = {e.path: e for e in empty_overrides_catalogue.entries}
     shipped_snapshot = dict(feature_docs_module.STATUS_OVERRIDES)
     rationale = "test-only AC28/AC29 probe rationale, at least twenty characters"
     override_map = types.MappingProxyType({target_path: ("retire", rationale)})
