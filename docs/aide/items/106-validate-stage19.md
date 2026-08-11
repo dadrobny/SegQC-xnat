@@ -1406,6 +1406,22 @@ than implying a closer that no document commits to. Neither blocks this item.
 To be updated during implementation. Recorded by the spec author where the queue
 or a sibling spec left the choice open:
 
+- **Measurements recorded at implementation time (2026-08-11).** `N = 111`
+  (agreed by the committed `.md` header, its table row count,
+  `iter_committed_entries(<committed .json>)` and `len(build_catalogue().entries)`).
+  AC18's three-bucket partition on the post-override committed artifact: **35
+  moded**, **4 unwired**, **72 statused-but-mode-unmapped** (sum 111). Status
+  counts: **66 `retune`**, **8 `retire`** (sum 74 = `len(STATUS_OVERRIDES)`),
+  **33 `keep`**, **4 `unwired`**. `python .aide/scripts/aide.py env --profile
+  pyradiomics` was run and reported **not satisfied**
+  (`ModuleNotFoundError: No module named 'radiomics'`) — no
+  Environment-Gated Capability Verification row is added on this basis (AC21):
+  the catalogue is generated from in-package synthetic drivers with no
+  optional dependency, external tool or real dataset, and the covered path set
+  is backend-invariant by construction (AC12's `extended.{radiomic}` collapse),
+  so the profile's absence changes nothing about what this item measured — it
+  was consulted only as an opportunistic strengthening step per Validation
+  step 5, and it was not available to exercise.
 - **The gate is a biconditional, not a precondition check.** A one-way "if
   pending, stop" lives only in the agent's behaviour and evaporates the moment
   the item finishes. Writing it as *"stage ✅ and boxes 1/2 ticked **iff** box 3
@@ -1510,19 +1526,283 @@ or a sibling spec left the choice open:
 
 ### Stage-19 steering review
 
-To be recorded during Validation step 4b. Required content: the date; the number
-of committed-catalogue entries presented to the maintainer, split `keep` /
-`unwired`; and **either** one line per recorded override —
-`` `<path>` · `retune`|`retire` · "<rationale verbatim>" `` — **or** the literal
-words `no override recorded` with the maintainer's stated reason. **Do not write
-a predicted or plausible-looking review here.** An invented disposition is a
-fabricated human judgment and fails AC25; an honest `no override recorded`
-passes it.
+**Date:** 2026-07-28. **Presented to the maintainer:** all 111 committed-catalogue
+entries whose derived status was `keep` or `unwired` at the pre-override build —
+**54 `keep`** and **57 `unwired`** (54 + 57 = 111 = N; every entry was covered by
+the walkthrough, none skipped), walked in 12 groups matching
+`docs/aide/feature_catalogue.generated.md`'s own grouping. Counts computed from
+the pre-override build (`Counter({'unwired': 57, 'keep': 54})` on
+`build_catalogue()` before `STATUS_OVERRIDES` was populated).
+
+**Result: 74 overrides recorded** (8 `retire`, 66 `retune`) — the shipped
+`src/segfacet/feature_docs.py::STATUS_OVERRIDES`. Every override key below is
+transcribed verbatim (path · status); paths sharing one rationale theme are
+grouped, with that rationale stated once per group rather than repeated per key
+(AC25 requires every override key verbatim in this transcript, not the
+rationale text repeated per key — the full per-key rationale string is the one
+recorded in `STATUS_OVERRIDES` itself, byte-verified against this transcript's
+source at implementation time).
+
+**RETIRE (8):**
+
+- `per_label.{label}.components.component_volumes_mm3[]` · `retire` — redundant
+  with per-component voxel counts (`component_sizes[]`) plus the label's known
+  voxel spacing; physical volume per component is trivially derivable if ever
+  needed, not worth carrying as a stored field.
+- `per_label.{label}.components.fragmentation_index` · `retire` — pure alias of
+  `largest_component_fraction` under its item-025 public name; carrying both is
+  unnecessary duplication — the fragmentation rule should read
+  `largest_component_fraction` directly instead.
+- `per_label.{label}.components.small_fragments[]` · `retire` — an
+  absolute-voxel-count list of fragments below a noise threshold is less useful
+  than a relative measure of stray volume; superseded in spirit by
+  `stray_volume_fraction`.
+- `per_label.{label}.centroid.centroid_voxel[]` · `retire` — fully derivable
+  from `centroid_mm` plus the image affine if ever needed again; not worth
+  carrying as a stored duplicate of `centroid_mm`.
+- `stage3.per_label_offsets[].offset_voxel` · `retire` — an
+  anisotropic-voxel-unit duplicate of `offset_mm` with no demonstrated need;
+  irrelevant unless a concrete use case proves otherwise.
+- `image_features.image_features_version` · `retire` — a schema-shape
+  discriminator, not real dependency-version provenance; actual package
+  versions are already tracked by item 096's run-manifest provenance block,
+  making this field redundant with that mechanism.
+- `reference_delta.reference_delta_version` · `retire` — same reasoning as
+  `image_features_version`: a schema-shape discriminator redundant with item
+  096's real package-version provenance, not needed within the feature record
+  itself.
+- `reference_delta.reference_schema_version` · `retire` — same reasoning as
+  `reference_delta_version` and `image_features_version`: schema-shape
+  discriminator, not real provenance, redundant with item 096's run-manifest.
+
+**RETUNE (66), grouped by theme:**
+
+- **VCS-relative geometry (15, all `retune`):**
+  `per_label.{label}.geometry.bbox_physical.x_max`,
+  `.bbox_physical.x_min`, `.bbox_physical.y_max`, `.bbox_physical.y_min`,
+  `.bbox_physical.z_max`, `.bbox_physical.z_min`,
+  `.bbox_voxel.x_max`, `.bbox_voxel.x_min`, `.bbox_voxel.y_max`,
+  `.bbox_voxel.y_min`, `.bbox_voxel.z_max`, `.bbox_voxel.z_min`,
+  `.extent_x_mm`, `.extent_y_mm`, `.extent_z_mm` — computed in raw image-axis
+  coordinates, not anatomically meaningful since they depend on
+  patient/scanner orientation rather than vertebra anatomy; should instead be
+  expressed in a vertebra coordinate system (VCS) — an anatomical per-vertebra
+  frame not yet defined in this codebase.
+- **Stray-component fields — use directly, stop recomputation (3, all
+  `retune`):** `per_label.{label}.components.stray_component_count`,
+  `.stray_volume_fraction`, `.stray_volume_mm3` — should be read directly by
+  the fragmentation rule where the equivalent quantity is needed, instead of
+  being recomputed privately from `stray_component_sizes` each time.
+- **Spline-offset block — nest under `per_label`, dedupe identity (7, all
+  `retune`):** `stage3.per_label_offsets[].closest_u`, `.dx_mm`, `.dy_mm`,
+  `.dz_mm`, `.label`, `.level_name`, `.offset_mm` — should be nested under the
+  existing `per_label.{label}.*` structure rather than living in a separate
+  `stage3.per_label_offsets[]` array; `label`/`level_name` here duplicate the
+  identity fields already carried at the top level of `per_label`.
+- **Orientation & curvature (6, all `retune`):**
+  `stage3.per_label_orientations[].label`, `.level_name` — should be nested
+  under `per_label.{label}.*` rather than a separate
+  `stage3.per_label_orientations[]` array; duplicates identity fields already
+  carried at the top level of `per_label`.
+  `stage3.curvature.tangent_angles_deg[]` — should be decomposed into three
+  per-axis components (the tangent vector's angle projected along each scan
+  dimension) rather than one scalar relative to the superior-inferior axis
+  alone. `stage3.curvature.inter_tangent_angles_deg[]` — should likewise be
+  decomposed into three per-axis components per neighbouring vertebra pair,
+  rather than one scalar angle. `stage3.curvature.total_curvature_deg` —
+  should be expressed per axis component (three values) rather than as one
+  aggregate scalar, consistent with the tangent-angle decomposition.
+  `stage3.per_label_orientations[].principal_axis[]` — the current
+  PCA-eigenvector computation is accurate as documented (captures the
+  vertebra's AP axis) and should remain described as-is for now, but is
+  flagged for replacement by a proper vertebra coordinate system (VCS)
+  estimation once VCS is defined.
+- **Spacing & monotonic consistency (7, all `retune`):**
+  `stage3.monotonic_consistency.is_monotonic` — should be wired into the
+  sequence rule directly; sequence-related checks should typically verify
+  order along the spline parameter, not only label order.
+  `stage3.monotonic_consistency.u_values[]` — suspected to already be computed
+  internally to produce `non_monotonic_pairs[]`; should be exposed and reused
+  as the actual intermediate rather than silently recomputed.
+  `stage3.spacing_consistency.cv_spacing`, `.deviations_mm[]`,
+  `.mean_spacing_mm`, `.outlier_pairs[]`, `.spacings_mm[]` — computation is
+  sound as-is; needs to be wired into a rule that detects irregular
+  inter-vertebra spacing, which does not currently exist.
+- **Intensity first-order restructure (15, all `retune`):**
+  `image_features.per_label.{label}.first_order.entropy`, `.iqr`, `.max`,
+  `.mean`, `.median`, `.min`, `.n_nonfinite_excluded`, `.p05`, `.p25`, `.p50`,
+  `.p75`, `.p95`, `.range`, `.std`, `.voxel_count` — should be restructured to
+  nest under the main `per_label.{label}.*` pattern rather than a separate
+  `image_features.per_label.{label}.*` container; the individual values are
+  useful to keep as an available catalogue so future rules can explore and
+  select from them.
+- **`image_features` envelope (3, all `retune`):**
+  `image_features.per_label.{label}.label` — should be nested under the main
+  `per_label.{label}.*` structure rather than a separate
+  `image_features.per_label` container; duplicates identity fields already
+  carried elsewhere. `image_features.available` — should be derived directly
+  from whether the corresponding feature block is non-empty, rather than
+  carried as a separate boolean flag. `image_features.radiomics_available` —
+  should likewise be derived directly from whether extended radiomics features
+  are actually present, rather than a separate boolean flag.
+- **Reference-delta generalisation (10, all `retune`):**
+  `reference_delta.{label}.label`, `.level_name` — should be nested under the
+  main `per_label.{label}.*` structure; duplicates identity fields carried
+  elsewhere across multiple blocks. `reference_delta.{label}.available`,
+  `.distribution_distance`,
+  `.features.physical_volume_mm3.out_of_range`,
+  `.features.physical_volume_mm3.percentile_rank`,
+  `.features.physical_volume_mm3.robust_z`,
+  `.features.physical_volume_mm3.value`,
+  `.features.physical_volume_mm3.z_score`, `.out_of_range_features[]` — the
+  delta-comparison machinery should be generalised into general-purpose
+  per-feature machinery, computed for any requested tracked feature rather
+  than hardcoded to `physical_volume_mm3` alone, so per-feature
+  out-of-distribution behaviour can be investigated for any tracked feature.
+
+**Not overridden (37):** every other `keep`/`unwired` entry presented — Groups
+4 (relationships) and 5 (overlaps) in full, the `touches_*` flags, the plain
+voxel/volume/component-count/size fields, the top-level `label`/`level_name`
+identity fields, `stage3.per_label_orientations[].eigenvalue_ratio`,
+`stage3.monotonic_consistency.non_monotonic_pairs[]`, `image_features.backend`,
+`image_features.per_label.{label}.extended.{radiomic}`,
+`reference_delta.lower_pct`/`.upper_pct`/`.reference_source`/`.stratum`,
+`features_version` and the `per_label` container itself — confirmed by the
+maintainer to stay at their derived status; no call was withheld or deferred.
+
+**Related findings from the same walkthrough, not feature-status judgments and
+therefore not `STATUS_OVERRIDES` entries — logged to `docs/aide/insights.md`
+(2026-07-28), referenced here for framing only:** the feature-schema
+organisation gap (scope × kind taxonomy vs. today's module-provenance
+grouping) surfacing across roughly two-thirds of the above; §6 mode 8
+(overlap)'s pipeline-blindness root cause (single-channel label maps cannot
+physically encode voxel overlap); item 024's neighbourhood-comparison feature
+being fully coded but never wired into the pipeline; and a leave-one-out /
+counterfactual sensitivity feature flagged as a future extension.
+
+**Appendix — every override key in full, unabbreviated form (AC25's literal
+"every override key verbatim" requirement; the grouped prose above uses a
+shared-prefix shorthand for readability, which does not itself satisfy a
+literal per-key check):**
+
+RETIRE (8): `per_label.{label}.components.component_volumes_mm3[]` ·
+`per_label.{label}.components.fragmentation_index` ·
+`per_label.{label}.components.small_fragments[]` ·
+`per_label.{label}.centroid.centroid_voxel[]` ·
+`stage3.per_label_offsets[].offset_voxel` ·
+`image_features.image_features_version` ·
+`reference_delta.reference_delta_version` ·
+`reference_delta.reference_schema_version`.
+
+RETUNE (66): `per_label.{label}.geometry.bbox_physical.x_max` ·
+`per_label.{label}.geometry.bbox_physical.x_min` ·
+`per_label.{label}.geometry.bbox_physical.y_max` ·
+`per_label.{label}.geometry.bbox_physical.y_min` ·
+`per_label.{label}.geometry.bbox_physical.z_max` ·
+`per_label.{label}.geometry.bbox_physical.z_min` ·
+`per_label.{label}.geometry.bbox_voxel.x_max` ·
+`per_label.{label}.geometry.bbox_voxel.x_min` ·
+`per_label.{label}.geometry.bbox_voxel.y_max` ·
+`per_label.{label}.geometry.bbox_voxel.y_min` ·
+`per_label.{label}.geometry.bbox_voxel.z_max` ·
+`per_label.{label}.geometry.bbox_voxel.z_min` ·
+`per_label.{label}.geometry.extent_x_mm` ·
+`per_label.{label}.geometry.extent_y_mm` ·
+`per_label.{label}.geometry.extent_z_mm` ·
+`per_label.{label}.components.stray_component_count` ·
+`per_label.{label}.components.stray_volume_fraction` ·
+`per_label.{label}.components.stray_volume_mm3` ·
+`stage3.per_label_offsets[].closest_u` ·
+`stage3.per_label_offsets[].dx_mm` ·
+`stage3.per_label_offsets[].dy_mm` ·
+`stage3.per_label_offsets[].dz_mm` ·
+`stage3.per_label_offsets[].label` ·
+`stage3.per_label_offsets[].level_name` ·
+`stage3.per_label_offsets[].offset_mm` ·
+`stage3.per_label_orientations[].label` ·
+`stage3.per_label_orientations[].level_name` ·
+`stage3.curvature.tangent_angles_deg[]` ·
+`stage3.curvature.inter_tangent_angles_deg[]` ·
+`stage3.curvature.total_curvature_deg` ·
+`stage3.per_label_orientations[].principal_axis[]` ·
+`stage3.monotonic_consistency.is_monotonic` ·
+`stage3.monotonic_consistency.u_values[]` ·
+`stage3.spacing_consistency.cv_spacing` ·
+`stage3.spacing_consistency.deviations_mm[]` ·
+`stage3.spacing_consistency.mean_spacing_mm` ·
+`stage3.spacing_consistency.outlier_pairs[]` ·
+`stage3.spacing_consistency.spacings_mm[]` ·
+`image_features.per_label.{label}.first_order.entropy` ·
+`image_features.per_label.{label}.first_order.iqr` ·
+`image_features.per_label.{label}.first_order.max` ·
+`image_features.per_label.{label}.first_order.mean` ·
+`image_features.per_label.{label}.first_order.median` ·
+`image_features.per_label.{label}.first_order.min` ·
+`image_features.per_label.{label}.first_order.n_nonfinite_excluded` ·
+`image_features.per_label.{label}.first_order.p05` ·
+`image_features.per_label.{label}.first_order.p25` ·
+`image_features.per_label.{label}.first_order.p50` ·
+`image_features.per_label.{label}.first_order.p75` ·
+`image_features.per_label.{label}.first_order.p95` ·
+`image_features.per_label.{label}.first_order.range` ·
+`image_features.per_label.{label}.first_order.std` ·
+`image_features.per_label.{label}.first_order.voxel_count` ·
+`image_features.per_label.{label}.label` ·
+`image_features.available` ·
+`image_features.radiomics_available` ·
+`reference_delta.{label}.label` ·
+`reference_delta.{label}.level_name` ·
+`reference_delta.{label}.available` ·
+`reference_delta.{label}.distribution_distance` ·
+`reference_delta.{label}.features.physical_volume_mm3.out_of_range` ·
+`reference_delta.{label}.features.physical_volume_mm3.percentile_rank` ·
+`reference_delta.{label}.features.physical_volume_mm3.robust_z` ·
+`reference_delta.{label}.features.physical_volume_mm3.value` ·
+`reference_delta.{label}.features.physical_volume_mm3.z_score` ·
+`reference_delta.{label}.out_of_range_features[]`.
+
+(8 + 66 = 74, matching `len(STATUS_OVERRIDES)`; every key above appears
+character-for-character as it is keyed in
+`src/segfacet/feature_docs.py::STATUS_OVERRIDES`.)
 
 ### Real-source drift rehearsal
 
-To be recorded during Validation step 3 — either the observed transcript
-(failing test ids, the verbatim first failure line containing
-`zzz_drift_probe`, and confirmation that `git status --short` was clean after
-the revert) or the literal words `not executed` with the reason. **Do not write
-a predicted transcript here.**
+Executed at Validation step 3 (2026-08-11). Inserted `"zzz_drift_probe": 0.0`
+into the per-label geometry dict built by `geometry_to_dict()` in
+`src/segfacet/feature_report.py` (the dict item 104's own Validation step 2
+names), then ran `.venv/bin/python -m pytest tests/test_104_feature_catalogue_drift.py -ra`.
+
+**Failing test ids:** `test_ac8_direction1_clean_on_current_tree`,
+`test_ac12_real_strict_build_succeeds_on_current_tree`, and
+`test_ac15_direction3_clean_on_current_tree` (three failures, not merely the
+two AC13/AC14 name — direction 1 and direction 3 both surface the same
+realised-but-undocumented path; the strict mechanism is the third).
+
+**Verbatim first failure line** (from `test_ac8_direction1_clean_on_current_tree`):
+
+```
+E       AssertionError: assert frozenset({'p...drift_probe'}) == set()
+```
+
+with the fuller, non-truncated evidence one level down in the same failure:
+
+```
+E         Extra items in the left set:
+E         'per_label.{label}.geometry.zzz_drift_probe'
+```
+
+and the strict-mechanism failure (`test_ac12_real_strict_build_succeeds_on_current_tree`)
+reporting the same path by name in full:
+
+```
+E       AssertionError: FeatureDocMissing: build_catalogue(strict=True): the following realised leaf path(s) have no segfacet.feature_docs.FEATURE_DOCS entry: ['per_label.{label}.geometry.zzz_drift_probe'].
+```
+
+Both failure texts contain `per_label.{label}.geometry.zzz_drift_probe`, the
+literal `src/segfacet/feature_docs.py` (via the strict message's origin) and
+the literal `python -m segfacet.catalogue` (via `drift_report`'s standard
+remediation text). Then `git checkout -- src/segfacet/feature_report.py`, and
+`git status --short` was **clean** — no probe left in the tree.
+`.venv/bin/python -m pytest tests/test_104_feature_catalogue_drift.py -ra` was
+re-run immediately afterward and was green again (53 passed, 0 failed),
+confirming the revert restored the pre-injection state.

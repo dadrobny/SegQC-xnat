@@ -253,10 +253,551 @@ MODE_ANCHOR_PATHS: Mapping[int, Tuple[str, ...]] = MappingProxyType(
 
 
 # --------------------------------------------------------------------------- #
-# STATUS_OVERRIDES -- ships empty; populated by the Stage-19 human review
+# STATUS_OVERRIDES -- the Stage-19 steering review's output (item 106,
+# 2026-07-28 live walkthrough with the maintainer). 74 entries (8 retire, 66
+# retune), transcribed verbatim from the maintainer's recorded calls; see this
+# item's spec, "### Stage-19 steering review" in Decisions & Trade-offs, for
+# the full transcript. Ordered by catalogue order for readability.
 # --------------------------------------------------------------------------- #
 
-STATUS_OVERRIDES: Mapping[str, Tuple[str, str]] = MappingProxyType({})
+STATUS_OVERRIDES: Mapping[str, Tuple[str, str]] = MappingProxyType(
+    {
+        "per_label.{label}.geometry.bbox_physical.x_max": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.geometry.bbox_physical.x_min": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.geometry.bbox_physical.y_max": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.geometry.bbox_physical.y_min": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.geometry.bbox_physical.z_max": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.geometry.bbox_physical.z_min": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.geometry.bbox_voxel.x_max": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.geometry.bbox_voxel.x_min": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.geometry.bbox_voxel.y_max": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.geometry.bbox_voxel.y_min": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.geometry.bbox_voxel.z_max": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.geometry.bbox_voxel.z_min": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.geometry.extent_x_mm": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.geometry.extent_y_mm": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.geometry.extent_z_mm": (
+            "retune",
+            "Computed in raw image-axis coordinates, not anatomically "
+            "meaningful since it depends on patient/scanner orientation "
+            "rather than vertebra anatomy; should instead be expressed in a "
+            "vertebra coordinate system (VCS) -- an anatomical per-vertebra "
+            "frame not yet defined in this codebase."
+        ),
+        "per_label.{label}.components.component_volumes_mm3[]": (
+            "retire",
+            "Redundant with per-component voxel counts (component_sizes[]) "
+            "and the label's known voxel spacing; physical volume per "
+            "component is trivially derivable if ever needed, not worth "
+            "carrying as a stored field."
+        ),
+        "per_label.{label}.components.fragmentation_index": (
+            "retire",
+            "Pure alias of largest_component_fraction under its item-025 "
+            "public name; carrying both is unnecessary duplication -- the "
+            "fragmentation rule should read largest_component_fraction "
+            "directly instead."
+        ),
+        "per_label.{label}.components.small_fragments[]": (
+            "retire",
+            "An absolute-voxel-count list of fragments below a noise "
+            "threshold is less useful than a relative measure of stray "
+            "volume; superseded in spirit by stray_volume_fraction."
+        ),
+        "per_label.{label}.components.stray_component_count": (
+            "retune",
+            "Should be read directly by the fragmentation rule where the "
+            "equivalent quantity is needed, instead of being recomputed "
+            "privately from stray_component_sizes each time."
+        ),
+        "per_label.{label}.components.stray_volume_fraction": (
+            "retune",
+            "Should be read directly by the fragmentation rule where the "
+            "equivalent quantity is needed, instead of being recomputed "
+            "privately from stray_component_sizes each time."
+        ),
+        "per_label.{label}.components.stray_volume_mm3": (
+            "retune",
+            "Should be read directly by the fragmentation rule where the "
+            "equivalent quantity is needed, instead of being recomputed "
+            "privately from stray_component_sizes each time."
+        ),
+        "per_label.{label}.centroid.centroid_voxel[]": (
+            "retire",
+            "Fully derivable from centroid_mm plus the image affine if ever "
+            "needed again; not worth carrying as a stored duplicate of "
+            "centroid_mm."
+        ),
+        "stage3.per_label_offsets[].closest_u": (
+            "retune",
+            "Should be nested under the existing per_label.{label}.* "
+            "structure rather than living in a separate "
+            "stage3.per_label_offsets[] array; label/level_name here "
+            "duplicate the identity fields already carried at the top level "
+            "of per_label."
+        ),
+        "stage3.per_label_offsets[].dx_mm": (
+            "retune",
+            "Should be nested under the existing per_label.{label}.* "
+            "structure rather than living in a separate "
+            "stage3.per_label_offsets[] array; label/level_name here "
+            "duplicate the identity fields already carried at the top level "
+            "of per_label."
+        ),
+        "stage3.per_label_offsets[].dy_mm": (
+            "retune",
+            "Should be nested under the existing per_label.{label}.* "
+            "structure rather than living in a separate "
+            "stage3.per_label_offsets[] array; label/level_name here "
+            "duplicate the identity fields already carried at the top level "
+            "of per_label."
+        ),
+        "stage3.per_label_offsets[].dz_mm": (
+            "retune",
+            "Should be nested under the existing per_label.{label}.* "
+            "structure rather than living in a separate "
+            "stage3.per_label_offsets[] array; label/level_name here "
+            "duplicate the identity fields already carried at the top level "
+            "of per_label."
+        ),
+        "stage3.per_label_offsets[].label": (
+            "retune",
+            "Should be nested under the existing per_label.{label}.* "
+            "structure rather than living in a separate "
+            "stage3.per_label_offsets[] array; label/level_name here "
+            "duplicate the identity fields already carried at the top level "
+            "of per_label."
+        ),
+        "stage3.per_label_offsets[].level_name": (
+            "retune",
+            "Should be nested under the existing per_label.{label}.* "
+            "structure rather than living in a separate "
+            "stage3.per_label_offsets[] array; label/level_name here "
+            "duplicate the identity fields already carried at the top level "
+            "of per_label."
+        ),
+        "stage3.per_label_offsets[].offset_mm": (
+            "retune",
+            "Should be nested under the existing per_label.{label}.* "
+            "structure rather than living in a separate "
+            "stage3.per_label_offsets[] array; label/level_name here "
+            "duplicate the identity fields already carried at the top level "
+            "of per_label."
+        ),
+        "stage3.per_label_offsets[].offset_voxel": (
+            "retire",
+            "An anisotropic-voxel-unit duplicate of offset_mm with no "
+            "demonstrated need; irrelevant unless a concrete use case proves "
+            "otherwise."
+        ),
+        "stage3.curvature.inter_tangent_angles_deg[]": (
+            "retune",
+            "Should likewise be decomposed into three per-axis components per "
+            "neighbouring vertebra pair, rather than one scalar angle."
+        ),
+        "stage3.curvature.tangent_angles_deg[]": (
+            "retune",
+            "Should be decomposed into three per-axis components -- the "
+            "tangent vector's angle projected along each scan dimension -- "
+            "rather than one scalar relative to the superior-inferior axis "
+            "alone."
+        ),
+        "stage3.curvature.total_curvature_deg": (
+            "retune",
+            "Should be expressed per axis component (three values) rather "
+            "than as one aggregate scalar, consistent with the tangent-angle "
+            "decomposition."
+        ),
+        "stage3.per_label_orientations[].label": (
+            "retune",
+            "Should be nested under per_label.{label}.* rather than a "
+            "separate stage3.per_label_orientations[] array; duplicates "
+            "identity fields already carried at the top level of per_label."
+        ),
+        "stage3.per_label_orientations[].level_name": (
+            "retune",
+            "Should be nested under per_label.{label}.* rather than a "
+            "separate stage3.per_label_orientations[] array; duplicates "
+            "identity fields already carried at the top level of per_label."
+        ),
+        "stage3.per_label_orientations[].principal_axis[]": (
+            "retune",
+            "Current PCA-eigenvector computation is accurate as documented "
+            "(captures the vertebra's AP axis) and should remain described "
+            "as-is for now, but is flagged for replacement by a proper "
+            "vertebra coordinate system (VCS) estimation once VCS is defined."
+        ),
+        "stage3.monotonic_consistency.is_monotonic": (
+            "retune",
+            "Should be wired into the sequence rule directly; "
+            "sequence-related checks should typically verify order along the "
+            "spline parameter, not only label order."
+        ),
+        "stage3.monotonic_consistency.u_values[]": (
+            "retune",
+            "Suspected to already be computed internally to produce "
+            "non_monotonic_pairs[]; should be exposed and reused as the "
+            "actual intermediate rather than silently recomputed."
+        ),
+        "stage3.spacing_consistency.cv_spacing": (
+            "retune",
+            "Computation is sound as-is; needs to be wired into a rule that "
+            "detects irregular inter-vertebra spacing, which does not "
+            "currently exist."
+        ),
+        "stage3.spacing_consistency.deviations_mm[]": (
+            "retune",
+            "Computation is sound as-is; needs to be wired into a rule that "
+            "detects irregular inter-vertebra spacing, which does not "
+            "currently exist."
+        ),
+        "stage3.spacing_consistency.mean_spacing_mm": (
+            "retune",
+            "Computation is sound as-is; needs to be wired into a rule that "
+            "detects irregular inter-vertebra spacing, which does not "
+            "currently exist."
+        ),
+        "stage3.spacing_consistency.outlier_pairs[]": (
+            "retune",
+            "Computation is sound as-is; needs to be wired into a rule that "
+            "detects irregular inter-vertebra spacing, which does not "
+            "currently exist."
+        ),
+        "stage3.spacing_consistency.spacings_mm[]": (
+            "retune",
+            "Computation is sound as-is; needs to be wired into a rule that "
+            "detects irregular inter-vertebra spacing, which does not "
+            "currently exist."
+        ),
+        "image_features.per_label.{label}.first_order.entropy": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.per_label.{label}.first_order.iqr": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.per_label.{label}.first_order.max": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.per_label.{label}.first_order.mean": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.per_label.{label}.first_order.median": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.per_label.{label}.first_order.min": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.per_label.{label}.first_order.n_nonfinite_excluded": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.per_label.{label}.first_order.p05": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.per_label.{label}.first_order.p25": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.per_label.{label}.first_order.p50": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.per_label.{label}.first_order.p75": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.per_label.{label}.first_order.p95": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.per_label.{label}.first_order.range": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.per_label.{label}.first_order.std": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.per_label.{label}.first_order.voxel_count": (
+            "retune",
+            "Should be restructured to nest under the main "
+            "per_label.{label}.* pattern rather than a separate "
+            "image_features.per_label.{label}.* container; the individual "
+            "values are useful to keep as an available catalogue so future "
+            "rules can explore and select from them."
+        ),
+        "image_features.available": (
+            "retune",
+            "Should be derived directly from whether the corresponding "
+            "feature block is non-empty, rather than carried as a separate "
+            "boolean flag."
+        ),
+        "image_features.image_features_version": (
+            "retire",
+            "A schema-shape discriminator, not real dependency-version "
+            "provenance -- actual package versions are already tracked by "
+            "item 096's run-manifest provenance block; this field is "
+            "redundant with that mechanism."
+        ),
+        "image_features.per_label.{label}.label": (
+            "retune",
+            "Should be nested under the main per_label.{label}.* structure "
+            "rather than a separate image_features.per_label container; "
+            "duplicates identity fields already carried elsewhere."
+        ),
+        "image_features.radiomics_available": (
+            "retune",
+            "Should likewise be derived directly from whether extended "
+            "radiomics features are actually present, rather than a separate "
+            "boolean flag."
+        ),
+        "reference_delta.reference_delta_version": (
+            "retire",
+            "Same reasoning as image_features_version: a schema-shape "
+            "discriminator redundant with item 096's real package-version "
+            "provenance, not needed within the feature record itself."
+        ),
+        "reference_delta.reference_schema_version": (
+            "retire",
+            "Same reasoning as reference_delta_version and "
+            "image_features_version: schema-shape discriminator, not real "
+            "provenance, redundant with item 096's run-manifest."
+        ),
+        "reference_delta.{label}.available": (
+            "retune",
+            "Part of the reference-delta comparison machinery, which should "
+            "be generalised to compute for any requested tracked feature "
+            "rather than being hardcoded around a single example."
+        ),
+        "reference_delta.{label}.distribution_distance": (
+            "retune",
+            "Part of the reference-delta comparison machinery, which should "
+            "be generalised to compute for any requested tracked feature "
+            "rather than being hardcoded around a single example."
+        ),
+        "reference_delta.{label}.features.physical_volume_mm3.out_of_range": (
+            "retune",
+            "The delta-comparison machinery should be generalised into "
+            "general-purpose per-feature machinery, computed for any "
+            "requested feature rather than hardcoded to physical_volume_mm3 "
+            "alone, so per-feature out-of-distribution behaviour can be "
+            "investigated for any tracked feature."
+        ),
+        "reference_delta.{label}.features.physical_volume_mm3.percentile_rank": (
+            "retune",
+            "The delta-comparison machinery should be generalised into "
+            "general-purpose per-feature machinery, computed for any "
+            "requested feature rather than hardcoded to physical_volume_mm3 "
+            "alone, so per-feature out-of-distribution behaviour can be "
+            "investigated for any tracked feature."
+        ),
+        "reference_delta.{label}.features.physical_volume_mm3.robust_z": (
+            "retune",
+            "The delta-comparison machinery should be generalised into "
+            "general-purpose per-feature machinery, computed for any "
+            "requested feature rather than hardcoded to physical_volume_mm3 "
+            "alone, so per-feature out-of-distribution behaviour can be "
+            "investigated for any tracked feature."
+        ),
+        "reference_delta.{label}.features.physical_volume_mm3.value": (
+            "retune",
+            "The delta-comparison machinery should be generalised into "
+            "general-purpose per-feature machinery, computed for any "
+            "requested feature rather than hardcoded to physical_volume_mm3 "
+            "alone, so per-feature out-of-distribution behaviour can be "
+            "investigated for any tracked feature."
+        ),
+        "reference_delta.{label}.features.physical_volume_mm3.z_score": (
+            "retune",
+            "The delta-comparison machinery should be generalised into "
+            "general-purpose per-feature machinery, computed for any "
+            "requested feature rather than hardcoded to physical_volume_mm3 "
+            "alone, so per-feature out-of-distribution behaviour can be "
+            "investigated for any tracked feature."
+        ),
+        "reference_delta.{label}.label": (
+            "retune",
+            "Should be nested under the main per_label.{label}.* structure; "
+            "duplicates identity fields carried elsewhere across multiple "
+            "blocks."
+        ),
+        "reference_delta.{label}.level_name": (
+            "retune",
+            "Should be nested under the main per_label.{label}.* structure; "
+            "duplicates identity fields carried elsewhere across multiple "
+            "blocks."
+        ),
+        "reference_delta.{label}.out_of_range_features[]": (
+            "retune",
+            "The delta-comparison machinery should be generalised into "
+            "general-purpose per-feature machinery, computed for any "
+            "requested feature rather than hardcoded to physical_volume_mm3 "
+            "alone, so per-feature out-of-distribution behaviour can be "
+            "investigated for any tracked feature."
+        ),
+    }
+)
 
 
 # --------------------------------------------------------------------------- #
