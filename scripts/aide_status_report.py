@@ -878,6 +878,19 @@ def _feature_item_detail(entry: dict) -> str:
     return " ".join(parts)
 
 
+def _str_field(mapping: dict, key: str) -> str:
+    """Return ``mapping[key]`` if it is a ``str``, else ``""``.
+
+    A partially-corrupt but still-parseable document can carry ``None`` (or
+    any other JSON type) under a key a well-formed catalogue would always
+    populate with a string. Plain ``str(mapping.get(key, ""))`` would turn
+    that into the literal text ``"None"`` and render it as if it were real
+    content; this treats anything that isn't already a string as absent.
+    """
+    value = mapping.get(key, "")
+    return value if isinstance(value, str) else ""
+
+
 def load_feature_catalog(path: Path) -> Tuple[FeatureGroupSpec, ...]:
     """Load the generated feature catalogue JSON at *path* into render-ready
     ``FeatureGroupSpec`` tuples.
@@ -911,19 +924,26 @@ def load_feature_catalog(path: Path) -> Tuple[FeatureGroupSpec, ...]:
             for raw_entry in raw_entries:
                 if not isinstance(raw_entry, dict):
                     continue
+                # A malformed/missing "path" would otherwise render as the
+                # literal string "None" (or some other stringified garbage)
+                # for a partially-corrupt but still-parseable document — skip
+                # the entry rather than fabricate a feature name for it.
+                path = raw_entry.get("path")
+                if not isinstance(path, str) or not path:
+                    continue
                 items.append(
                     FeatureItem(
-                        name=str(raw_entry.get("path", "")),
-                        summary=str(raw_entry.get("measures", "")),
+                        name=path,
+                        summary=_str_field(raw_entry, "measures"),
                         detail=_feature_item_detail(raw_entry),
                     )
                 )
         groups.append(
             FeatureGroupSpec(
-                title=str(raw_group.get("title", "")),
-                stage=str(raw_group.get("stage", "")),
-                module=str(raw_group.get("module", "")),
-                intro=str(raw_group.get("intro", "")),
+                title=_str_field(raw_group, "title"),
+                stage=_str_field(raw_group, "stage"),
+                module=_str_field(raw_group, "module"),
+                intro=_str_field(raw_group, "intro"),
                 items=tuple(items),
             )
         )

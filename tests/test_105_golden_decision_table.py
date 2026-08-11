@@ -595,10 +595,22 @@ _PRE_105_CORPUS_HASH = "aad04c1b0e42074a11342b24dc94c7f2ec896cda1664efeee7c5fc5b
 # baseline going forward, not the pre-item-106 value. Recomputed with
 # _tracked_files' __pycache__ exclusion (see that function's docstring for
 # the unrelated hash-instability bug this also fixed).
-_PRE_105_SRC_HASH = "52e9307fce6352aa9d8128c2b07e2efb4256be4a52d924254c845e33099620c3"
+# Re-pinned again 2026-08-11 (PR #48, Copilot review response): src/segfacet
+# changed once more to fix two Copilot findings -- load_feature_catalog()'s
+# str(None) coercion (scripts/aide_status_report.py, out of this hash's
+# scope but committed alongside) and the lost per-group intro text
+# (src/segfacet/catalogue.py + feature_docs.py's new GROUP_INTROS). Same
+# authorisation as above -- this is still the mechanical consequence of a
+# whole-tree fence over a package other items keep legitimately touching.
+_PRE_105_SRC_HASH = "fbd761ebfc8d5b2d07d8ebc9cae473d7610f4aefc13fd9d93dfecd8fb6f16a4f"
 _PRE_105_GOLDEN_NAMES = ("016_features_report.json", "022_stage3_report.json")
 _PRE_105_GOLDEN_TEXT_HASH = "273ffe653925c0f149ed4a55778aba81cc8e95a68c3ca1f0e448fe6ee25c5430"
-_PRE_105_GITATTRIBUTES_HASH = "3544297cb0ecf7f0ad9131b6c6dc3599588a4df939893f36ff03cf8f16ace5d1"
+# Re-pinned 2026-08-11 (PR #48 Windows CI fix): added three missing LF pins
+# (.gitattributes self-pin, src/segfacet/**/*.yaml, docs/aide/
+# golden-decision-table.md) after a Windows CI run found all three files
+# were subject to the exact core.autocrlf gotcha .gitattributes exists to
+# prevent -- see the .gitattributes comments at each new pin.
+_PRE_105_GITATTRIBUTES_HASH = "28f177084b16db04931c99c70471a668d312fb7a750d8792727f2e1dbaae8fa4"
 
 
 def _combined_hash(base: Path, files) -> str:

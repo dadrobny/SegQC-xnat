@@ -474,7 +474,7 @@
           "units": "voxels"
         }
       ],
-      "intro": "",
+      "intro": "For every present integer label, computed directly from the voxel mask (NumPy/CuPy) with spacing read from the NIfTI header.",
       "module": "segfacet.features.geometry",
       "stage": "Stage 2 · item 011",
       "title": "Per-Label Geometry"
@@ -722,7 +722,7 @@
           "units": "mm3"
         }
       ],
-      "intro": "",
+      "intro": "6-connectivity (face-neighbour only) connected-components analysis of each label's voxel mask via scipy.ndimage.label (or the CuPy equivalent on GPU); item 098 promotes the non-dominant ('stray') component population to first-class fields alongside the original item 012/025 measures.",
       "module": "segfacet.features.components",
       "stage": "Stage 2 · items 012, 025, 098",
       "title": "Connected Components & Fragmentation"
@@ -908,7 +908,7 @@
           "units": ""
         }
       ],
-      "intro": "",
+      "intro": "Centre of mass of each label's voxel mask, plus the integer label/anatomical level_name identity pair every other per-label block below re-carries.",
       "module": "segfacet.features.centroids",
       "stage": "Stage 2 · item 013",
       "title": "Centroid & Identity"
@@ -1102,7 +1102,7 @@
           "units": ""
         }
       ],
-      "intro": "",
+      "intro": "Computed once per case from the full ordered set of centroids (ascending integer-label order).",
       "module": "segfacet.features.relationships",
       "stage": "Stage 2 · item 014",
       "title": "Case-Level Relationships"
@@ -1305,7 +1305,7 @@
           "units": ""
         }
       ],
-      "intro": "",
+      "intro": "Requires a boolean per-label mask stack (a single integer label map cannot represent a voxel claimed by two labels at once).",
       "module": "segfacet.features.overlap",
       "stage": "Stage 2 · item 015",
       "title": "Voxel Overlap"
@@ -1551,7 +1551,7 @@
           "units": "voxels"
         }
       ],
-      "intro": "",
+      "intro": "A cubic (degree clamped to n_points-1 when the sequence is short) B-spline is fit through the ordered centroids' mm-coordinates (scipy.interpolate.splprep, s=0 -> passes exactly through every centroid); this spline underlies the per-vertebra offset measured here and the orientation/curvature/consistency families below.",
       "module": "segfacet.features.spline_offset",
       "stage": "Stage 3 · item 018",
       "title": "Spline Offset"
@@ -1757,7 +1757,7 @@
           "units": ""
         }
       ],
-      "intro": "",
+      "intro": "Per-vertebra orientation (PCA of the mean-centred, spacing-scaled voxel cloud) and case-level curvature summaries derived from the same fitted spline's local tangent at each vertebra.",
       "module": "segfacet.features.orientation",
       "stage": "Stage 3 · item 019",
       "title": "Orientation & Curvature"
@@ -1905,7 +1905,7 @@
           "units": "mm"
         }
       ],
-      "intro": "",
+      "intro": "Inter-vertebra centroid spacing regularity and whether each vertebra's closest-spline-parameter u increases along the anatomical order, both derived from the same fitted spline.",
       "module": "segfacet.features.consistency",
       "stage": "Stage 3 · item 020",
       "title": "Spacing & Monotonic Consistency"
@@ -2164,7 +2164,7 @@
           "units": "voxels"
         }
       ],
-      "intro": "",
+      "intro": "The first feature family to read scan intensities rather than only the label map; computed over the finite (non-NaN/inf) scan voxels under each label's mask.",
       "module": "segfacet.features.intensity",
       "stage": "Stage 8 · item 059",
       "title": "Intensity — First-Order"
@@ -2187,7 +2187,7 @@
           "units": ""
         }
       ],
-      "intro": "",
+      "intro": "Populated only when the optional PyRadiomics dependency is installed and enabled; degrades to an empty dict otherwise without failing the pipeline.",
       "module": "segfacet.features.radiomics",
       "stage": "Stage 8 · item 060",
       "title": "Intensity — Extended Radiomics"
@@ -2336,7 +2336,7 @@
           "units": ""
         }
       ],
-      "intro": "",
+      "intro": "The first feature family to read scan intensities rather than only the label map; computed over the finite (non-NaN/inf) scan voxels under each label's mask.",
       "module": "segfacet.feature_report",
       "stage": "Stage 8 · items 059, 061",
       "title": "Intensity — First-Order"
@@ -2824,7 +2824,7 @@
           "units": ""
         }
       ],
-      "intro": "",
+      "intro": "Not new extraction -- scores a case's already-computed per-label features against a versioned cohort ReferenceDistribution (item 045), for the tracked geometric/morphology/intensity vocabulary.",
       "module": "segfacet.reference.delta",
       "stage": "Stage 6/8 · items 046, 064",
       "title": "Reference-Distribution Deltas"
@@ -2921,7 +2921,7 @@
           "units": ""
         }
       ],
-      "intro": "",
+      "intro": "The top-level report scaffolding -- the schema-version discriminator and the per-label container every block above nests under.",
       "module": "segfacet.feature_report",
       "stage": "Stage 2 · item 016",
       "title": "Record Envelope"

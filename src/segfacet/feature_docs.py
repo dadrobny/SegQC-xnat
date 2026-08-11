@@ -24,6 +24,13 @@ Contents
     (irrespective of authored order -- the generator does its own descending-
     length sort) to assign a group/stage/module, reproducing the pre-103
     hand-typed ``FEATURE_CATALOG`` grouping.
+``GROUP_INTROS``
+    ``{group_title: intro_prose}`` -- the per-group summary sentence(s) the
+    pre-103 hand-typed ``FEATURE_CATALOG`` carried on each ``FeatureGroupSpec``
+    (e.g. "For every present integer label, computed directly from the voxel
+    mask..."). Looked up by ``group_title`` (the second element of the
+    matched ``BLOCK_OWNERS`` row) when a ``CatalogueGroup`` is assembled;
+    ``""`` for a title with no authored intro (never raises).
 ``PATH_ALIASES``
     ``{vocabulary_name: leaf_path}`` for mechanism D's declared-vocabulary
     matching, only where the vocabulary name is not itself the leaf path's
@@ -89,6 +96,7 @@ __all__ = [
     "FeatureDoc",
     "FEATURE_DOCS",
     "BLOCK_OWNERS",
+    "GROUP_INTROS",
     "PATH_ALIASES",
     "MODE_ANCHOR_PATHS",
     "STATUS_OVERRIDES",
@@ -220,6 +228,77 @@ BLOCK_OWNERS: Tuple[Tuple[str, str, str, str], ...] = (
         "Stage 2 · item 016",
         "segfacet.feature_report",
     ),
+)
+
+
+# --------------------------------------------------------------------------- #
+# GROUP_INTROS -- per-group summary prose, keyed by BLOCK_OWNERS's group_title
+# --------------------------------------------------------------------------- #
+
+GROUP_INTROS: Mapping[str, str] = MappingProxyType(
+    {
+        "Per-Label Geometry": (
+            "For every present integer label, computed directly from the voxel "
+            "mask (NumPy/CuPy) with spacing read from the NIfTI header."
+        ),
+        "Connected Components & Fragmentation": (
+            "6-connectivity (face-neighbour only) connected-components analysis "
+            "of each label's voxel mask via scipy.ndimage.label (or the CuPy "
+            "equivalent on GPU); item 098 promotes the non-dominant ('stray') "
+            "component population to first-class fields alongside the original "
+            "item 012/025 measures."
+        ),
+        "Centroid & Identity": (
+            "Centre of mass of each label's voxel mask, plus the integer "
+            "label/anatomical level_name identity pair every other per-label "
+            "block below re-carries."
+        ),
+        "Case-Level Relationships": (
+            "Computed once per case from the full ordered set of centroids "
+            "(ascending integer-label order)."
+        ),
+        "Voxel Overlap": (
+            "Requires a boolean per-label mask stack (a single integer label "
+            "map cannot represent a voxel claimed by two labels at once)."
+        ),
+        "Spline Offset": (
+            "A cubic (degree clamped to n_points-1 when the sequence is short) "
+            "B-spline is fit through the ordered centroids' mm-coordinates "
+            "(scipy.interpolate.splprep, s=0 -> passes exactly through every "
+            "centroid); this spline underlies the per-vertebra offset measured "
+            "here and the orientation/curvature/consistency families below."
+        ),
+        "Orientation & Curvature": (
+            "Per-vertebra orientation (PCA of the mean-centred, spacing-scaled "
+            "voxel cloud) and case-level curvature summaries derived from the "
+            "same fitted spline's local tangent at each vertebra."
+        ),
+        "Spacing & Monotonic Consistency": (
+            "Inter-vertebra centroid spacing regularity and whether each "
+            "vertebra's closest-spline-parameter u increases along the "
+            "anatomical order, both derived from the same fitted spline."
+        ),
+        "Intensity — First-Order": (
+            "The first feature family to read scan intensities rather than "
+            "only the label map; computed over the finite (non-NaN/inf) scan "
+            "voxels under each label's mask."
+        ),
+        "Intensity — Extended Radiomics": (
+            "Populated only when the optional PyRadiomics dependency is "
+            "installed and enabled; degrades to an empty dict otherwise "
+            "without failing the pipeline."
+        ),
+        "Reference-Distribution Deltas": (
+            "Not new extraction -- scores a case's already-computed per-label "
+            "features against a versioned cohort ReferenceDistribution (item "
+            "045), for the tracked geometric/morphology/intensity vocabulary."
+        ),
+        "Record Envelope": (
+            "The top-level report scaffolding -- the schema-version "
+            "discriminator and the per-label container every block above "
+            "nests under."
+        ),
+    }
 )
 
 

@@ -770,6 +770,7 @@ def build_catalogue(*, strict: bool = True) -> FeatureCatalogue:
     mode_anchor_paths = _feature_docs_module.MODE_ANCHOR_PATHS
     status_overrides = _feature_docs_module.STATUS_OVERRIDES
     block_owners = _feature_docs_module.BLOCK_OWNERS
+    group_intros = _feature_docs_module.GROUP_INTROS
 
     anchor_modes_by_path: Dict[str, Set[int]] = defaultdict(set)
     for mode, paths in mode_anchor_paths.items():
@@ -893,7 +894,7 @@ def build_catalogue(*, strict: bool = True) -> FeatureCatalogue:
                 title=title,
                 stage_label=stage_label,
                 module=module,
-                intro="",
+                intro=group_intros.get(title, ""),
                 entries=entries,
             )
         )
