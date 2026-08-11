@@ -586,7 +586,16 @@ def test_ac13_divergences_section_names_exactly_the_keep_rows(
 # =========================================================================== #
 
 _PRE_105_CORPUS_HASH = "aad04c1b0e42074a11342b24dc94c7f2ec896cda1664efeee7c5fc5b0ec4f547"
-_PRE_105_SRC_HASH = "c797c21229e527a48699f8f5b152b61151845891f163d82ea0665749a5865347"
+# Re-pinned 2026-07-28, authorised by item 106's Description ("The scope fence
+# is therefore widened by exactly one file and one name" -- feature_docs.py's
+# STATUS_OVERRIDES) and Assumptions ("Item 105's AC14 fence may need one
+# re-pin"), following the _PRE_100_HASHES precedent
+# (tests/test_100_severity_ladder.py:947-949). This value is the src/segfacet
+# tree AFTER item 106's one authorised STATUS_OVERRIDES edit -- the new
+# baseline going forward, not the pre-item-106 value. Recomputed with
+# _tracked_files' __pycache__ exclusion (see that function's docstring for
+# the unrelated hash-instability bug this also fixed).
+_PRE_105_SRC_HASH = "52e9307fce6352aa9d8128c2b07e2efb4256be4a52d924254c845e33099620c3"
 _PRE_105_GOLDEN_NAMES = ("016_features_report.json", "022_stage3_report.json")
 _PRE_105_GOLDEN_TEXT_HASH = "273ffe653925c0f149ed4a55778aba81cc8e95a68c3ca1f0e448fe6ee25c5430"
 _PRE_105_GITATTRIBUTES_HASH = "3544297cb0ecf7f0ad9131b6c6dc3599588a4df939893f36ff03cf8f16ace5d1"
@@ -600,15 +609,28 @@ def _combined_hash(base: Path, files) -> str:
     return h.hexdigest()
 
 
+def _tracked_files(root: Path):
+    # Defect fix (found during item 106's execution, 2026-07-28): an
+    # unfiltered rglob("*") picks up __pycache__/*.pyc alongside real source
+    # -- compiled bytecode that is gitignored, untracked, and whose bytes
+    # embed source mtimes, so the digest is non-reproducible across repeated
+    # runs on an *unchanged* tree (observed: three different hashes across
+    # three clear-cache-then-run cycles). Excluding any path with a
+    # __pycache__ component restricts the hash to real, tracked source, which
+    # is what a scope fence is actually supposed to pin.
+    return [
+        p for p in root.rglob("*")
+        if p.is_file() and "__pycache__" not in p.parts
+    ]
+
+
 def test_ac14_tests_corpus_byte_identical_to_pre_105_state():
     corpus_dir = _TESTS_DIR / "corpus"
-    files = [p for p in corpus_dir.rglob("*") if p.is_file()]
-    assert _combined_hash(corpus_dir, files) == _PRE_105_CORPUS_HASH
+    assert _combined_hash(corpus_dir, _tracked_files(corpus_dir)) == _PRE_105_CORPUS_HASH
 
 
 def test_ac14_src_segfacet_byte_identical_to_pre_105_state():
-    files = [p for p in _SEGFACET_SRC.rglob("*") if p.is_file()]
-    assert _combined_hash(_SEGFACET_SRC, files) == _PRE_105_SRC_HASH
+    assert _combined_hash(_SEGFACET_SRC, _tracked_files(_SEGFACET_SRC)) == _PRE_105_SRC_HASH
 
 
 def test_ac14_tests_golden_unchanged_by_name_set_and_text_digest():
