@@ -260,7 +260,7 @@ mislabelling heuristics.
 - [X] Spline fits cleanly on GT fixtures; offsets near-zero for GT, large for displaced/mislabelled.
 - [X] Robust to a deliberately missing level (no crash, sensible fit).
 - [X] Orientation / curvature features in JSON; tests pass. *(Item 019)*
-- [X] Neighbour-consistency and neighbourhood-comparison features in JSON. *(Items 020, 024)*
+- [X] Neighbour-consistency features in JSON. *(Item 020)* *(Item 024: neighbourhood-comparison module implemented but not wired into pipeline — absent from JSON output; see Stage 26 D8.)*
 - [X] Regression tests over GT + perturbed cases pass. *(Item 022)*
 
 ---
