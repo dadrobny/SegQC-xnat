@@ -22,7 +22,9 @@
   to its destination, then ticked in place with a pointer:
     - [x] <type> — <one line> *(item NNN, YYYY-MM-DD)* → <where it landed>
 
-  Append-only: never rewrite, reorder, or delete existing lines.
+  Append-only: never reorder or delete existing lines. Triage may tick the
+  checkbox in place and append a "→ routed to …" pointer; any other rewrite
+  of a captured line is not permitted.
 -->
 # Insight Inbox
 
