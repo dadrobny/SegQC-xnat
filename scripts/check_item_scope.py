@@ -27,9 +27,12 @@ Glob semantics:
   string is matched by ``**`` alone).
 
 A small, explicit set of paths (see ``_ALWAYS_AUTHORISED_PATHS``) is treated
-as authorised for every item regardless of its spec's list -- currently just
-``docs/aide/progress.md``, which the ``aide`` CLI itself rewrites on every
-item as loop bookkeeping, not item work.
+as authorised for every item regardless of its spec's list: the loop
+bookkeeping files that the ``aide`` CLI and the agent roles are mandated to
+write on *any* item, so a change to them is never evidence of scope creep.
+Currently ``docs/aide/progress.md`` (rewritten by ``aide progress set`` as
+part of the claim protocol) and ``docs/aide/insights.md`` (the
+compound-engineering inbox every role is told to append to).
 
 Exit codes:
 
@@ -56,12 +59,24 @@ _BULLET_PATTERN_CHARS = "-*+"
 # Paths that are always authorised, regardless of what any spec's
 # `## Authorised paths` section lists. Kept minimal and explicit -- no
 # directories, no wildcards -- so this set cannot silently grow into a scope
-# hole. `docs/aide/progress.md` is loop bookkeeping: `python
-# .aide/scripts/aide.py progress set` rewrites it on every single item as
-# part of the claim protocol, not as item work, so a diff touching it is
-# never evidence of scope creep and every spec would otherwise have to
-# repeat the same boilerplate bullet just to pass this check.
-_ALWAYS_AUTHORISED_PATHS = frozenset({"docs/aide/progress.md"})
+# hole.
+#
+# The principle: these are *loop bookkeeping* files that the `aide` CLI and
+# the agent roles are mandated to write on any item, whatever that item is
+# about. A change to one of them is therefore never evidence of scope creep,
+# and listing them would force every spec to repeat the same boilerplate
+# bullets just to pass this check. Concretely:
+#
+# - `docs/aide/progress.md` -- `python .aide/scripts/aide.py progress set`
+#   rewrites it on every single item as part of the claim protocol.
+# - `docs/aide/insights.md` -- the compound-engineering inbox. `CLAUDE.md`
+#   and every agent role instruct agents to append an out-of-scope insight
+#   whenever they learn one; `.aide/conventions.md` names this as the one
+#   write allowed outside an agent's edit scope. Flagging it would punish
+#   exactly the behaviour the framework requires.
+_ALWAYS_AUTHORISED_PATHS = frozenset(
+    {"docs/aide/progress.md", "docs/aide/insights.md"}
+)
 
 
 def _run_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess:

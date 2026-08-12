@@ -211,16 +211,36 @@ this item's script; item 115 audits that no fence remains.
   explaining why, and no `disposition`/`rationale`/`replacement guarantee`
   cell was touched. `docs/aide/golden-decision-table.md` is now listed in
   this item's own `## Authorised paths`.
-- **Always-authorised path for `docs/aide/progress.md` (attempt 2, 2026-08-12).**
-  `python .aide/scripts/aide.py progress set` rewrites `progress.md` on
-  every item as loop bookkeeping, not item work, so `check_item_scope.py`
-  was flagging its own item's `progress set` commit as a violation. Added a
-  minimal, explicit `_ALWAYS_AUTHORISED_PATHS = frozenset({"docs/aide/progress.md"})`
-  constant to `scripts/check_item_scope.py`, checked before the glob match, with a
-  comment explaining why — deliberately a single explicit path, not a
-  directory or wildcard, so this exemption cannot silently widen. Checked
-  `tests/test_107_item_scope_check.py` first for a test pinning the old
-  behaviour (progress.md being flagged); none exists, so no test conflict to
+- **Always-authorised paths: loop bookkeeping is never scope creep
+  (attempts 2–3, 2026-08-12).** `_ALWAYS_AUTHORISED_PATHS` in
+  `scripts/check_item_scope.py` exempts a small, explicit set of paths from
+  the glob match. The principle behind the set — not a list of special cases
+  — is: *a file that the `aide` CLI or an agent role is mandated to write on
+  **any** item, whatever that item is about, cannot be evidence of scope
+  creep, and requiring every spec to list it would be pure boilerplate.* Two
+  files meet that test today, and both are exempted:
+  - `docs/aide/progress.md` — `python .aide/scripts/aide.py progress set`
+    rewrites it on every item as part of the claim protocol (attempt 2; the
+    checker was flagging its own item's `progress set` commit).
+  - `docs/aide/insights.md` — the compound-engineering inbox. `CLAUDE.md`
+    and every agent role instruct agents to append an out-of-scope insight
+    whenever they learn one, and `.aide/conventions.md` calls this the one
+    write allowed outside an agent's edit scope; flagging it would punish
+    the behaviour the framework requires (attempt 3; commit `c710b93` on
+    this branch was flagged for exactly this).
+
+  Deliberately **named files only** — no directories, no wildcards — so the
+  exemption cannot silently widen into a scope hole. Candidates considered
+  and **rejected**: `docs/aide/queue/queue-NNN.md` (written by `aide queue
+  tidy`, but only at the queue boundary by the queue-planner on its own
+  branch, not on every item, and it is not a fixed path); the item's own
+  spec `docs/aide/items/NNN-*.md` (edited by builder/validator on every item,
+  but it is item-specific rather than a fixed name, and every spec already
+  lists itself under `## Authorised paths`, which is the honest place for
+  it); and `docs/aide/status/*` plus `.aide/loop/loop.local.toml` (personal,
+  git-ignored, so they never appear in a diff at all). Checked
+  `tests/test_107_item_scope_check.py` on both attempts for a test pinning
+  the old flagging behaviour; none exists, so there is no test conflict to
   report.
 
 ## Implementation notes (builder, 2026-08-12)
