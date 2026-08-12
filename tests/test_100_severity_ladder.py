@@ -186,7 +186,19 @@ _CORPUS_DIR = _REPO_ROOT / "tests" / "corpus"
 def _corpus_content_digest(files, base: Path) -> str:
     """Intra-run content digest (not a byte-hash scope fence -- see item 107:
     this compares a before/after snapshot within a single test run, never a
-    pinned pre-item constant)."""
+    pinned pre-item constant).
+
+    Renamed from `_combined_hash` by item 107 (2026-08-12): item 107 deleted
+    every `_PRE_NNN_*` byte-hash scope fence, and `test_ac23_leaves_tests_corpus_byte_unchanged`
+    (below) is the one surviving intra-run before/after digest that AC13
+    requires to keep working, not a fence -- it hashes `_CORPUS_DIR`'s
+    contents at the start and end of the *same* test run and asserts they
+    match, so there is nothing pinned across runs or items for a later item
+    to legitimately collide with. The old name `_combined_hash` was a leftover
+    from when this module's fence helper shared that name; keeping the old
+    name after the fence was removed would have read as reusing/renaming a
+    fence helper to dodge item 107's own AC3 grep for fence helpers, so it was
+    renamed to describe what it actually is."""
     h = hashlib.sha256()
     for f in files:
         h.update(f.relative_to(base).as_posix().encode())

@@ -187,6 +187,7 @@ this item's script; item 115 audits that no fence remains.
 - `tests/test_106_stage19_validation.py`
 - `.github/workflows/ci.yml`
 - `docs/aide/items/107-retire-byte-hash-scope-fences.md`
+- `docs/aide/golden-decision-table.md`
 
 ## Decisions & Trade-offs
 
@@ -198,6 +199,29 @@ this item's script; item 115 audits that no fence remains.
   belongs to every consumer rather than to this repo. Prototyping it here first
   is deliberate: the upstream change becomes a port of something already proven
   in use rather than a design sketch.
+- **`docs/aide/golden-decision-table.md` reconciliation (attempt 2, 2026-08-12).**
+  Round 1 deleted `test_099_per_mode_metrics.py::test_ac25_committed_goldens_byte_identical_to_pre_099_state`
+  as an authorised fence but left it named in the "asserted by" column of all
+  nine Group-A rows in `docs/aide/golden-decision-table.md`, tripping item
+  105's AC6 (asserted-by cells must resolve to real tests) — the same class
+  of collision `insights.md` already documents for item 106
+  (2026-07-28 entries) and had in fact already flagged for item 107 itself
+  (insights.md, 2026-08-12). Fixed the same way item 106 did: the nine cells
+  no longer name the deleted test, a dated note was added above the table
+  explaining why, and no `disposition`/`rationale`/`replacement guarantee`
+  cell was touched. `docs/aide/golden-decision-table.md` is now listed in
+  this item's own `## Authorised paths`.
+- **Always-authorised path for `docs/aide/progress.md` (attempt 2, 2026-08-12).**
+  `python .aide/scripts/aide.py progress set` rewrites `progress.md` on
+  every item as loop bookkeeping, not item work, so `check_item_scope.py`
+  was flagging its own item's `progress set` commit as a violation. Added a
+  minimal, explicit `_ALWAYS_AUTHORISED_PATHS = frozenset({"docs/aide/progress.md"})`
+  constant to `scripts/check_item_scope.py`, checked before the glob match, with a
+  comment explaining why — deliberately a single explicit path, not a
+  directory or wildcard, so this exemption cannot silently widen. Checked
+  `tests/test_107_item_scope_check.py` first for a test pinning the old
+  behaviour (progress.md being flagged); none exists, so no test conflict to
+  report.
 
 ## Implementation notes (builder, 2026-08-12)
 

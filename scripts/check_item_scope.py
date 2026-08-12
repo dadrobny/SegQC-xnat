@@ -26,6 +26,11 @@ Glob semantics:
   directory (the directory itself is not a path, so nothing "below" an empty
   string is matched by ``**`` alone).
 
+A small, explicit set of paths (see ``_ALWAYS_AUTHORISED_PATHS``) is treated
+as authorised for every item regardless of its spec's list -- currently just
+``docs/aide/progress.md``, which the ``aide`` CLI itself rewrites on every
+item as loop bookkeeping, not item work.
+
 Exit codes:
 
 - ``0`` -- every changed path is authorised (including a zero-change diff).
@@ -47,6 +52,16 @@ from pathlib import Path
 
 _SECTION_HEADING = "## Authorised paths"
 _BULLET_PATTERN_CHARS = "-*+"
+
+# Paths that are always authorised, regardless of what any spec's
+# `## Authorised paths` section lists. Kept minimal and explicit -- no
+# directories, no wildcards -- so this set cannot silently grow into a scope
+# hole. `docs/aide/progress.md` is loop bookkeeping: `python
+# .aide/scripts/aide.py progress set` rewrites it on every single item as
+# part of the claim protocol, not as item work, so a diff touching it is
+# never evidence of scope creep and every spec would otherwise have to
+# repeat the same boilerplate bullet just to pass this check.
+_ALWAYS_AUTHORISED_PATHS = frozenset({"docs/aide/progress.md"})
 
 
 def _run_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
@@ -152,7 +167,10 @@ def main(argv: list[str] | None = None) -> int:
     changed = [line for line in diff.stdout.splitlines() if line.strip()]
 
     violations = [
-        path for path in changed if not any(_path_matches(path, g) for g in globs)
+        path
+        for path in changed
+        if path not in _ALWAYS_AUTHORISED_PATHS
+        and not any(_path_matches(path, g) for g in globs)
     ]
 
     if violations:
