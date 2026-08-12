@@ -1100,24 +1100,32 @@ changes on the corpus except where a retune is explicitly authorised.
 - **Multichannel / probabilistic segmentation input.** Not planned. Recorded because it is
   the precondition that would make §6 mode 8 (overlap) observable on real data at all — see
   Stage 20's evidence rungs.
-- **Scaling the per-mode metrics that are not bounded 0..1** *(2026-08-12)*. The eight metrics
-  do not share units, and they do not share a remedy either — the choice is per metric, and
-  the deciding question is **scope**, not whether the metric happens to be a count:
-  - **A faithful ratio exists where numerator and denominator share scope.**
-    `missing_level_count` is scan-level on both sides — GT levels absent, over GT levels
-    expected — so `missing / expected` is a genuine fraction of the scan's own anatomy.
-  - **A ratio is wrong where scope differs.** `rogue_island_count` is a *maximum over
-    per-label entries*; dividing it by a scan-level count converts a per-level worst case
-    into a scan-level density, which is a different quantity (possibly a useful feature in
-    its own right — but not a scaling of the original).
-  - **A declared threshold fits where the clean expectation is a known constant.** For rogue
-    islands the expectation is *none*, so a small declared count is defensible as the scale
-    without inventing a "full-blown failure" magnitude. The value is **TBC** and deliberately
-    unset by item 109, which ships only the mechanism.
-  - **Neighbourhood-relative comparison is the fallback**, reached for when neither a
-    same-scope denominator nor a defensible global constant exists: compare a vertebra's value
-    against its own neighbours rather than against anything global. Item 110's generalised
-    neighbourhood API (arbitrary named features, selectable scored subset) is the mechanism;
-    coupling `eval/` to a `features/` refactor was deliberately kept out of Stage 26. A
-    natural fit for **Stage 27**, which is already generalising `reference_delta` off its
-    single hardcoded tracked feature.
+- **Feature and metric normalisation policy** *(2026-08-12)*. Two rules govern every scaling
+  decision, and they are project-wide rather than specific to any one metric:
+  1. **A normalisation factor must never introduce a supervision dependency.** Anything
+     derived from ground truth — "the levels this scan *should* have", a GT label count, a
+     reference annotation — is supervision, not a feature. Scaling by it produces a number
+     that cannot be computed on real segmenter output, which is the setting FACET exists to
+     analyse, and quietly mixes supervision into the feature space. This holds even for
+     metrics that are themselves defined as a candidate-vs-GT comparison: that a metric
+     *needs* GT does not license its **scale** to import further GT-derived quantities.
+  2. **Normalisation is human-reviewed, or it does not happen.** The exception is a scaling
+     that is intrinsic by construction — a metric already dimensionless, or bounded 0..1 with
+     a derivable full swing, where the denominator comes from the metric's own definition and
+     no judgement is exercised. Everything else needs an explicitly reviewed and recorded
+     constant or threshold, in the manner of item 106's steering review. **The default, absent
+     review, is no normalisation**: report the raw value.
+
+  Applied to the per-mode metrics: the fraction-valued ones scale intrinsically;
+  `rogue_island_count` (a *maximum over per-label entries*, so a scan-level denominator would
+  change the quantity anyway) and `missing_level_count` (whose only natural denominator is
+  GT-derived, barred by rule 1) both stay **raw** until a reviewed threshold exists. For rogue
+  islands the clean expectation is *none*, so a small declared threshold is the plausible
+  candidate — value **TBC**, and item 109 ships the mechanism without setting it.
+
+  Where no reviewable global constant is defensible at all, the fallback is
+  **neighbourhood-relative** comparison — a vertebra measured against its own neighbours
+  rather than against anything global or supervised. Item 110's generalised neighbourhood API
+  (arbitrary named features, selectable scored subset) is the mechanism; coupling `eval/` to a
+  `features/` refactor was deliberately kept out of Stage 26. A natural fit for **Stage 27**,
+  which is already generalising `reference_delta` off its single hardcoded tracked feature.

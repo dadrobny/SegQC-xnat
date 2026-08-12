@@ -22,31 +22,40 @@ run-vs-run **attribution** deliverable does not do what its own docstring
 claims, and two of item 101's own tests demonstrate the trap on deliberately
 different-magnitude inputs.
 
-The fix is **not** a single universal scale, because the eight metrics do not
-share units — and the deciding question is **scope**, not whether a metric
-happens to be a count. Each metric falls into one of three classes:
+The fix is **not** a single universal scale. Two project-wide rules govern
+which metrics may be scaled at all:
 
-- **Bounded 0..1 — scale by the derivable full swing.**
-  `unanchored_foreground_fraction` (baseline 0.0),
-  `min_dominant_component_fraction` (baseline 1.0, decreasing),
+1. **No normalisation factor may introduce a supervision dependency.** Anything
+   derived from ground truth — a GT label count, "the levels this scan *should*
+   have", a reference annotation — is supervision, not a feature. Scaling by it
+   yields a number that cannot be computed on real segmenter output, the setting
+   FACET exists to analyse, and mixes supervision into the feature space. This
+   holds even for metrics that are themselves defined as a candidate-vs-GT
+   comparison: that a metric *needs* GT does not license its **scale** to import
+   further GT-derived quantities.
+2. **Normalisation is human-reviewed, or it does not happen.** The sole
+   exception is a scaling intrinsic by construction — already dimensionless, or
+   bounded 0..1 with a derivable full swing, where the denominator falls out of
+   the metric's own definition and no judgement is exercised. Everything else
+   needs an explicitly reviewed, recorded constant or threshold. **The default,
+   absent review, is no normalisation.**
+
+Applied to the eight metrics:
+
+- **Intrinsic — scaled automatically.** `unanchored_foreground_fraction`
+  (baseline 0.0), `min_dominant_component_fraction` (baseline 1.0, decreasing),
   `mislabelled_volume_fraction` (0.0) and the other fraction-valued entries are
   mathematically confined, so the distance from baseline to the far end of the
-  range is derivable with no free parameter.
-- **Same-scope ratio available — scale by the case's own denominator.**
-  `missing_level_count` is scan-level on **both** sides: it counts GT labels
-  absent from the candidate, and the scan's GT label count is a denominator of
-  the same scope. `missing / expected` is a genuine fraction of that scan's own
-  anatomy, not a change of quantity, and needs no declared constant.
-- **Scope mismatch — no faithful ratio; leave raw, allow a declared threshold.**
-  `rogue_island_count` is a **maximum over per-label entries**, so dividing by a
-  scan-level count converts a per-level worst case into a scan-level density —
-  a different quantity. Here the natural scale is a declared threshold rather
-  than a ratio, since the clean expectation is *none*; the value is **TBC** and
-  this item ships the mechanism without setting it.
-
-So: scale where the scale is faithful — a derivable range, or a denominator of
-the same scope — and otherwise report raw, leaving a declared threshold
-available for whoever can justify one.
+  range is derivable with no free parameter and no supervision.
+- **Raw by default.** `rogue_island_count` is a *maximum over per-label
+  entries*, so a scan-level denominator would change the quantity rather than
+  scale it. `missing_level_count` is scan-level, but its only natural
+  denominator — the levels the scan was expected to contain — is GT-derived and
+  therefore barred by rule 1. Both report raw with `normalised_delta = None`.
+- **Reviewed threshold, opt-in, none set here.** For rogue islands the clean
+  expectation is *none*, which makes a small declared threshold the plausible
+  candidate; the value is **TBC**. This item ships the mechanism and the review
+  requirement, and declares nothing.
 
 **In scope.** The normalisation and attribution logic, the optional per-metric
 excursion field, and the affected rendering and tests.
@@ -62,18 +71,19 @@ Decisions).
   metric confined to a known range, `normalised_delta` is `delta` divided by the
   distance from `baseline` to the far end of that range, and the divisor is
   derived from the metric's declaration, not hand-entered.
-- [ ] **AC1b: same-scope metrics scale by the case's own denominator.**
-  `missing_level_count` is divided by the number of GT levels expected in that
-  case, yielding a fraction of the scan's own anatomy; the denominator comes
-  from the comparison's inputs, not from a constant.
-- [ ] **AC2: scope-mismatched metrics are not scaled by default.**
-  `normalised_delta is None` for a metric with neither a derivable range, a
-  same-scope denominator, nor a declared threshold — `rogue_island_count`
-  today — and the raw delta remains available on the same record.
-- [ ] **AC3: an optional excursion may be declared.** `MetricSpec` gains an
+- [ ] **AC1b: no scale depends on supervision.** No metric's divisor is derived
+  from ground truth, a reference annotation, or any other supervision signal —
+  including for metrics whose own `source` is `candidate_vs_gt`. A test asserts
+  this for every metric that carries a scale.
+- [ ] **AC2: everything else is raw by default.** `normalised_delta is None` for
+  any metric without an intrinsic scale or a reviewed declared threshold —
+  `rogue_island_count` and `missing_level_count` today — and the raw delta
+  remains available on the same record.
+- [ ] **AC3: a reviewed threshold may be declared.** `MetricSpec` gains an
   optional reference-excursion field, unset for every metric by default; when
-  set, that metric normalises by it.
-- [ ] **AC4: no excursion is set in this item.** Every shipped `MetricSpec`
+  set, that metric scales by it. The field's docstring states that setting it is
+  a human-review decision requiring a recorded rationale, not a tuning knob.
+- [ ] **AC4: no threshold is set in this item.** Every shipped `MetricSpec`
   leaves the new field unset — the mechanism exists, the judgement is not made
   here.
 - [ ] **AC5: attribution follows magnitude.** Given two modes whose normalised
@@ -104,11 +114,14 @@ Decisions).
 ## Assumptions
 
 - **The classification is recorded per metric, not inferred from its name.**
-  Name-based inference (`*_fraction` bounded, `*_count` unbounded) is wrong:
-  `missing_level_count` and `rogue_island_count` are both counts and fall in
-  different classes, because the first is scan-level on both sides and the
-  second is a per-label maximum. Each of the eight metrics carries an explicit,
+  Name-based inference (`*_fraction` scalable, `*_count` not) happens to give
+  the right answer today, but for the wrong reason — the deciding questions are
+  whether the scale is intrinsic and whether it stays free of supervision, not
+  what the metric is called. Each of the eight metrics carries an explicit,
   reviewed class.
+- **A metric may use GT even though its scale may not.** Four of the eight are
+  `source: "candidate_vs_gt"` by item 099's design, which this item does not
+  change. The supervision rule constrains the **divisor**, not the metric.
 - **`PER_MODE_METRIC_SPECS` may gain an optional field.** Additive only —
   existing field names, values, baselines and directions are untouched, so
   item 104's catalogue and any consumer reading the specs keep working.
@@ -140,6 +153,9 @@ New module `tests/test_109_attribution_scale.py`, plus updates to
 `tests/test_101_per_mode_cohort.py` where its ACs pinned the old behaviour:
 
 - AC1/AC2: one test per metric class, asserting divisor provenance.
+- AC1b: for every metric carrying a scale, assert the divisor is a function of
+  the metric's own declaration only — computing a comparison twice with two
+  different GT inputs but identical candidates must yield the same divisor.
 - AC5/AC7: the differential fixture (0.1 vs 0.9 from a shared baseline).
 - AC6: one run exactly on baseline, assert `< 1.0`.
 - AC8/AC9: a comparison over unbounded metrics only — `attributed_mode is
@@ -177,15 +193,22 @@ to `eval/per_mode.py`.
 
 ## Decisions & Trade-offs
 
-- **Scale only where the scale is faithful; scope decides, not units**
-  (maintainer, 2026-08-12). A blanket case-intrinsic denominator for counts was
-  rejected on the observation that dividing a per-level maximum by the level
-  count changes the quantity rather than scaling it: *"this could be a useful
-  feature itself but isn't a normalisation true to the original feature."* The
-  converse was then corrected in the same review: `missing_level_count` **is**
-  scan-level on both sides, so it does have a faithful denominator and should
-  use it. The two metrics that look alike by name behave differently, which is
-  why the class is declared per metric.
+- **Two rules decide scaling: no supervision in the divisor, and review or
+  don't scale** (maintainer, 2026-08-12). The design arrived here in three
+  steps, and both intermediate positions were wrong:
+  1. A blanket case-intrinsic denominator for counts was rejected — dividing a
+     per-level maximum by the level count changes the quantity rather than
+     scaling it: *"this could be a useful feature itself but isn't a
+     normalisation true to the original feature."*
+  2. `missing_level_count` was then treated as the exception, on the grounds
+     that it is scan-level on both sides. Also rejected: its denominator would
+     be *"GT levels expected"*, which **is not derivable from the segmentation
+     or image alone** — *"that's mixing supervision with features."* A scale
+     built on supervision cannot be computed on real segmenter output, the one
+     setting FACET exists for.
+  3. Settled: intrinsic scalings (ratios, bounded-by-construction) proceed
+     automatically; everything else requires human review; the default absent
+     review is raw.
 - **`rogue_island_count`'s scale is a threshold, not a ratio** (maintainer,
   2026-08-12) — the clean expectation is *none*, so a small declared count is
   defensible where a "full-blown failure" magnitude would not be. The exact
