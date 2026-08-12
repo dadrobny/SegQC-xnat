@@ -171,8 +171,10 @@ to `eval/per_mode.py`.
 - **Neighbourhood-relative normalisation is the more meaningful direction for
   unbounded metrics** (maintainer, 2026-08-12) — comparing a vertebra's island
   count against its neighbours' rather than against a fixed constant. Logged to
-  [`insights.md`](../insights.md) and the roadmap Backlog; deliberately **not**
-  built here, and not coupled to item 110's generalised neighbourhood API,
-  which would make this item depend on a features/ refactor mid-stage.
+  [`insights.md`](../insights.md) (2026-08-12) for triage at the next queue
+  boundary; deliberately **not** built here, and not coupled to item 110's
+  generalised neighbourhood API, which would make this item depend on a
+  features/ refactor mid-stage. Item 110's API is named there as the natural
+  mechanism when the feature-set selection vocabulary is next open.
 
 To be updated during implementation.

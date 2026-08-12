@@ -122,9 +122,10 @@ these are **not** fences and must survive untouched (see AC7).
    `<path> not authorised by <spec>`; exit 1 on any violation, 2 on a missing
    or empty section, 0 otherwise.
 6. Add the CI job to `.github/workflows/ci.yml`: `on: pull_request`, resolve
-   the spec for the branch (or accept it as an input), run the script against
-   `origin/${{ github.base_ref }}`. Keep it a pure-git job — no venv, no
-   Docker, no network beyond the checkout.
+   the spec for the branch (or accept it as an input), and run the script
+   against the pull request's base ref — `origin/$BASE_REF`, with `BASE_REF`
+   taken from the workflow's `github.base_ref` context. Keep it a pure-git job
+   — no venv, no Docker, no network beyond the checkout.
 7. Document the convention: the `## Authorised paths` section, the command, and
    the "branch not pytest" rule, in this item's spec and referenced from the
    queue so later items can copy it.
