@@ -288,6 +288,24 @@ segmentation:
 Each failure mode is a **test target**: the evaluation corpus (§8) must include
 examples (real or synthetic) and at least one heuristic must detect each.
 
+**The catalogue is open, and grows in tandem** *(clarified 2026-08-11)*. These eight
+are the modes known today, not a closed set. A mode is added **together with the
+rule(s) that detect it**, plus any new feature(s) those rules need when the existing
+feature pool does not already carry them — never a mode alone, never a rule that
+targets no mode. Features are the exception: the record is a deliberately over-broad
+vector that rules *select from*, so a feature may be added on its own and sit
+**unwired** until a future rule draws on it. Full consumption of the feature set is
+never an expected state. What must hold at all times is coverage in the other two
+directions — every catalogued mode has a rule, every rule names a mode — which
+[`roadmap.md`](roadmap.md) Stage 20 makes visible and enforceable as a matrix.
+
+Note also that "a rule covers this mode" and "we have demonstrated it end-to-end" are
+different claims. Some modes are demonstrable on synthetic fixtures; others need real
+data because hand-crafted geometry cannot express them (§6.7's `L1 → T12 → L2 → L5`
+is one); and at least one — §6.8, overlapping segments — cannot occur at all in the
+single-channel integer label maps FACET supports, since a voxel holds exactly one
+label. Each mode carries which of these applies rather than an unqualified tick.
+
 ---
 
 ## 7. Technical Architecture

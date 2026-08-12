@@ -760,8 +760,19 @@ so execution can then proceed unattended.
 
 **Validation / acceptance.** The catalogue is generated, not hand-written; the drift test
 fails on a deliberately undocumented feature (**G7**); every feature carries a status and
-a named failure mode or is explicitly marked `unwired` (**G8**); the golden decision table
-is complete and signed off.
+**one of**: a named failure mode · the marker `unwired` · or *statused but mode-unmapped,
+with the consuming mode-less rule named* (**G8**); the golden decision table is complete
+and signed off.
+
+> **G8 wording amended 2026-08-11.** The original sentence named only two
+> states and was unsatisfiable as written by the mechanism this stage shipped: a path
+> consumed solely by a rule that carries no §6 mapping (`bounds`, `intensity`,
+> `reference_delta`, `intensity_reference_delta`) is statused `keep` with empty
+> `failure_modes` and `mode_evidence == ("rule_unmapped",)` — statused, not `unwired`, and
+> naming no mode. 72 of 111 entries sit there. The third state is now named explicitly, and
+> the *substantive* close is **Stage 20**'s job: map those four rules to §6 modes or record
+> that they target none. A rule that consumes features but targets no catalogued failure
+> mode is itself the finding.
 
 ---
 
@@ -782,21 +793,82 @@ match — it **never asserts that no other rule fires**. Cross-talk today is 0/9
 assertion is free to adopt *now*; once cases become realistic it is expensive to
 introduce retroactively.
 
+### What the matrix is — and what it is not *(clarified 2026-08-11)*
+
+The matrix is read in **three directions, only two of which must ever be complete**. This
+is the load-bearing distinction of the stage, and Stage 19's G8 sentence originally implied
+the opposite:
+
+| Direction | Complete? | A hole means |
+| --- | --- | --- |
+| **mode → rule** | **Yes, always** | a catalogued §6 failure mode nothing can detect. A defect, and this stage's primary finding. Restates [`vision.md`](vision.md) §6: *"at least one heuristic must detect each"* |
+| **rule → mode** | **Yes, always** | a registered rule targeting no catalogued mode — so either the mode catalogue is short a mode, or the rule is speculative. Four rules sit here today (`bounds`, `intensity`, `reference_delta`, `intensity_reference_delta`) |
+| **feature → rule** | **No — by design** | *nothing.* The feature record is a deliberately over-broad vector that rules **select from**. A leaf path no rule reads is inventory (`unwired`), not a gap; 34 of item 103's 111 catalogued paths are read by nothing today, and full consumption is never an expected end state |
+
+**Evidence rungs.** *"A rule covers this mode"* and *"we have demonstrated it end-to-end"*
+are different claims and each mode's row carries **both**. Three legitimate evidence
+states, drawn from Stage 21's realism ladder:
+
+- **synthetic-demonstrable** — a rung-1 fixture drives the rule end-to-end today.
+- **needs real data (or a corpus the fixtures cannot express)** — the rule exists but the
+  hand-crafted geometry cannot produce the input. Mode 7 is structurally capped at a
+  **single** rank descent by the label convention (`rank(v) == v - 1` under the TPTBox
+  default), so §6.7's own two-descent example — `L1 → T12 → L2 → L5` — is not representable
+  at rung 1 at all; mode 1's severity ladder is FOV-capped by the five-level fixture.
+- **structurally unobservable in the supported input format** — the *feature* the mode
+  targets cannot occur. Mode 8 (overlap) is exactly this: a **single-channel integer label
+  map cannot assign two labels to one voxel**, so `overlaps[]` populates only on a map
+  deliberately corrupted to violate that invariant, which no real segmenter output can be.
+  The `overlap` rule and all six fields it reads are correct and fully wired — the mode
+  becomes meaningfully testable only if multichannel / probabilistic segmentation input is
+  ever supported, which no stage currently plans.
+
+A row recording *needs real data* or *structurally unobservable* is an acceptable outcome.
+A row that is **silent** is not.
+
+**Growth contract.** The catalogue of modes, the rule set and the feature pool grow
+**together, and usually in tandem**: a new §6 mode arrives with the rule(s) that detect it,
+plus any new feature(s) those rules need when the existing pool does not suffice. The
+matrix is what makes that enforceable — a mode with no rule row, or a rule with no mode
+row, fails the same way item 104's drift test fails an undocumented feature. **Features may
+be added alone** (an unwired feature awaiting a future rule is legitimate and expected); a
+mode or a rule may not.
+
 **Deliverables.**
 
-- The **traceability matrix**: 8 failure modes × features × 10 rules, gaps visible rather
-  than implied.
+- The **traceability matrix**, *generated* from item 103's catalogue + the rule registry +
+  a corpus run rather than hand-maintained: 8 failure modes × rules × the features each
+  rule actually consumes, with the three directions above scored separately, and every mode
+  row carrying its evidence rung.
+- **Map the four mode-less rules** (`bounds`, `intensity`, `reference_delta`,
+  `intensity_reference_delta`) to §6 modes, or record that they target none and why —
+  closing Stage 19's G8 shortfall at its root.
 - **The specificity assertion** — no unintended rule may fire — adopted as a ratchet.
-- **Close the reachability hole**: make modes 1/4/8 pipeline-detectable, or record them
-  explicitly as *not detected end-to-end* in the coverage accounting. Not both silent.
-- **Per-rule corpus-exercise reporting**, so "6 of 10 rules fire on zero cases" cannot
-  recur unnoticed.
+- **Close the reachability hole for modes 1/4/8** by naming the *mechanism* per mode, not
+  just the symptom: mode 8 is single-channel-unobservable (above), mode 1's ladder is
+  FOV-capped, mode 4's cause is to be determined by the stage. Made pipeline-detectable
+  where the mechanism allows, recorded with its mechanism where it does not. Not both
+  silent.
+- **Per-rule *and per-operator* corpus-exercise reporting**, so neither "6 of 10 rules fire
+  on zero cases" nor "the registered `fuse` operator generates no corpus case at all"
+  (`synth/component_shape.py:209` vs `synth/corpus.py`'s `CASE_RECIPE`) can recur unnoticed.
+- **Widen item 100's mode-1 ladder base** (a larger FOV, or a base with headroom for a
+  30–40 mm displacement) so mode 1's own metric swing is set by the perturbation rather than
+  the fixture's walls — the recorded root cause of mode 6's Stage-18 specificity shortfall,
+  which should then clear without touching mode 6.
 
-**Dependencies.** Stage 19 (the catalogue supplies the feature↔mode column).
+**Dependencies.** Stage 19 (the catalogue supplies the feature↔mode column). ⚠️ Several
+Stage-26 remediation defects touch the same surfaces this stage audits (`normalised_delta`
+attribution, the RAS `touches_*` face mapping, `neighbourhood.py`'s dead wiring) — auditing
+before they are fixed records findings that are about to change.
 
-**Validation / acceptance.** Every registered rule is either exercised by ≥1 case or
-recorded as unexercised with a reason (**G2**); the specificity assertion is enforced for
-every case; the end-to-end detection count is stated honestly in `progress.md` (**G7**).
+**Validation / acceptance.** Every §6 failure mode has ≥1 rule **and** a recorded evidence
+rung, never silent (**G2**); every registered rule maps to ≥1 §6 mode or is recorded as
+mode-less with a reason; every registered rule is exercised by ≥1 case or recorded as
+unexercised with a reason (**G2**); the specificity assertion is enforced for every case;
+the end-to-end detection count is stated honestly in `progress.md` (**G7**).
+**Explicitly not required:** feature→rule completeness — unwired features are a designed
+state, not a defect.
 
 ---
 
@@ -860,3 +932,150 @@ from the manifest.
 - **Stage 25 — Segmenter-native perturbations.** Rung 3's generator: perturbations derived
   from what a real segmenter actually does wrong, rather than from a catalogue written in
   advance.
+
+---
+
+# Stages scoped 2026-08-11 (after Stage 19)
+
+> Numbered after the placeholders so numbering stays stable; **both run earlier than their
+> numbers suggest** — see each stage's Dependencies. Scoped from triaged
+> [`insights.md`](insights.md) entries that had accumulated no owner.
+
+---
+
+## Stage 26 — Carried-Defect Remediation (pre-real-data) (G2, G7)
+
+**Goal.** Clear the defects that Stages 17–19 recorded but were forbidden (correctly) from
+fixing in scope, **before** Stage 20 audits the surfaces they sit on and before Stage 21
+starts producing numbers from real data. Every item here is a known, diagnosed defect with
+a named location — this stage does no discovery.
+
+**Deliverables** (each a candidate item; D1–D3 and D8 are the load-bearing ones):
+
+- **D1 — `normalised_delta` saturation** (`eval/per_mode_cohort.py`). `delta / max(|a −
+  baseline|, |b − baseline|)` saturates to exactly ±1.0 whenever one run sits on baseline —
+  and 7 of 8 `PER_MODE_METRIC_SPECS` baselines are `0.0`, so any two modes that both return
+  to baseline tie at 1.0 and AC13's lowest-mode tie-break decides attribution, blind to
+  actual magnitude. Stage 18's run-vs-run **attribution** deliverable does not work as
+  specified today; two of its own tests demonstrate the trap.
+- **D2 — RAS `touches_*` face mapping** (`features/geometry.py:251-256`, consumed by
+  `heuristics/border.py` and `heuristics/fov.py`). Item 094 now reorients every loaded
+  volume to RAS, so `x == 0 → touches_inferior` names the **left-right** axis: every
+  `border`/`fov` finding on data read through `segfacet.io` is anatomically mislabelled.
+  Must land before real data, or Stage 21's findings inherit the error.
+- **D3 — golden-fixture test hygiene.** `tests/golden/*.json` is the only committed
+  byte-reproducible text fixture family absent from `.gitattributes` (latent Windows-CI
+  break, three prior instances documented); and
+  `test_022_stage3_serialisation.py::test_ac8_golden_snapshot` **writes its own golden and
+  skips** when the file is missing, so deleting the golden makes the check pass. Both
+  goldens are dispositioned *retire* by item 105, so "fix or retire" — whichever comes
+  first.
+- **D4 —** `eval/per_mode.py::compute_per_mode_metrics` gains an optional
+  `overlap_result=` so the Stage-7 harness stops paying for a second full overlap pass per
+  case.
+- **D5 —** scope `test-numpy-majors` (`.github/workflows/ci.yml`) off the Docker- and
+  PyRadiomics-gated modules; it exists to test numpy-major agnosticism and currently
+  doubles the repo's exposure to Docker Hub rate-limiting for no verification value.
+- **D6 —** refresh `heuristics/bounds.py`'s comments, which still name the retired `S` /
+  `Cocygis` labels (behaviour is correct; the comment is not).
+- **D7 —** resolve `progress.md`'s Stage 17 acceptance box, whose `- [x]` contradicts its
+  own annotation (*"Not ticked: no real SPINEPS output is available…"*). Maintainer's call
+  between untick / reword / a third state.
+- **D8 — `features/neighbourhood.py` is dead wiring.** Stage 3's ✅ deliverable claims local
+  vertebra-neighbourhood comparison "flags isolated anatomical outliers"; the module is
+  implemented in full and referenced by **nothing** — not `pipeline.py`, not
+  `feature_report.py`, not any of the 10 rules — so it never reached item 103's catalogue
+  and no verdict has ever been influenced by it. Wire it (deciding whether it needs a
+  consuming rule, and reconciling its mean/std deviation score with the percentile-based
+  `robust_z` machinery), or retire it and correct the Stage 3 claim.
+
+**Dependencies.** None. **Runs next, ahead of Stage 20** — D1/D2/D8 change surfaces Stage
+20 audits, so auditing first records findings that are about to move. D2 is additionally a
+prerequisite for any real-data claim (Stages 16/21).
+
+**Validation / acceptance.** Each defect has a regression test that fails before the fix
+(**G7**); `border`/`fov` findings carry anatomically correct face names under RAS (**G2**);
+per-mode attribution distinguishes a large move from a small one on a fixture built to have
+both; `neighbourhood.py` is either reachable from `extract_feature_record` and present in
+the regenerated catalogue, or removed with the Stage 3 deliverable reworded.
+
+---
+
+## Stage 27 — Feature Schema Taxonomy & Coordinate System (G8)
+
+**Goal.** Give the feature record a **deliberately designed structure** in place of the
+current one, which groups fields by *which extractor module happened to compute them*.
+Item 106's full 111-entry steering review found this to be the single recurring theme behind
+roughly two-thirds of its per-field `retune` verdicts: those verdicts are symptoms of one
+structural problem, and executing them one field at a time would entrench the same shape.
+
+**This stage designs the taxonomy; it does not inherit one.** The maintainer's framing —
+group by **scope** (`per_label` / `per_neighbour-pair` / `per_scan`-or-case-level) crossed
+with **kind** (shape/geometry · intensity · label-identity · …) — is the **starting
+proposal and the standard of quality**, not a specification to implement literally. The
+stage is expected to evaluate it against the real 111-entry record, and **may deviate where
+it has a recorded reason to**: a different axis, an extra dimension, or a flat scheme for
+part of the record are all acceptable outcomes *provided the deviation and its rationale are
+written down* alongside the design. What is not acceptable is another grouping that happens
+to fall out of module provenance.
+
+**Deliverables.**
+
+- **The taxonomy itself**, written down as a design with its rationale, the alternatives
+  considered, and every deviation from the scope×kind starting proposal justified — reviewed
+  with the maintainer before migration begins. This is a human-checkpoint stage in the same
+  sense Stage 19 was.
+- **The migration**, applied to the record shape, with item 104's drift test as the safety
+  net and item 103's catalogue regenerated against the new schema.
+- **Known instances the design must have an answer for** (evidence, not a to-do list):
+  identity fields (`label` / `level_name`) independently duplicated across
+  `stage3.per_label_offsets[]`, `stage3.per_label_orientations[]`, `image_features.per_label`
+  and `reference_delta.{label}`; `stage3.*` / `image_features.*` sitting as top-level
+  containers parallel to the `per_label.{label}.*` structure that already holds
+  geometry/components/centroid; image-axis-relative shape features (axis-aligned
+  bbox/extent, `principal_axis`) flagged for re-expression in a **vertebra coordinate
+  system** that does not yet exist — the same axis-semantics problem Stage 26's D2 fixes for
+  `touches_*`; and the reference-delta machinery being hardcoded to one tracked feature
+  (`physical_volume_mm3`) when it should take any requested feature — which only becomes
+  coherent once the record is organised well enough to *select a feature set* from.
+
+**Dependencies.** Stages 19 (the catalogue is the map of what moves) and 20 (the matrix says
+which features are load-bearing before any of them are renamed). Should land **before**
+Stages 23/24, which both consume the feature vector as a vector. This stage renames leaf
+paths wholesale, so it is the natural moment to execute item 105's golden retire
+dispositions if Stage 21 has not already.
+
+**Validation / acceptance.** The taxonomy is documented with its rationale and every
+deviation from the starting proposal justified, and is signed off by the maintainer before
+migration (**G8**); every feature is addressable under it and no identity field is stored
+more than once; the regenerated catalogue and the drift test agree; no rule's behaviour
+changes on the corpus except where a retune is explicitly authorised.
+
+---
+
+# Backlog — unowned ideas
+
+> Recorded so they are not lost. **No stage owns these**; each was raised deliberately as
+> "consider later, not now". Promote to a stage when its evidence exists.
+
+- **Leave-one-out / counterfactual sensitivity feature** *(maintainer, 2026-07-28)*. For a
+  given vertebra, measure how much a scan-level shape metric (e.g. spline
+  smoothness/curvature) changes under a hypothetical modification of that vertebra —
+  dropping its label, or merging it into its largest bordering neighbour — as a measure of
+  that vertebra's structural influence on the whole spine. Distinct from both the population
+  reference (`reference_delta`) and the local-neighbourhood comparison (Stage 26 D8): this
+  is an *ablation*, not a static comparison. Closest neighbours are Stages 20 (specificity,
+  not a new feature), 21 (perturbation corpus, not a counterfactual) and 23 (normative
+  model, framed around thresholds).
+- **How should the synthetic fallback reference be generated at all?** *(maintainer,
+  2026-07-28)*. `reference_default.json` is built from a 5-subject **synthetic** cohort
+  (`build_clean_spine` + `paint_clean_scan(seed=0)`); it is no longer the CLI default
+  (`reference_verse_v1.json`, 80 real VerSe19 subjects, has been since item 090) and is kept
+  as a fixed fallback / synthetic-regression fixture. Open question: derive it from
+  published anatomical value ranges instead of synthesised geometry, and/or adopt a
+  realistic synthetic-data toolkit. *(The narrower, actionable half — a plausibility check
+  that its ranges have not drifted relative to the real artifact — is a Stage 21
+  deliverable, not backlog.)*
+- **Multichannel / probabilistic segmentation input.** Not planned. Recorded because it is
+  the precondition that would make §6 mode 8 (overlap) observable on real data at all — see
+  Stage 20's evidence rungs.
