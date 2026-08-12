@@ -74,7 +74,6 @@ from __future__ import annotations
 
 import copy
 import dataclasses
-import hashlib
 import json
 import re
 from pathlib import Path
@@ -1311,52 +1310,12 @@ def test_ac24_shape_mismatch_is_a_caller_error_not_a_silent_none():
 
 
 # =========================================================================== #
-# AC25: the scope fence holds
+# AC25: structural / public-API checks (the byte-hash scope fences that used
+# to sit here were removed by item 107 -- see docs/aide/insights.md and
+# docs/aide/items/107-retire-byte-hash-scope-fences.md for the rationale;
+# diff-time scope is now checked by scripts/check_item_scope.py on the
+# branch, not re-asserted forever as a runtime invariant).
 # =========================================================================== #
-
-_SEGFACET_SRC = Path(
-    __import__("segfacet").__file__
-).resolve().parent
-
-_PRE_099_HASHES = {
-    "report_schema_v0.json": "8c7b48c1fcfc82edf49187c8aa912ac42470b20f53fd739c9b65f0bbf76f4a4b",
-    # Updated by item 101 (added --per-mode / compare-runs to cli.py, a change
-    # authorized by item 101's own spec, not scope creep on this file).
-    "cli.py": "0284d05b819c384ebb3fead90d256d46466a390812e73b379b1880ad12f28b32",
-    "eval/metrics.py": "15a21e7d9c8d738bfe5755637f736e60fd86d620c6117dd39a5d3b3bfa8bff8a",
-}
-_PRE_099_HEURISTICS_COMBINED_HASH = (
-    "92cdc63e9a9bcef3c4ebd6c9b5567e80c30a3077bd3613d635c443bf055d19c4"
-)
-_PRE_099_GOLDEN_COMBINED_HASH = (
-    "08fc9ddc0b149d109eb5f6a5265b7a768ec1ae1f6a518316c4719d4a617ef2a3"
-)
-
-
-@pytest.mark.parametrize("relpath", sorted(_PRE_099_HASHES))
-def test_ac25_named_file_byte_identical_to_pre_099_state(relpath):
-    path = _SEGFACET_SRC / relpath
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    assert digest == _PRE_099_HASHES[relpath], relpath
-
-
-def test_ac25_heuristics_package_byte_identical_to_pre_099_state():
-    heur_files = sorted((_SEGFACET_SRC / "heuristics").rglob("*.py"))
-    h = hashlib.sha256()
-    for f in heur_files:
-        h.update(f.relative_to(_SEGFACET_SRC).as_posix().encode())
-        h.update(f.read_bytes())
-    assert h.hexdigest() == _PRE_099_HEURISTICS_COMBINED_HASH
-
-
-def test_ac25_committed_goldens_byte_identical_to_pre_099_state():
-    golden_dir = Path(__file__).resolve().parent / "corpus" / "golden"
-    files = sorted(golden_dir.glob("*.json"))
-    h = hashlib.sha256()
-    for f in files:
-        h.update(f.name.encode())
-        h.update(f.read_bytes())
-    assert h.hexdigest() == _PRE_099_GOLDEN_COMBINED_HASH
 
 
 def test_ac25_eval_metrics_public_names_unchanged():

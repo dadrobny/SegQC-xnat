@@ -1135,48 +1135,6 @@ def test_ac22_annotations_state_stage19_decides_stage21_executes_if_ticked():
     assert "stage 21" in combined_lower and "execut" in combined_lower
 
 
-_PRE_106_OBJECTIVE_ROW_DIGESTS = {
-    "G7": "fd54e1ce4add20d77bf2e88f4d36d2cd7f37726f1038e17b50bf96a06f19b724",
-    "G8": "cdb36d01c028c48734bccff6b737c572292f13912025a6cd5abe07536c9fe86e",
-}
-_PRE_106_OUTCOME_TARGETS_DIGEST = (
-    "f4f2c9b9c9c9e0cc2b0d47d2adcae193da3558777d63c0e0de042cd93ac54367"
-)
-_PRE_106_REAL_CORPUS_ROW_DIGEST = (
-    "2e827dfc1efcc6f133541b311a798c9428937cf814d61cd236836480a42aefb7"
-)
-
-
-def test_ac24_objective_coverage_g7_and_g8_rows_unchanged():
-    import hashlib
-
-    text = _read_progress()
-    section = _markdown_section(text, "## Objective coverage")
-    g7_line = next(l for l in section.splitlines() if l.strip().startswith("|") and "G7" in l)
-    g8_line = next(l for l in section.splitlines() if l.strip().startswith("|") and "G8" in l)
-    assert hashlib.sha256(g7_line.encode("utf-8")).hexdigest() == _PRE_106_OBJECTIVE_ROW_DIGESTS["G7"]
-    assert hashlib.sha256(g8_line.encode("utf-8")).hexdigest() == _PRE_106_OBJECTIVE_ROW_DIGESTS["G8"]
-
-
-def test_ac24_outcome_targets_table_unchanged():
-    import hashlib
-
-    text = _read_progress()
-    section = _markdown_section(text, "## Outcome targets")
-    assert hashlib.sha256(section.encode("utf-8")).hexdigest() == _PRE_106_OUTCOME_TARGETS_DIGEST
-
-
-def test_ac24_real_corpus_verification_row_unchanged_and_names_stage16():
-    import hashlib
-
-    text = _read_progress()
-    section = _markdown_section(text, "## Environment-Gated Capability Verification")
-    row = next(l for l in section.splitlines() if "Real automatic-segmentation failure corpus" in l)
-    assert hashlib.sha256(row.encode("utf-8")).hexdigest() == _PRE_106_REAL_CORPUS_ROW_DIGEST
-    assert "❓ Unverified" in row
-    assert "Stage 16" in row
-
-
 def test_ac24_no_annotation_asserts_real_data_coverage():
     text = _read_progress()
     section = _stage19_section(text)

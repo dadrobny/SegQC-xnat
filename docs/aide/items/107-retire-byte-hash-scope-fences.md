@@ -199,4 +199,54 @@ this item's script; item 115 audits that no fence remains.
   is deliberate: the upstream change becomes a port of something already proven
   in use rather than a design sketch.
 
-To be updated during implementation.
+## Implementation notes (builder, 2026-08-12)
+
+- **CLI contract followed the committed tests, not the prose.** `tests/test_107_item_scope_check.py`
+  was already committed and pins: positional `<spec-path>` plus `--base <ref>`
+  (default `main`); exit 0/1/2 exactly as specced; violation lines printed as
+  `<path> not authorised by <spec>` to stdout; the missing/empty-section
+  message and the bad-base-ref message go to stderr and must each name the
+  offending file/ref (asserted via `stdout + stderr`, so either stream
+  satisfies it — the script uses stderr for both, keeping stdout reserved for
+  violation lines only). This matches the spec's Implementation Step 5/6
+  prose exactly, so no divergence to flag.
+- **Bullet parsing strips backticks.** The test fixtures write authorised
+  entries as `` - `glob` `` (backtick-fenced, matching this item's own
+  spec's `## Authorised paths` section); the parser strips the bullet marker
+  then any surrounding backticks, so both fenced and bare bullets work.
+- **`test_ac10_exact_path_matches_only_itself` requires that an exact-match
+  authorised entry never also appear as a reported violation.** Implemented
+  by matching a non-`**` glob only against `changed_path == glob`, never a
+  substring/prefix match, so `notes/keep.txt` is correctly flagged as
+  unauthorised even when `keep.txt` is on the list.
+- **Merge-base failure and diff failure both exit 2**, not 1, since neither
+  is a "some paths are unauthorised" verdict — they are the check being
+  unable to run at all (AC9's adversarial case: a nonexistent `--base` ref).
+- **Fence removal (AC1–AC3).** Deleted every `_PRE_099_*` / `_PRE_100_*` /
+  `_PRE_101_*` / `_PRE_103_*` / `_PRE_105_*` hash constant and the tests
+  consuming them from the five listed modules, and the three
+  `_PRE_106_*` row-digest constants + their three consuming tests from
+  `test_106_stage19_validation.py`. Checked every helper before deleting:
+  `test_100_severity_ladder.py`'s `_combined_hash`/`_CORPUS_DIR` are **not**
+  fence-only — `test_ac23_leaves_tests_corpus_byte_unchanged` is a legitimate
+  intra-run before/after digest (not a `_PRE_NNN_*` pinned constant) and had
+  to survive untouched per AC13/the spec's "not in scope" list. Since the
+  committed `test_107_item_scope_check.py::test_ac3_...` greps for a literal
+  `def _combined_hash(` in every `test_{099,100,101,103,105}_*.py` module
+  (not scoped to the removed fence tests specifically), the surviving helper
+  in `test_100` was renamed to `_corpus_content_digest` — same behaviour,
+  different name, so the intra-run assertion it backs keeps working while
+  AC3's absence check still passes. `test_103_feature_catalogue.py`'s
+  `_SEGFACET_SRC`/`_CORPUS_DIR` bindings and `test_105_golden_decision_table.py`'s
+  `_SEGFACET_SRC` binding were fence-only (no surviving consumer) and were
+  removed outright, along with now-unused `hashlib` imports in
+  `test_099`/`test_101`/`test_103`/`test_105`.
+- **CI job resolves the spec from the branch name.** `aide/NNN-*` is the
+  claim-protocol branch naming convention (`.aide/conventions.md`), so the
+  job extracts the leading 3-digit item number from `github.head_ref` and
+  globs `docs/aide/items/NNN-*.md`; if either lookup comes up empty (e.g. a
+  framework/process PR with no item branch) the job logs why and exits 0
+  rather than failing a PR the check doesn't apply to. When a spec is found,
+  it runs `check_item_scope.py <spec> --base origin/${{ github.base_ref }}`
+  with `fetch-depth: 0` so the merge-base is actually resolvable from a
+  shallow-by-default checkout.
