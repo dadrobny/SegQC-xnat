@@ -1023,22 +1023,31 @@ discovery.
 
 - 📋 **D1** `normalised_delta` saturates to ±1.0 whenever one run sits on baseline (7 of 8
   metric baselines are `0.0`), so Stage 18's run-vs-run attribution is decided by the
-  lowest-mode tie-break rather than by magnitude. `eval/per_mode_cohort.py`.
+  lowest-mode tie-break rather than by magnitude. `eval/per_mode_cohort.py`. *(Item 109)*
 - 📋 **D2** `touches_*` face mapping is anatomically wrong under RAS since item 094
   (`x == 0 → touches_inferior` names the left-right axis) — every `border`/`fov` finding on
-  data read through `segfacet.io` is mislabelled. Must land before real data.
+  data read through `segfacet.io` is mislabelled. Must land before real data. *(Item 108)*
 - 📋 **D3** Golden-fixture test hygiene: `tests/golden/*.json` unpinned in `.gitattributes`
   (latent Windows-CI break); `test_022_stage3_serialisation.py::test_ac8_golden_snapshot`
   writes its own golden and skips when missing, so deleting the file makes it pass.
+  *(Item 111)*
 - 📋 **D4** `compute_per_mode_metrics` gains an optional `overlap_result=` (halves the
-  overlap work of a cohort-scale per-mode run).
-- 📋 **D5** `test-numpy-majors` scoped off the Docker/PyRadiomics-gated modules.
+  overlap work of a cohort-scale per-mode run). *(Item 112)*
+- 📋 **D5** `test-numpy-majors` scoped off the Docker/PyRadiomics-gated modules. *(Item 113)*
 - 📋 **D6** `heuristics/bounds.py` comments still name the retired `S` / `Cocygis` labels.
+  *(Item 114)*
 - 📋 **D7** Stage 17's acceptance box contradicts its own annotation — maintainer's call
-  between untick / reword / third state.
+  between untick / reword / third state. *(Item 114)*
 - 📋 **D8** `features/neighbourhood.py` is dead wiring: implemented in full, referenced by
   nothing, yet Stage 3 claims it "flags isolated anatomical outliers" ✅. Wire it or retire
-  it and correct the claim.
+  it and correct the claim. *(Item 110)*
+- 📋 **D9** The `_PRE_NNN_*` byte-hash scope fences (items 099/100/101/103/105, plus item
+  106's `progress.md` row digests) encode a diff-time property as a permanent runtime
+  invariant: six documented failures, no recorded true positive, and a re-pin toll on every
+  later item that edits source. Retire them and land the deterministic diff-based scope
+  check they were reaching for. *(Item 107)*
+- 📋 Stage 26 end-to-end validation: per-defect red-then-green replay, fresh-clone suite
+  run, fence-retirement audit, and verification-row closure. *(Item 115)*
 
 **Acceptance.**
 
@@ -1048,6 +1057,8 @@ discovery.
   to have both.
 - [ ] `neighbourhood.py` is reachable from `extract_feature_record` and present in the
   regenerated catalogue, or removed with Stage 3's deliverable reworded.
+- [ ] No `_PRE_NNN_*` byte-hash fence remains, and the diff-based scope check that replaces
+  it flags a deliberately out-of-scope edit on a scratch branch (**G7**).
 
 ---
 
