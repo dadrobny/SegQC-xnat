@@ -23,21 +23,30 @@ claims, and two of item 101's own tests demonstrate the trap on deliberately
 different-magnitude inputs.
 
 The fix is **not** a single universal scale, because the eight metrics do not
-share units. They split in two:
+share units — and the deciding question is **scope**, not whether a metric
+happens to be a count. Each metric falls into one of three classes:
 
-- **Bounded metrics** — `unanchored_foreground_fraction` (baseline 0.0),
+- **Bounded 0..1 — scale by the derivable full swing.**
+  `unanchored_foreground_fraction` (baseline 0.0),
   `min_dominant_component_fraction` (baseline 1.0, decreasing),
-  `mislabelled_volume_fraction` (0.0) and the other fraction-valued entries.
-  These are mathematically confined to 0..1, so the full swing from baseline is
-  derivable with no free parameter, and normalising by it is faithful.
-- **Unbounded metrics** — `rogue_island_count`, `missing_level_count`. These
-  have no natural full swing. Any denominator is either a hand-set judgement or
-  a change of quantity: dividing `rogue_island_count` (defined as a **maximum
-  over per-label entries**) by the number of levels converts a per-level
-  worst-case into a scan-level density — a different and possibly useful
-  feature, but not a normalisation of the original.
+  `mislabelled_volume_fraction` (0.0) and the other fraction-valued entries are
+  mathematically confined, so the distance from baseline to the far end of the
+  range is derivable with no free parameter.
+- **Same-scope ratio available — scale by the case's own denominator.**
+  `missing_level_count` is scan-level on **both** sides: it counts GT labels
+  absent from the candidate, and the scan's GT label count is a denominator of
+  the same scope. `missing / expected` is a genuine fraction of that scan's own
+  anatomy, not a change of quantity, and needs no declared constant.
+- **Scope mismatch — no faithful ratio; leave raw, allow a declared threshold.**
+  `rogue_island_count` is a **maximum over per-label entries**, so dividing by a
+  scan-level count converts a per-level worst case into a scan-level density —
+  a different quantity. Here the natural scale is a declared threshold rather
+  than a ratio, since the clean expectation is *none*; the value is **TBC** and
+  this item ships the mechanism without setting it.
 
-So: normalise where a genuine full swing exists, and report raw otherwise.
+So: scale where the scale is faithful — a derivable range, or a denominator of
+the same scope — and otherwise report raw, leaving a declared threshold
+available for whoever can justify one.
 
 **In scope.** The normalisation and attribution logic, the optional per-metric
 excursion field, and the affected rendering and tests.
@@ -49,13 +58,18 @@ Decisions).
 
 ## Acceptance Criteria
 
-- [ ] **AC1: bounded metrics normalise by their derivable full swing.** For a
+- [ ] **AC1: bounded metrics scale by their derivable full swing.** For a
   metric confined to a known range, `normalised_delta` is `delta` divided by the
   distance from `baseline` to the far end of that range, and the divisor is
   derived from the metric's declaration, not hand-entered.
-- [ ] **AC2: unbounded metrics are not normalised by default.**
-  `normalised_delta is None` for a metric with no declared full swing, and the
-  raw delta remains available on the same record.
+- [ ] **AC1b: same-scope metrics scale by the case's own denominator.**
+  `missing_level_count` is divided by the number of GT levels expected in that
+  case, yielding a fraction of the scan's own anatomy; the denominator comes
+  from the comparison's inputs, not from a constant.
+- [ ] **AC2: scope-mismatched metrics are not scaled by default.**
+  `normalised_delta is None` for a metric with neither a derivable range, a
+  same-scope denominator, nor a declared threshold — `rogue_island_count`
+  today — and the raw delta remains available on the same record.
 - [ ] **AC3: an optional excursion may be declared.** `MetricSpec` gains an
   optional reference-excursion field, unset for every metric by default; when
   set, that metric normalises by it.
@@ -89,10 +103,12 @@ Decisions).
 
 ## Assumptions
 
-- **Bounded-vs-unbounded is derivable from the existing declarations.** A
-  metric named `*_fraction` with a `0.0` or `1.0` baseline is bounded 0..1; a
-  metric named `*_count` is unbounded. If any metric resists that reading, the
-  spec's classification is recorded explicitly per metric rather than inferred.
+- **The classification is recorded per metric, not inferred from its name.**
+  Name-based inference (`*_fraction` bounded, `*_count` unbounded) is wrong:
+  `missing_level_count` and `rogue_island_count` are both counts and fall in
+  different classes, because the first is scan-level on both sides and the
+  second is a per-label maximum. Each of the eight metrics carries an explicit,
+  reviewed class.
 - **`PER_MODE_METRIC_SPECS` may gain an optional field.** Additive only —
   existing field names, values, baselines and directions are untouched, so
   item 104's catalogue and any consumer reading the specs keep working.
@@ -161,13 +177,19 @@ to `eval/per_mode.py`.
 
 ## Decisions & Trade-offs
 
-- **Normalise only where a real full swing exists** (maintainer, 2026-08-12).
-  The originally-proposed case-intrinsic denominator for counts was rejected on
-  the maintainer's observation that dividing a per-level maximum by the level
-  count changes the quantity rather than normalising it: *"this could be a
-  useful feature itself but isn't a normalisation true to the original
-  feature."* Optional declared constants are permitted where someone can justify
-  one; none is declared here.
+- **Scale only where the scale is faithful; scope decides, not units**
+  (maintainer, 2026-08-12). A blanket case-intrinsic denominator for counts was
+  rejected on the observation that dividing a per-level maximum by the level
+  count changes the quantity rather than scaling it: *"this could be a useful
+  feature itself but isn't a normalisation true to the original feature."* The
+  converse was then corrected in the same review: `missing_level_count` **is**
+  scan-level on both sides, so it does have a faithful denominator and should
+  use it. The two metrics that look alike by name behave differently, which is
+  why the class is declared per metric.
+- **`rogue_island_count`'s scale is a threshold, not a ratio** (maintainer,
+  2026-08-12) — the clean expectation is *none*, so a small declared count is
+  defensible where a "full-blown failure" magnitude would not be. The exact
+  value is **TBC**; this item ships the mechanism and sets nothing.
 - **Neighbourhood-relative normalisation is the more meaningful direction for
   unbounded metrics** (maintainer, 2026-08-12) — comparing a vertebra's island
   count against its neighbours' rather than against a fixed constant. Logged to

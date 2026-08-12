@@ -1100,3 +1100,24 @@ changes on the corpus except where a retune is explicitly authorised.
 - **Multichannel / probabilistic segmentation input.** Not planned. Recorded because it is
   the precondition that would make §6 mode 8 (overlap) observable on real data at all — see
   Stage 20's evidence rungs.
+- **Scaling the per-mode metrics that are not bounded 0..1** *(2026-08-12)*. The eight metrics
+  do not share units, and they do not share a remedy either — the choice is per metric, and
+  the deciding question is **scope**, not whether the metric happens to be a count:
+  - **A faithful ratio exists where numerator and denominator share scope.**
+    `missing_level_count` is scan-level on both sides — GT levels absent, over GT levels
+    expected — so `missing / expected` is a genuine fraction of the scan's own anatomy.
+  - **A ratio is wrong where scope differs.** `rogue_island_count` is a *maximum over
+    per-label entries*; dividing it by a scan-level count converts a per-level worst case
+    into a scan-level density, which is a different quantity (possibly a useful feature in
+    its own right — but not a scaling of the original).
+  - **A declared threshold fits where the clean expectation is a known constant.** For rogue
+    islands the expectation is *none*, so a small declared count is defensible as the scale
+    without inventing a "full-blown failure" magnitude. The value is **TBC** and deliberately
+    unset by item 109, which ships only the mechanism.
+  - **Neighbourhood-relative comparison is the fallback**, reached for when neither a
+    same-scope denominator nor a defensible global constant exists: compare a vertebra's value
+    against its own neighbours rather than against anything global. Item 110's generalised
+    neighbourhood API (arbitrary named features, selectable scored subset) is the mechanism;
+    coupling `eval/` to a `features/` refactor was deliberately kept out of Stage 26. A
+    natural fit for **Stage 27**, which is already generalising `reference_delta` off its
+    single hardcoded tracked feature.
