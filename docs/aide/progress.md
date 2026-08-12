@@ -1041,7 +1041,7 @@ discovery.
 - 📋 **D8** `features/neighbourhood.py` is dead wiring: implemented in full, referenced by
   nothing, yet Stage 3 claims it "flags isolated anatomical outliers" ✅. Wire it or retire
   it and correct the claim. *(Item 110)*
-- 🚧 **D9** The `_PRE_NNN_*` byte-hash scope fences (items 099/100/101/103/105, plus item
+- ✅ **D9** The `_PRE_NNN_*` byte-hash scope fences (items 099/100/101/103/105, plus item
   106's `progress.md` row digests) encode a diff-time property as a permanent runtime
   invariant: six documented failures, no recorded true positive, and a re-pin toll on every
   later item that edits source. Retire them and land the deterministic diff-based scope
