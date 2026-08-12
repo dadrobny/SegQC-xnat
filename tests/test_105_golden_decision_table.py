@@ -63,7 +63,6 @@ line rather than raising ``IndexError``.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 from pathlib import Path
@@ -72,7 +71,6 @@ import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _TESTS_DIR = Path(__file__).resolve().parent
-_SEGFACET_SRC = _REPO_ROOT / "src" / "segfacet"
 _DOC_PATH = _REPO_ROOT / "docs" / "aide" / "golden-decision-table.md"
 _PROGRESS_PATH = _REPO_ROOT / "docs" / "aide" / "progress.md"
 _CORPUS_GOLDEN_DIR = _TESTS_DIR / "corpus" / "golden"
@@ -581,91 +579,10 @@ def test_ac13_divergences_section_names_exactly_the_keep_rows(
 
 
 # =========================================================================== #
-# AC14: the scope fence holds -- nothing under tests/corpus/**,
-# src/segfacet/**, tests/golden/**, or .gitattributes is touched
+# AC14: (byte-hash scope fences formerly here were removed by item 107; see
+# docs/aide/items/107-retire-byte-hash-scope-fences.md. Diff-time scope is
+# now checked by scripts/check_item_scope.py on the branch.)
 # =========================================================================== #
-
-_PRE_105_CORPUS_HASH = "aad04c1b0e42074a11342b24dc94c7f2ec896cda1664efeee7c5fc5b0ec4f547"
-# Re-pinned 2026-07-28, authorised by item 106's Description ("The scope fence
-# is therefore widened by exactly one file and one name" -- feature_docs.py's
-# STATUS_OVERRIDES) and Assumptions ("Item 105's AC14 fence may need one
-# re-pin"), following the _PRE_100_HASHES precedent
-# (tests/test_100_severity_ladder.py:947-949). This value is the src/segfacet
-# tree AFTER item 106's one authorised STATUS_OVERRIDES edit -- the new
-# baseline going forward, not the pre-item-106 value. Recomputed with
-# _tracked_files' __pycache__ exclusion (see that function's docstring for
-# the unrelated hash-instability bug this also fixed).
-# Re-pinned again 2026-08-11 (PR #48, Copilot review response): src/segfacet
-# changed once more to fix two Copilot findings -- load_feature_catalog()'s
-# str(None) coercion (scripts/aide_status_report.py, out of this hash's
-# scope but committed alongside) and the lost per-group intro text
-# (src/segfacet/catalogue.py + feature_docs.py's new GROUP_INTROS). Same
-# authorisation as above -- this is still the mechanical consequence of a
-# whole-tree fence over a package other items keep legitimately touching.
-_PRE_105_SRC_HASH = "fbd761ebfc8d5b2d07d8ebc9cae473d7610f4aefc13fd9d93dfecd8fb6f16a4f"
-_PRE_105_GOLDEN_NAMES = ("016_features_report.json", "022_stage3_report.json")
-_PRE_105_GOLDEN_TEXT_HASH = "273ffe653925c0f149ed4a55778aba81cc8e95a68c3ca1f0e448fe6ee25c5430"
-# Re-pinned 2026-08-11 (PR #48 Windows CI fix): added three missing LF pins
-# (.gitattributes self-pin, src/segfacet/**/*.yaml, docs/aide/
-# golden-decision-table.md) after a Windows CI run found all three files
-# were subject to the exact core.autocrlf gotcha .gitattributes exists to
-# prevent -- see the .gitattributes comments at each new pin.
-_PRE_105_GITATTRIBUTES_HASH = "28f177084b16db04931c99c70471a668d312fb7a750d8792727f2e1dbaae8fa4"
-
-
-def _combined_hash(base: Path, files) -> str:
-    h = hashlib.sha256()
-    for f in sorted(files):
-        h.update(f.relative_to(base).as_posix().encode())
-        h.update(f.read_bytes())
-    return h.hexdigest()
-
-
-def _tracked_files(root: Path):
-    # Defect fix (found during item 106's execution, 2026-07-28): an
-    # unfiltered rglob("*") picks up __pycache__/*.pyc alongside real source
-    # -- compiled bytecode that is gitignored, untracked, and whose bytes
-    # embed source mtimes, so the digest is non-reproducible across repeated
-    # runs on an *unchanged* tree (observed: three different hashes across
-    # three clear-cache-then-run cycles). Excluding any path with a
-    # __pycache__ component restricts the hash to real, tracked source, which
-    # is what a scope fence is actually supposed to pin.
-    return [
-        p for p in root.rglob("*")
-        if p.is_file() and "__pycache__" not in p.parts
-    ]
-
-
-def test_ac14_tests_corpus_byte_identical_to_pre_105_state():
-    corpus_dir = _TESTS_DIR / "corpus"
-    assert _combined_hash(corpus_dir, _tracked_files(corpus_dir)) == _PRE_105_CORPUS_HASH
-
-
-def test_ac14_src_segfacet_byte_identical_to_pre_105_state():
-    assert _combined_hash(_SEGFACET_SRC, _tracked_files(_SEGFACET_SRC)) == _PRE_105_SRC_HASH
-
-
-def test_ac14_tests_golden_unchanged_by_name_set_and_text_digest():
-    # tests/golden/*.json is NOT LF-pinned in .gitattributes (a logged survey
-    # defect this item does not fix -- see insights.md), so byte-hashing it
-    # would be a platform-dependent false positive on a Windows checkout
-    # (core.autocrlf rewrites LF -> CRLF on checkout, per the CLAUDE.md
-    # gotcha this repo has been bitten by three times already). Compare the
-    # name set plus a digest over universal-newline-normalised text instead.
-    golden_dir = _TESTS_DIR / "golden"
-    files = sorted(p for p in golden_dir.iterdir() if p.is_file())
-    assert tuple(p.name for p in files) == _PRE_105_GOLDEN_NAMES
-
-    h = hashlib.sha256()
-    for f in files:
-        h.update(f.name.encode())
-        h.update(f.read_text(encoding="utf-8").encode("utf-8"))
-    assert h.hexdigest() == _PRE_105_GOLDEN_TEXT_HASH
-
-
-def test_ac14_gitattributes_byte_unchanged():
-    digest = hashlib.sha256((_REPO_ROOT / ".gitattributes").read_bytes()).hexdigest()
-    assert digest == _PRE_105_GITATTRIBUTES_HASH
 
 
 # =========================================================================== #

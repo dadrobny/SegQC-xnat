@@ -183,7 +183,22 @@ _REPO_ROOT = _SEGFACET_SRC.parent.parent
 _CORPUS_DIR = _REPO_ROOT / "tests" / "corpus"
 
 
-def _combined_hash(files, base: Path) -> str:
+def _corpus_content_digest(files, base: Path) -> str:
+    """Intra-run content digest (not a byte-hash scope fence -- see item 107:
+    this compares a before/after snapshot within a single test run, never a
+    pinned pre-item constant).
+
+    Renamed from `_combined_hash` by item 107 (2026-08-12): item 107 deleted
+    every `_PRE_NNN_*` byte-hash scope fence, and `test_ac23_leaves_tests_corpus_byte_unchanged`
+    (below) is the one surviving intra-run before/after digest that AC13
+    requires to keep working, not a fence -- it hashes `_CORPUS_DIR`'s
+    contents at the start and end of the *same* test run and asserts they
+    match, so there is nothing pinned across runs or items for a later item
+    to legitimately collide with. The old name `_combined_hash` was a leftover
+    from when this module's fence helper shared that name; keeping the old
+    name after the fence was removed would have read as reusing/renaming a
+    fence helper to dodge item 107's own AC3 grep for fence helpers, so it was
+    renamed to describe what it actually is."""
     h = hashlib.sha256()
     for f in files:
         h.update(f.relative_to(base).as_posix().encode())
@@ -844,13 +859,13 @@ def test_ac23_evaluate_ladder_opens_no_file_and_reads_no_clock(monkeypatch):
 
 def test_ac23_leaves_tests_corpus_byte_unchanged():
     files_before = sorted(p for p in _CORPUS_DIR.rglob("*") if p.is_file())
-    hash_before = _combined_hash(files_before, _CORPUS_DIR)
+    hash_before = _corpus_content_digest(files_before, _CORPUS_DIR)
 
     sl = _sl()
     sl.evaluate_ladder(sl.SEVERITY_LADDERS[1])
 
     files_after = sorted(p for p in _CORPUS_DIR.rglob("*") if p.is_file())
-    hash_after = _combined_hash(files_after, _CORPUS_DIR)
+    hash_after = _corpus_content_digest(files_after, _CORPUS_DIR)
     assert hash_after == hash_before
 
 
@@ -937,50 +952,10 @@ def test_ac25_unregistered_operator_raises_key_error_not_skipped():
 
 
 # =========================================================================== #
-# AC26: the scope fence holds
+# AC26: (byte-hash scope fences formerly here were removed by item 107; see
+# docs/aide/items/107-retire-byte-hash-scope-fences.md. Diff-time scope is
+# now checked by scripts/check_item_scope.py on the branch.)
 # =========================================================================== #
-
-_PRE_100_HASHES = {
-    "eval/per_mode.py": "5fd77f74b33dccbe32c3b899a9d2a4e1f051df03a5deb9a3a0cda7058ff0d9c6",
-    "eval/metrics.py": "15a21e7d9c8d738bfe5755637f736e60fd86d620c6117dd39a5d3b3bfa8bff8a",
-    # cli.py and eval/eval_report_schema_v0.json updated by item 101 (added
-    # --per-mode / compare-runs to cli.py and the additive per_mode_magnitude
-    # block to the schema, both authorized by item 101's own spec).
-    "cli.py": "0284d05b819c384ebb3fead90d256d46466a390812e73b379b1880ad12f28b32",
-    "report_schema_v0.json": "8c7b48c1fcfc82edf49187c8aa912ac42470b20f53fd739c9b65f0bbf76f4a4b",
-    "eval/eval_report_schema_v0.json": "1e76d8153dc854dc4a308c7df5861d0f130ee1633a0d7b66b18572562504c8aa",
-}
-_PRE_100_SYNTH_HASH = "8ed4d4d5d1d26c36077eef2a35569d8db6687d51d7551e94f38e76f8d7323205"
-_PRE_100_HEURISTICS_HASH = "92cdc63e9a9bcef3c4ebd6c9b5567e80c30a3077bd3613d635c443bf055d19c4"
-_PRE_100_FEATURES_HASH = "92cc4fba7269f8c77c33441ea870b7eb6224d561a03c192028fa03560a6f60ce"
-_PRE_100_CORPUS_HASH = "aad04c1b0e42074a11342b24dc94c7f2ec896cda1664efeee7c5fc5b0ec4f547"
-
-
-@pytest.mark.parametrize("relpath", sorted(_PRE_100_HASHES))
-def test_ac26_named_file_byte_identical_to_pre_100_state(relpath):
-    path = _SEGFACET_SRC / relpath
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    assert digest == _PRE_100_HASHES[relpath], relpath
-
-
-def test_ac26_synth_package_byte_identical_to_pre_100_state():
-    files = sorted((_SEGFACET_SRC / "synth").rglob("*.py"))
-    assert _combined_hash(files, _SEGFACET_SRC) == _PRE_100_SYNTH_HASH
-
-
-def test_ac26_heuristics_package_byte_identical_to_pre_100_state():
-    files = sorted((_SEGFACET_SRC / "heuristics").rglob("*.py"))
-    assert _combined_hash(files, _SEGFACET_SRC) == _PRE_100_HEURISTICS_HASH
-
-
-def test_ac26_features_package_byte_identical_to_pre_100_state():
-    files = sorted((_SEGFACET_SRC / "features").rglob("*.py"))
-    assert _combined_hash(files, _SEGFACET_SRC) == _PRE_100_FEATURES_HASH
-
-
-def test_ac26_corpus_byte_identical_to_pre_100_state():
-    files = sorted(p for p in _CORPUS_DIR.rglob("*") if p.is_file())
-    assert _combined_hash(files, _CORPUS_DIR) == _PRE_100_CORPUS_HASH
 
 
 # =========================================================================== #

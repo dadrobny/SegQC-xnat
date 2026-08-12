@@ -6,6 +6,50 @@ on:
   pull_request:
 
 jobs:
+  # Item 107: diff-based scope check, replacing the byte-hash "scope fence"
+  # pytests it retired. Pure git -- no venv, no Docker, no network beyond the
+  # checkout -- so it stays fast and dependency-free. Resolves the item spec
+  # for the PR branch from its own filename convention
+  # (docs/aide/items/NNN-*.md) using the PR title/branch name's leading
+  # item number, and runs scripts/check_item_scope.py against the PR's base
+  # ref (github.base_ref) so a changed file outside that item's declared
+  # `## Authorised paths` fails the build.
+  scope-check:
+    name: item scope check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve item spec for this branch
+        id: spec
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -e
+          # Item branches are named aide/NNN-... (see .aide/conventions.md's
+          # claim protocol); pull the leading item number out of the branch
+          # name and match it to its docs/aide/items/NNN-*.md spec.
+          item_number=$(echo "$HEAD_REF" | grep -oE '[0-9]{3}' | head -n1 || true)
+          if [ -z "$item_number" ]; then
+            echo "could not extract a 3-digit item number from branch '$HEAD_REF'; skipping scope check"
+            echo "spec=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          spec=$(ls docs/aide/items/${item_number}-*.md 2>/dev/null | head -n1 || true)
+          if [ -z "$spec" ]; then
+            echo "no docs/aide/items/${item_number}-*.md spec found; skipping scope check"
+            echo "spec=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "spec=$spec" >> "$GITHUB_OUTPUT"
+      - name: Run scope check
+        if: steps.spec.outputs.spec != ''
+        run: |
+          python scripts/check_item_scope.py "${{ steps.spec.outputs.spec }}" --base "origin/${{ github.base_ref }}"
+
   test:
     name: test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

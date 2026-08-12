@@ -49,7 +49,7 @@
 | 23    | *(placeholder)* Multivariate Normative Model                          | G3              | 📋     |
 | 24    | *(placeholder)* Failure-Mode Discovery & Typed Reference Set          | G8              | 📋     |
 | 25    | *(placeholder)* Segmenter-Native Perturbations                        | G2              | 📋     |
-| 26    | Carried-Defect Remediation (pre-real-data)*(runs next)*               | G2, G7          | 📋     |
+| 26    | Carried-Defect Remediation (pre-real-data)*(runs next)*               | G2, G7          | 🚧     |
 | 27    | Feature Schema Taxonomy & Coordinate System                             | G8              | 📋     |
 
 > **Supersession 2026-07-25.** Stages 0–14 are history and are not reopened. Stage 15 is
@@ -1012,7 +1012,7 @@ failures.*
 
 ---
 
-## Stage 26 — Carried-Defect Remediation (pre-real-data) (G2, G7) — 📋
+## Stage 26 — Carried-Defect Remediation (pre-real-data) (G2, G7) — 🚧
 
 **Goal.** Clear the defects Stages 17–19 recorded but were (correctly) forbidden from
 fixing in scope, **before** Stage 20 audits those surfaces and before Stage 21 produces
@@ -1041,7 +1041,7 @@ discovery.
 - 📋 **D8** `features/neighbourhood.py` is dead wiring: implemented in full, referenced by
   nothing, yet Stage 3 claims it "flags isolated anatomical outliers" ✅. Wire it or retire
   it and correct the claim. *(Item 110)*
-- 📋 **D9** The `_PRE_NNN_*` byte-hash scope fences (items 099/100/101/103/105, plus item
+- ✅ **D9** The `_PRE_NNN_*` byte-hash scope fences (items 099/100/101/103/105, plus item
   106's `progress.md` row digests) encode a diff-time property as a permanent runtime
   invariant: six documented failures, no recorded true positive, and a re-pin toll on every
   later item that edits source. Retire them and land the deterministic diff-based scope

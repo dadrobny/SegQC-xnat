@@ -62,7 +62,6 @@ identical ``run_id``s on both sides (allowed).
 from __future__ import annotations
 
 import dataclasses
-import hashlib
 import json
 import math
 import time
@@ -1496,60 +1495,10 @@ def test_ac26_compare_runs_opens_no_file_and_reads_no_clock(monkeypatch):
 
 
 # =========================================================================== #
-# AC27: the scope fence holds
+# AC27: (byte-hash scope fences formerly here were removed by item 107; see
+# docs/aide/items/107-retire-byte-hash-scope-fences.md. Diff-time scope is
+# now checked by scripts/check_item_scope.py on the branch.)
 # =========================================================================== #
-
-_SEGFACET_SRC = Path(__import__("segfacet").__file__).resolve().parent
-_REPO_ROOT = _SEGFACET_SRC.parent.parent
-_CORPUS_DIR = _REPO_ROOT / "tests" / "corpus"
-
-_PRE_101_HASHES = {
-    "eval/per_mode.py": "5fd77f74b33dccbe32c3b899a9d2a4e1f051df03a5deb9a3a0cda7058ff0d9c6",
-    "eval/metrics.py": "15a21e7d9c8d738bfe5755637f736e60fd86d620c6117dd39a5d3b3bfa8bff8a",
-    "eval/overlap.py": "aafeee545c2a719ba7f25e6ef03abeb3c2b845105691ca9114d121479b39d5b5",
-    "eval/severity_ladder.py": "9921eede59824ca596452a9a7ea80d8995e591a168d775b195d10396a0916b08",
-    "eval/calibrate.py": "cc15c377ce6199c5ad88375f07ad206b9c4711560cc0397ff756c0767fc2c760",
-    "report_schema_v0.json": "8c7b48c1fcfc82edf49187c8aa912ac42470b20f53fd739c9b65f0bbf76f4a4b",
-}
-_PRE_101_HEURISTICS_HASH = "92cdc63e9a9bcef3c4ebd6c9b5567e80c30a3077bd3613d635c443bf055d19c4"
-_PRE_101_FEATURES_HASH = "92cc4fba7269f8c77c33441ea870b7eb6224d561a03c192028fa03560a6f60ce"
-_PRE_101_SYNTH_HASH = "8ed4d4d5d1d26c36077eef2a35569d8db6687d51d7551e94f38e76f8d7323205"
-_PRE_101_CORPUS_HASH = "aad04c1b0e42074a11342b24dc94c7f2ec896cda1664efeee7c5fc5b0ec4f547"
-
-
-def _combined_hash(files, base: Path) -> str:
-    h = hashlib.sha256()
-    for f in sorted(files):
-        h.update(f.relative_to(base).as_posix().encode())
-        h.update(f.read_bytes())
-    return h.hexdigest()
-
-
-@pytest.mark.parametrize("relpath", sorted(_PRE_101_HASHES))
-def test_ac27_named_untouched_file_byte_identical_to_pre_101_state(relpath):
-    path = _SEGFACET_SRC / relpath
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    assert digest == _PRE_101_HASHES[relpath], relpath
-
-
-def test_ac27_heuristics_package_byte_identical_to_pre_101_state():
-    files = sorted((_SEGFACET_SRC / "heuristics").rglob("*.py"))
-    assert _combined_hash(files, _SEGFACET_SRC) == _PRE_101_HEURISTICS_HASH
-
-
-def test_ac27_features_package_byte_identical_to_pre_101_state():
-    files = sorted((_SEGFACET_SRC / "features").rglob("*.py"))
-    assert _combined_hash(files, _SEGFACET_SRC) == _PRE_101_FEATURES_HASH
-
-
-def test_ac27_synth_package_byte_identical_to_pre_101_state():
-    files = sorted((_SEGFACET_SRC / "synth").rglob("*.py"))
-    assert _combined_hash(files, _SEGFACET_SRC) == _PRE_101_SYNTH_HASH
-
-
-def test_ac27_corpus_byte_identical_to_pre_101_state():
-    files = sorted(p for p in _CORPUS_DIR.rglob("*") if p.is_file())
-    assert _combined_hash(files, _CORPUS_DIR) == _PRE_101_CORPUS_HASH
 
 
 # =========================================================================== #
