@@ -49,11 +49,21 @@
 | 23    | *(placeholder)* Multivariate Normative Model                          | G3              | 📋     |
 | 24    | *(placeholder)* Failure-Mode Discovery & Typed Reference Set          | G8              | 📋     |
 | 25    | *(placeholder)* Segmenter-Native Perturbations                        | G2              | 📋     |
+| 26    | Carried-Defect Remediation (pre-real-data)*(runs next)*               | G2, G7          | 📋     |
+| 27    | Feature Schema Taxonomy & Coordinate System                             | G8              | 📋     |
 
 > **Supersession 2026-07-25.** Stages 0–14 are history and are not reopened. Stage 15 is
 > `❌ Excluded` (deployment left scope — see [`vision.md`](vision.md) §0). Stages 17–21
 > are the live work; 22–25 are placeholders authored at the full re-vision. Item
 > numbering continues from **093** — never restart, `*(Item NNN)*` references are global.
+
+> **Feedback loop 2026-08-11.** Stages **26** and **27** were scoped from triaged
+> [`insights.md`](insights.md) entries that had accumulated no owner. They are numbered
+> after the placeholders so numbering stays stable, but **run earlier than their numbers
+> suggest**: Stage 26 runs **next, ahead of Stage 20** (it fixes surfaces Stage 20 audits),
+> and Stage 27 runs after Stage 20 and before Stages 23/24. The same loop reworded Stage
+> 19's G8 criterion and clarified what Stage 20's traceability matrix must prove — see
+> [`roadmap.md`](roadmap.md).
 
 ## Two kinds of "done" — implementation vs. validation
 
@@ -243,14 +253,14 @@ mislabelling heuristics.
 - ✅ Neighbour-consistency metrics (spacing regularity, monotonic progression). *(Item 020)*
 - ✅ Optional sagittal projection of centroids + spline for the human report. *(Item 021)*
 - ✅ Stage 3 feature serialisation & GT-vs-perturbed regression tests. *(Item 022)*
-- ✅ Local vertebra neighbourhood comparison (sliding window, n=3–5): per-vertebra deviation from neighbourhood mean/median of centroid spacing, spline offset, and volume; flags isolated anatomical outliers. *(Item 024)*
+- ✅ Local vertebra neighbourhood comparison (sliding window, n=3–5): per-vertebra deviation from neighbourhood mean/median of centroid spacing, spline offset, and volume; flags isolated anatomical outliers. *(Item 024)* ⚠️ **Correction, 2026-08-11:** the module (`features/neighbourhood.py`) is implemented in full but **wired into nothing** — absent from `pipeline.py`, `feature_report.py` and all 10 rules, which is why it never appeared in item 103's 111-entry catalogue. The "flags isolated anatomical outliers" half of this claim has never been true of any case's report or verdict. The ✅ is left in place deliberately (flipping item 024 would reopen queue-002 and change what `claim_scope = "live-queue"` resolves to — a maintainer's call); the work is carried as **Stage 26 D8**, wire it or retire it.
 
 **Acceptance.**
 
 - [X] Spline fits cleanly on GT fixtures; offsets near-zero for GT, large for displaced/mislabelled.
 - [X] Robust to a deliberately missing level (no crash, sensible fit).
 - [X] Orientation / curvature features in JSON; tests pass. *(Item 019)*
-- [X] Neighbour-consistency and neighbourhood-comparison features in JSON. *(Items 020, 024)*
+- [X] Neighbour-consistency features in JSON. *(Item 020)* *(Item 024: neighbourhood-comparison module implemented but not wired into pipeline — absent from JSON output; see Stage 26 D8.)*
 - [X] Regression tests over GT + perturbed cases pass. *(Item 022)*
 
 ---
@@ -840,6 +850,15 @@ verifies they agree, and no document records which failure mode each feature ser
   executor yet and are not implied to be Stage 21's. All of the above is
   measured on in-package synthetic driver records and the committed artifact,
   never on real data. See item 106's spec, "### Stage-19 steering review".)*
+  **Criterion reworded 2026-08-11:** the roadmap's G8 sentence now
+  names this third state explicitly — *statused but mode-unmapped, with the
+  consuming mode-less rule named* — so it is no longer unsatisfiable-as-written by
+  the mechanism this stage shipped, and the 72-entry bucket is a recorded state
+  rather than a shortfall. The substantive close stays **Stage 20**'s: map
+  `bounds` / `intensity` / `reference_delta` / `intensity_reference_delta` to §6
+  modes, or record that they target none. Note the *feature* `retune`/`retire`
+  calls recorded above now have an assigned carrier: **Stage 27** (schema
+  taxonomy) for the structural two-thirds of them.
 - [x] The golden decision table is complete and signed off by the human reviewer.
   *(Signed off 2026-07-28: all 36 rows of `docs/aide/golden-decision-table.md`
   reviewed individually — 11 retire (the 9 corpus-golden whole-record
@@ -861,20 +880,47 @@ end-to-end** while the corpus reads as covering all eight. Separately, `verify_c
 never asserts that *no other* rule fires; cross-talk is 0/9 today, so the assertion is
 free to adopt now and expensive later.
 
+**Scope clarified 2026-08-11** (full statement in
+[`roadmap.md`](roadmap.md)). The matrix is read in three directions and only two must ever
+be complete: **mode → rule** (complete, always — an uncovered §6 mode is a defect) and
+**rule → mode** (complete, always — a rule targeting no catalogued mode is itself a
+finding; four rules sit there today). **Feature → rule is deliberately incomplete**: the
+record is an over-broad vector rules *select from*, so a leaf path no rule reads is
+inventory (`unwired`), not a gap — 34 of 111 catalogued paths, and that is an expected
+steady state, not a shortfall. Each mode also carries an **evidence rung**:
+synthetic-demonstrable · needs real data · structurally unobservable in single-channel
+input (mode 8). Modes, rules and features grow **in tandem** — a new mode arrives with its
+rule(s) and any features they need; features may be added alone, modes and rules may not.
+
 **Deliverables.**
 
-- 📋 Traceability matrix: 8 failure modes × features × 10 rules, gaps visible.
+- 📋 Traceability matrix, *generated* (not hand-maintained): 8 failure modes × 10 rules ×
+  the features each rule consumes, scored in all three directions, every mode row carrying
+  its evidence rung.
+- 📋 The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
+  `intensity_reference_delta`) mapped to §6 modes, or recorded as targeting none with a
+  reason — the root close of Stage 19's G8 shortfall.
 - 📋 Specificity assertion — no unintended rule may fire — adopted as a ratchet.
-- 📋 Reachability hole closed: modes 1/4/8 made pipeline-detectable, or recorded
-  explicitly as not detected end-to-end. Not both silent.
-- 📋 Per-rule corpus-exercise reporting.
+- 📋 Reachability hole closed *with its mechanism named per mode*: mode 8 is
+  single-channel-unobservable, mode 1's ladder is FOV-capped, mode 4's cause TBD. Made
+  detectable where the mechanism allows, recorded where it does not. Not both silent.
+- 📋 Per-rule **and per-operator** corpus-exercise reporting (the registered `fuse` operator
+  generates no corpus case at all).
+- 📋 Item 100's mode-1 ladder base widened so mode 1's metric swing is set by the
+  perturbation rather than the fixture's FOV walls — the recorded root cause of mode 6's
+  Stage-18 specificity shortfall.
 
 **Acceptance.**
 
+- [ ] Every §6 failure mode has ≥1 rule **and** a recorded evidence rung — never silent
+  (**G2**).
+- [ ] Every registered rule maps to ≥1 §6 mode or is recorded as mode-less with a reason.
 - [ ] Every registered rule is exercised by ≥1 case or recorded as unexercised with a
   reason (**G2**).
 - [ ] The specificity assertion is enforced for every corpus case.
 - [ ] The end-to-end detection count is stated honestly here rather than implied (**G7**).
+
+> **Not required:** feature→rule completeness. Unwired features are a designed state.
 
 ---
 
@@ -956,3 +1002,80 @@ does wrong, rather than from a catalogue written in advance.
 
 **Deliverables.** 📋 *Deliberately unspecified until Stage 16 has characterised real
 failures.*
+
+---
+
+# Stages scoped 2026-08-11
+
+> Numbered after the placeholders so numbering stays stable; both run earlier than their
+> numbers suggest. Full statements in [`roadmap.md`](roadmap.md).
+
+---
+
+## Stage 26 — Carried-Defect Remediation (pre-real-data) (G2, G7) — 📋
+
+**Goal.** Clear the defects Stages 17–19 recorded but were (correctly) forbidden from
+fixing in scope, **before** Stage 20 audits those surfaces and before Stage 21 produces
+real-data numbers. Every deliverable is a diagnosed defect with a named location — no
+discovery.
+
+**Deliverables.**
+
+- 📋 **D1** `normalised_delta` saturates to ±1.0 whenever one run sits on baseline (7 of 8
+  metric baselines are `0.0`), so Stage 18's run-vs-run attribution is decided by the
+  lowest-mode tie-break rather than by magnitude. `eval/per_mode_cohort.py`.
+- 📋 **D2** `touches_*` face mapping is anatomically wrong under RAS since item 094
+  (`x == 0 → touches_inferior` names the left-right axis) — every `border`/`fov` finding on
+  data read through `segfacet.io` is mislabelled. Must land before real data.
+- 📋 **D3** Golden-fixture test hygiene: `tests/golden/*.json` unpinned in `.gitattributes`
+  (latent Windows-CI break); `test_022_stage3_serialisation.py::test_ac8_golden_snapshot`
+  writes its own golden and skips when missing, so deleting the file makes it pass.
+- 📋 **D4** `compute_per_mode_metrics` gains an optional `overlap_result=` (halves the
+  overlap work of a cohort-scale per-mode run).
+- 📋 **D5** `test-numpy-majors` scoped off the Docker/PyRadiomics-gated modules.
+- 📋 **D6** `heuristics/bounds.py` comments still name the retired `S` / `Cocygis` labels.
+- 📋 **D7** Stage 17's acceptance box contradicts its own annotation — maintainer's call
+  between untick / reword / third state.
+- 📋 **D8** `features/neighbourhood.py` is dead wiring: implemented in full, referenced by
+  nothing, yet Stage 3 claims it "flags isolated anatomical outliers" ✅. Wire it or retire
+  it and correct the claim.
+
+**Acceptance.**
+
+- [ ] Each defect has a regression test that fails before its fix (**G7**).
+- [ ] `border`/`fov` findings carry anatomically correct face names under RAS (**G2**).
+- [ ] Per-mode attribution distinguishes a large move from a small one on a fixture built
+  to have both.
+- [ ] `neighbourhood.py` is reachable from `extract_feature_record` and present in the
+  regenerated catalogue, or removed with Stage 3's deliverable reworded.
+
+---
+
+## Stage 27 — Feature Schema Taxonomy & Coordinate System (G8) — 📋
+
+**Goal.** Give the feature record a deliberately designed structure instead of the current
+grouping by *which extractor module happened to compute a field* — the single recurring
+theme behind roughly two-thirds of item 106's 111-entry steering review verdicts. **This
+stage designs the taxonomy rather than inheriting one**: the maintainer's scope × kind
+framing is the starting proposal and the quality bar, and deviation is allowed where it is
+justified in writing.
+
+**Deliverables.**
+
+- 📋 The taxonomy, written down with rationale, alternatives considered, and every deviation
+  from the starting proposal justified — reviewed with the maintainer before migration (a
+  human-checkpoint stage in the same sense Stage 19 was).
+- 📋 The migration applied, item 103's catalogue regenerated, item 104's drift test as the
+  safety net.
+- 📋 Answers for the known instances: duplicated `label`/`level_name` identity fields across
+  four containers; `stage3.*` / `image_features.*` parallel to `per_label.{label}.*`;
+  image-axis-relative shape features (bbox/extent, `principal_axis`) awaiting a vertebra
+  coordinate system; reference-delta hardcoded to `physical_volume_mm3`.
+
+**Acceptance.**
+
+- [ ] The taxonomy is documented with its rationale and every deviation justified, and is
+  signed off by the maintainer before migration (**G8**).
+- [ ] Every feature is addressable under it; no identity field is stored more than once.
+- [ ] The regenerated catalogue and the drift test agree; no rule's behaviour changes on the
+  corpus except where a retune is explicitly authorised.
