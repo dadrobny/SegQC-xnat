@@ -474,14 +474,27 @@ def test_ac9_missing_affine_deterministic_outcome():
 
 def test_ac9_singular_affine_deterministic_outcome():
     """AC9: a singular affine (zero row -- rank-deficient rotation part)
-    yields a clear error or a deterministic result."""
+    yields a clear error or a deterministic result.
+
+    ``nib.Nifti1Image(data, singular_affine)`` itself raises
+    (``HeaderDataError``/``LinAlgError``, via NiBabel's own header-affine
+    decomposition) before this ever reaches production code -- constructing
+    with the singular affine directly would only exercise NiBabel's
+    constructor, never ``compute_label_geometry``'s own degenerate-affine
+    handling that AC9 documents. Built instead with a harmless placeholder
+    affine, then the singular affine is assigned onto the image post
+    construction (``Nifti1Image.affine`` is a settable property that writes
+    straight into the header, with no re-validation) so the object actually
+    reaches ``compute_label_geometry`` carrying the singular affine (item
+    116 AC14)."""
     affine = np.array(
         [[1.0, 0.0, 0.0, 0.0],
          [0.0, 1.0, 0.0, 0.0],
          [0.0, 0.0, 0.0, 0.0],
          [0.0, 0.0, 0.0, 1.0]]
     )
-    seg = nib.Nifti1Image(_small_labelmap(), affine)
+    seg = nib.Nifti1Image(_small_labelmap(), np.eye(4))
+    seg.affine[:] = affine
     _assert_documented_outcome(seg)
 
 
