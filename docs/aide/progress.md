@@ -1046,6 +1046,10 @@ discovery.
   invariant: six documented failures, no recorded true positive, and a re-pin toll on every
   later item that edits source. Retire them and land the deterministic diff-based scope
   check they were reaching for. *(Item 107)*
+- 📋 **D10** `synth/` implements a documented array-axis convention (axis 0 = superior-
+  inferior) that D2's affine-derived mapping replaces; migrate the synthetic corpus
+  RAS-native (bodies along axis 2, truthful affine, load as array-identity) and
+  regenerate fixtures, manifest and goldens. *(Item 116)*
 - 📋 Stage 26 end-to-end validation: per-defect red-then-green replay, fresh-clone suite
   run, fence-retirement audit, and verification-row closure. *(Item 115)*
 
