@@ -1024,7 +1024,7 @@ discovery.
 - 📋 **D1** `normalised_delta` saturates to ±1.0 whenever one run sits on baseline (7 of 8
   metric baselines are `0.0`), so Stage 18's run-vs-run attribution is decided by the
   lowest-mode tie-break rather than by magnitude. `eval/per_mode_cohort.py`. *(Item 109)*
-- 📋 **D2** `touches_*` face mapping is anatomically wrong under RAS since item 094
+- 🚧 **D2** `touches_*` face mapping is anatomically wrong under RAS since item 094
   (`x == 0 → touches_inferior` names the left-right axis) — every `border`/`fov` finding on
   data read through `segfacet.io` is mislabelled. Must land before real data. *(Item 108)*
 - 📋 **D3** Golden-fixture test hygiene: `tests/golden/*.json` unpinned in `.gitattributes`
