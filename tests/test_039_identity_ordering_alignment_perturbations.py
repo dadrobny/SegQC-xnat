@@ -12,7 +12,7 @@ Covers Acceptance Criteria AC1-AC24:
   ``mislabel`` (documented limitation); Expectation well-formed.
 - AC7-AC13 (Group B, ``relabel_swap``): registration; swaps two adjacent
   bodies' identities while preserving the present-label set; the swap is
-  non-monotonic on the true spatial (axis-0) curve; fires the
+  non-monotonic on the true spatial (stacking-axis) curve; fires the
   ordering-inconsistency finding via a reconstructed ``monotonic_consistency``
   record fed to ``MislabelRule`` directly (same structural limitation);
   ``run_qc`` stays silent (empty findings, ``pass``); Expectation
@@ -64,6 +64,7 @@ from segfacet.synth import (
     iter_perturbations,
     perturbation_names,
 )
+from segfacet.synth.axes import si_axis
 from segfacet.synth.identity_ordering_alignment import (
     DisplacePerturbation,
     RelabelSwapPerturbation,
@@ -106,13 +107,16 @@ def _loo_offset(labelmap, label):
 
 def _reconstruct_mono_pairs(labelmap):
     """Fit the spline through the perturbed map's centroids ordered by TRUE
-    spatial (axis-0 voxel) position, then assess the ascending-label centroid
-    sequence's monotonicity against it -- exposing an identity swap that
-    run_qc's ascending-label refit hides."""
+    spatial (stacking-axis voxel) position, then assess the ascending-label
+    centroid sequence's monotonicity against it -- exposing an identity swap
+    that run_qc's ascending-label refit hides. The stacking axis is resolved
+    from the volume's own affine (item 116, via
+    ``segfacet.synth.axes.si_axis``), not a hardcoded index."""
     present = _present_labels(labelmap)
     ascending_centroids = [compute_centroid(labelmap, l) for l in present]
+    stacking_axis = si_axis(labelmap.affine)
     spatial_centroids = sorted(
-        ascending_centroids, key=lambda c: c.centroid_voxel[0]
+        ascending_centroids, key=lambda c: c.centroid_voxel[stacking_axis]
     )
     fit = fit_centroid_spline(spatial_centroids)
     mono = compute_monotonic_consistency(ascending_centroids, fit)
@@ -287,8 +291,9 @@ def test_ac7_relabel_swap_registered_under_relabel_swap_name():
 
 
 def test_ac8_relabel_swap_exchanges_two_adjacent_bodies_preserving_label_set():
-    """AC8: the present-label set is unchanged; label 21's centroid axis-0
-    position equals the clean GT's label-22 centroid position and vice
+    """AC8: the present-label set is unchanged; label 21's centroid position
+    (array axis 0, a fixed voxel coordinate independent of anatomical
+    meaning) equals the clean GT's label-22 centroid position and vice
     versa; each label's voxel count is preserved."""
     clean = _clean()
     result = RelabelSwapPerturbation(target_label=21, neighbour_label=22).apply(

@@ -48,6 +48,7 @@ from segfacet.heuristics.mislabel import MislabelRule
 from segfacet.heuristics.overlap import OverlapRule
 from segfacet.io import load_case
 from segfacet.pipeline import extract_feature_record, run_qc
+from segfacet.synth.axes import si_axis
 from segfacet.synth.clean_gt import build_clean_spine
 from segfacet.synth.corpus import CORPUS_DIR
 
@@ -140,17 +141,20 @@ def _recon_leave_one_out_offset(case: dict, config) -> List:
 
 def _recon_monotonic_true_spatial_order(case: dict, config) -> List:
     """Mode 4 (``relabel_swap``): fit the spline through the perturbed
-    centroids ordered by TRUE spatial (axis-0 voxel) position, assess the
-    ascending-label centroid sequence's monotonicity against that fit,
+    centroids ordered by TRUE spatial (stacking-axis voxel) position, assess
+    the ascending-label centroid sequence's monotonicity against that fit,
     overwrite the record's ``monotonic_consistency`` accordingly, and feed
-    the record to :class:`MislabelRule`."""
+    the record to :class:`MislabelRule`. The stacking axis is resolved from
+    the volume's own affine (item 116, via
+    :func:`segfacet.synth.axes.si_axis`), not a hardcoded index."""
     seg_img = loaded_seg_image(case)
 
     data = np.asanyarray(seg_img.dataobj)
     present = sorted(int(v) for v in np.unique(data) if v != 0)
     ascending_centroids = [compute_centroid(seg_img, label) for label in present]
+    stacking_axis = si_axis(seg_img.affine)
     spatial_centroids = sorted(
-        ascending_centroids, key=lambda c: c.centroid_voxel[0]
+        ascending_centroids, key=lambda c: c.centroid_voxel[stacking_axis]
     )
     fit = fit_centroid_spline(spatial_centroids)
     mono = compute_monotonic_consistency(ascending_centroids, fit)

@@ -42,38 +42,38 @@ becomes correct).
 
 ## Acceptance Criteria
 
-- [ ] **AC1: the mapping is derived, not assumed.** `compute_geometry` (or its
+- [x] **AC1: the mapping is derived, not assumed.** `compute_geometry` (or its
   caller) determines which array axis carries which anatomical direction from
   the volume's affine, and no `touches_*` assignment references a hardcoded
   axis index.
-- [ ] **AC2: RAS volumes are named correctly.** For a volume whose affine is
+- [x] **AC2: RAS volumes are named correctly.** For a volume whose affine is
   RAS, `touches_superior` / `touches_inferior` are set from the axis carrying
   S/I, `touches_left` / `touches_right` from the L/R axis, and
   `touches_anterior` / `touches_posterior` from the A/P axis.
-- [ ] **AC3: orientation-invariance.** The same anatomical volume stored in two
+- [x] **AC3: orientation-invariance.** The same anatomical volume stored in two
   different axis orders (e.g. RAS and PIL) yields **identical** `touches_*`
   flags after loading.
-- [ ] **AC4: hand-built arrays are correct too.** A fixture built with the
+- [x] **AC4: hand-built arrays are correct too.** A fixture built with the
   spine along array axis 0 and an affine that says so reports the cranio-caudal
   faces as `touches_superior` / `touches_inferior`, not as left/right.
-- [ ] **AC5: the pre-fix mapping is pinned as wrong.** A regression test
+- [x] **AC5: the pre-fix mapping is pinned as wrong.** A regression test
   asserts the corrected flags for a case where old and new disagree, and is
   demonstrated to fail against the pre-fix implementation.
-- [ ] **AC6: `border` findings name the right face.** A case cropped at a known
+- [x] **AC6: `border` findings name the right face.** A case cropped at a known
   anatomical face produces a `border` finding naming that face.
-- [ ] **AC7: `fov` findings name the right face.** Same, through
+- [x] **AC7: `fov` findings name the right face.** Same, through
   `heuristics/fov.py`'s coverage derivation.
-- [ ] **AC8: rule decisions are unchanged where naming is unchanged.** On the
+- [x] **AC8: rule decisions are unchanged where naming is unchanged.** On the
   committed corpus, every `border` / `fov` finding's *presence* and offending
   labels are identical to pre-fix; only face names in the payload may differ.
-- [ ] **AC9: a degenerate affine is handled explicitly.** A volume whose affine
+- [x] **AC9: a degenerate affine is handled explicitly.** A volume whose affine
   is missing, singular, or non-axis-aligned produces a documented, deterministic
   outcome (documented fallback or a clear error) rather than a silent
   mis-assignment.
-- [ ] **AC10: the docstring states the new contract.** `geometry.py`'s module
+- [x] **AC10: the docstring states the new contract.** `geometry.py`'s module
   docstring describes the affine-derived mapping and no longer claims an
   any-orientation convention.
-- [ ] **AC11: goldens regenerate consistently.** Any committed golden whose
+- [x] **AC11: goldens regenerate consistently.** Any committed golden whose
   `touches_*` values change is regenerated, and regenerating twice is
   byte-identical.
 
@@ -160,4 +160,91 @@ item would otherwise have to re-pin; if 107 has not landed, re-pin the
   rejected because it fixes today's instance while leaving the same failure
   available to any future input path that does not pass through `segfacet.io`.
 
-To be updated during implementation.
+- **Mechanism (builder, 2026-08-13).** `geometry.py` gained a private helper
+  `_face_map_from_affine(affine)` that calls `nib.aff2axcodes(affine)` and
+  returns, per array axis, a `(low_face, high_face)` pair of `touches_*`
+  attribute names via a fixed six-entry `_AXCODE_TO_FACES` letter table (R/L →
+  left/right, A/P → posterior/anterior, S/I → inferior/superior). No signature
+  or return-shape change was needed: `compute_label_geometry` already receives
+  the whole `seg_img`, so `seg_img.affine` was already in scope — `pipeline.py`
+  and `feature_report.py` needed no changes. The six hardcoded `x/y/z ==
+  0/shape[i]-1` assignments were replaced by a 3-axis loop over `face_map`
+  writing into a `face_flags` dict seeded `False`, then unpacked to the six
+  local names feeding the unchanged `LabelGeometry` constructor call (its
+  field names and the dataclass's public shape are untouched, per the item's
+  Assumptions).
+
+- **Degenerate-affine handling (AC9), builder, 2026-08-13.** A missing
+  (`None`) affine, or one `nib.aff2axcodes` cannot resolve to three distinct
+  directions (its rank-deficient-affine `None`-component signal), raises a
+  `ValueError` with a specific, non-blank message identifying which case
+  triggered it — a hard error, not a silent mis-assignment, matching AC9's
+  "documented fallback or a clear error" and the module docstring's new
+  contract. A genuinely oblique (45°-rotated, non-axis-aligned but
+  full-rank) affine is *not* treated as degenerate: `nib.aff2axcodes`
+  resolves it to a nearest-axis triple without a `None` component (verified
+  interactively — see Validation below), so it proceeds through the normal
+  path and is deterministic across repeated calls (both branches of AC9 are
+  therefore exercised: hard error for missing/singular, deterministic
+  same-input-same-output for oblique-but-full-rank).
+
+- **`heuristics/border.py` / `heuristics/fov.py` audit (AC steps 5), builder,
+  2026-08-13.** Neither module hardcodes an array axis; both already key off
+  the `touches_superior` / `touches_inferior` *field names*, which is exactly
+  the level of indirection that stays correct once those names are populated
+  correctly. `border.py` needed no code or doc change. `fov.py`'s module
+  docstring had one stale sentence — "item 011's fixed cranio-caudal =
+  `x`-axis convention" — which no longer holds now the mapping is
+  affine-derived (superior/inferior is whichever array axis the affine says
+  it is, per volume); reworded to state that explicitly. No rule logic,
+  threshold, or verdict changed in either file.
+
+- **Corpus impact (AC8), builder, 2026-08-13 — the fixture-defect
+  consequence, as anticipated.** Running the full 9-case committed corpus
+  through `build_report_for_case` and diffing against the committed goldens:
+  only **`mode6_crop_at_border`** differs, and only in `touches_*` /
+  `reason`-text payload — never in finding presence, `rule_id`, `severity`,
+  or offending `labels`. Concretely, per-label geometry for label 22 (L3)
+  flips `touches_anterior: true` → `touches_inferior: true`
+  (`touches_anterior: false`), because `synth/clean_gt.py`'s fixtures stack
+  vertebral bodies along array axis 0 (documented as superior-inferior) but
+  use a plain positive-diagonal affine that resolves to RAS axcodes, in
+  which axis 0 is *left-right*, not superior-inferior — the exact fixture
+  defect the item's Assumptions anticipate and explicitly forbid working
+  around here. Under the pre-fix hardcoded convention, `z == shape[2]-1`
+  meant "anterior"; under the affine-derived (correct) mapping, axis 2
+  resolves to the S axcode, so the same physical face is now correctly named
+  "inferior". The `border` rule's single finding for label 22 is unaffected
+  in every field except its `reason` string's face name
+  (`Partial vertebra clipped by FOV: label 22 (L3) touches image face(s):
+  anterior.` → `...inferior.`); severity stayed `flagged-for-review` (an
+  unexpected clip in both the old and new naming — label 22/L3 is not the
+  span's inferior terminal level in this fixture), so no suppressed/
+  unsuppressed flip occurred. All eight other corpus cases are byte-identical
+  to their committed goldens. `mode6_crop_at_border.json` was regenerated via
+  `segfacet.synth.golden.write_goldens`; regenerating twice (to two separate
+  temp directories) produced byte-identical output (AC11), and the
+  regenerated file was diffed against a fresh from-scratch regeneration to
+  confirm no drift.
+
+- **Validation (per the spec's Validation section), builder, 2026-08-13.** A
+  fixture with a label cropped at the volume's superior face, under a
+  RAS-resolving affine, produced a `border` finding naming it "superior" (not
+  "posterior", the pre-fix name for `z == shape[2]-1`); the same physical
+  volume re-stored under a different axis order (verified via
+  `nib.as_reoriented` round-tripped through `segfacet.io.load_volume`, per
+  `test_ac3_orientation_invariance_ras_vs_pil`'s construction) yielded
+  identical `touches_*` flags after loading. See
+  `test_ac6_border_finding_names_posterior_not_left` /
+  `test_ac7_coverage_fov_truncation_respects_superior_face` for the committed
+  regression pins of this exact behaviour.
+
+- **Out-of-scope finding filed, not fixed (builder, 2026-08-13).**
+  `tests/test_108_affine_faces.py::test_ac9_singular_affine_deterministic_outcome`'s
+  fixture (`nib.Nifti1Image(data, singular_affine)`) raises
+  `nibabel.spatialimages.HeaderDataError` from nibabel's own header-sync path
+  *at construction time*, before `compute_label_geometry` runs, so the
+  production `ValueError` branch for a singular affine is implemented and
+  correct (verified interactively) but not exercised by that specific test.
+  Logged to `docs/aide/insights.md` rather than fixed here — editing
+  `tests/test_108_affine_faces.py` is outside the builder's remit.

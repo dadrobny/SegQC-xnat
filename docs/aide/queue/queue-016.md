@@ -90,7 +90,7 @@ box. `aide.toml` sets `clarify = "assume"`, so under unattended execution a
 spec author will pick and record a default. Running this queue through
 `/aide-spec-queue 016` front-loads both decisions into one interactive sitting.
 
-**Numbering.** Continues at the next free integer: **107–115**.
+**Numbering.** Continues at the next free integer: **107–115**, plus **116**, inserted 2026-08-12 during execution (see below).
 
 ### Stage-26 deliverable → item coverage
 
@@ -104,6 +104,7 @@ spec author will pick and record a default. Running this queue through
 | **D4** `compute_per_mode_metrics(overlap_result=…)` short-circuit | 112 |
 | **D5** `test-numpy-majors` scoped off environment-gated modules | 113 |
 | **D6** + **D7** Documentation corrections (`bounds.py` comments, Stage 17 acceptance box) | 114 |
+| **D10** Synthetic corpus migrated RAS-native, completing the axis-convention change | 116 |
 | Stage validation + verification-row closure | 115 |
 
 ---
@@ -310,6 +311,31 @@ absent from `CANONICAL_ORDER`, and the rule's behaviour is byte-identical on
 the corpus; `progress.md`'s Stage 17 acceptance box and its annotation agree
 with each other and with the verification row; `aide check` reports no new
 warning.
+
+### Item 116: Make the synthetic corpus RAS-native
+
+**Inserted 2026-08-12, mid-execution.** Item 108 revealed that `synth/` is not
+merely inconsistent with the affine — it implements a *documented* array-axis
+convention (`clean_gt.py`: *"Axis convention (matching
+`segfacet.features.geometry`): image axis 0 is superior-inferior … Bodies are
+stacked along axis 0"*) that item 108's affine-derived mapping replaces. 14 tests
+across six pre-existing modules fail on item 108's branch as a result. This item
+completes the migration: bodies stack along **axis 2**, the plain diagonal affine
+becomes truthful, loading is an array-identity operation, and every operator that
+names a face resolves its axis through the affine. Fixtures, manifest and goldens
+are regenerated; the tests encoding the legacy convention are updated to assert
+anatomical intent rather than a hardcoded face. Case identity is preserved — a
+case designed to trip `border` still trips `border` on the same labels — while
+numeric feature values legitimately move. **Branches off
+`aide/108-ras-correct-touches-face-mapping`** and merges into `aide/queue-016`
+with it: migrating fixtures under the pre-108 mapping would break the same tests
+in mirror image and name cranio-caudal faces "anterior" for one item's duration.
+*Testable:* the affine-derived S/I axis matches the axis body centroids vary
+along; loading a fixture leaves the array unchanged; cropping toward each of the
+six faces sets that face's flag; every corpus case trips the same
+`(rule_id, labels)` as before; `crop_at_border` sensitivity is restored in the
+Stage-7/14 acceptance suites; fixtures, manifest and goldens regenerate
+byte-identically twice over; `tests/test_108_affine_faces.py` passes unchanged.
 
 ### Item 115: Validate stage 26: Carried-Defect Remediation
 

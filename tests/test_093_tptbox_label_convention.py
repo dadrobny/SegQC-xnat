@@ -12,7 +12,9 @@ Covers Acceptance Criteria AC1-AC8:
 - AC5: ``reference_verse_v1.json`` is re-keyed (``"S"`` -> ``"L6"``), not
   re-fit -- ``feature_stats`` is byte-for-byte identical to the pre-rename
   ``"S"`` entry.
-- AC6: ``reference_default.json`` is unaffected by this item.
+- AC6: ``reference_default.json`` is unaffected by this item (checked by
+  level-set content, not a byte-hash pin -- see item 116's retirement of the
+  perpetual pre-item digest fence, in the same spirit as item 107).
 - AC7: the reference-delta rule resolves a label-25 (-> ``"L6"``) case
   against the renamed level in ``bundled_production_reference()``.
 - AC8: is exercised at the suite level (not a single test here) -- see the
@@ -257,14 +259,6 @@ _PRE_RENAME_S_FEATURE_STATS = {
     },
 }
 
-# AC6: pinned SHA-256 of the committed reference_default.json, captured
-# before this item's edit (which touches only reference_verse_v1.json).
-# reference_default.json's fixed synthetic cohort only ever segments L1-L5
-# and should be byte-for-byte untouched by this item.
-_PRE_ITEM_REFERENCE_DEFAULT_SHA256 = (
-    "7bc0777cc868fe7f5ca7adf22242d603ee28efe36051ebd3b60e600ae80f1142"
-)
-
 
 def _feature_stats_to_plain_dict(stats) -> dict:
     """Convert a schema ``FeatureStats`` dataclass to a plain JSON-shaped dict
@@ -461,18 +455,6 @@ def test_ac6_reference_default_levels_are_l1_through_l5_only():
     assert set(dist.levels) == {"L1", "L2", "L3", "L4", "L5"}
     assert "S" not in dist.levels
     assert "L6" not in dist.levels
-
-
-def test_ac6_reference_default_json_byte_unchanged():
-    """Byte-for-byte check via a pinned SHA-256 captured before this item's
-    edit (which touches only reference_verse_v1.json, never
-    reference_default.json)."""
-    import hashlib
-
-    from segfacet.reference.artifact import default_artifact_path
-
-    data = default_artifact_path().read_bytes()
-    assert hashlib.sha256(data).hexdigest() == _PRE_ITEM_REFERENCE_DEFAULT_SHA256
 
 
 # =========================================================================== #

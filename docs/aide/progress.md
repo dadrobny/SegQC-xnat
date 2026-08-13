@@ -1024,7 +1024,7 @@ discovery.
 - 📋 **D1** `normalised_delta` saturates to ±1.0 whenever one run sits on baseline (7 of 8
   metric baselines are `0.0`), so Stage 18's run-vs-run attribution is decided by the
   lowest-mode tie-break rather than by magnitude. `eval/per_mode_cohort.py`. *(Item 109)*
-- 📋 **D2** `touches_*` face mapping is anatomically wrong under RAS since item 094
+- ✅ **D2** `touches_*` face mapping is anatomically wrong under RAS since item 094
   (`x == 0 → touches_inferior` names the left-right axis) — every `border`/`fov` finding on
   data read through `segfacet.io` is mislabelled. Must land before real data. *(Item 108)*
 - 📋 **D3** Golden-fixture test hygiene: `tests/golden/*.json` unpinned in `.gitattributes`
@@ -1046,6 +1046,10 @@ discovery.
   invariant: six documented failures, no recorded true positive, and a re-pin toll on every
   later item that edits source. Retire them and land the deterministic diff-based scope
   check they were reaching for. *(Item 107)*
+- ✅ **D10** `synth/` implements a documented array-axis convention (axis 0 = superior-
+  inferior) that D2's affine-derived mapping replaces; migrate the synthetic corpus
+  RAS-native (bodies along axis 2, truthful affine, load as array-identity) and
+  regenerate fixtures, manifest and goldens. *(Item 116)*
 - 📋 Stage 26 end-to-end validation: per-defect red-then-green replay, fresh-clone suite
   run, fence-retirement audit, and verification-row closure. *(Item 115)*
 

@@ -46,7 +46,11 @@ from segfacet import cli
 from segfacet.synth.corpus import load_manifest
 from segfacet.synth.perturbation import FAILURE_MODE_NAMES, get_perturbation
 from segfacet.synth.clean_gt import build_clean_spine
-from test_098_stray_components import _PRE_098_GOLDEN_VERDICT_AND_FINDINGS
+from test_098_stray_components import (
+    _FACE_NAME_SENSITIVE_CASES,
+    _PRE_098_GOLDEN_VERDICT_AND_FINDINGS,
+    _finding_summary,
+)
 
 _TESTS_DIR = Path(__file__).resolve().parent
 _CORPUS_FIXTURES = _TESTS_DIR / "corpus" / "fixtures"
@@ -223,20 +227,19 @@ def block_b(tmp_path_factory):
 
 @pytest.mark.parametrize("case_id", sorted(_PRE_098_GOLDEN_VERDICT_AND_FINDINGS.keys()))
 def test_ac5_report_verdict_and_findings_match_pre_098_snapshot(block_b, case_id):
+    """AC5. Reason text is compared exactly except for the one
+    face-name-sensitive case (``mode6_crop_at_border``'s ``border`` finding,
+    item 116) -- see ``test_098_stray_components._FACE_NAME_SENSITIVE_CASES``."""
     report = block_b[case_id]
     expected = _PRE_098_GOLDEN_VERDICT_AND_FINDINGS[case_id]
     assert report["verdict"] == expected["verdict"]
 
-    got_findings = [
-        {
-            "rule_id": f["rule_id"],
-            "severity": f["severity"],
-            "labels": sorted(f["labels"]),
-            "reason": f["reason"],
-        }
-        for f in report["findings"]
+    include_reason = case_id not in _FACE_NAME_SENSITIVE_CASES
+    got_findings = [_finding_summary(f, include_reason=include_reason) for f in report["findings"]]
+    expected_findings = [
+        _finding_summary(f, include_reason=include_reason) for f in expected["findings"]
     ]
-    assert got_findings == expected["findings"]
+    assert got_findings == expected_findings
 
 
 # =========================================================================== #
