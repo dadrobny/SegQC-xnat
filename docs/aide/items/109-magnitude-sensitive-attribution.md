@@ -180,8 +180,11 @@ into Decisions.
 
 ## Dependencies
 
-None blocking. Coordinates with item 112, which owns the only authorised change
-to `eval/per_mode.py`.
+None.
+
+**Downstream:** item 112 owns the only authorised change to `eval/per_mode.py`
+this stage; this item must not edit that file. Neither blocks the other — the
+note sits after the marker so `aide claim` does not read it as a dependency.
 
 ## Authorised paths
 

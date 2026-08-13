@@ -110,8 +110,11 @@ and after, and record both the identical output and the halved
 
 ## Dependencies
 
-None blocking. Shares `eval/per_mode.py` with no other item this stage by
-agreement (item 109's spec defers it here).
+None.
+
+**Downstream:** this item owns the only authorised change to `eval/per_mode.py`
+this stage; item 109 defers to it. Neither blocks the other — the note sits
+after the marker so `aide claim` does not read it as a dependency.
 
 ## Authorised paths
 
