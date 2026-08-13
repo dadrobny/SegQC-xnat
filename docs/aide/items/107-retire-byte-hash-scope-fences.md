@@ -291,6 +291,7 @@ this item's script; item 115 audits that no fence remains.
   globs `docs/aide/items/NNN-*.md`; if either lookup comes up empty (e.g. a
   framework/process PR with no item branch) the job logs why and exits 0
   rather than failing a PR the check doesn't apply to. When a spec is found,
-  it runs `check_item_scope.py <spec> --base origin/${{ github.base_ref }}`
+  it runs `check_item_scope.py <spec> --base origin/$BASE_REF`, with `BASE_REF`
+  taken from the workflow's `github.base_ref` context,
   with `fetch-depth: 0` so the merge-base is actually resolvable from a
   shallow-by-default checkout.
