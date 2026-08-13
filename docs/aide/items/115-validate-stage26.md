@@ -12,7 +12,8 @@
 
 Close Stage 26 by **replaying its use cases end-to-end**, not by re-running the
 unit suite. Stage 26 exists because eight diagnosed defects had accumulated
-without owners; the stage's claim is that they are fixed, so this item's job is
+without owners — a ninth, item 116, was found during execution and inserted;
+the stage's claim is that they are fixed, so this item's job is
 to demonstrate each fix against the behaviour it replaced, then record what was
 actually exercised in `progress.md`.
 
@@ -35,7 +36,7 @@ and this item reports that rather than ticking around it.
 ## Acceptance Criteria
 
 - [ ] **AC1: every defect has a demonstrably-failing regression test.** For each
-  of items 107-114, the test that pins its fix is identified by name, and its
+  of items 107-114 and 116, the test that pins its fix is identified by name, and its
   relationship to the pre-fix behaviour is recorded.
 - [ ] **AC2: red-then-green is observed for item 108.** The affine-driven face
   mapping is reverted in a scratch tree, the face test observed failing, and the
@@ -56,10 +57,24 @@ and this item reports that rather than ticking around it.
   verified on both sides: the module is reachable from `extract_feature_record`
   **and** present in the regenerated catalogue with `status: "unwired"`, and no
   `progress.md` claim about it remains that observable behaviour does not back.
-- [ ] **AC8: no byte-hash fence remains.** No `_PRE_[0-9]` constant exists
-  anywhere under `tests/`.
-- [ ] **AC9: every queue-016 item declared `## Authorised paths`.** All nine
-  specs carry the section, and item 107's checker parses each without error.
+- [ ] **AC8: no byte-hash fence remains — searched by assertion shape, not by
+  name.** A fence is *a SHA-256 taken over a committed file's bytes and compared
+  against a hardcoded literal*. Searching for the `_PRE_[0-9]` naming pattern is
+  **not sufficient** and must not be the check: item 107's own AC1 did exactly
+  that and missed three survivors, one of which
+  (`_PRE_ITEM_REFERENCE_DEFAULT_SHA256` in
+  `tests/test_093_tptbox_label_convention.py`) then fired on item 116's
+  legitimate regeneration of `reference_default.json`. Two are known to remain at
+  the time of writing — `tests/test_098_stray_components.py`'s pinned pre-098
+  digest of `reference_verse_v1.json`, and
+  `tests/test_102_stage18_validation.py`'s path-to-digest dict asserted around
+  line 668 — and this item must either retire them or record why each stays.
+  **The discriminator:** a digest compared against a *hardcoded constant* is a
+  fence; a digest compared against a value *computed in the same run* (hash,
+  run the code, re-hash, compare) is an intra-run determinism assertion and must
+  survive untouched.
+- [ ] **AC9: every queue-016 item declared `## Authorised paths`.** All ten
+  specs carry the section (item 116 was inserted mid-execution), and item 107's checker parses each without error.
 - [ ] **AC10: the checker catches a real violation.** On a scratch branch, an
   edit outside an item's authorised paths makes
   `scripts/check_item_scope.py` exit non-zero naming that path; the output is
@@ -82,12 +97,12 @@ and this item reports that rather than ticking around it.
 
 ## Assumptions
 
-- **Items 107-114 are all ✅ before this item starts.** If any is incomplete,
+- **Items 107-114 and 116 are all ✅ before this item starts.** If any is incomplete,
   this item halts and reports rather than validating a partial stage — the same
   posture item 106 took on a pending sign-off.
 - **Red-then-green is staged in a scratch tree, never on the branch.** Reverts
   are made, observed and discarded; no revert is committed.
-- **Three defects are enough for AC2-AC4.** Items 107, 110, 112, 113 and 114 are
+- **Three defects are enough for AC2-AC4.** Items 107, 110, 112, 113, 114 and 116 are
   verified by inspection and their own tests rather than by re-breaking, because
   re-breaking them means deleting a script, unwiring a module, or editing CI —
   disproportionate to the evidence gained. The choice is recorded.
@@ -98,14 +113,16 @@ and this item reports that rather than ticking around it.
 
 ## Implementation Steps
 
-1. Confirm items 107-114 are ✅ in `progress.md`; halt if not.
+1. Confirm items 107-114 and 116 are ✅ in `progress.md`; halt if not.
 2. For each item, identify the pinning test by name and record it (AC1).
 3. Stage AC2/AC3/AC4's reverts one at a time in a scratch tree, observe the
    failure output, restore, and record each.
 4. Run the AC5 and AC6 end-to-end replays; capture the report excerpts.
 5. Verify AC7 against the regenerated catalogue and `progress.md`.
-6. Grep `tests/` for `_PRE_[0-9]` (AC8) and parse every queue-016 spec with the
-   checker (AC9); stage the AC10 violation on a scratch branch.
+6. Search `tests/` for the fence *shape* — a `hashlib.sha256(...)` over a
+   committed file compared against a hardcoded literal — not for the
+   `_PRE_[0-9]` name (AC8); parse every queue-016 spec with the checker (AC9);
+   stage the AC10 violation on a scratch branch.
 7. Clone into a fresh directory, build a venv, run the full suite (AC11).
 8. Update `progress.md`: Stage 26 acceptance ticks with evidence, verification
    rows, and the deliverable statuses.
@@ -116,8 +133,9 @@ and this item reports that rather than ticking around it.
 New module `tests/test_115_stage26_validation.py` for the assertions that can be
 made in-suite; the replays themselves belong to the Validation section:
 
-- AC8: assert no `_PRE_[0-9]` constant under `tests/`.
-- AC9: assert each of the nine specs has a non-empty `## Authorised paths`.
+- AC8: assert no digest-vs-hardcoded-literal comparison over a committed file
+  remains under `tests/`, and that the intra-run before/after digests still do.
+- AC9: assert each of the ten specs has a non-empty `## Authorised paths`.
 - AC7: assert the neighbourhood paths are in the committed catalogue with
   `status: "unwired"`, and that `progress.md`'s item 024 bullets match.
 - AC12: assert every Stage 26 acceptance box is either ticked **and** followed
