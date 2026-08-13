@@ -6,20 +6,28 @@ that the real Stage 4 pipeline (:func:`segfacet.pipeline.run_qc`, under the
 bundled default config) judges it ``pass`` with zero findings. This is the
 positive-control base every Stage 5 perturbation (items 037-039) starts from.
 
-Axis convention (matching :mod:`segfacet.features.geometry`): image axis 0 is
-superior-inferior (the stacking axis), axis 1 is left-right, axis 2 is
-anterior-posterior. Bodies are stacked along axis 0.
+Axis convention (item 116): the **affine is the source of truth**, not a
+fixed axis order. ``_affine_from_spacing`` emits a plain positive diagonal
+affine, which ``nibabel.aff2axcodes`` resolves to RAS axcodes -- array axis 0
+runs left->right, axis 1 posterior->anterior, axis 2 inferior->superior. This
+generator places bodies to match that affine's own claim (rather than
+contradicting it, as the pre-116 axis-0-stacking layout did): bodies are
+stacked along **axis 2** (superior-inferior), axis 0 is left-right, axis 1 is
+anterior-posterior. Loading a generated fixture through :mod:`segfacet.io`
+(which reorients every volume to RAS) is therefore an array-identity
+operation -- the fixture is already RAS-native.
 
 Design (see the item 036 spec's Implementation Steps for the full rationale):
 
 * Each body is a solid rectangular block sized in **physical mm**, converted
   to voxel counts via ``spacing`` -- so the body's volume/extents land inside
   every level group's default ``bounds`` regardless of spacing (AC4/AC6).
-* Bodies are separated by a fixed gap along axis 0 (disjoint -> no overlap,
-  single component each -- AC7/AC9) and inset from all six faces by a margin
-  (no border contact -- AC8).
+* Bodies are separated by a fixed gap along axis 2 (the stacking axis;
+  disjoint -> no overlap, single component each -- AC7/AC9) and inset from
+  all six faces by a margin (no border contact -- AC8).
 * Centroids follow a smooth, gently-curved path (a shallow non-negative hump
-  in the left-right plane as a function of axis-0 position); the fitted
+  in the left-right plane as a function of axis-2 (superior-inferior)
+  position); the fitted
   spline (item 017) passes through the centroids exactly (``s=0``
   interpolation), so every offset stays near-zero, well under the default
   15 mm ``mislabel`` threshold (AC11), and the path is centroid-order
@@ -65,16 +73,19 @@ __all__ = [
 #: vertebra (see the module docstring's "transitional-vertebra trap" note).
 DEFAULT_LEVELS: Tuple[str, ...] = ("L1", "L2", "L3", "L4", "L5")
 
-# Per-body physical size in mm, ordered (axis0, axis1, axis2) i.e.
-# (superior-inferior, left-right, anterior-posterior). Chosen to sit
-# comfortably inside every level group's DEFAULT_BOUNDS
-# (cervical/thoracic/lumbar) simultaneously: volume 25*30*25 = 18750 mm^3
-# (cervical [3000,35000], thoracic [5000,70000], lumbar [8000,120000]); each
-# extent axis is likewise inside every group's per-axis range.
-_BODY_SIZE_MM: Tuple[float, float, float] = (25.0, 30.0, 25.0)
+# Per-body physical size in mm, named by anatomical direction (not by array
+# axis -- see the module docstring: array axis 0 is left-right, axis 1
+# anterior-posterior, axis 2 superior-inferior). Chosen to sit comfortably inside
+# every level group's DEFAULT_BOUNDS (cervical/thoracic/lumbar)
+# simultaneously: volume 25*30*25 = 18750 mm^3 (cervical [3000,35000],
+# thoracic [5000,70000], lumbar [8000,120000]); each extent axis is likewise
+# inside every group's per-axis range.
+_BODY_SIZE_SI_MM: float = 25.0
+_BODY_SIZE_LR_MM: float = 30.0
+_BODY_SIZE_AP_MM: float = 25.0
 
-# Inter-body gap along axis 0 (mm) -- keeps bodies disjoint (no overlap, one
-# component each) with headroom.
+# Inter-body gap along the stacking (superior-inferior) axis (mm) -- keeps
+# bodies disjoint (no overlap, one component each) with headroom.
 _GAP_MM: float = 15.0
 
 # Margin from every one of the six FOV faces (mm) -- keeps every body's
@@ -239,55 +250,59 @@ def build_clean_spine(
     labels, level_names = _validate_span(levels, convention)
     n = len(labels)
 
+    # sx/sy/sz are per-array-axis spacings (axis 0/1/2 respectively -- the
+    # order header.get_zooms() and the affine diagonal both use). Per the
+    # module docstring's RAS-native convention: axis 0 = left-right, axis 1 =
+    # anterior-posterior, axis 2 = superior-inferior (the stacking axis).
     sx, sy, sz = (float(s) for s in spacing)
-    body_mm0, body_mm1, body_mm2 = _BODY_SIZE_MM
 
-    body_vox0 = max(1, math.ceil(body_mm0 / sx))
-    body_vox1 = max(1, math.ceil(body_mm1 / sy))
-    body_vox2 = max(1, math.ceil(body_mm2 / sz))
+    body_vox_lr = max(1, math.ceil(_BODY_SIZE_LR_MM / sx))
+    body_vox_ap = max(1, math.ceil(_BODY_SIZE_AP_MM / sy))
+    body_vox_si = max(1, math.ceil(_BODY_SIZE_SI_MM / sz))
 
-    gap_vox0 = max(1, math.ceil(_GAP_MM / sx))
-    margin_vox0 = max(1, math.ceil(_MARGIN_MM / sx))
-    margin_vox1 = max(1, math.ceil(_MARGIN_MM / sy))
-    margin_vox2 = max(1, math.ceil(_MARGIN_MM / sz))
+    gap_vox_si = max(1, math.ceil(_GAP_MM / sz))
+    margin_vox_lr = max(1, math.ceil(_MARGIN_MM / sx))
+    margin_vox_ap = max(1, math.ceil(_MARGIN_MM / sy))
+    margin_vox_si = max(1, math.ceil(_MARGIN_MM / sz))
 
     amplitude = max(0.0, float(curve_amplitude_mm))
-    amplitude_vox1 = math.ceil(amplitude / sy) if amplitude > 0.0 else 0
+    amplitude_vox_lr = math.ceil(amplitude / sx) if amplitude > 0.0 else 0
 
-    shape0 = 2 * margin_vox0 + n * body_vox0 + max(0, n - 1) * gap_vox0
-    shape1 = 2 * margin_vox1 + body_vox1 + amplitude_vox1
-    shape2 = 2 * margin_vox2 + body_vox2
+    shape0 = 2 * margin_vox_lr + body_vox_lr + amplitude_vox_lr
+    shape1 = 2 * margin_vox_ap + body_vox_ap
+    shape2 = 2 * margin_vox_si + n * body_vox_si + max(0, n - 1) * gap_vox_si
     shape = (int(shape0), int(shape1), int(shape2))
 
     seg_data = np.zeros(shape, dtype=np.uint16)
 
     voxel_counts: Dict[int, int] = {}
     for i, label in enumerate(labels):
-        start0 = margin_vox0 + i * (body_vox0 + gap_vox0)
-        end0 = start0 + body_vox0
+        start2 = margin_vox_si + i * (body_vox_si + gap_vox_si)
+        end2 = start2 + body_vox_si
 
         # Smooth, non-negative lateral hump: 0 at the ends, peaking at the
         # middle body -- always >= 0, so a fixed one-sided margin suffices.
         frac = (i / (n - 1)) if n > 1 else 0.0
         shift_mm = amplitude * math.sin(math.pi * frac)
-        shift_vox1 = int(round(shift_mm / sy)) if sy > 0 else 0
-        shift_vox1 = max(0, min(shift_vox1, amplitude_vox1))
+        shift_vox_lr = int(round(shift_mm / sx)) if sx > 0 else 0
+        shift_vox_lr = max(0, min(shift_vox_lr, amplitude_vox_lr))
 
-        start1 = margin_vox1 + shift_vox1
-        end1 = start1 + body_vox1
+        start0 = margin_vox_lr + shift_vox_lr
+        end0 = start0 + body_vox_lr
 
-        start2 = margin_vox2
-        end2 = start2 + body_vox2
+        start1 = margin_vox_ap
+        end1 = start1 + body_vox_ap
 
         seg_data[start0:end0, start1:end1, start2:end2] = label
-        voxel_counts[label] = int(body_vox0 * body_vox1 * body_vox2)
+        voxel_counts[label] = int(body_vox_lr * body_vox_ap * body_vox_si)
 
     affine = _affine_from_spacing(spacing)
     seg_img = nib.Nifti1Image(seg_data, affine)
 
-    # A deterministic, non-constant scan texture (a simple ramp along axis 0),
-    # mirroring tests/synthetic.py's make_scan(gradient=True) idiom.
-    ramp = np.arange(shape[0], dtype=np.int64).reshape(shape[0], 1, 1)
+    # A deterministic, non-constant scan texture (a simple ramp along axis 2,
+    # the stacking/superior-inferior axis), mirroring tests/synthetic.py's
+    # make_scan(gradient=True) idiom.
+    ramp = np.arange(shape[2], dtype=np.int64).reshape(1, 1, shape[2])
     scan_data = np.ascontiguousarray(np.broadcast_to(ramp, shape).astype(np.int16))
     scan_img = nib.Nifti1Image(scan_data, affine)
 

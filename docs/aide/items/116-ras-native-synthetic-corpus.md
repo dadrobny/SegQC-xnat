@@ -184,4 +184,76 @@ began. Item 107 supplied the scope checker used above.
   therefore a convention migration, not a bug fix, and the fixtures' contradictory
   affines are the reason it went unnoticed for so long — nothing read them.
 
-To be updated during implementation.
+- **`_affine_from_spacing` needed no change.** The plain positive diagonal
+  affine it already emits resolves to RAS axcodes `('R', 'A', 'S')` — array
+  axis 0 = left-right, axis 1 = anterior-posterior, axis 2 = superior-inferior.
+  That affine was already truthful about axis 2 carrying S/I; the bug was
+  entirely on the array side (bodies stacked along axis 0 instead). The fix
+  is therefore a data-layout change only: `build_clean_spine` now stacks
+  along axis 2, puts the lateral (left-right) curve on axis 0, and fixes
+  axis 1 (anterior-posterior) per body — matching the affine's own claim
+  rather than contradicting it. Constants were renamed by anatomical
+  direction (`_BODY_SIZE_LR_MM`/`_AP_MM`/`_SI_MM`) rather than by array-axis
+  index, so a future re-check of "does the code match the affine" is a direct
+  read rather than a re-derivation.
+
+- **One shared affine-resolution helper, not one per operator (AC5).** Added
+  `segfacet/synth/axes.py`: `resolve_face(affine, face) -> (axis, side)`,
+  `si_axis(affine) -> axis`, and `non_stacking_axes(affine) -> (axis, axis)`,
+  all built on `nibabel.aff2axcodes` (independent of, not imported from,
+  `segfacet.features.geometry` — item 108 owns that module and the `synth/`
+  package's established convention is to reimplement small shared idioms
+  locally rather than reach across the package boundary). `CropAtBorderPerturbation`
+  (named face), `ForceOverlapPerturbation` and `FragmentPerturbation` (stacking
+  axis) all resolve through it now instead of a hardcoded index.
+
+- **`DisplacePerturbation` was migrated too.** Audited per the task brief: its
+  docstring and code hardcoded "shift along axis 1 and axis 2" to mean "the two
+  axes that are not the stacking axis" — a direct encoding of the legacy
+  axis-0-stacking convention, not an orientation-agnostic choice. Migrated to
+  `non_stacking_axes(labelmap.affine)` so it shifts the target off-curve along
+  whichever two array axes are not S/I on that volume's own affine, regardless
+  of stacking-axis position. This is not literally "targets a named face"
+  (AC5's own wording), but the same failure mode (an anatomical-intent choice
+  keyed to a hardcoded index) and the same fix (resolve via the shared
+  `segfacet.synth.axes` helper) applied, so it was folded into the same
+  migration rather than left inconsistent.
+
+- **`regression.py`'s mode-4 reconstruction also hardcoded axis 0.**
+  `_recon_monotonic_true_spatial_order` (the `relabel_swap` test-only
+  reconstruction) sorted centroids by `centroid_voxel[0]` to recover "true
+  spatial order" — correct only when axis 0 was the stacking axis. Migrated
+  to sort by `centroid_voxel[si_axis(seg_img.affine)]`. `regression.py` is
+  under the authorised `src/segfacet/synth/**` glob, so this was in scope;
+  left unfixed, mode 4's reconstruction would have silently sorted by the
+  wrong (now left-right) axis and produced a meaningless monotonicity check
+  that happened to still pass by coincidence on the single default fixture.
+
+- **`eval/harness.py`'s AC9 guard substitutes a unit placeholder only in the
+  affine, never in the header zooms.** A zero (or otherwise degenerate)
+  spacing component makes the diagonal affine singular, and item 108's
+  affine-derived `touches_*` mapping raises `ValueError` when
+  `nib.aff2axcodes` cannot resolve a distinct direction for every axis. The
+  guard replaces only the degenerate affine-diagonal component(s) with `1.0`
+  (orientation resolution only, forcing default RAS axcodes) while recording
+  the *true* requested spacing on the header via `set_zooms`, since every
+  physical-volume/extent computation reads `header.get_zooms()`, never the
+  affine magnitude. This keeps the documented zero-volume behaviour exact
+  while letting `run_qc`'s affine-derived features resolve without raising.
+  Scoped to this one file per the item's Assumptions.
+
+- **`InjectIslandsPerturbation` was left unchanged.** It places islands using
+  array-index bookkeeping only (a generic "own x-span" / "above-or-below
+  along axis 1" placement algorithm with no anatomical face lookup), so it is
+  orientation-agnostic by construction and required no migration — confirmed
+  by full-corpus regeneration and `verify_case` passing for
+  `mode3_inject_islands` unchanged.
+
+- **AC7 verified against the true pre-migration state.** `main` had not
+  diverged from the merge-base of this stacked branch at implementation time,
+  so `git merge-base HEAD main` resolves to the pre-108-and-pre-116 commit.
+  Every corpus case's `(rule_id, sorted labels)` pairs, freshly built, match
+  that merge-base's committed goldens exactly; the reconstruction-based cases
+  (modes 1/4/8) were additionally confirmed via
+  `segfacet.synth.regression.verify_case` after regeneration. No case's
+  designated rule or offending labels moved.
