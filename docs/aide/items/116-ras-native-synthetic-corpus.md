@@ -89,6 +89,16 @@ designed to trip `border` must still trip `border`.
   `tests/test_108_affine_faces.py` passes; this migration must satisfy item 108's
   acceptance, not weaken it. *(Amended 2026-08-12: "unchanged" was too strong —
   see AC14.)*
+- [ ] **AC15: the surviving `reference_default.json` scope fence is retired, not
+  re-pinned.** `tests/test_093_tptbox_label_convention.py::test_ac6_reference_default_json_byte_unchanged`
+  pins a SHA-256 of `reference_default.json` captured "before item 093's edit" —
+  a byte-hash scope fence of exactly the kind item 107 retired, which survived
+  only because item 107's AC1 grep searched for the `_PRE_NNN_*` naming pattern
+  and this constant is called `_PRE_ITEM_REFERENCE_DEFAULT_SHA256`. Item 093's
+  scope claim was verified at merge; asserting it forever is what item 107
+  removed. **Delete the fence rather than re-pinning its hash** — re-pinning
+  perpetuates the instrument the project has decided against, and would break
+  again on the next legitimate regeneration.
 - [ ] **AC14: item 108's singular-affine fixture is repaired.**
   `test_ac9_singular_affine_deterministic_outcome` currently fails at item 108's
   own tip: `nib.Nifti1Image(data, singular_affine)` raises
@@ -192,6 +202,7 @@ began. Item 107 supplied the scope checker used above.
 - `tests/test_094_tptbox_image_layer.py`
 - `tests/test_039_identity_ordering_alignment_perturbations.py`
 - `tests/test_108_affine_faces.py`
+- `tests/test_093_tptbox_label_convention.py`
 - `docs/aide/queue/queue-016.md`
 - `docs/aide/items/116-ras-native-synthetic-corpus.md`
 
