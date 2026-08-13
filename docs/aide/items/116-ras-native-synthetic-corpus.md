@@ -75,16 +75,30 @@ designed to trip `border` must still trip `border`.
 - [ ] **AC9: the degenerate-spacing path does not raise.** A `(0.0, 1.0, 1.0)`
   spacing through the eval harness produces the documented zeroed physical volume
   rather than propagating a `ValueError` from affine resolution.
-- [ ] **AC10: fixtures and goldens are regenerated together.** Every committed
-  corpus fixture and golden is regenerated from the migrated generator, and
-  regenerating twice is byte-identical.
+- [ ] **AC10: every artifact derived from the generator is regenerated.** Not
+  only `tests/corpus/**` — anything built from the synthetic cohort, including
+  the bundled `src/segfacet/reference/reference_default.json`, is regenerated
+  from the migrated generator, and regenerating twice is byte-identical. The
+  audit for such artifacts is part of this criterion, not an assumption.
 - [ ] **AC11: the manifest still round-trips.** `tests/corpus/manifest.json`
   regenerates byte-identically and still describes every case.
 - [ ] **AC12: the whole suite is green**, including the 14 tests failing on item
   108's branch and the two golden-verdict snapshots in
   `test_098_stray_components.py` / `test_102_stage18_validation.py`.
-- [ ] **AC13: item 108's acceptance still holds.** `tests/test_108_affine_faces.py`
-  passes unchanged — this migration must satisfy it, not weaken it.
+- [ ] **AC13: item 108's acceptance still holds.** Every test in
+  `tests/test_108_affine_faces.py` passes; this migration must satisfy item 108's
+  acceptance, not weaken it. *(Amended 2026-08-12: "unchanged" was too strong —
+  see AC14.)*
+- [ ] **AC14: item 108's singular-affine fixture is repaired.**
+  `test_ac9_singular_affine_deterministic_outcome` currently fails at item 108's
+  own tip: `nib.Nifti1Image(data, singular_affine)` raises
+  `HeaderDataError`/`LinAlgError` during fixture construction, before production
+  code runs, so AC9's `ValueError` branch is never exercised. Rebuild the fixture
+  so it reaches `compute_label_geometry` — assigning the affine post-construction
+  or building the header directly — and assert the documented degenerate-affine
+  behaviour. This is a test-only repair of an inherited defect, carried here
+  because item 108's branch is stacked beneath this one and the two merge as a
+  pair.
 
 ## Assumptions
 
@@ -174,8 +188,22 @@ began. Item 107 supplied the scope checker used above.
 - `tests/test_091_stage14_acceptance.py`
 - `tests/test_098_stray_components.py`
 - `tests/test_102_stage18_validation.py`
+- `src/segfacet/reference/reference_default.json`
+- `tests/test_094_tptbox_image_layer.py`
+- `tests/test_039_identity_ordering_alignment_perturbations.py`
+- `tests/test_108_affine_faces.py`
 - `docs/aide/queue/queue-016.md`
 - `docs/aide/items/116-ras-native-synthetic-corpus.md`
+
+> **Extended 2026-08-12, mid-execution.** Validation round 1 found three
+> consumers of the synthetic generator that the original list missed, all
+> genuine blast radius of this migration rather than new scope:
+> `reference_default.json` is *built from* the synthetic cohort via `clean_gt.py`
+> and so goes stale the moment the generator changes;
+> `test_094_tptbox_image_layer.py` hardcodes fixture shapes that the stacking-axis
+> move invalidates; and `test_039_identity_ordering_alignment_perturbations.py`
+> asserts against the mode-4 reconstruction this item corrected.
+> `test_108_affine_faces.py` is added for one narrow repair only — see AC14.
 
 ## Decisions & Trade-offs
 
