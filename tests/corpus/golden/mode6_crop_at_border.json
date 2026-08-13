@@ -177,8 +177,8 @@
           "extent_y_mm": 30.0,
           "extent_z_mm": 20.0,
           "physical_volume_mm3": 15000.0,
-          "touches_anterior": true,
-          "touches_inferior": false,
+          "touches_anterior": false,
+          "touches_inferior": true,
           "touches_left": false,
           "touches_posterior": false,
           "touches_right": false,
@@ -485,7 +485,7 @@
       "labels": [
         22
       ],
-      "reason": "Partial vertebra clipped by FOV: label 22 (L3) touches image face(s): anterior.",
+      "reason": "Partial vertebra clipped by FOV: label 22 (L3) touches image face(s): inferior.",
       "rule_id": "border",
       "severity": "flagged-for-review"
     }
@@ -496,7 +496,7 @@
         "labels": [
           22
         ],
-        "message": "Partial vertebra clipped by FOV: label 22 (L3) touches image face(s): anterior.",
+        "message": "Partial vertebra clipped by FOV: label 22 (L3) touches image face(s): inferior.",
         "severity": "flagged-for-review"
       }
     ]

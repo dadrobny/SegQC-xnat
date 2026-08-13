@@ -13,22 +13,24 @@ following geometric properties for that label's voxel set:
   ``z_min``, ``z_max`` in voxel indices (inclusive) or mm coordinates.
 * **touches_inferior/superior/left/right/anterior/posterior** — bool flags
   indicating whether the label touches each face of the image volume.  The
-  mapping from image axes to anatomical directions is:
-
-  ========================  ==================
-  Image face                Anatomical flag
-  ========================  ==================
-  x == 0                    touches_inferior
-  x == shape[0]-1           touches_superior
-  y == 0                    touches_left
-  y == shape[1]-1           touches_right
-  z == 0                    touches_anterior
-  z == shape[2]-1           touches_posterior
-  ========================  ==================
-
-  This mapping is a pragmatic convention for tools that work in any orientation
-  without a reliable RAS header; downstream callers that have orientation
-  information can remap as needed.
+  mapping from array axes to these six anatomical flags is **derived from the
+  image's affine** (item 108), via ``nibabel.aff2axcodes`` — it is *not* a
+  fixed axis order.  For each array axis, ``aff2axcodes`` reports which
+  anatomical direction that axis' *increasing* index points toward (its
+  "axcode" letter, one of R/L/A/P/S/I); the axis' low face (index 0) and high
+  face (index ``shape[axis]-1``) are then named from the opposite/matching
+  ends of that letter's L/R, A/P or S/I pair. E.g. for a volume whose affine
+  resolves to RAS axcodes (``segfacet.io`` reorients every loaded volume to
+  RAS — item 094), array axis 0 runs left→right, so its low face is
+  ``touches_left`` and its high face is ``touches_right``; axis 1 runs
+  posterior→anterior (``touches_posterior`` / ``touches_anterior``); axis 2
+  runs inferior→superior (``touches_inferior`` / ``touches_superior``). A
+  volume stored under any other axis order/orientation yields the same six
+  flags for the same physical anatomy, because the mapping is read from that
+  volume's own affine rather than assumed. A missing or degenerate (singular)
+  affine — one ``aff2axcodes`` cannot resolve to six distinct directions — is
+  a hard error (:class:`ValueError`) rather than a silent mis-assignment; see
+  :func:`_face_map_from_affine`.
 
 Public API
 ----------
@@ -108,12 +110,13 @@ class LabelGeometry:
     bbox_physical:
         Axis-aligned bounding box in mm (voxel-centre convention, i.e. the
         physical coordinate of each boundary voxel's centre).
-    touches_inferior, touches_superior:
-        True if any voxel of this label occupies the x=0 or x=shape[0]-1 face.
-    touches_left, touches_right:
-        True if any voxel of this label occupies the y=0 or y=shape[1]-1 face.
+    touches_inferior, touches_superior, touches_left, touches_right,
     touches_anterior, touches_posterior:
-        True if any voxel of this label occupies the z=0 or z=shape[2]-1 face.
+        True if any voxel of this label occupies the corresponding face of
+        the image volume. Which array axis/index carries which of these six
+        flags is derived from the image's affine (item 108) -- see the
+        module docstring and :func:`_face_map_from_affine`; it is *not* a
+        fixed axis order.
     """
 
     voxel_count: int
@@ -134,6 +137,60 @@ class LabelGeometry:
 # --------------------------------------------------------------------------- #
 # Core compute function
 # --------------------------------------------------------------------------- #
+
+
+# Anatomical axcode letter -> (flag name for the axis' *low*-index face,
+# flag name for its *high*-index face). ``aff2axcodes`` reports, per array
+# axis, which direction *increasing* index points toward; the low face is
+# therefore the opposite end of that pair, the high face the named end.
+_AXCODE_TO_FACES = {
+    "R": ("touches_left", "touches_right"),
+    "L": ("touches_right", "touches_left"),
+    "A": ("touches_posterior", "touches_anterior"),
+    "P": ("touches_anterior", "touches_posterior"),
+    "S": ("touches_inferior", "touches_superior"),
+    "I": ("touches_superior", "touches_inferior"),
+}
+
+
+def _face_map_from_affine(affine) -> Tuple[Tuple[str, str], Tuple[str, str], Tuple[str, str]]:
+    """Derive the per-array-axis (low_face, high_face) flag-name triple from
+    *affine* (item 108).
+
+    Parameters
+    ----------
+    affine:
+        A 4x4 NIfTI affine (or ``None``).
+
+    Returns
+    -------
+    tuple of 3 (low_face, high_face) pairs
+        One pair per array axis (0, 1, 2), each a ``touches_*`` attribute
+        name.
+
+    Raises
+    ------
+    ValueError
+        If *affine* is ``None``, or ``nibabel.aff2axcodes`` cannot resolve
+        one of the three array axes to a distinct anatomical direction (a
+        singular/rank-deficient affine) -- a degenerate affine per AC9,
+        surfaced as a clear error rather than a silent mis-assignment.
+    """
+    if affine is None:
+        raise ValueError(
+            "compute_label_geometry requires a non-None affine to derive the "
+            "touches_* face mapping (item 108); the segmentation image's "
+            "affine is None."
+        )
+    axcodes = nib.aff2axcodes(affine)
+    if len(axcodes) != 3 or any(code is None for code in axcodes):
+        raise ValueError(
+            "compute_label_geometry cannot derive the touches_* face mapping "
+            f"from a degenerate affine (nib.aff2axcodes resolved to {axcodes!r}, "
+            "not three distinct anatomical directions); the affine is missing, "
+            "singular, or otherwise rank-deficient."
+        )
+    return tuple(_AXCODE_TO_FACES[code] for code in axcodes)  # type: ignore[return-value]
 
 
 def _get_spacing(seg_img: nib.Nifti1Image) -> Tuple[float, float, float]:
@@ -243,17 +300,35 @@ def compute_label_geometry(
         z_max=float(z_max_v * sz),
     )
 
-    # Border-contact flags: does the label touch each face of the image volume?
-    # Face mapping: x=0 -> inferior, x=max -> superior,
-    #               y=0 -> left,     y=max -> right,
-    #               z=0 -> anterior, z=max -> posterior.
+    # Border-contact flags: does the label touch each face of the image
+    # volume? The array-axis -> anatomical-face mapping is derived from
+    # seg_img.affine (item 108), not assumed.
     shape = data.shape
-    touches_inferior  = bool(x_min_v == 0)
-    touches_superior  = bool(x_max_v == shape[0] - 1)
-    touches_left      = bool(y_min_v == 0)
-    touches_right     = bool(y_max_v == shape[1] - 1)
-    touches_anterior  = bool(z_min_v == 0)
-    touches_posterior = bool(z_max_v == shape[2] - 1)
+    face_map = _face_map_from_affine(seg_img.affine)
+    min_v = (x_min_v, y_min_v, z_min_v)
+    max_v = (x_max_v, y_max_v, z_max_v)
+
+    face_flags = {
+        "touches_inferior": False,
+        "touches_superior": False,
+        "touches_left": False,
+        "touches_right": False,
+        "touches_anterior": False,
+        "touches_posterior": False,
+    }
+    for axis in range(3):
+        low_face, high_face = face_map[axis]
+        if min_v[axis] == 0:
+            face_flags[low_face] = True
+        if max_v[axis] == shape[axis] - 1:
+            face_flags[high_face] = True
+
+    touches_inferior = face_flags["touches_inferior"]
+    touches_superior = face_flags["touches_superior"]
+    touches_left = face_flags["touches_left"]
+    touches_right = face_flags["touches_right"]
+    touches_anterior = face_flags["touches_anterior"]
+    touches_posterior = face_flags["touches_posterior"]
 
     return LabelGeometry(
         voxel_count=voxel_count,
