@@ -1,100 +1,164 @@
-"""Local vertebra neighbourhood comparison (item 024).
+"""Local vertebra neighbourhood comparison, generalised (item 110; item 024).
 
-For each vertebra in the ordered centroid sequence, compute sliding-window
-statistics over the surrounding neighbours:
+For each element in an ordered sequence, compute sliding-window statistics
+over the surrounding neighbours for an arbitrary, caller-named set of
+features:
 
-* Mean, median, and std of inter-centroid **spacing** (mm) within the window.
-* Mean, median, and std of **spline offset** (mm) within the window.
-* Mean, median, and std of **label volume** (mm³) within the window.
-* A per-vertebra **deviation score** (non-negative scalar) summarising how
-  anomalous the focal vertebra is relative to its neighbours.
-* An **outlier flag** when the deviation score exceeds a configurable threshold.
+* Mean, median, and std of every named feature within the window (the window
+  always includes the focal element).
+* A leave-one-out z-score per feature: the focal element's value compared
+  against the *remaining* window members only (its neighbours, not itself).
+* A per-element **deviation score** (non-negative scalar), the ``max`` of the
+  leave-one-out z-scores of a caller-selected scored subset of the features.
+* An **outlier flag** when the deviation score exceeds a configurable
+  threshold.
 
 The window of width ``n`` centred at position ``i`` spans indices
-``max(0, i - n//2)`` to ``min(len-1, i + n//2)`` inclusive.  At the
-boundaries the window is asymmetric but the focal vertebra is always included.
+``max(0, i - n//2)`` to ``min(len-1, i + n//2)`` inclusive. At the boundaries
+the window is asymmetric but the focal element is always included.
+
+Item 110 generalisation
+------------------------
+The pre-item-110 API took three fixed typed arguments (``centroids``,
+``offsets``, ``geometries``) and computed inter-centroid spacing internally
+via ``_window_spacing``. The mechanism itself -- leave-one-out z-score of a
+focal element against a sliding window of its neighbours -- is entirely
+feature-agnostic, so it now takes an ordered element sequence plus a
+``{feature_name: values}`` mapping:
+
+* ``spacing_mm`` is now a **caller-supplied per-element value**, not an
+  internally computed pairwise inter-centroid distance. The caller (
+  ``pipeline.py``) is responsible for deriving one spacing value per element
+  (see that module for the boundary convention used at the first/last
+  element).
+* Any number of named features may be passed; which subset is scored into
+  ``deviation_score`` is the ``scored`` parameter, not a hardcoded pair.
+* ``DEFAULT_FEATURES``/``DEFAULT_SCORED`` reproduce the historical three
+  features and historical scored pair exactly, so the pre-refactor
+  ``deviation_score``/``is_outlier`` behaviour is unchanged under the
+  defaults (AC5). ``UNSCORED_RATIONALE`` documents the one default feature
+  that is reported but deliberately not scored, closing the historical
+  silent mismatch where ``spacing_mm`` was reported but never fed into
+  ``_deviation_score``.
 
 Public API
 ----------
+``FeatureWindowStats``
+    Frozen dataclass: ``mean``/``median``/``std`` (over the whole window,
+    including the focal element) plus a leave-one-out ``z_score`` (excluding
+    the focal element) for one named feature.
 ``VertebralNeighbourhood``
-    Frozen dataclass with per-vertebra neighbourhood statistics.
-``compute_neighbourhood_features(centroids, offsets, geometries, window_n=3,
-    outlier_threshold=2.0) -> List[VertebralNeighbourhood]``
-    Compute one record per centroid.
+    Frozen dataclass with per-element neighbourhood statistics.
+``DEFAULT_FEATURES``
+    ``("spacing_mm", "offset_mm", "volume_mm3")`` -- the historical three.
+``DEFAULT_SCORED``
+    ``("offset_mm", "volume_mm3")`` -- the historical scored pair.
+``UNSCORED_RATIONALE``
+    ``{feature_name: reason}`` for every ``DEFAULT_FEATURES`` name not in
+    ``DEFAULT_SCORED``.
+``compute_neighbourhood_features(elements, features, *, scored=DEFAULT_SCORED,
+    window_n=3, outlier_threshold=2.0) -> List[VertebralNeighbourhood]``
+    Compute one record per element.
 """
 
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Dict, List, Mapping, Sequence
+from typing import Dict, List, Mapping, Sequence, Tuple
 
 import numpy as np
 
-from segfacet.features.centroids import LabelCentroid
-from segfacet.features.geometry import LabelGeometry
-from segfacet.features.spline_offset import VertebralSplineOffset
-
 __all__ = [
+    "FeatureWindowStats",
     "VertebralNeighbourhood",
+    "DEFAULT_FEATURES",
+    "DEFAULT_SCORED",
+    "UNSCORED_RATIONALE",
     "compute_neighbourhood_features",
 ]
 
 
 # --------------------------------------------------------------------------- #
-# VertebralNeighbourhood dataclass
+# Default feature selection (item 110 AC4/AC5)
+# --------------------------------------------------------------------------- #
+
+# The historical three base features (pre-item-110 fixed fields).
+DEFAULT_FEATURES: Tuple[str, ...] = ("spacing_mm", "offset_mm", "volume_mm3")
+
+# The historical scored pair -- matches pre-item-110 _deviation_score exactly.
+DEFAULT_SCORED: Tuple[str, ...] = ("offset_mm", "volume_mm3")
+
+# AC4: every DEFAULT_FEATURES name not in DEFAULT_SCORED must carry a
+# non-empty, documented reason here -- reconciles "reported but unscored" so
+# the historical silent spacing_mm mismatch cannot recur undocumented.
+UNSCORED_RATIONALE: Dict[str, str] = {
+    "spacing_mm": (
+        "spacing_mm is a caller-supplied per-element value (see "
+        "pipeline.py::extract_feature_record for the boundary convention "
+        "used at the first/last element), not a geometric quantity this "
+        "module derives. It is reported for context but deliberately "
+        "excluded from deviation_score so the default scored pair matches "
+        "the pre-item-110 implementation exactly (item 110 AC5); scoring "
+        "spacing is left to a future item with its own threshold "
+        "calibration."
+    ),
+}
+
+
+# --------------------------------------------------------------------------- #
+# Dataclasses
 # --------------------------------------------------------------------------- #
 
 
 @dataclass(frozen=True)
-class VertebralNeighbourhood:
-    """Per-vertebra local neighbourhood statistics.
+class FeatureWindowStats:
+    """Window statistics for one named feature at one focal element.
 
     Attributes
     ----------
-    label : int
-        Integer label value of the focal vertebra.
-    level_name : str
-        Anatomical name of the focal vertebra.
-    window_labels : tuple[int, ...]
-        Integer label values of all vertebrae in the window (including focal).
-    mean_spacing_mm : float
-        Mean inter-centroid spacing (mm) within the window.
-    median_spacing_mm : float
-        Median inter-centroid spacing (mm) within the window.
-    std_spacing_mm : float
-        Standard deviation of inter-centroid spacings within the window.
-    mean_offset_mm : float
-        Mean spline offset (mm) within the window.
-    median_offset_mm : float
-        Median spline offset (mm) within the window.
-    std_offset_mm : float
-        Standard deviation of spline offsets within the window.
-    mean_volume_mm3 : float
-        Mean label volume (mm³) within the window.
-    median_volume_mm3 : float
-        Median label volume (mm³) within the window.
-    std_volume_mm3 : float
-        Standard deviation of label volumes within the window.
-    deviation_score : float
-        Per-vertebra scalar summarising how anomalous the focal vertebra is
-        relative to its neighbours (non-negative; 0 = perfectly consistent).
-    is_outlier : bool
+    mean, median, std:
+        Computed over the *whole* window (including the focal element).
+    z_score:
+        Leave-one-out z-score: the focal element's value compared against
+        the window's *other* members only (excluding itself). ``0.0`` when
+        the window has no neighbours (e.g. ``window_n == 1``).
+    """
+
+    mean: float
+    median: float
+    std: float
+    z_score: float
+
+
+@dataclass(frozen=True)
+class VertebralNeighbourhood:
+    """Per-element local neighbourhood statistics.
+
+    Attributes
+    ----------
+    label:
+        Integer label value of the focal element.
+    level_name:
+        Anatomical name of the focal element.
+    window_labels:
+        Integer label values of all elements in the window (including focal).
+    stats:
+        ``{feature_name: FeatureWindowStats}`` -- one entry per name in the
+        ``features`` mapping passed to :func:`compute_neighbourhood_features`.
+    deviation_score:
+        Per-element scalar summarising how anomalous the focal element is
+        relative to its neighbours (non-negative; 0 = perfectly consistent):
+        the ``max`` of the leave-one-out z-scores of the ``scored`` feature
+        subset.
+    is_outlier:
         True when deviation_score exceeds the configured threshold.
     """
 
     label: int
     level_name: str
-    window_labels: tuple
-    mean_spacing_mm: float
-    median_spacing_mm: float
-    std_spacing_mm: float
-    mean_offset_mm: float
-    median_offset_mm: float
-    std_offset_mm: float
-    mean_volume_mm3: float
-    median_volume_mm3: float
-    std_volume_mm3: float
+    window_labels: Tuple[int, ...]
+    stats: Mapping[str, FeatureWindowStats]
     deviation_score: float
     is_outlier: bool
 
@@ -103,17 +167,10 @@ class VertebralNeighbourhood:
 # Internal helpers
 # --------------------------------------------------------------------------- #
 
-# Minimum std denominator to avoid division by zero when all window values are
-# identical.  Chosen to be safely below any real mm deviation of interest while
-# keeping the normalised score meaningful.
+# Minimum std denominator to avoid division by zero when all neighbour values
+# are identical. Chosen to be safely below any real deviation of interest
+# while keeping the normalised score meaningful.
 _MIN_STD: float = 1e-6
-
-
-def _euclidean(a: tuple, b: tuple) -> float:
-    """Return Euclidean distance (mm) between two 3-tuples."""
-    return math.sqrt(
-        (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2
-    )
 
 
 def _safe_std(values: np.ndarray) -> float:
@@ -123,68 +180,20 @@ def _safe_std(values: np.ndarray) -> float:
     return float(np.std(values, ddof=0))
 
 
-def _window_spacing(centroids: Sequence[LabelCentroid], win_start: int, win_end: int) -> np.ndarray:
-    """Return pairwise inter-centroid spacings within window [win_start, win_end].
-
-    For a window of k vertebrae there are k-1 pairs.  When k == 1 (single
-    vertebra), returns an empty array so callers get 0-valued statistics.
+def _leave_one_out_z(window_values: np.ndarray, focal_idx: int, focal_value: float) -> float:
+    """Leave-one-out z-score of ``focal_value`` against the *other* window
+    members (excludes ``window_values[focal_idx]`` from the neighbour mean
+    and std). Returns 0.0 when there are no neighbours (single-element
+    window). Uses ``_MIN_STD`` as a floor for a near-zero neighbour std.
     """
-    if win_end <= win_start:
-        return np.array([], dtype=np.float64)
-    spacings = []
-    for j in range(win_start, win_end):
-        spacings.append(_euclidean(centroids[j].centroid_mm, centroids[j + 1].centroid_mm))
-    return np.array(spacings, dtype=np.float64)
-
-
-def _deviation_score(
-    focal_offset: float,
-    focal_volume: float,
-    win_offsets: np.ndarray,
-    win_volumes: np.ndarray,
-    focal_idx_in_window: int,
-) -> float:
-    """Compute the deviation score for the focal vertebra.
-
-    Strategy: leave-one-out z-score — compare the focal vertebra's offset and
-    volume against the *remaining* window members (its neighbours only, not
-    itself).  This prevents the focal vertebra's own anomalous value from
-    inflating the local mean/std and masking its own deviation.
-
-    When the window std is near zero (homogeneous neighbours) we use a fixed
-    reference of _MIN_STD so the formula remains numerically stable and the
-    score stays near 0 for consistent spines.
-
-    When there are no neighbours (window size 1), the score is 0.0 by
-    definition — there is nothing to compare against.
-
-    The result is always non-negative.
-    """
-    # Build neighbour-only arrays (leave out the focal element).
-    neighbour_offsets = np.concatenate(
-        [win_offsets[:focal_idx_in_window], win_offsets[focal_idx_in_window + 1:]]
+    neighbours = np.concatenate(
+        [window_values[:focal_idx], window_values[focal_idx + 1:]]
     )
-    neighbour_volumes = np.concatenate(
-        [win_volumes[:focal_idx_in_window], win_volumes[focal_idx_in_window + 1:]]
-    )
-
-    if len(neighbour_offsets) == 0:
-        # Single-element window: no neighbours — score is 0.
+    if len(neighbours) == 0:
         return 0.0
-
-    # Offset component
-    mean_off = float(np.mean(neighbour_offsets))
-    std_off = max(float(np.std(neighbour_offsets, ddof=0)), _MIN_STD)
-    z_off = abs(focal_offset - mean_off) / std_off
-
-    # Volume component
-    mean_vol = float(np.mean(neighbour_volumes))
-    std_vol = max(float(np.std(neighbour_volumes, ddof=0)), _MIN_STD)
-    z_vol = abs(focal_volume - mean_vol) / std_vol
-
-    # Combined score: take the maximum of the two normalised deviations so
-    # that a large anomaly in either dimension is clearly visible.
-    return float(max(z_off, z_vol))
+    mean_n = float(np.mean(neighbours))
+    std_n = max(float(np.std(neighbours, ddof=0)), _MIN_STD)
+    return abs(focal_value - mean_n) / std_n
 
 
 # --------------------------------------------------------------------------- #
@@ -193,123 +202,120 @@ def _deviation_score(
 
 
 def compute_neighbourhood_features(
-    centroids: Sequence[LabelCentroid],
-    offsets: Sequence[VertebralSplineOffset],
-    geometries: Mapping[int, LabelGeometry],
+    elements: Sequence,
+    features: Mapping[str, Sequence[float]],
+    *,
+    scored: Sequence[str] = DEFAULT_SCORED,
     window_n: int = 3,
     outlier_threshold: float = 2.0,
 ) -> List[VertebralNeighbourhood]:
-    """Compute local neighbourhood statistics for each vertebra.
+    """Compute local neighbourhood statistics for each element.
 
     Parameters
     ----------
-    centroids:
-        Ordered (head-to-tail anatomical) sequence of LabelCentroid objects.
-        Must have >= 1 entry; raises ValueError when empty.
-    offsets:
-        Per-vertebra spline offsets from compute_spline_offsets (item 018).
-        Must be in the same order as centroids and have the same length.
-    geometries:
-        Mapping from integer label to LabelGeometry (item 011).
-        Must contain an entry for every label in centroids.
+    elements:
+        Ordered (head-to-tail anatomical) sequence of objects exposing
+        ``.label`` (int) and ``.level_name`` (str) -- e.g.
+        ``segfacet.features.centroids.LabelCentroid``. Must have >= 1 entry;
+        raises ``ValueError`` when empty.
+    features:
+        ``{feature_name: values}``, each ``values`` sequence the same length
+        and order as ``elements``. Any number of named features is accepted.
+        Every value must be finite (a NaN/inf value raises ``ValueError``).
+        Never mutated.
+    scored:
+        The subset of ``features`` keys whose leave-one-out z-scores are
+        combined (``max``) into ``deviation_score``. Duplicate names are
+        deduplicated. Every name must be present in ``features`` -- an
+        absent name raises ``ValueError`` naming it. Defaults to
+        :data:`DEFAULT_SCORED`.
     window_n:
-        Total window width (must be >= 1 and odd). Default 3 (= focal + 1 on
-        each side). Raises ValueError when window_n < 1.
+        Total window width (must be >= 1). Default 3 (= focal + 1 on each
+        side). Raises ``ValueError`` when ``window_n < 1``.
     outlier_threshold:
-        Deviation score threshold above which a vertebra is flagged as an
+        Deviation score threshold above which an element is flagged as an
         outlier. Default 2.0.
 
     Returns
     -------
     List[VertebralNeighbourhood]
-        One record per centroid, in the same order as the input sequence.
+        One record per element, in the same order as the input sequence.
 
     Raises
     ------
     ValueError
-        When centroids is empty or window_n < 1.
+        When ``elements`` is empty, ``window_n < 1``, a feature's values
+        contain a non-finite (NaN/inf) entry, a feature's length does not
+        match ``len(elements)``, or a ``scored`` name is absent from
+        ``features``.
     """
-    if len(centroids) == 0:
+    if len(elements) == 0:
         raise ValueError(
-            "compute_neighbourhood_features requires at least one centroid, "
+            "compute_neighbourhood_features requires at least one element, "
             "but received an empty sequence."
         )
     if window_n < 1:
-        raise ValueError(
-            f"window_n must be >= 1, got {window_n!r}."
-        )
+        raise ValueError(f"window_n must be >= 1, got {window_n!r}.")
 
-    n = len(centroids)
+    n = len(elements)
     half = window_n // 2
 
-    # Pre-extract per-vertebra arrays (same order as centroids).
-    offset_vals = np.array([float(o.offset_mm) for o in offsets], dtype=np.float64)
-    volume_vals = np.array(
-        [float(geometries[c.label].physical_volume_mm3) for c in centroids],
-        dtype=np.float64,
-    )
+    feature_arrays: Dict[str, np.ndarray] = {}
+    for name, values in features.items():
+        if len(values) != n:
+            raise ValueError(
+                f"features[{name!r}] has length {len(values)}, expected "
+                f"{n} (one value per element)."
+            )
+        arr = np.array([float(v) for v in values], dtype=np.float64)
+        if not np.all(np.isfinite(arr)):
+            raise ValueError(
+                f"features[{name!r}] contains a non-finite (NaN/inf) value; "
+                "all feature values must be finite."
+            )
+        feature_arrays[name] = arr
+
+    # Dedupe scored names, preserving order; validate presence.
+    scored_names = list(dict.fromkeys(scored))
+    for name in scored_names:
+        if name not in feature_arrays:
+            raise ValueError(
+                f"scored feature {name!r} is not present in the features "
+                f"mapping (available: {sorted(feature_arrays)})."
+            )
 
     records: List[VertebralNeighbourhood] = []
 
-    for i, c in enumerate(centroids):
-        # Window bounds (inclusive on both ends).
+    for i in range(n):
         win_start = max(0, i - half)
         win_end = min(n - 1, i + half)
-
-        # Window label IDs (as Python ints).
-        window_labels = tuple(int(centroids[j].label) for j in range(win_start, win_end + 1))
-
-        # --- Spacing statistics (pairwise distances within the window) ---
-        spacings = _window_spacing(centroids, win_start, win_end)
-        if len(spacings) == 0:
-            mean_spacing = 0.0
-            median_spacing = 0.0
-            std_spacing = 0.0
-        else:
-            mean_spacing = float(np.mean(spacings))
-            median_spacing = float(np.median(spacings))
-            std_spacing = _safe_std(spacings)
-
-        # --- Offset statistics ---
-        win_offsets = offset_vals[win_start : win_end + 1]
-        mean_offset = float(np.mean(win_offsets))
-        median_offset = float(np.median(win_offsets))
-        std_offset = _safe_std(win_offsets)
-
-        # --- Volume statistics ---
-        win_volumes = volume_vals[win_start : win_end + 1]
-        mean_volume = float(np.mean(win_volumes))
-        median_volume = float(np.median(win_volumes))
-        std_volume = _safe_std(win_volumes)
-
-        # --- Deviation score ---
-        # Index of the focal vertebra within the window slice.
         focal_idx_in_window = i - win_start
-        score = _deviation_score(
-            focal_offset=float(offset_vals[i]),
-            focal_volume=float(volume_vals[i]),
-            win_offsets=win_offsets,
-            win_volumes=win_volumes,
-            focal_idx_in_window=focal_idx_in_window,
-        )
 
+        window_labels = tuple(int(elements[j].label) for j in range(win_start, win_end + 1))
+
+        stats: Dict[str, FeatureWindowStats] = {}
+        z_by_name: Dict[str, float] = {}
+        for name, arr in feature_arrays.items():
+            window_vals = arr[win_start : win_end + 1]
+            mean_v = float(np.mean(window_vals))
+            median_v = float(np.median(window_vals))
+            std_v = _safe_std(window_vals)
+            z = _leave_one_out_z(window_vals, focal_idx_in_window, float(arr[i]))
+            stats[name] = FeatureWindowStats(
+                mean=mean_v, median=median_v, std=std_v, z_score=z
+            )
+            z_by_name[name] = z
+
+        score = max((z_by_name[name] for name in scored_names), default=0.0)
         is_outlier = bool(score >= outlier_threshold)
 
         records.append(
             VertebralNeighbourhood(
-                label=int(c.label),
-                level_name=c.level_name,
+                label=int(elements[i].label),
+                level_name=elements[i].level_name,
                 window_labels=window_labels,
-                mean_spacing_mm=mean_spacing,
-                median_spacing_mm=median_spacing,
-                std_spacing_mm=std_spacing,
-                mean_offset_mm=mean_offset,
-                median_offset_mm=median_offset,
-                std_offset_mm=std_offset,
-                mean_volume_mm3=mean_volume,
-                median_volume_mm3=median_volume,
-                std_volume_mm3=std_volume,
-                deviation_score=score,
+                stats=stats,
+                deviation_score=float(score),
                 is_outlier=is_outlier,
             )
         )

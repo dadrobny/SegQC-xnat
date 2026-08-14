@@ -357,6 +357,161 @@
           0.9999994401419617
         ]
       },
+      "per_label_neighbourhood": [
+        {
+          "deviation_score": 94.96947204602492,
+          "is_outlier": true,
+          "label": 20,
+          "level_name": "L1",
+          "stats": {
+            "offset_mm": {
+              "mean": 7.383322216658329e-05,
+              "median": 7.383322216658329e-05,
+              "std": 4.748473602301245e-05,
+              "z_score": 94.96947204602492
+            },
+            "spacing_mm": {
+              "mean": 42.42686480400789,
+              "median": 42.42686480400789,
+              "std": 2.227362319524328,
+              "z_score": 4454724.639048656
+            },
+            "volume_mm3": {
+              "mean": 18750.0,
+              "median": 18750.0,
+              "std": 0.0,
+              "z_score": 0.0
+            }
+          },
+          "window_labels": [
+            20,
+            21
+          ]
+        },
+        {
+          "deviation_score": 0.5812575764493828,
+          "is_outlier": false,
+          "label": 21,
+          "level_name": "L2",
+          "stats": {
+            "offset_mm": {
+              "mean": 4.962182924309796e-05,
+              "median": 2.634848614357084e-05,
+              "std": 5.172603984494568e-05,
+              "z_score": 0.5812575764493828
+            },
+            "spacing_mm": {
+              "mean": 43.169318910516004,
+              "median": 44.654227123532216,
+              "std": 2.0999773337267333,
+              "z_score": 0.9999999999999984
+            },
+            "volume_mm3": {
+              "mean": 18750.0,
+              "median": 18750.0,
+              "std": 0.0,
+              "z_score": 0.0
+            }
+          },
+          "window_labels": [
+            20,
+            21,
+            22
+          ]
+        },
+        {
+          "deviation_score": 25.149442751002766,
+          "is_outlier": true,
+          "label": 22,
+          "level_name": "L3",
+          "stats": {
+            "offset_mm": {
+              "mean": 1.7965338563462484e-05,
+              "median": 2.634848614357084e-05,
+              "std": 1.1855561008197941e-05,
+              "z_score": 25.149442751002766
+            },
+            "spacing_mm": {
+              "mean": 43.169318910516004,
+              "median": 44.654227123532216,
+              "std": 2.0999773337267333,
+              "z_score": 0.9999999999999984
+            },
+            "volume_mm3": {
+              "mean": 18750.0,
+              "median": 18750.0,
+              "std": 0.0,
+              "z_score": 0.0
+            }
+          },
+          "window_labels": [
+            21,
+            22,
+            23
+          ]
+        },
+        {
+          "deviation_score": 0.5802517214223188,
+          "is_outlier": false,
+          "label": 23,
+          "level_name": "L4",
+          "stats": {
+            "offset_mm": {
+              "mean": 4.952588110526402e-05,
+              "median": 2.63484861506893e-05,
+              "std": 5.1593055633071906e-05,
+              "z_score": 0.5802517214223188
+            },
+            "spacing_mm": {
+              "mean": 41.68441069749978,
+              "median": 40.19950248448356,
+              "std": 2.0999773337267333,
+              "z_score": 1.0000000000000016
+            },
+            "volume_mm3": {
+              "mean": 18750.0,
+              "median": 18750.0,
+              "std": 0.0,
+              "z_score": 0.0
+            }
+          },
+          "window_labels": [
+            22,
+            23,
+            24
+          ]
+        },
+        {
+          "deviation_score": 94.68162761828613,
+          "is_outlier": true,
+          "label": 24,
+          "level_name": "L5",
+          "stats": {
+            "offset_mm": {
+              "mean": 7.368929995983237e-05,
+              "median": 7.368929995983237e-05,
+              "std": 4.7340813809143064e-05,
+              "z_score": 94.68162761828613
+            },
+            "spacing_mm": {
+              "mean": 40.19950248448356,
+              "median": 40.19950248448356,
+              "std": 0.0,
+              "z_score": 0.0
+            },
+            "volume_mm3": {
+              "mean": 18750.0,
+              "median": 18750.0,
+              "std": 0.0,
+              "z_score": 0.0
+            }
+          },
+          "window_labels": [
+            23,
+            24
+          ]
+        }
+      ],
       "per_label_offsets": [
         {
           "closest_u": 5.611895432316293e-07,

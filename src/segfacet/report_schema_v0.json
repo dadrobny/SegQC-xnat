@@ -390,6 +390,11 @@
         "monotonic_consistency": {
           "description": "Anatomical-order vs spline-parameter monotonicity metrics (item 020).",
           "$ref": "#/definitions/stage3MonotonicConsistency"
+        },
+        "per_label_neighbourhood": {
+          "type": "array",
+          "description": "Per-vertebra local neighbourhood comparison (item 110): sliding-window statistics and a leave-one-out deviation score/outlier flag for a named feature set. Sorted ascending by label. Unwired: no rule consumes this block yet.",
+          "items": {"$ref": "#/definitions/stage3NeighbourhoodEntry"}
         }
       }
     },
@@ -502,6 +507,44 @@
           "description": "Per-centroid spline parameter values (length n_centroids).",
           "items": {"type": "number"}
         }
+      }
+    },
+    "stage3NeighbourhoodEntry": {
+      "type": "object",
+      "description": "One vertebra's local neighbourhood comparison result (item 110).",
+      "additionalProperties": false,
+      "required": ["label", "level_name", "window_labels", "stats", "deviation_score", "is_outlier"],
+      "properties": {
+        "label": {"type": "integer", "description": "Integer label value."},
+        "level_name": {"type": "string", "description": "Anatomical vertebra name."},
+        "window_labels": {
+          "type": "array",
+          "description": "Integer label values of every vertebra in the sliding window (including the focal vertebra).",
+          "items": {"type": "integer"}
+        },
+        "stats": {
+          "type": "object",
+          "description": "Per-feature window statistics, keyed by feature name (e.g. spacing_mm, offset_mm, volume_mm3).",
+          "additionalProperties": {"$ref": "#/definitions/stage3NeighbourhoodFeatureStats"}
+        },
+        "deviation_score": {
+          "type": "number",
+          "minimum": 0,
+          "description": "max() of the leave-one-out z-scores of the scored feature subset."
+        },
+        "is_outlier": {"type": "boolean", "description": "True when deviation_score exceeds the configured threshold."}
+      }
+    },
+    "stage3NeighbourhoodFeatureStats": {
+      "type": "object",
+      "description": "Window statistics for one named feature at one focal vertebra.",
+      "additionalProperties": false,
+      "required": ["mean", "median", "std", "z_score"],
+      "properties": {
+        "mean": {"type": "number", "description": "Mean of the feature's values over the whole window (including the focal vertebra)."},
+        "median": {"type": "number", "description": "Median of the feature's values over the whole window (including the focal vertebra)."},
+        "std": {"type": "number", "minimum": 0, "description": "Standard deviation of the feature's values over the whole window (including the focal vertebra)."},
+        "z_score": {"type": "number", "minimum": 0, "description": "Leave-one-out z-score of the focal vertebra's value against the window's other members only."}
       }
     },
     "referenceDelta": {

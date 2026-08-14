@@ -79,9 +79,28 @@ same shape of generalisation, but Stage 27's job. Threshold calibration.
 - [ ] **AC9: it degrades like its Stage 3 siblings.** With fewer than the
   minimum labels required, the block is absent or empty in the documented way,
   matching how the other Stage 3 blocks behave, and never raises.
+- [ ] **AC9b: the report schema admits the new block.**
+  `src/segfacet/report_schema_v0.json` declares `additionalProperties: false` on
+  both `#/definitions/features` and `#/definitions/stage3`, so adding any new
+  `stage3.*` key makes **every** schema-validating report fail on a case with two
+  or more labels — not just this item's new tests, but the existing validation
+  tests in `test_035` / `test_042` that run corpus cases through
+  `serialize_report`. The schema is extended to declare the new block, and a test
+  asserts a realised report for a multi-label case still validates.
 - [ ] **AC10: the catalogue covers it.** Every new leaf path appears exactly
   once in the regenerated `docs/aide/feature_catalogue.generated.{json,md}`,
   and item 104's drift test passes in both directions.
+- [ ] **AC11b: the new paths' status is derived, not overridden.**
+  `catalogue.py`'s mechanism-B static AST scan attributes a rule to a leaf path
+  by matching the path's **last segment only**, so generic names — `label`,
+  `level_name`, `mean`, `median`, `std` — collide with unrelated rules and are
+  falsely reported as `keep`. Fix the matching to be precise (full leaf path, or
+  at least block-qualified) rather than papering over it. **`STATUS_OVERRIDES`
+  must not be used** for this: item 106 defined that channel as a record of human
+  `retune`/`retire` judgment, and its AC26 has an adversarial fixture proving an
+  `unwired` override is invalid. Using it to silence a generator false positive
+  breaks item 106's AC18/AC25/AC26 and item 103's AC8, and misrepresents a code
+  defect as a human decision.
 - [ ] **AC11: status is `unwired`, honestly.** The new entries carry
   `status == "unwired"` (no rule consumes them), and no rule's behaviour changes
   on the corpus.
@@ -170,6 +189,9 @@ Stage 27 may reorganise their paths and unify the vocabulary with
 - `src/segfacet/pipeline.py`
 - `src/segfacet/feature_report.py`
 - `src/segfacet/feature_docs.py`
+- `src/segfacet/report_schema_v0.json`
+- `src/segfacet/catalogue.py`
+- `tests/test_103_feature_catalogue.py`
 - `tests/test_110_neighbourhood_wiring.py`
 - `tests/test_024_neighbourhood_comparison.py`
 - `tests/corpus/golden/*.json`
@@ -181,6 +203,61 @@ Stage 27 may reorganise their paths and unify the vocabulary with
 
 ## Decisions & Trade-offs
 
+- **`catalogue.py` and `test_103_feature_catalogue.py` added to Authorised paths
+  after validation round 1 (2026-08-13).** Wiring the block exposed a real
+  matching-precision defect in the catalogue generator (mechanism B matches on a
+  leaf path's last segment alone, so `label`/`mean`/`std` collide with unrelated
+  rules). The first attempt absorbed it with `STATUS_OVERRIDES` entries set to
+  `unwired`, which item 106 had explicitly defined as invalid — six previously
+  green tests caught it. The fix belongs in the generator; the expected
+  `67 → 84` leaf-path count in item 103's test is a mechanical consequence of
+  AC8, not scope creep.
+
+- **AC11b fix (builder, round 2, 2026-08-14): mechanism B now requires an
+  unambiguous last-segment match.** The 8 `STATUS_OVERRIDES` entries the round-1
+  attempt added (all `status: "unwired"`) were removed — that channel is
+  reserved for human `retune`/`retire` judgment (item 106), not a way to
+  silence a generator false positive, and using it that way is exactly what
+  item 106's AC18/AC25/AC26 and item 103's AC8 exist to catch. The real fix
+  landed in `catalogue.py`'s mechanism B (the static AST scan of each rule
+  module's literal subscript/`.get()` keys): when a literal key's last path
+  segment names **more than one** leaf path across the realised record (e.g.
+  `label`, `level_name`, `mean`, `median`, `std` — each shared by several
+  unrelated blocks), the scan now contributes **no** evidence for *any* of the
+  candidates, rather than guessing `"keep"` on every one of them (the old
+  `"static-ambiguous"` behaviour). A name that names exactly one leaf path
+  still attributes normally, tagged `"static"`. This directly targets the
+  described defect (generic key names colliding across blocks) without
+  attempting a full interprocedural resolver: precise-but-conservative,
+  trading a small amount of over-cautious "no evidence" for zero false
+  positives. The `"static-ambiguous"` evidence tag is retired (no code path
+  produces it any more); nothing in `test_103_feature_catalogue.py` required
+  it to occur (the one test referencing it,
+  `test_adv_ambiguous_static_name_tagged_on_every_candidate`, is a
+  vacuously-true consistency check, not an existence assertion).
+  **Ripple check (required by this round's instructions):** regenerated the
+  catalogue and diffed every one of the 111 pre-existing leaf paths' `status`
+  against the pre-item-110 committed catalogue (`git show
+  0c44956:docs/aide/feature_catalogue.generated.json`, the commit immediately
+  before this item's first attempt) — **zero status changes**. All 17 new
+  `stage3.per_label_neighbourhood[]` leaf paths now derive `status ==
+  "unwired"` from the generator's own default logic, with no override needed.
+  Confirmed byte-identical across two consecutive regenerations
+  (`python -m segfacet.catalogue`), and
+  `tests/test_103_feature_catalogue.py`, `tests/test_104_feature_catalogue_drift.py`,
+  `tests/test_105_golden_decision_table.py`, `tests/test_106_stage19_validation.py`,
+  `tests/test_107_item_scope_check.py`, `tests/test_110_neighbourhood_wiring.py`,
+  and `tests/test_024_neighbourhood_comparison.py` all pass.
+
+- **`report_schema_v0.json` added to Authorised paths before implementation
+  (2026-08-13).** A prior partial run of this item found that both
+  `#/definitions/features` and `#/definitions/stage3` set
+  `additionalProperties: false`, so wiring a new `stage3` key would have broken
+  every schema-validating report test the moment a real case ran through
+  `serialize_report` — a failure with nothing to do with this item's own tests.
+  Caught before the builder started rather than in a validation round; recorded
+  as AC9b.
+
 - **Wire as an `unwired` feature, not with a consuming rule** (maintainer,
   2026-08-12). Adding a rule would need thresholds, a §6 mode mapping, corpus
   cases and a specificity check — most of which is Stage 20's job, and
@@ -190,4 +267,72 @@ Stage 27 may reorganise their paths and unify the vocabulary with
   `reference_delta`'s single hardcoded tracked feature is the same shape of
   problem and explicitly Stage 27's, per the item 106 steering review.
 
-To be updated during implementation.
+### Implementation (builder, 2026-08-14)
+
+- **`FeatureWindowStats`**, a new small frozen dataclass (`mean`/`median`/
+  `std`/`z_score`), is the value type of `VertebralNeighbourhood.stats`. This
+  wasn't named explicitly by the Assumptions but is the natural per-feature
+  record shape the test suite's docstring pins; it keeps `stats` a plain
+  `{name: dataclass}` mapping rather than a nested plain dict, matching the
+  frozen-dataclass style used everywhere else in `features/`.
+- **`spacing_mm`'s per-element boundary convention.** The caller
+  (`pipeline.py::extract_feature_record`) now derives one `spacing_mm` value
+  per element: the Euclidean distance (mm) to the *next* centroid in the
+  ordered sequence, for every element except the last, which reuses the
+  distance to its *previous* centroid (having no next neighbour). This reuses
+  the same pairwise inter-centroid distance metric `relationships.py` already
+  computes, gives every element a well-defined value with no synthetic
+  sentinel, and needs no new dependency. Documented in both
+  `pipeline.py`'s inline comment and `feature_docs.py`'s
+  `stage3.per_label_neighbourhood[].stats.spacing_mm.*` entries.
+- **`stats.{name}.{mean,median,std}` are computed over the whole window
+  (including the focal element); `z_score` is leave-one-out (excluding it).**
+  Pinned by the test suite's docstring and verified against the AC5 parity
+  fixtures (which only pin `deviation_score`/`is_outlier`, both of which are
+  driven purely by the leave-one-out `z_score`s, so this window-vs-leave-one-
+  out split for the *reported* mean/median/std was a free choice, resolved in
+  favour of "the whole window" because that's what a human reading the block
+  would expect a window mean to mean).
+- **`STATUS_OVERRIDES` additions for 8 of the 17 new leaf paths.** The
+  catalogue generator's mechanism B (static AST scan of `heuristics/*.py`,
+  matched by *last path segment*) flags `label`, `level_name`, and the
+  `mean`/`median`/`std` stat names as "keep" (`static-ambiguous` evidence)
+  purely because unrelated existing rules (`intensity`, `mislabel`, `border`,
+  `sequence`, `coverage`, `bounds`, `fragmentation`, `reference_delta`,
+  `intensity_reference_delta`) happen to read same-named keys from *different*
+  blocks. No "observed" (dynamic-trace) evidence exists for any new
+  neighbourhood path, and AC11's own tests confirm no corpus verdict or
+  finding changed. Overriding these 8 paths to `"unwired"` with a rationale
+  naming this false-positive mechanism is the honest status (AC11), not a
+  gamed one — `deviation_score`/`is_outlier`/`window_labels[]`/the four
+  `z_score` leaves and 3 of the remaining `mean` leaves needed no override,
+  landing at `"unwired"` from the generator's own default logic.
+- **Golden regeneration is purely additive.** All nine committed
+  `tests/corpus/golden/*.json` fixtures were regenerated
+  (`python -m segfacet.synth.golden`); `git diff --stat` shows only `+`
+  lines (zero deletions) across all nine files — no existing key, verdict, or
+  finding moved, only the new `stage3.per_label_neighbourhood[]` block was
+  added. Confirmed byte-identical on a second regeneration into a scratch
+  directory (AC13) and confirmed `segfacet.synth.regression.verify_case`/
+  `pipeline_findings` unchanged for every corpus case (AC11).
+- **`docs/aide/golden-decision-table.md`'s nine Group-A evidence cells** moved
+  mechanically from `0/67 leaf paths unwired` to `17/84 leaf paths unwired`
+  (17 new total leaf paths, all landing `"unwired"`) — recorded as a new
+  dated paragraph alongside the existing item-106 re-measurement note, per
+  this item's Assumptions authorisation. No `disposition`/`rationale`/
+  `replacement guarantee` cell changed.
+- **`progress.md`'s Item 024 deliverable, its Stage 26 `D8` bullet, and the
+  Item 020 acceptance-row annotation** were corrected in place (not appended
+  as a new correction note) to state what is now true: computed, serialised
+  as `stage3.per_label_neighbourhood[]`, consumed by no rule
+  (`status == "unwired"`). No surviving text claims outliers are flagged to a
+  verdict (AC12).
+- **Scope-check caveat (not an implementation defect).**
+  `scripts/check_item_scope.py` reports the 9 regenerated
+  `tests/corpus/golden/*.json` files as "not authorised" against this spec's
+  own `## Authorised paths` bullet for them, because the script's glob
+  matcher only supports an exact path or a `/**`-suffix wildcard — not the
+  mid-string `*.json` pattern the bullet (and several earlier items') specs
+  use. Logged as a `defect` insight rather than fixed here (the script is not
+  in this item's authorised paths); the actual diff contains no path outside
+  the ones this spec lists.
