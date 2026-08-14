@@ -49,6 +49,7 @@ PATH and a working tree that is a git repository.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import subprocess
 import sys
 from pathlib import Path
@@ -128,9 +129,20 @@ def _parse_authorised_paths(spec_text: str) -> list[str] | None:
 
 
 def _path_matches(changed_path: str, glob: str) -> bool:
+    # `dir/**` matches the directory itself and anything at any depth below it.
     if glob.endswith("/**"):
         prefix = glob[: -len("/**")]
         return changed_path == prefix or changed_path.startswith(prefix + "/")
+    # Anything else with a wildcard is matched by fnmatch, so the ordinary
+    # shell-glob forms specs actually use (`tests/corpus/golden/*.json`) work.
+    # fnmatch's `*` crosses `/`, so anchor per segment: the glob must have the
+    # same number of path segments as the candidate, and each must match.
+    if any(ch in glob for ch in "*?["):
+        glob_parts = glob.split("/")
+        path_parts = changed_path.split("/")
+        if len(glob_parts) != len(path_parts):
+            return False
+        return all(fnmatch.fnmatchcase(p, g) for p, g in zip(path_parts, glob_parts))
     return changed_path == glob
 
 
