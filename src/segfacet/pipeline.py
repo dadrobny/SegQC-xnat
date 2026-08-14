@@ -127,9 +127,15 @@ def extract_feature_record(seg_img: "nib.Nifti1Image", config: "HeuristicConfig"
 
     stage3_kwargs: dict = {}
     if len(labels) >= 2:
+        import math
+
         from segfacet.features.consistency import (
             compute_monotonic_consistency,
             compute_spacing_consistency,
+        )
+        from segfacet.features.neighbourhood import (
+            DEFAULT_SCORED,
+            compute_neighbourhood_features,
         )
         from segfacet.features.orientation import (
             compute_spine_curvature,
@@ -141,10 +147,12 @@ def extract_feature_record(seg_img: "nib.Nifti1Image", config: "HeuristicConfig"
         spacing_mm = tuple(float(z) for z in seg_img.header.get_zooms()[:3])
         fit = fit_centroid_spline(ordered_centroids)
 
+        spline_offsets = compute_spline_offsets(
+            ordered_centroids, fit, spacing_mm=spacing_mm
+        )
+
         stage3_kwargs = {
-            "spline_offsets": compute_spline_offsets(
-                ordered_centroids, fit, spacing_mm=spacing_mm
-            ),
+            "spline_offsets": spline_offsets,
             "orientations": compute_vertebra_orientations(seg_img, labels),
             "curvature": compute_spine_curvature(fit, ordered_centroids),
             "spacing_consistency": compute_spacing_consistency(ordered_centroids),
@@ -152,6 +160,45 @@ def extract_feature_record(seg_img: "nib.Nifti1Image", config: "HeuristicConfig"
                 ordered_centroids, fit
             ),
         }
+
+        # --- item 110: wire the generalised neighbourhood comparison in ---
+        #
+        # spacing_mm is a per-*element* value here (one per centroid), not
+        # the per-*pair* sequence relationships/spacing_consistency compute.
+        # Convention: element i's spacing_mm is the Euclidean distance (mm)
+        # to its *next* neighbour in the ordered sequence; the last element
+        # (which has no next neighbour) reuses the distance to its
+        # *previous* neighbour instead. This gives every element a
+        # well-defined value with no synthetic sentinel, using the same
+        # inter-centroid distance metric relationships.py already computes.
+        pairwise_spacings_mm = [
+            math.sqrt(
+                sum(
+                    (a - b) ** 2
+                    for a, b in zip(
+                        ordered_centroids[j].centroid_mm,
+                        ordered_centroids[j + 1].centroid_mm,
+                    )
+                )
+            )
+            for j in range(len(ordered_centroids) - 1)
+        ]
+        per_element_spacing_mm = [
+            pairwise_spacings_mm[idx] if idx < len(pairwise_spacings_mm) else pairwise_spacings_mm[-1]
+            for idx in range(len(ordered_centroids))
+        ]
+
+        offset_by_label = {o.label: o.offset_mm for o in spline_offsets}
+        neighbourhood_features = {
+            "spacing_mm": per_element_spacing_mm,
+            "offset_mm": [offset_by_label[label] for label in labels],
+            "volume_mm3": [geometry[label].physical_volume_mm3 for label in labels],
+        }
+        stage3_kwargs["neighbourhood"] = compute_neighbourhood_features(
+            ordered_centroids,
+            neighbourhood_features,
+            scored=DEFAULT_SCORED,
+        )
 
     return build_features_block(
         geometry=geometry,

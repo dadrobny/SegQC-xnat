@@ -208,4 +208,72 @@ Stage 27 may reorganise their paths and unify the vocabulary with
   `reference_delta`'s single hardcoded tracked feature is the same shape of
   problem and explicitly Stage 27's, per the item 106 steering review.
 
-To be updated during implementation.
+### Implementation (builder, 2026-08-14)
+
+- **`FeatureWindowStats`**, a new small frozen dataclass (`mean`/`median`/
+  `std`/`z_score`), is the value type of `VertebralNeighbourhood.stats`. This
+  wasn't named explicitly by the Assumptions but is the natural per-feature
+  record shape the test suite's docstring pins; it keeps `stats` a plain
+  `{name: dataclass}` mapping rather than a nested plain dict, matching the
+  frozen-dataclass style used everywhere else in `features/`.
+- **`spacing_mm`'s per-element boundary convention.** The caller
+  (`pipeline.py::extract_feature_record`) now derives one `spacing_mm` value
+  per element: the Euclidean distance (mm) to the *next* centroid in the
+  ordered sequence, for every element except the last, which reuses the
+  distance to its *previous* centroid (having no next neighbour). This reuses
+  the same pairwise inter-centroid distance metric `relationships.py` already
+  computes, gives every element a well-defined value with no synthetic
+  sentinel, and needs no new dependency. Documented in both
+  `pipeline.py`'s inline comment and `feature_docs.py`'s
+  `stage3.per_label_neighbourhood[].stats.spacing_mm.*` entries.
+- **`stats.{name}.{mean,median,std}` are computed over the whole window
+  (including the focal element); `z_score` is leave-one-out (excluding it).**
+  Pinned by the test suite's docstring and verified against the AC5 parity
+  fixtures (which only pin `deviation_score`/`is_outlier`, both of which are
+  driven purely by the leave-one-out `z_score`s, so this window-vs-leave-one-
+  out split for the *reported* mean/median/std was a free choice, resolved in
+  favour of "the whole window" because that's what a human reading the block
+  would expect a window mean to mean).
+- **`STATUS_OVERRIDES` additions for 8 of the 17 new leaf paths.** The
+  catalogue generator's mechanism B (static AST scan of `heuristics/*.py`,
+  matched by *last path segment*) flags `label`, `level_name`, and the
+  `mean`/`median`/`std` stat names as "keep" (`static-ambiguous` evidence)
+  purely because unrelated existing rules (`intensity`, `mislabel`, `border`,
+  `sequence`, `coverage`, `bounds`, `fragmentation`, `reference_delta`,
+  `intensity_reference_delta`) happen to read same-named keys from *different*
+  blocks. No "observed" (dynamic-trace) evidence exists for any new
+  neighbourhood path, and AC11's own tests confirm no corpus verdict or
+  finding changed. Overriding these 8 paths to `"unwired"` with a rationale
+  naming this false-positive mechanism is the honest status (AC11), not a
+  gamed one — `deviation_score`/`is_outlier`/`window_labels[]`/the four
+  `z_score` leaves and 3 of the remaining `mean` leaves needed no override,
+  landing at `"unwired"` from the generator's own default logic.
+- **Golden regeneration is purely additive.** All nine committed
+  `tests/corpus/golden/*.json` fixtures were regenerated
+  (`python -m segfacet.synth.golden`); `git diff --stat` shows only `+`
+  lines (zero deletions) across all nine files — no existing key, verdict, or
+  finding moved, only the new `stage3.per_label_neighbourhood[]` block was
+  added. Confirmed byte-identical on a second regeneration into a scratch
+  directory (AC13) and confirmed `segfacet.synth.regression.verify_case`/
+  `pipeline_findings` unchanged for every corpus case (AC11).
+- **`docs/aide/golden-decision-table.md`'s nine Group-A evidence cells** moved
+  mechanically from `0/67 leaf paths unwired` to `17/84 leaf paths unwired`
+  (17 new total leaf paths, all landing `"unwired"`) — recorded as a new
+  dated paragraph alongside the existing item-106 re-measurement note, per
+  this item's Assumptions authorisation. No `disposition`/`rationale`/
+  `replacement guarantee` cell changed.
+- **`progress.md`'s Item 024 deliverable, its Stage 26 `D8` bullet, and the
+  Item 020 acceptance-row annotation** were corrected in place (not appended
+  as a new correction note) to state what is now true: computed, serialised
+  as `stage3.per_label_neighbourhood[]`, consumed by no rule
+  (`status == "unwired"`). No surviving text claims outliers are flagged to a
+  verdict (AC12).
+- **Scope-check caveat (not an implementation defect).**
+  `scripts/check_item_scope.py` reports the 9 regenerated
+  `tests/corpus/golden/*.json` files as "not authorised" against this spec's
+  own `## Authorised paths` bullet for them, because the script's glob
+  matcher only supports an exact path or a `/**`-suffix wildcard — not the
+  mid-string `*.json` pattern the bullet (and several earlier items') specs
+  use. Logged as a `defect` insight rather than fixed here (the script is not
+  in this item's authorised paths); the actual diff contains no path outside
+  the ones this spec lists.
