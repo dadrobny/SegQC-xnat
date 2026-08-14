@@ -21,8 +21,8 @@ closes that gap with two entry points:
     plus an ``attributed_mode`` -- the mode whose value moved the largest
     *normalised* amount.
 
-The comparison arithmetic
---------------------------
+The comparison arithmetic (item 109)
+-------------------------------------
 Per-mode metrics are not commensurable -- ``rogue_island_count`` is a count,
 ``mislabelled_volume_fraction`` is a fraction. For mode ``m``, with
 ``baseline`` taken from ``PER_MODE_METRIC_SPECS[m].baseline``::
@@ -30,20 +30,57 @@ Per-mode metrics are not commensurable -- ``rogue_island_count`` is a count,
     value_a           = mean over run A's cases whose mode-m value is not None
     value_b           = mean over run B's cases whose mode-m value is not None
     delta             = value_b - value_a
-    scale             = max(abs(value_a - baseline), abs(value_b - baseline))
-    normalised_delta  = delta / scale        (0.0 exactly when scale == 0.0)
 
-``normalised_delta`` is the fraction of the mode's own observed excursion
-from its clean baseline that the change accounts for; it is bounded and
-never divides by zero, ``nan`` or ``inf``. ``worsened`` is direction-aware:
-the metric moving *away* from ``baseline`` in the mode's declared
-``direction`` (``"increases"``/``"decreases"``, mirrored from
+Item 109 replaced the original per-comparison ``scale = max(abs(value_a -
+baseline), abs(value_b - baseline))``: that adaptive divisor saturated to
+exactly ``+/-1.0`` whenever *either* run sat on its metric's baseline --
+seven of the eight baselines are ``0.0`` -- so any comparison in which two or
+more modes returned to baseline tied at 1.0, and ``attributed_mode`` fell
+through to the lowest-mode tie-break instead of reflecting which mode moved
+further. ``scale`` is now a **fixed property of the metric's own
+classification**, declared once in the module-local ``MODE_SCALE_SPECS``
+table and never recomputed from ``value_a``/``value_b``:
+
+- **Bounded metrics** (a mode whose ``ModeScaleSpec.full_swing`` is not
+  ``None`` -- today modes 1/2/4, the three ``*_fraction`` metrics) scale by
+  their derivable **full swing**: the distance from ``baseline`` to the far
+  end of the metric's own ``0..1`` range, a constant with no free parameter
+  and no supervision dependency.
+- **Reviewed-threshold metrics** (``ModeScaleSpec.reference_excursion`` set)
+  scale by that declared constant. No shipped spec sets one today (AC4) --
+  the field exists as a mechanism for a future, explicitly human-reviewed
+  declaration, never a default.
+- **Everything else is raw**: ``scale`` and ``normalised_delta`` are both
+  ``None``, and the raw ``delta`` remains available on the same
+  :class:`ModeDelta`. Today that is every count metric (modes 3/5/6/7/8):
+  ``rogue_island_count`` is a *maximum over per-label entries*, so a
+  scan-level denominator would change the quantity rather than scale it;
+  ``missing_level_count``'s only natural denominator -- the levels the scan
+  was expected to contain -- is ground-truth-derived and therefore barred
+  from ever appearing in a divisor (no normalisation factor may introduce a
+  supervision dependency, even for a metric whose own ``source`` is
+  ``candidate_vs_gt``).
+
+``normalised_delta = delta / scale`` when ``scale`` is known (``0.0`` exactly
+when ``scale == 0.0``), else ``None``; it never divides by zero, ``nan`` or
+``inf``. ``worsened`` is direction-aware and computed from ``delta`` alone,
+independently of ``scale``: the metric moving *away* from ``baseline`` in the
+mode's declared ``direction`` (``"increases"``/``"decreases"``, mirrored from
 ``PER_MODE_METRIC_SPECS``) is worse -- mode 2's
 ``min_dominant_component_fraction`` decreases with severity, so a *negative*
 delta there is a regression, the opposite sign of every other mode.
-``attributed_mode`` is the mode with the greatest ``abs(normalised_delta)``,
-ties broken to the lowest mode number, ``None`` when every mode's
-``normalised_delta`` is ``None`` or ``0.0``.
+
+``attributed_mode`` ranks only :class:`ModeDelta` entries carrying a
+non-``None``, non-zero ``normalised_delta`` -- unnormalisable modes (raw
+``delta`` but no ``scale``) are never silently dropped from view: they are
+named in :attr:`RunComparison.excluded_modes`. Among the ranked entries,
+``attributed_mode`` is the one with the greatest ``abs(normalised_delta)``;
+the lowest-mode tie-break applies **only** on an exact equality of that
+magnitude, never as a fallback for "nothing was comparable". When no entry
+carries a normalised delta at all (or every one of them is exactly ``0.0``),
+``attributed_mode`` is ``None`` and :attr:`RunComparison.unattributable_reason`
+states why -- distinguishing "no metric here is normalisable" from "every
+normalisable metric agreed nothing moved".
 
 Purity contract
 -----------------
@@ -103,6 +140,8 @@ __all__ = [
     "RunPerModeSummary",
     "ModeDelta",
     "RunComparison",
+    "ModeScaleSpec",
+    "MODE_SCALE_SPECS",
     "summarise_run_per_mode",
     "compare_runs",
 ]
@@ -123,6 +162,67 @@ def _tuples_to_lists(obj: Any) -> Any:
     if isinstance(obj, dict):
         return {k: _tuples_to_lists(v) for k, v in obj.items()}
     return obj
+
+
+# --------------------------------------------------------------------------- #
+# Per-mode scale classification (item 109)
+#
+# Additive and local to this module -- deliberately NOT a field on
+# ``segfacet.eval.per_mode.MetricSpec``. That file is item 112's authorised
+# territory this stage; the per-metric classification a normalisation rule
+# needs lives here instead, next to the code that applies the supervision and
+# review rules, without contesting that ownership. See the module docstring's
+# "The comparison arithmetic" section for the rules this table encodes.
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class ModeScaleSpec:
+    """One failure mode's ``normalised_delta`` scale classification.
+
+    Attributes
+    ----------
+    full_swing:
+        The metric's derivable full swing -- the distance from its
+        ``PER_MODE_METRIC_SPECS[mode].baseline`` to the far end of its own
+        bounded range -- when the metric is bounded by construction (today,
+        the three ``*_fraction`` metrics: modes 1/2/4, always ``1.0`` since
+        every such metric's range is ``0..1``). ``None`` for every unbounded
+        metric (a count with no derivable, supervision-free denominator).
+        Fixed at classification time; never recomputed from a comparison's
+        actual values.
+    reference_excursion:
+        An optional declared scale for an otherwise-unbounded metric.
+        **Setting this field is a human-review decision, not a tuning
+        knob**: project policy (item 109) requires an explicit, recorded
+        rationale before any unbounded metric is assigned a divisor, because
+        the sole disqualifying failure mode -- a denominator that quietly
+        imports a ground-truth-derived quantity -- is not mechanically
+        detectable from the number alone. Every metric shipped by this item
+        leaves this field unset (``None``); it exists as a mechanism for a
+        future reviewed declaration (see the module Decisions log for the
+        standing candidate, ``rogue_island_count``, and why its value is
+        still TBC).
+    """
+
+    full_swing: Optional[float]
+    reference_excursion: Optional[float] = None
+
+
+#: ``{1..8: ModeScaleSpec}`` -- one entry per ``PER_MODE_METRIC_SPECS`` mode.
+#: Bounded metrics (1/2/4) declare their fixed ``full_swing``; every other
+#: mode declares ``full_swing=None`` and an unset ``reference_excursion``
+#: (AC4 -- no threshold is set by this item).
+MODE_SCALE_SPECS: Dict[int, ModeScaleSpec] = {
+    1: ModeScaleSpec(full_swing=1.0),  # unanchored_foreground_fraction: 0.0 -> 1.0
+    2: ModeScaleSpec(full_swing=1.0),  # min_dominant_component_fraction: 1.0 -> 0.0
+    3: ModeScaleSpec(full_swing=None),  # rogue_island_count: raw (per-label max)
+    4: ModeScaleSpec(full_swing=1.0),  # mislabelled_volume_fraction: 0.0 -> 1.0
+    5: ModeScaleSpec(full_swing=None),  # missing_level_count: raw (GT-derived denom barred)
+    6: ModeScaleSpec(full_swing=None),  # fov_clipped_label_count: raw
+    7: ModeScaleSpec(full_swing=None),  # out_of_order_label_count: raw
+    8: ModeScaleSpec(full_swing=None),  # overlapping_voxel_count: raw
+}
 
 
 # --------------------------------------------------------------------------- #
@@ -293,11 +393,14 @@ class ModeDelta:
     delta:
         ``value_b - value_a``, or ``None`` when either side is ``None``.
     scale:
-        ``max(abs(value_a - baseline), abs(value_b - baseline))``, or
-        ``None`` when ``delta`` is ``None``.
+        The mode's fixed ``MODE_SCALE_SPECS[failure_mode].full_swing`` (or,
+        if set, ``.reference_excursion``); ``None`` when the metric is
+        unbounded and no reviewed threshold is declared, or when ``delta``
+        is ``None``. Never derived from ``value_a``/``value_b`` (item 109).
     normalised_delta:
         ``delta / scale``; exactly ``0.0`` when ``scale == 0.0``; ``None``
-        when ``delta`` is ``None``.
+        when ``delta`` is ``None`` or ``scale`` is ``None`` (the metric is
+        not normalisable for this comparison).
     worsened:
         ``None`` iff ``delta`` is ``None``; otherwise ``True`` iff the metric
         moved away from ``baseline`` in its declared ``direction``, ``False``
@@ -342,11 +445,30 @@ class RunComparison:
     volume_weighted_dice_a, volume_weighted_dice_b, volume_weighted_dice_delta:
         As above, for the volume-weighted aggregate Dice.
     attributed_mode, attributed_mode_name, attributed_metric_name:
-        The mode with the greatest ``abs(normalised_delta)`` (ties to the
-        lowest mode number), or ``None`` when every mode's
-        ``normalised_delta`` is ``None`` or ``0.0``.
+        The mode with the greatest ``abs(normalised_delta)`` among entries
+        that carry a non-``None``, non-zero ``normalised_delta`` (ties
+        broken to the lowest mode number, and reached **only** on an exact
+        tie -- never as a fallback for "nothing was normalisable"); ``None``
+        when no entry qualifies -- see ``unattributable_reason``.
     run_manifest_a, run_manifest_b:
         The two runs' ``run_manifest`` blocks, embedded verbatim.
+
+    Properties
+    ----------
+    excluded_modes:
+        Item 109 (AC8): the ``failure_mode``\\ s, in ascending order, that
+        carry a real (non-``None``) ``delta`` but no ``normalised_delta`` --
+        i.e. modes that had data to compare but are not normalisable, so
+        they are visibly excluded from the attribution ranking rather than
+        silently dropped. A mode with no data at all on either side (``delta
+        is None``) is not "excluded" -- there was nothing to rank.
+        Computed on access, not stored -- never appears in ``to_dict()``.
+    unattributable_reason:
+        Item 109 (AC9): ``None`` whenever ``attributed_mode`` is not
+        ``None``; otherwise a non-empty, human-readable string distinguishing
+        "no mode here is normalisable" from "every normalisable mode agreed
+        nothing moved". Computed on access, not stored -- never appears in
+        ``to_dict()``.
     """
 
     run_a_id: str
@@ -382,6 +504,44 @@ class RunComparison:
             if entry.failure_mode == failure_mode:
                 return entry
         raise KeyError(failure_mode)
+
+    @property
+    def excluded_modes(self) -> Tuple[int, ...]:
+        """``failure_mode``\\ s with real data but no ``normalised_delta``.
+
+        See the class docstring's "Properties" section. Computed on every
+        access from ``self.per_mode`` -- not a stored dataclass field, so it
+        never appears in :meth:`to_dict`'s output.
+        """
+        return tuple(
+            entry.failure_mode
+            for entry in self.per_mode
+            if entry.delta is not None and entry.normalised_delta is None
+        )
+
+    @property
+    def unattributable_reason(self) -> Optional[str]:
+        """Why ``attributed_mode is None``, or ``None`` when it is not.
+
+        See the class docstring's "Properties" section. Computed on every
+        access -- not a stored dataclass field, so it never appears in
+        :meth:`to_dict`'s output.
+        """
+        if self.attributed_mode is not None:
+            return None
+        normalisable = [
+            entry for entry in self.per_mode if entry.normalised_delta is not None
+        ]
+        if not normalisable:
+            return (
+                "no mode is attributable: every candidate metric in this "
+                "comparison is not normalisable (raw count metrics carry no "
+                "declared scale) -- see excluded_modes for which ones."
+            )
+        return (
+            "no mode is attributable: every normalisable mode's "
+            "normalised_delta is exactly 0.0 -- nothing moved."
+        )
 
     def summary(self) -> str:
         """Return a single-line free-text summary naming the attributed mode."""
@@ -576,6 +736,7 @@ def compare_runs(run_a: RunPerModeSummary, run_b: RunPerModeSummary) -> RunCompa
     per_mode: List[ModeDelta] = []
     for mode in range(1, 9):
         spec = PER_MODE_METRIC_SPECS[mode]
+        scale_spec = MODE_SCALE_SPECS[mode]
         agg_a = run_a.by_mode(mode)
         agg_b = run_b.by_mode(mode)
         value_a = agg_a.mean
@@ -587,8 +748,19 @@ def compare_runs(run_a: RunPerModeSummary, run_b: RunPerModeSummary) -> RunCompa
             normalised_delta = None
             worsened = None
         else:
-            scale = max(abs(value_a - spec.baseline), abs(value_b - spec.baseline))
-            normalised_delta = 0.0 if scale == 0.0 else delta / scale
+            # item 109: scale is a fixed property of the metric's own
+            # classification (MODE_SCALE_SPECS), never adaptively recomputed
+            # from value_a/value_b -- that adaptive form is exactly what
+            # saturated to +/-1.0 whenever either run sat on baseline.
+            if scale_spec.full_swing is not None:
+                scale = scale_spec.full_swing
+            elif scale_spec.reference_excursion is not None:
+                scale = scale_spec.reference_excursion
+            else:
+                scale = None
+            normalised_delta = (
+                None if scale is None else (0.0 if scale == 0.0 else delta / scale)
+            )
             if delta == 0.0:
                 worsened = False
             elif spec.direction == "increases":

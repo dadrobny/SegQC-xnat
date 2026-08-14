@@ -235,4 +235,39 @@ note sits after the marker so `aide claim` does not read it as a dependency.
   features/ refactor mid-stage. Item 110's API is named there as the natural
   mechanism when the feature-set selection vocabulary is next open.
 
-To be updated during implementation.
+- **`excluded_modes` / `unattributable_reason` are computed `@property`s on
+  `RunComparison`, not stored dataclass fields** (builder, 2026-08-14). Both
+  are derived purely from `self.per_mode`/`self.attributed_mode` on every
+  access, so they deliberately do **not** appear in `dataclasses.asdict`'s
+  output and therefore never reach `to_dict()`. This was necessary, not
+  stylistic: `report.py`'s `build_run_comparison_report` embeds
+  `comparison.to_dict()` verbatim under a JSON-Schema-validated
+  (`additionalProperties: false`) `"comparison"` key
+  (`per_mode_comparison_schema_v0.json`), and that schema file is outside
+  this item's Authorised paths (owned by the item that introduced Stage 18's
+  serialisation contract). Adding either field as a real dataclass field
+  would have broken every existing `build_run_comparison_report` schema
+  validation (`test_ac20_*`) unless the schema were also edited -- out of
+  scope here. Computing them as properties keeps AC8/AC9 satisfied (both
+  attributes are readable on any `RunComparison` instance) while leaving the
+  wire format, and the schema file, untouched.
+- **`MODE_SCALE_SPECS` full-swing values** (builder, 2026-08-14): modes 1, 2
+  and 4 are all confined to `0..1` by construction (three `*_fraction`
+  metrics), so each declares `full_swing=1.0` -- the distance from its own
+  `baseline` (`0.0` for modes 1/4, `1.0` for mode 2) to the opposite end of
+  that range. Modes 3/5/6/7/8 declare `full_swing=None` per the Description's
+  classification (rogue-island count is a per-label maximum, not a
+  scan-level ratio; the other four counts have no supervision-free
+  denominator at all). Every `reference_excursion` ships `None` (AC4).
+- **Validation run** (builder, 2026-08-14) -- two synthetic runs, mode 2
+  (`min_dominant_component_fraction`, baseline 1.0) moving 0.9 -> 0.1 (large)
+  alongside mode 3 (`rogue_island_count`, unbounded) moving 2.0 -> 3.0
+  (small): the comparator attributes mode 2
+  (`normalised_delta=-0.8000`) and lists mode 3 among `excluded_modes`
+  (`(3, 5, 6, 7, 8)`) with its raw `delta=1.0000` still visible in the
+  per-mode table (`normalised_delta=n/a`, "not normalisable" rather than a
+  fabricated number). Reversing which run is A and which is B reverses the
+  sign of mode 2's `normalised_delta` (`-0.8000` -> `+0.8000`) while
+  attribution stays on mode 2 throughout -- full transcript kept in this
+  session's scratchpad (`validation_109.py`), reproducible via
+  `tests/test_109_attribution_scale.py`'s own fixture helpers.
