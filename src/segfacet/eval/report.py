@@ -664,6 +664,19 @@ def render_run_comparison(comparison: "RunComparison") -> str:
         f"accounts for the largest normalised move "
         f"(normalised_delta={_fmt_metric(top.normalised_delta)})."
     )
+
+    if comparison.excluded_modes:
+        # Item 109 (AC8b): even when attribution succeeds, name any mode
+        # that carried real data but no normalised_delta -- the per-mode
+        # table above already shows "n/a" for each such entry, which by
+        # itself does not tell a reader whether "n/a" means "excluded from
+        # ranking because unbounded/no reviewed scale" or "missing data".
+        excluded = ", ".join(str(m) for m in comparison.excluded_modes)
+        lines.append(
+            f"Excluded from attribution ranking (not normalisable, raw "
+            f"delta only): mode(s) {excluded}."
+        )
+
     lines.append("")
 
     return "\n".join(lines)

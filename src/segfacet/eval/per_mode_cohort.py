@@ -456,19 +456,23 @@ class RunComparison:
     Properties
     ----------
     excluded_modes:
-        Item 109 (AC8): the ``failure_mode``\\ s, in ascending order, that
-        carry a real (non-``None``) ``delta`` but no ``normalised_delta`` --
-        i.e. modes that had data to compare but are not normalisable, so
-        they are visibly excluded from the attribution ranking rather than
-        silently dropped. A mode with no data at all on either side (``delta
-        is None``) is not "excluded" -- there was nothing to rank.
-        Computed on access, not stored -- never appears in ``to_dict()``.
+        Item 109 (AC8/AC8b): the ``failure_mode``\\ s, in ascending order,
+        that carry a real (non-``None``) ``delta`` but no
+        ``normalised_delta`` -- i.e. modes that had data to compare but are
+        not normalisable, so they are visibly excluded from the attribution
+        ranking rather than silently dropped. A mode with no data at all on
+        either side (``delta is None``) is not "excluded" -- there was
+        nothing to rank. Computed on access, not stored as a dataclass
+        field -- but :meth:`to_dict` copies its value (as a ``list``) into
+        the serialised dict under the same key, so a reader of the JSON
+        report finds it there too, not only on the live object.
     unattributable_reason:
-        Item 109 (AC9): ``None`` whenever ``attributed_mode`` is not
+        Item 109 (AC9/AC8b): ``None`` whenever ``attributed_mode`` is not
         ``None``; otherwise a non-empty, human-readable string distinguishing
         "no mode here is normalisable" from "every normalisable mode agreed
-        nothing moved". Computed on access, not stored -- never appears in
-        ``to_dict()``.
+        nothing moved". Computed on access, not stored as a dataclass field
+        -- but :meth:`to_dict` copies its value into the serialised dict
+        under the same key, exactly like ``excluded_modes`` above.
     """
 
     run_a_id: str
@@ -489,8 +493,23 @@ class RunComparison:
     run_manifest_b: Optional[dict] = None
 
     def to_dict(self) -> dict:
-        """Return a JSON-serialisable nested dict for this comparison."""
-        return _tuples_to_lists(dataclasses.asdict(self))
+        """Return a JSON-serialisable nested dict for this comparison.
+
+        Item 109 (AC8b): in addition to every stored dataclass field, the
+        dict carries ``excluded_modes`` (a ``list`` of ``failure_mode`` ints,
+        possibly empty) and ``unattributable_reason`` (a string or ``None``)
+        -- the same values :attr:`excluded_modes`/:attr:`unattributable_reason`
+        compute on access. Both are additive keys layered onto
+        ``dataclasses.asdict(self)``'s output, not stored fields, so a
+        reader of the serialised JSON report can see which modes were
+        excluded from attribution and why without inferring it by filtering
+        ``per_mode`` entries for ``delta is not None and normalised_delta is
+        None``.
+        """
+        d = _tuples_to_lists(dataclasses.asdict(self))
+        d["excluded_modes"] = list(self.excluded_modes)
+        d["unattributable_reason"] = self.unattributable_reason
+        return d
 
     def by_mode(self, failure_mode: int) -> ModeDelta:
         """Return the entry for *failure_mode* (``1..8``) by key, not position.

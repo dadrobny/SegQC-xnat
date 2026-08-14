@@ -425,29 +425,58 @@ def test_ac8_compare_runs_writes_schema_valid_comparison(block_c):
     assert "comparison" in doc
 
 
-def test_ac9_attribution_lands_on_mode_3(block_c):
+def test_ac9_attribution_lands_on_mode_1(block_c):
+    # Reconciled for item 109 (found in validation round 1, 2026-08-14):
+    # mode 3 (rogue_island_count) is unbounded, so under item 109's rules it
+    # never carries a normalised_delta and can never be `attributed_mode` --
+    # the original pin was Stage 18's demonstration relying on the very
+    # saturation bug this item fixes (every mode drove to +/-1.0 and the
+    # lowest-mode tie-break happened to land on 3). Of the four *bounded*
+    # metrics (modes 1/2/4), only mode 1 (unanchored_foreground_fraction)
+    # actually differs between run A (islands injected on label 24) and run
+    # B (islands stripped): the shared displace/fragment perturbations
+    # contribute identically to both runs and cancel out of the delta, while
+    # the three stray islands -- placed in what GT calls background -- are
+    # exactly the extra "unanchored foreground" run A carries and run B does
+    # not. Mode 1 wins on its own merits (it is the only nonzero entry among
+    # the normalisable modes), not by a tie-break -- legitimate, if small in
+    # absolute terms because three 27-voxel islands are a tiny fraction of
+    # the case's total voxel count.
     comparison = block_c["comparison_doc"]["comparison"]
-    assert comparison["attributed_mode"] == 3
-    assert comparison["attributed_metric_name"] == "rogue_island_count"
+    assert comparison["attributed_mode"] == 1
+    assert comparison["attributed_metric_name"] == "unanchored_foreground_fraction"
 
-    mode3 = _per_mode_by_mode(block_c["comparison_doc"], 3)
-    assert mode3["value_a"] == 3.0
-    assert mode3["value_b"] == 0.0
-    assert mode3["delta"] == -3.0
-    assert mode3["normalised_delta"] == -1.0
-    assert mode3["worsened"] is False
+    mode1 = _per_mode_by_mode(block_c["comparison_doc"], 1)
+    assert mode1["value_a"] == pytest.approx(0.079264)
+    assert mode1["value_b"] == pytest.approx(0.0784)
+    assert mode1["delta"] == pytest.approx(-0.000864, abs=1e-6)
+    assert mode1["normalised_delta"] == pytest.approx(-0.000864, abs=1e-6)
+    assert mode1["worsened"] is False
 
 
 def test_ac10_no_untouched_mode_is_implicated(block_c):
     doc = block_c["comparison_doc"]
-    for mode in (4, 5, 6, 7, 8):
+
+    # Mode 4 (mislabelled_volume_fraction) is bounded and genuinely
+    # untouched by either run -- its normalised_delta is a real 0.0, not a
+    # saturated fallback.
+    mode4 = _per_mode_by_mode(doc, 4)
+    assert mode4["delta"] == 0.0
+    assert mode4["normalised_delta"] == 0.0
+
+    # Modes 5-8 are unbounded counts (item 109 AC2): raw delta 0.0, and no
+    # fabricated normalised_delta for an untouched mode.
+    for mode in (5, 6, 7, 8):
         entry = _per_mode_by_mode(doc, mode)
         assert entry["delta"] == 0.0
-        assert entry["normalised_delta"] == 0.0
+        assert entry["normalised_delta"] is None
 
+    # Reconciled for item 109: mode 1's normalised_delta under the fixed
+    # full_swing scale (see test_ac9) is the real -0.000864, not the old
+    # adaptive-scale artefact -0.0109 (delta / max(|value_a|, |value_b|)).
     mode1 = _per_mode_by_mode(doc, 1)
     assert abs(mode1["normalised_delta"]) < 0.05
-    assert math.isclose(mode1["normalised_delta"], -0.0109, abs_tol=1e-3)
+    assert math.isclose(mode1["normalised_delta"], -0.000864, abs_tol=1e-4)
 
 
 def test_ac11_aggregate_dice_does_not_attribute_what_per_mode_does(block_c):
@@ -455,14 +484,23 @@ def test_ac11_aggregate_dice_does_not_attribute_what_per_mode_does(block_c):
     assert abs(comparison["mean_dice_delta"]) < 0.01
     assert math.isclose(comparison["mean_dice_delta"], 0.00043, abs_tol=1e-4)
 
+    # Reconciled for item 109: mode 3 (rogue_island_count) carries the real
+    # injected signal -- 3 islands added in run A, stripped in run B -- but
+    # is unbounded under item 109's rules (AC2), so it never carries a
+    # normalised_delta and cannot win attribution even though its raw
+    # movement (3 -> 0) dwarfs aggregate Dice's near-zero delta. Its raw
+    # delta stays visible on the record (AC2) and it is named in
+    # excluded_modes (AC8b) rather than silently dropped.
     mode3 = _per_mode_by_mode(block_c["comparison_doc"], 3)
-    assert abs(mode3["normalised_delta"]) == 1.0
+    assert mode3["normalised_delta"] is None
+    assert mode3["delta"] == -3.0
+    assert 3 in comparison["excluded_modes"]
 
 
 def test_ac12_rendered_txt_names_the_implicated_mode_in_words(block_c):
     txt = block_c["txt"]
-    assert FAILURE_MODE_NAMES[3] in txt
-    assert "rogue_island_count" in txt
+    assert FAILURE_MODE_NAMES[1] in txt
+    assert "unanchored_foreground_fraction" in txt
     for mode in range(1, 9):
         assert FAILURE_MODE_NAMES[mode] in txt
 
@@ -475,19 +513,32 @@ def test_ac13_confounding_modes_are_off_baseline(block_c):
         assert entry["value_a"] != entry["baseline"]
         assert entry["value_b"] != entry["baseline"]
 
+    # Reconciled for item 109: pre-fix, being off baseline on both sides
+    # could still saturate a mode to exactly +/-1.0 (the adaptive divisor
+    # bug); post-fix, off-baseline alone no longer implies saturation --
+    # nothing here reaches |normalised_delta| == 1.0 merely from sitting off
+    # baseline. Mode 3's large raw movement (3 -> 0 islands) is real but
+    # excluded from normalisation entirely (unbounded, AC2), not saturated.
     saturated = [
         entry
         for entry in doc["comparison"]["per_mode"]
-        if abs(entry["normalised_delta"]) == 1.0
+        if entry["normalised_delta"] is not None and abs(entry["normalised_delta"]) == 1.0
     ]
-    assert [entry["failure_mode"] for entry in saturated] == [3]
+    assert saturated == []
+    assert 3 in doc["comparison"]["excluded_modes"]
 
 
 # --- Adversarial (Block C): swapped runs, self-comparison, mismatched
 # cohorts, no-per-mode report, determinism, no-mutation ---------------------
 
 
-def test_adv_swapped_runs_flip_sign_still_attributes_to_mode_3(block_c, tmp_path_factory):
+def test_adv_swapped_runs_flip_sign_still_attributes_to_mode_1(block_c, tmp_path_factory):
+    # Reconciled for item 109 (see test_ac9): the surviving attributed mode
+    # is 1, not 3 -- swapping which run is A and which is B flips mode 1's
+    # sign (run B's islands-stripped candidate is now "A") while attribution
+    # stays on mode 1 throughout, exactly the property this test's name
+    # promises ("swapped runs flip sign, still attributes to the same
+    # mode").
     out_compare = tmp_path_factory.mktemp("block_c_swapped")
     exit_code = cli.main(
         [
@@ -502,10 +553,10 @@ def test_adv_swapped_runs_flip_sign_still_attributes_to_mode_3(block_c, tmp_path
     )
     assert exit_code == 0
     doc = json.loads((out_compare / "per_mode_comparison.json").read_text(encoding="utf-8"))
-    assert doc["comparison"]["attributed_mode"] == 3
-    mode3 = _per_mode_by_mode(doc, 3)
-    assert mode3["normalised_delta"] == 1.0
-    assert mode3["worsened"] is True
+    assert doc["comparison"]["attributed_mode"] == 1
+    mode1 = _per_mode_by_mode(doc, 1)
+    assert mode1["normalised_delta"] == pytest.approx(0.000864, abs=1e-6)
+    assert mode1["worsened"] is True
 
 
 def test_adv_self_comparison_is_all_zero_and_names_no_mode(tmp_path_factory, block_c):

@@ -263,19 +263,72 @@ note sits after the marker so `aide claim` does not read it as a dependency.
 - **`excluded_modes` / `unattributable_reason` are computed `@property`s on
   `RunComparison`, not stored dataclass fields** (builder, 2026-08-14). Both
   are derived purely from `self.per_mode`/`self.attributed_mode` on every
-  access, so they deliberately do **not** appear in `dataclasses.asdict`'s
-  output and therefore never reach `to_dict()`. This was necessary, not
-  stylistic: `report.py`'s `build_run_comparison_report` embeds
-  `comparison.to_dict()` verbatim under a JSON-Schema-validated
-  (`additionalProperties: false`) `"comparison"` key
-  (`per_mode_comparison_schema_v0.json`), and that schema file is outside
-  this item's Authorised paths (owned by the item that introduced Stage 18's
-  serialisation contract). Adding either field as a real dataclass field
-  would have broken every existing `build_run_comparison_report` schema
-  validation (`test_ac20_*`) unless the schema were also edited -- out of
-  scope here. Computing them as properties keeps AC8/AC9 satisfied (both
-  attributes are readable on any `RunComparison` instance) while leaving the
-  wire format, and the schema file, untouched.
+  access. *(Superseded by AC8b below -- round-1 validation judged that
+  keeping them out of `to_dict()` did not satisfy AC8's "records" language.
+  Left here for the record of the original reasoning.)*
+
+- **AC8b: `to_dict()` now layers `excluded_modes`/`unattributable_reason` on
+  top of the dataclass fields; the schema is extended additively** (builder,
+  2026-08-14, round 2). Validation round 1 judged the properties-only
+  approach insufficient: a reader of the serialised JSON report had no field
+  naming the exclusions and had to infer them by filtering `per_mode` for
+  `delta is not None and normalised_delta is None` -- AC8 says the result
+  "records" the exclusions, and inference from a null is not a record. Fix:
+  `RunComparison.to_dict()` still starts from `dataclasses.asdict(self)` (so
+  every existing key/value is unchanged -- AC11's regression pins are
+  untouched) and then adds two keys computed from the same properties:
+  `excluded_modes` (as a `list`, JSON has no tuple) and
+  `unattributable_reason`. `per_mode_comparison_schema_v0.json` -- now in
+  this item's Authorised paths -- gained matching `properties` entries and
+  both new keys were added to `required` (since `to_dict()` always populates
+  them, requiring them is safe and catches a future regression that drops
+  them); no existing key, type, or requirement was changed or removed, so
+  every pre-existing schema-validated report still validates. Plain-text
+  `render_run_comparison` now also appends an "Excluded from attribution
+  ranking" line naming `comparison.excluded_modes` in the **success** branch
+  (attribution non-`None`), not only the fully-degenerate branch, so a
+  reader is never left inferring what a per-mode row's `n/a` normalised
+  delta means from context.
+
+- **Stage 18's real-pipeline demonstrator legitimately re-pins to mode 1, not
+  mode 2** (builder, 2026-08-14, round 2). Unlike `test_101_per_mode_cohort.
+  py`'s AC16 (a hand-crafted dict fixture free to pick mode 2's magnitude),
+  `test_102_stage18_validation.py`'s Block C drives the real CLI pipeline
+  over one case built from `build_clean_spine` + registered perturbation
+  operators (`displace`, `fragment`, `inject_islands`), so the winning mode
+  had to be discovered, not chosen. Measured directly (see the module's own
+  fixture, `_build_composite_fixtures`): mode 2 (`min_dominant_component_
+  fraction`) is identical in both runs (`0.34782608695652173` both sides) --
+  the shared `fragment(label 20, n_pieces=3)` step already drives the
+  cohort-wide minimum below anything the label-24 island injection could
+  reach (label 24's own dominant fraction only drops to `~0.9957`, and the
+  `inject_islands` operator's placement search has no room in this fixture
+  to push it lower), so mode 2 cannot be made to carry the signal here
+  without restructuring the corpus (out of scope -- Authorised paths cover
+  test *assertions*, not fixture geometry beyond what's needed). Mode 1
+  (`unanchored_foreground_fraction`) does carry it: the `displace`/`fragment`
+  steps are common to both run A and run B and cancel out of the delta,
+  while the three `inject_islands` islands -- present only in run A, placed
+  in what GT calls background -- are exactly the extra unanchored-foreground
+  voxels run A carries and run B does not. Mode 1 is therefore the *only*
+  nonzero entry among the four bounded (normalisable) modes in this
+  comparison -- it wins outright, not by tie-break, and the win is causally
+  tied to the injected perturbation being compared away. The magnitude is
+  small (`normalised_delta ≈ -0.000864`) because three 27-voxel islands are
+  a tiny fraction of the fixture's total voxel count -- smaller than would
+  make a compelling demonstrator on its own, but legitimate: real signal,
+  correctly attributed, not a saturation artefact. Five tests reconciled:
+  `test_ac9_attribution_lands_on_mode_1` (renamed from `..._mode_3`),
+  `test_ac10_no_untouched_mode_is_implicated`,
+  `test_ac11_aggregate_dice_does_not_attribute_what_per_mode_does`,
+  `test_ac13_confounding_modes_are_off_baseline`, and
+  `test_adv_swapped_runs_flip_sign_still_attributes_to_mode_1` (renamed).
+  Each keeps its original intent (attribution lands where genuine damage
+  is measurable; no untouched/unbounded mode is implicated; aggregate Dice
+  doesn't attribute what per-mode does; confounding-but-unmoved modes don't
+  spuriously saturate; sign flips on run swap) -- only the specific mode
+  number and the numeric pins changed, to values pulled directly from the
+  fixed implementation's own output, not hand-picked to make the test pass.
 - **`MODE_SCALE_SPECS` full-swing values** (builder, 2026-08-14): modes 1, 2
   and 4 are all confined to `0..1` by construction (three `*_fraction`
   metrics), so each declares `full_swing=1.0` -- the distance from its own
