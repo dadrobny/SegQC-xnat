@@ -127,4 +127,32 @@ None.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **AC3 precondition verified before editing `.gitattributes`.** `git show
+  HEAD:tests/golden/016_features_report.json` and the `022_stage3_report.json`
+  sibling were each piped through a byte-level `\r` count: zero in both. The
+  `.gitattributes` change is therefore pin-only, confirmed with
+  `git check-attr text eol -- tests/golden/016_features_report.json
+  tests/golden/022_stage3_report.json` reporting `eol: lf` for both after the
+  edit.
+- **Pin added as a single `tests/golden/*.json text eol=lf` line**, in the same
+  commented style as the rest of the file, rather than two separate lines per
+  file — the existing `tests/corpus/golden/*.json` entry uses the same glob
+  shape.
+- **AC4 survey reused, not re-walked.** `tests/test_111_golden_guard.py`'s
+  `_KNOWN_BYTE_EXACT_FIXTURE_FAMILIES` list is the AC4 survey; no additional
+  unpinned family was found during implementation, so no further
+  `.gitattributes` entries were needed beyond the one pin.
+- **`test_ac8_golden_snapshot`'s self-healing branch was deleted outright**
+  (not replaced with an explicit `raise`), matching the sibling
+  `test_ac5_golden_snapshot` exactly per AC9 — `GOLDEN_PATH.read_text()` now
+  raises `FileNotFoundError` on a missing file, and that exception's message
+  already contains the full path (hence the file's name), satisfying AC7
+  without extra code.
+- **Regeneration guidance moved into the drift-assertion message** rather than
+  kept as executable code: the message now spells out writing `produced` to
+  `GOLDEN_PATH` and committing the result, and explicitly notes "this test no
+  longer does that for you" so a developer used to the old self-healing
+  behaviour isn't surprised.
+- **Neither golden was retired.** Both carry a `retire` disposition in
+  `docs/aide/golden-decision-table.md`, but per `progress.md` that decision is
+  Stage 21's to execute, not this item's.
