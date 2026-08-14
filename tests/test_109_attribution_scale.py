@@ -57,12 +57,23 @@ NaN/inf finiteness guard across the full comparison.
 from __future__ import annotations
 
 import dataclasses
+import json
 import math
 from typing import Optional
 
+import jsonschema
 import pytest
 
 from segfacet.eval.per_mode import PER_MODE_METRIC_SPECS
+
+
+def _comparison_schema() -> dict:
+    import importlib.resources
+
+    import segfacet.eval as eval_pkg
+
+    ref = importlib.resources.files(eval_pkg).joinpath("per_mode_comparison_schema_v0.json")
+    return json.loads(ref.read_text(encoding="utf-8"))
 
 
 def _pmc():
@@ -371,6 +382,32 @@ def test_ac9_no_metric_normalisable_yields_none_with_a_stated_reason_not_lowest_
     # The pre-fix bug's failure mode was exactly this: falling through to the
     # documented lowest-mode tie-break instead of reporting no attribution.
     assert cmp.attributed_mode != 1
+
+
+def test_ac8b_fully_degenerate_comparison_serialises_excluded_modes_and_reason():
+    # Same fully-degenerate scenario as AC9 (no metric normalisable), but
+    # asserted through the *serialised* form -- to_dict() -- and validated
+    # against the bundled schema. AC8b requires a reader of the serialised
+    # output to be able to read which modes were excluded and why, rather
+    # than infer it from the Python properties (which every other test of
+    # this scenario stops at).
+    a_values = {3: 1.0, 5: 1.0, 6: 1.0, 7: 1.0, 8: 1.0}
+    b_values = {3: 5.0, 5: 2.0, 6: 3.0, 7: 1.0, 8: 4.0}
+    cmp = _cmp(a_values, b_values)
+    doc = cmp.to_dict()
+
+    assert doc["attributed_mode"] is None
+    assert doc["excluded_modes"] == list(UNBOUNDED_MODES)
+    assert isinstance(doc["unattributable_reason"], str) and doc["unattributable_reason"]
+    assert "not normalisable" in doc["unattributable_reason"].lower()
+
+    # The bundled schema requires both keys in every comparison document,
+    # including this fully-degenerate one -- prove it is actually
+    # satisfiable here, not just in the successful-attribution case the
+    # existing schema test covers.
+    schema = _comparison_schema()
+    comparison_schema = schema["definitions"]["comparison"]
+    jsonschema.validate(doc, comparison_schema)
 
 
 # =========================================================================== #
