@@ -106,6 +106,14 @@ Decisions).
   Attribution ranks only metrics carrying a `normalised_delta`; the result
   records which modes were excluded and why, so a reader is never left to assume
   they were considered and lost.
+- [ ] **AC8b: exclusions survive serialisation.** `excluded_modes` and the
+  no-attribution reason appear in the **JSON report**, not only as Python
+  properties. A reader of the serialised output must be able to *read* which
+  modes were excluded and why, rather than infer it by filtering for entries
+  where `delta is not None and normalised_delta is None`. AC8 says the result
+  "records" the exclusions — inference from a null is not a record. The
+  plain-text rendering must also name excluded modes when an attribution
+  *succeeds*, not only in the fully-degenerate case.
 - [ ] **AC9: no-attribution is explicit.** When no metric carries a
   `normalised_delta`, `attributed_mode is None` with a stated reason — never a
   fallback to the lowest mode.
@@ -202,9 +210,26 @@ note sits after the marker so `aide claim` does not read it as a dependency.
 - `src/segfacet/eval/report.py`
 - `tests/test_109_attribution_scale.py`
 - `tests/test_101_per_mode_cohort.py`
+- `tests/test_102_stage18_validation.py`
+- `src/segfacet/eval/per_mode_comparison_schema_v0.json`
 - `docs/aide/items/109-magnitude-sensitive-attribution.md`
 
 ## Decisions & Trade-offs
+
+- **Stage 18's attribution demonstrator depended on the bug it was
+  demonstrating (found in validation round 1, 2026-08-14).**
+  `tests/test_102_stage18_validation.py` pins `attributed_mode == 3` as the
+  evidence for Stage 18's run-vs-run deliverable. Mode 3's metric is
+  `rogue_island_count` — an unbounded count that, under this item's rules, can
+  never carry a `normalised_delta` and so can never win attribution. It only
+  ever won because the saturating scale drove every mode to ±1.0 and the
+  lowest-mode tie-break happened to land there. Reconciling those five
+  assertions is therefore not a cosmetic pin update: it moves Stage 18's
+  demonstration onto a bounded mode that legitimately dominates. The same
+  pattern was already reconciled in `test_101_per_mode_cohort.py`'s AC16, whose
+  demonstrator moved from mode 3 to mode 2. Worth stating plainly in Stage 18's
+  record rather than quietly re-pinning: the original demonstration was an
+  artifact.
 
 - **Two rules decide scaling: no supervision in the divisor, and review or
   don't scale** (maintainer, 2026-08-12). The design arrived here in three
