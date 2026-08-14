@@ -457,8 +457,16 @@ def evaluate_case(
         from segfacet.eval.per_mode import compute_per_mode_metrics
 
         if candidate_present:
+            # candidate_present's earlier compute_overlap call above already
+            # produced this exact OverlapResult for `.overlap` -- item 112
+            # supplies it here so compute_per_mode_metrics does not pay a
+            # second full pass over the label map for the same computation.
             per_mode_metrics = compute_per_mode_metrics(
-                subject_block, candidate=candidate_arr, gt=gt_arr, spacing=gt_spacing
+                subject_block,
+                candidate=candidate_arr,
+                gt=gt_arr,
+                spacing=gt_spacing,
+                overlap_result=overlap,
             )
         else:
             pm_spacing = tuple(float(z) for z in gt_img.header.get_zooms()[:3])

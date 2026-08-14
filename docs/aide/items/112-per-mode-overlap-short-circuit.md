@@ -125,4 +125,38 @@ after the marker so `aide claim` does not read it as a dependency.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Cheap invariant chosen: label set + per-label voxel-count shape.**
+  `_validate_overlap_result` (per_mode.py) checks two things, both O(voxels)
+  single-pass work -- cheaper than the O(voxels x labels) work
+  `compute_overlap` itself does: (1) the set of label values
+  `overlap_result.per_label` covers equals `set(candidate) | set(gt)` minus
+  background, and (2) each entry's `candidate_voxels`/`gt_voxels` equals the
+  actual per-label voxel count in the given `candidate`/`gt` arrays (the
+  proxy for "this came from arrays of this shape/content", since
+  `OverlapResult` stores no shape field of its own -- Assumption 2). Neither
+  check touches `dice`/`jaccard`/`intersection_voxels`, so a same-shape,
+  same-label-set but otherwise-wrong result is trusted verbatim past this
+  point (AC7).
+- **Known gap: a shape mismatch confined to an all-background boundary
+  region is undetectable by this invariant, and the committed
+  `test_ac6_shape_mismatched_result_raises` currently exercises exactly that
+  case.** The test's `mode1_displace`/`clean_control` fixture pair has every
+  foreground voxel strictly interior (verified: `candidate[-1]`/`gt[-1]`,
+  and the analogous slice on every other axis, are all-background), so
+  `overlap.compute_overlap(candidate[:-1], gt[:-1], spacing)` produces an
+  `OverlapResult` that is byte-identical (`dataclasses.asdict` equal) to
+  `overlap.compute_overlap(candidate, gt, spacing)` -- confirmed by direct
+  execution, not just per-label voxel counts. Since `OverlapResult` records
+  no array shape and no background/total-size information (by design --
+  `compute_overlap`'s docstring: background is excluded from comparison),
+  there is no function of `overlap_result` plus the given `candidate`/`gt`
+  that can distinguish these two calls without recomputing the full overlap
+  (explicitly forbidden by AC6's "do not recompute to verify"). This is
+  exactly the scenario Assumption 2 anticipated ("If it does not [carry
+  enough to validate cheaply], AC6 is satisfied by the weakest available
+  invariant... and the gap is recorded in Decisions rather than by adding
+  fields to OverlapResult"). Fixing the test to exercise a genuine shape
+  mismatch would mean slicing an axis where the corpus has foreground at the
+  boundary (or using two candidate/gt pairs with different label sets in
+  addition to different shape) -- out of scope for the builder role (no test
+  edits) and flagged for the validator/test-writer instead.
