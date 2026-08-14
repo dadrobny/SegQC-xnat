@@ -21,10 +21,16 @@ changed path against the authorised globs.
 
 Glob semantics:
 
-- An entry with no ``*`` matches only that exact repo-relative path.
+- An entry with no wildcard matches only that exact repo-relative path.
 - An entry ending in ``/**`` matches any path at any depth below that
   directory (the directory itself is not a path, so nothing "below" an empty
   string is matched by ``**`` alone).
+- Any other entry containing ``*``, ``?`` or ``[`` is an ordinary shell glob,
+  matched per path segment: ``tests/corpus/golden/*.json`` matches a JSON file
+  in that directory but **not** one a level deeper, because ``*`` does not
+  cross a ``/``. Specs write this form routinely, so it must work — before it
+  did, authorised files were reported as violations (seen on items 108 and
+  110).
 
 A small, explicit set of paths (see ``_ALWAYS_AUTHORISED_PATHS``) is treated
 as authorised for every item regardless of its spec's list: the loop
