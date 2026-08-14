@@ -1021,7 +1021,7 @@ discovery.
 
 **Deliverables.**
 
-- 🚧 **D1** `normalised_delta` saturates to ±1.0 whenever one run sits on baseline (7 of 8
+- ✅ **D1** `normalised_delta` saturates to ±1.0 whenever one run sits on baseline (7 of 8
   metric baselines are `0.0`), so Stage 18's run-vs-run attribution is decided by the
   lowest-mode tie-break rather than by magnitude. `eval/per_mode_cohort.py`. *(Item 109)*
 - ✅ **D2** `touches_*` face mapping is anatomically wrong under RAS since item 094
