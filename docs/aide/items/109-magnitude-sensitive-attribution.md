@@ -79,12 +79,20 @@ Decisions).
   any metric without an intrinsic scale or a reviewed declared threshold —
   `rogue_island_count` and `missing_level_count` today — and the raw delta
   remains available on the same record.
-- [ ] **AC3: a reviewed threshold may be declared.** `MetricSpec` gains an
-  optional reference-excursion field, unset for every metric by default; when
-  set, that metric scales by it. The field's docstring states that setting it is
-  a human-review decision requiring a recorded rationale, not a tuning knob.
-- [ ] **AC4: no threshold is set in this item.** Every shipped `MetricSpec`
-  leaves the new field unset — the mechanism exists, the judgement is not made
+- [ ] **AC3: a reviewed threshold may be declared.** A per-mode scale
+  declaration — a new `ModeScaleSpec` / `MODE_SCALE_SPECS` table local to
+  `per_mode_cohort.py` — carries an optional reference-excursion field, unset for
+  every metric by default; when set, that metric scales by it. The field's
+  docstring states that setting it is a human-review decision requiring a
+  recorded rationale, not a tuning knob.
+  *(Corrected 2026-08-14: this AC originally said `MetricSpec` gains the field,
+  which contradicted this item's own Assumptions and Authorised paths —
+  `MetricSpec` lives in `eval/per_mode.py`, which item 112 owns and this item may
+  not touch. A `per_mode_cohort`-local table is additive, keeps the supervision
+  and review rules with the code that applies them, and leaves item 112's file
+  alone. Caught by the test-writer before implementation.)*
+- [ ] **AC4: no threshold is set in this item.** Every shipped scale
+  declaration leaves the new field unset — the mechanism exists, the judgement is not made
   here.
 - [ ] **AC5: attribution follows magnitude.** Given two modes whose normalised
   deltas differ, `attributed_mode` is the larger one regardless of mode number.
@@ -122,9 +130,11 @@ Decisions).
 - **A metric may use GT even though its scale may not.** Four of the eight are
   `source: "candidate_vs_gt"` by item 099's design, which this item does not
   change. The supervision rule constrains the **divisor**, not the metric.
-- **`PER_MODE_METRIC_SPECS` may gain an optional field.** Additive only —
-  existing field names, values, baselines and directions are untouched, so
-  item 104's catalogue and any consumer reading the specs keep working.
+- **The scale declaration is additive and lives in `per_mode_cohort.py`.**
+  `PER_MODE_METRIC_SPECS` and `MetricSpec` (in `eval/per_mode.py`) are NOT
+  modified — existing field names, values, baselines and directions are
+  untouched, so item 104's catalogue and every consumer reading the specs keep
+  working, and item 112's ownership of that file is not contested.
 - **`eval/per_mode.py` is not modified by this item.** The classification lives
   with the spec declaration; if that requires touching `per_mode.py`, hand back
   and coordinate with item 112 rather than both editing it.
