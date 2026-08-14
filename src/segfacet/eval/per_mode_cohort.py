@@ -529,8 +529,10 @@ class RunComparison:
         """``failure_mode``\\ s with real data but no ``normalised_delta``.
 
         See the class docstring's "Properties" section. Computed on every
-        access from ``self.per_mode`` -- not a stored dataclass field, so it
-        never appears in :meth:`to_dict`'s output.
+        access from ``self.per_mode`` rather than stored as a dataclass field,
+        but :meth:`to_dict` layers it onto the serialised output explicitly
+        (item 109 AC8b): a reader of the JSON must be able to *read* which
+        modes were excluded, not infer it from a null ``normalised_delta``.
         """
         return tuple(
             entry.failure_mode
@@ -543,8 +545,10 @@ class RunComparison:
         """Why ``attributed_mode is None``, or ``None`` when it is not.
 
         See the class docstring's "Properties" section. Computed on every
-        access -- not a stored dataclass field, so it never appears in
-        :meth:`to_dict`'s output.
+        access rather than stored as a dataclass field, but :meth:`to_dict`
+        layers it onto the serialised output explicitly (item 109 AC8b) --
+        this branch is exactly where the reason string is non-null and most
+        needed, so it must survive serialisation.
         """
         if self.attributed_mode is not None:
             return None
