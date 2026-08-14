@@ -1027,7 +1027,7 @@ discovery.
 - ✅ **D2** `touches_*` face mapping is anatomically wrong under RAS since item 094
   (`x == 0 → touches_inferior` names the left-right axis) — every `border`/`fov` finding on
   data read through `segfacet.io` is mislabelled. Must land before real data. *(Item 108)*
-- 📋 **D3** Golden-fixture test hygiene: `tests/golden/*.json` unpinned in `.gitattributes`
+- 🚧 **D3** Golden-fixture test hygiene: `tests/golden/*.json` unpinned in `.gitattributes`
   (latent Windows-CI break); `test_022_stage3_serialisation.py::test_ac8_golden_snapshot`
   writes its own golden and skips when missing, so deleting the file makes it pass.
   *(Item 111)*
