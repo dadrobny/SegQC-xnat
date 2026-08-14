@@ -79,6 +79,14 @@ same shape of generalisation, but Stage 27's job. Threshold calibration.
 - [ ] **AC9: it degrades like its Stage 3 siblings.** With fewer than the
   minimum labels required, the block is absent or empty in the documented way,
   matching how the other Stage 3 blocks behave, and never raises.
+- [ ] **AC9b: the report schema admits the new block.**
+  `src/segfacet/report_schema_v0.json` declares `additionalProperties: false` on
+  both `#/definitions/features` and `#/definitions/stage3`, so adding any new
+  `stage3.*` key makes **every** schema-validating report fail on a case with two
+  or more labels — not just this item's new tests, but the existing validation
+  tests in `test_035` / `test_042` that run corpus cases through
+  `serialize_report`. The schema is extended to declare the new block, and a test
+  asserts a realised report for a multi-label case still validates.
 - [ ] **AC10: the catalogue covers it.** Every new leaf path appears exactly
   once in the regenerated `docs/aide/feature_catalogue.generated.{json,md}`,
   and item 104's drift test passes in both directions.
@@ -170,6 +178,7 @@ Stage 27 may reorganise their paths and unify the vocabulary with
 - `src/segfacet/pipeline.py`
 - `src/segfacet/feature_report.py`
 - `src/segfacet/feature_docs.py`
+- `src/segfacet/report_schema_v0.json`
 - `tests/test_110_neighbourhood_wiring.py`
 - `tests/test_024_neighbourhood_comparison.py`
 - `tests/corpus/golden/*.json`
@@ -180,6 +189,15 @@ Stage 27 may reorganise their paths and unify the vocabulary with
 - `docs/aide/items/110-generalise-and-wire-neighbourhood.md`
 
 ## Decisions & Trade-offs
+
+- **`report_schema_v0.json` added to Authorised paths before implementation
+  (2026-08-13).** A prior partial run of this item found that both
+  `#/definitions/features` and `#/definitions/stage3` set
+  `additionalProperties: false`, so wiring a new `stage3` key would have broken
+  every schema-validating report test the moment a real case ran through
+  `serialize_report` — a failure with nothing to do with this item's own tests.
+  Caught before the builder started rather than in a validation round; recorded
+  as AC9b.
 
 - **Wire as an `unwired` feature, not with a consuming rule** (maintainer,
   2026-08-12). Adding a rule would need thresholds, a §6 mode mapping, corpus
