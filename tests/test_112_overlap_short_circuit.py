@@ -431,9 +431,21 @@ def test_ac6_shape_mismatched_result_raises():
     pm = _per_mode()
     overlap = _overlap_mod()
 
-    smaller_cand = _CAND_ARRAY[:-1]
-    smaller_gt = _GT_ARRAY[:-1]
+    # The trim must actually remove FOREGROUND, not just shrink the array.
+    # `_CAND_ARRAY[:-1]` does not: the corpus fixture's foreground bounding box
+    # ends at index 63 of a 66-long axis 0, so slicing off the last plane drops
+    # only background and `compute_overlap` returns a result that is
+    # dataclasses-identical to the untrimmed one -- nothing could reject it,
+    # because `OverlapResult` records no shape or total-size field by design.
+    # Cutting at 50 removes real foreground from both arrays while leaving the
+    # label set unchanged, so this isolates a shape/voxel-count disagreement;
+    # label-set disagreement is the sibling test's subject.
+    smaller_cand = _CAND_ARRAY[:50]
+    smaller_gt = _GT_ARRAY[:50]
     assert smaller_cand.shape != _CAND_ARRAY.shape
+    assert int((smaller_cand != 0).sum()) < int((_CAND_ARRAY != 0).sum())
+    assert int((smaller_gt != 0).sum()) < int((_GT_ARRAY != 0).sum())
+    assert set(np.unique(smaller_cand)) == set(np.unique(_CAND_ARRAY))
     wrong_result = overlap.compute_overlap(smaller_cand, smaller_gt, _SPACING)
 
     with pytest.raises(FacetInputError) as excinfo:

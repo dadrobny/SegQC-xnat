@@ -137,26 +137,26 @@ after the marker so `aide claim` does not read it as a dependency.
   check touches `dice`/`jaccard`/`intersection_voxels`, so a same-shape,
   same-label-set but otherwise-wrong result is trusted verbatim past this
   point (AC7).
-- **Known gap: a shape mismatch confined to an all-background boundary
-  region is undetectable by this invariant, and the committed
-  `test_ac6_shape_mismatched_result_raises` currently exercises exactly that
-  case.** The test's `mode1_displace`/`clean_control` fixture pair has every
-  foreground voxel strictly interior (verified: `candidate[-1]`/`gt[-1]`,
-  and the analogous slice on every other axis, are all-background), so
-  `overlap.compute_overlap(candidate[:-1], gt[:-1], spacing)` produces an
-  `OverlapResult` that is byte-identical (`dataclasses.asdict` equal) to
-  `overlap.compute_overlap(candidate, gt, spacing)` -- confirmed by direct
-  execution, not just per-label voxel counts. Since `OverlapResult` records
-  no array shape and no background/total-size information (by design --
-  `compute_overlap`'s docstring: background is excluded from comparison),
-  there is no function of `overlap_result` plus the given `candidate`/`gt`
-  that can distinguish these two calls without recomputing the full overlap
-  (explicitly forbidden by AC6's "do not recompute to verify"). This is
-  exactly the scenario Assumption 2 anticipated ("If it does not [carry
-  enough to validate cheaply], AC6 is satisfied by the weakest available
-  invariant... and the gap is recorded in Decisions rather than by adding
-  fields to OverlapResult"). Fixing the test to exercise a genuine shape
-  mismatch would mean slicing an axis where the corpus has foreground at the
-  boundary (or using two candidate/gt pairs with different label sets in
-  addition to different shape) -- out of scope for the builder role (no test
-  edits) and flagged for the validator/test-writer instead.
+- **The undetectable shape mismatch is exactly the harmless one.** The
+  invariant catches any shape difference that changes what is being compared,
+  because a trim that removes foreground changes a per-label voxel count. What
+  it cannot detect is a shape difference confined to an **all-background**
+  region -- and in that case `compute_overlap` returns a
+  `dataclasses.asdict`-identical result anyway, because background is excluded
+  from the comparison by design (`compute_overlap`'s own docstring). So the
+  "undetectable" case is one where accepting the supplied result is not merely
+  safe but correct: there is nothing to detect. No function of
+  `overlap_result` plus the given arrays could distinguish those two calls
+  without recomputing the full overlap, which AC6 explicitly forbids.
+- **The AC6 shape-mismatch fixture was rebuilt to test what its name claims
+  (orchestrator, 2026-08-14).** As first written it sliced `candidate[:-1]` /
+  `gt[:-1]`, but the corpus pair's foreground bounding box ends at index 63 of
+  a 66-long axis 0, so that trim removed only background -- the "wrong" result
+  was identical to the right one and no implementation could have rejected it.
+  The builder found this by direct execution, correctly refused both to edit
+  the test and to add a shape field to `OverlapResult` (out of scope), and
+  recorded it rather than declaring success. The fixture now cuts at index 50,
+  which provably removes foreground from both arrays while leaving the label
+  set unchanged, so the test isolates a shape/voxel-count disagreement and
+  leaves label-set disagreement to its sibling. It asserts those preconditions
+  inline, so it cannot silently regress into a no-op trim again.
