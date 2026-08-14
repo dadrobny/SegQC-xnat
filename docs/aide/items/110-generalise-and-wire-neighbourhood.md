@@ -213,6 +213,42 @@ Stage 27 may reorganise their paths and unify the vocabulary with
   `67 → 84` leaf-path count in item 103's test is a mechanical consequence of
   AC8, not scope creep.
 
+- **AC11b fix (builder, round 2, 2026-08-14): mechanism B now requires an
+  unambiguous last-segment match.** The 8 `STATUS_OVERRIDES` entries the round-1
+  attempt added (all `status: "unwired"`) were removed — that channel is
+  reserved for human `retune`/`retire` judgment (item 106), not a way to
+  silence a generator false positive, and using it that way is exactly what
+  item 106's AC18/AC25/AC26 and item 103's AC8 exist to catch. The real fix
+  landed in `catalogue.py`'s mechanism B (the static AST scan of each rule
+  module's literal subscript/`.get()` keys): when a literal key's last path
+  segment names **more than one** leaf path across the realised record (e.g.
+  `label`, `level_name`, `mean`, `median`, `std` — each shared by several
+  unrelated blocks), the scan now contributes **no** evidence for *any* of the
+  candidates, rather than guessing `"keep"` on every one of them (the old
+  `"static-ambiguous"` behaviour). A name that names exactly one leaf path
+  still attributes normally, tagged `"static"`. This directly targets the
+  described defect (generic key names colliding across blocks) without
+  attempting a full interprocedural resolver: precise-but-conservative,
+  trading a small amount of over-cautious "no evidence" for zero false
+  positives. The `"static-ambiguous"` evidence tag is retired (no code path
+  produces it any more); nothing in `test_103_feature_catalogue.py` required
+  it to occur (the one test referencing it,
+  `test_adv_ambiguous_static_name_tagged_on_every_candidate`, is a
+  vacuously-true consistency check, not an existence assertion).
+  **Ripple check (required by this round's instructions):** regenerated the
+  catalogue and diffed every one of the 111 pre-existing leaf paths' `status`
+  against the pre-item-110 committed catalogue (`git show
+  0c44956:docs/aide/feature_catalogue.generated.json`, the commit immediately
+  before this item's first attempt) — **zero status changes**. All 17 new
+  `stage3.per_label_neighbourhood[]` leaf paths now derive `status ==
+  "unwired"` from the generator's own default logic, with no override needed.
+  Confirmed byte-identical across two consecutive regenerations
+  (`python -m segfacet.catalogue`), and
+  `tests/test_103_feature_catalogue.py`, `tests/test_104_feature_catalogue_drift.py`,
+  `tests/test_105_golden_decision_table.py`, `tests/test_106_stage19_validation.py`,
+  `tests/test_107_item_scope_check.py`, `tests/test_110_neighbourhood_wiring.py`,
+  and `tests/test_024_neighbourhood_comparison.py` all pass.
+
 - **`report_schema_v0.json` added to Authorised paths before implementation
   (2026-08-13).** A prior partial run of this item found that both
   `#/definitions/features` and `#/definitions/stage3` set

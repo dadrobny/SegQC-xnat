@@ -14,12 +14,19 @@ Four derivation mechanisms, each carrying its own evidence tag
   a non-invasive ``dict``-subclass proxy (:func:`trace_record_access`) that
   records every leaf path actually read, then run every registered rule
   (:func:`segfacet.heuristics.rule.iter_rules`) over the traced record.
-- **B. Static AST scan of ``heuristics/*.py``** (``static`` /
-  ``static-ambiguous``) — string constants used as a subscript key or as
-  ``.get(...)``'s first positional argument in *each rule's own module file*,
-  matched to catalogue paths by last path segment. Catches branches the driver
-  set never realises (e.g. ``overlaps[].overlap_voxels`` when the driver set
-  happens not to populate it).
+- **B. Static AST scan of ``heuristics/*.py``** (``static``) — string
+  constants used as a subscript key or as ``.get(...)``'s first positional
+  argument in *each rule's own module file*, matched to catalogue paths by
+  last path segment -- but **only when that last segment names exactly one**
+  leaf path (item 110, AC11b). Catches branches the driver set never realises
+  (e.g. ``overlaps[].overlap_voxels`` when the driver set happens not to
+  populate it). A name shared by >1 leaf path's last segment (e.g. ``label``,
+  ``level_name``, ``mean``, ``median``, ``std``) carries no positional
+  information tying it to a specific block, so it contributes no evidence for
+  *any* of its candidates rather than guessing "keep" for all of them
+  (the pre-item-110 behaviour, tagged ``static-ambiguous``, produced exactly
+  this false-positive shape whenever an unrelated block reused a generic key
+  name).
 - **C. Static AST scan of ``synth/*.py``** — ``rule_id -> §6 mode(s)``, read
   off every ``Expectation(failure_mode=N, ..., expected_rule_ids=frozenset(
   {...}))`` call's literal keyword pairs. No hand-typed rule-id -> mode
@@ -754,9 +761,22 @@ def build_catalogue(*, strict: bool = True) -> FeatureCatalogue:
             candidates = by_last_segment.get(name)
             if not candidates:
                 continue
-            evidence = "static" if len(candidates) == 1 else "static-ambiguous"
+            if len(candidates) > 1:
+                # Item 110 (AC11b): a name shared by >1 leaf path's last
+                # segment (e.g. "label", "level_name", "mean", "median",
+                # "std") is exactly the case this scan cannot disambiguate --
+                # it has no notion of *which* block the literal key was read
+                # from, only that the bare string appears somewhere in the
+                # rule's module. Silently guessing "keep" for every candidate
+                # (the pre-fix behaviour, tagged "static-ambiguous") produced
+                # false positives whenever an unrelated block happened to
+                # reuse a generic key name. Contribute no mechanism-B
+                # evidence for an ambiguous name at all; an unambiguous
+                # last-segment match (below) or another mechanism (A/D) still
+                # attributes it correctly.
+                continue
             for path in candidates:
-                attributions[path][rule.rule_id].add(evidence)
+                attributions[path][rule.rule_id].add("static")
 
     # Mechanism C: rule_id -> §6 mode(s), from synth/*.py's Expectation(...).
     rule_mode_map = _scan_synth_rule_mode_map()

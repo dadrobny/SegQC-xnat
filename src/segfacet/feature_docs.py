@@ -519,59 +519,6 @@ STATUS_OVERRIDES: Mapping[str, Tuple[str, str]] = MappingProxyType(
             "needed again; not worth carrying as a stored duplicate of "
             "centroid_mm."
         ),
-        "stage3.per_label_neighbourhood[].label": (
-            "unwired",
-            "Item 110: no rule reads this block (verified -- every corpus "
-            "case's verdict/findings are unchanged before and after wiring, "
-            "and no 'observed' dynamic-access evidence names it). The "
-            "generator's mechanism B (static AST scan, last-path-segment "
-            "matching) surfaces 'static-ambiguous' matches against unrelated "
-            "rules that happen to read a same-named 'label' key from a "
-            "different block; overridden to the honest status."
-        ),
-        "stage3.per_label_neighbourhood[].level_name": (
-            "unwired",
-            "Item 110: same static-ambiguous last-path-segment false match "
-            "as stage3.per_label_neighbourhood[].label (see that entry) -- "
-            "no rule actually reads this block."
-        ),
-        "stage3.per_label_neighbourhood[].stats.offset_mm.median": (
-            "unwired",
-            "Item 110: static-ambiguous last-path-segment false match "
-            "against the intensity rule's unrelated 'median' key (see "
-            "stage3.per_label_neighbourhood[].label for the full "
-            "explanation) -- no rule reads this block."
-        ),
-        "stage3.per_label_neighbourhood[].stats.offset_mm.std": (
-            "unwired",
-            "Item 110: static-ambiguous last-path-segment false match "
-            "against the intensity rule's unrelated 'std' key -- no rule "
-            "reads this block."
-        ),
-        "stage3.per_label_neighbourhood[].stats.spacing_mm.median": (
-            "unwired",
-            "Item 110: static-ambiguous last-path-segment false match "
-            "against the intensity rule's unrelated 'median' key -- no rule "
-            "reads this block."
-        ),
-        "stage3.per_label_neighbourhood[].stats.spacing_mm.std": (
-            "unwired",
-            "Item 110: static-ambiguous last-path-segment false match "
-            "against the intensity rule's unrelated 'std' key -- no rule "
-            "reads this block."
-        ),
-        "stage3.per_label_neighbourhood[].stats.volume_mm3.median": (
-            "unwired",
-            "Item 110: static-ambiguous last-path-segment false match "
-            "against the intensity rule's unrelated 'median' key -- no rule "
-            "reads this block."
-        ),
-        "stage3.per_label_neighbourhood[].stats.volume_mm3.std": (
-            "unwired",
-            "Item 110: static-ambiguous last-path-segment false match "
-            "against the intensity rule's unrelated 'std' key -- no rule "
-            "reads this block."
-        ),
         "stage3.per_label_offsets[].closest_u": (
             "retune",
             "Should be nested under the existing per_label.{label}.* "
