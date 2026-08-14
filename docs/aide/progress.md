@@ -1031,7 +1031,7 @@ discovery.
   (latent Windows-CI break); `test_022_stage3_serialisation.py::test_ac8_golden_snapshot`
   writes its own golden and skips when missing, so deleting the file makes it pass.
   *(Item 111)*
-- 📋 **D4** `compute_per_mode_metrics` gains an optional `overlap_result=` (halves the
+- 🚧 **D4** `compute_per_mode_metrics` gains an optional `overlap_result=` (halves the
   overlap work of a cohort-scale per-mode run). *(Item 112)*
 - 📋 **D5** `test-numpy-majors` scoped off the Docker/PyRadiomics-gated modules. *(Item 113)*
 - 📋 **D6** `heuristics/bounds.py` comments still name the retired `S` / `Cocygis` labels.
