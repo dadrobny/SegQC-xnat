@@ -90,6 +90,17 @@ same shape of generalisation, but Stage 27's job. Threshold calibration.
 - [ ] **AC10: the catalogue covers it.** Every new leaf path appears exactly
   once in the regenerated `docs/aide/feature_catalogue.generated.{json,md}`,
   and item 104's drift test passes in both directions.
+- [ ] **AC11b: the new paths' status is derived, not overridden.**
+  `catalogue.py`'s mechanism-B static AST scan attributes a rule to a leaf path
+  by matching the path's **last segment only**, so generic names — `label`,
+  `level_name`, `mean`, `median`, `std` — collide with unrelated rules and are
+  falsely reported as `keep`. Fix the matching to be precise (full leaf path, or
+  at least block-qualified) rather than papering over it. **`STATUS_OVERRIDES`
+  must not be used** for this: item 106 defined that channel as a record of human
+  `retune`/`retire` judgment, and its AC26 has an adversarial fixture proving an
+  `unwired` override is invalid. Using it to silence a generator false positive
+  breaks item 106's AC18/AC25/AC26 and item 103's AC8, and misrepresents a code
+  defect as a human decision.
 - [ ] **AC11: status is `unwired`, honestly.** The new entries carry
   `status == "unwired"` (no rule consumes them), and no rule's behaviour changes
   on the corpus.
@@ -179,6 +190,8 @@ Stage 27 may reorganise their paths and unify the vocabulary with
 - `src/segfacet/feature_report.py`
 - `src/segfacet/feature_docs.py`
 - `src/segfacet/report_schema_v0.json`
+- `src/segfacet/catalogue.py`
+- `tests/test_103_feature_catalogue.py`
 - `tests/test_110_neighbourhood_wiring.py`
 - `tests/test_024_neighbourhood_comparison.py`
 - `tests/corpus/golden/*.json`
@@ -189,6 +202,16 @@ Stage 27 may reorganise their paths and unify the vocabulary with
 - `docs/aide/items/110-generalise-and-wire-neighbourhood.md`
 
 ## Decisions & Trade-offs
+
+- **`catalogue.py` and `test_103_feature_catalogue.py` added to Authorised paths
+  after validation round 1 (2026-08-13).** Wiring the block exposed a real
+  matching-precision defect in the catalogue generator (mechanism B matches on a
+  leaf path's last segment alone, so `label`/`mean`/`std` collide with unrelated
+  rules). The first attempt absorbed it with `STATUS_OVERRIDES` entries set to
+  `unwired`, which item 106 had explicitly defined as invalid — six previously
+  green tests caught it. The fix belongs in the generator; the expected
+  `67 → 84` leaf-path count in item 103's test is a mechanical consequence of
+  AC8, not scope creep.
 
 - **`report_schema_v0.json` added to Authorised paths before implementation
   (2026-08-13).** A prior partial run of this item found that both
