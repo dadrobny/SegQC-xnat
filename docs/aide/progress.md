@@ -49,7 +49,7 @@
 | 23    | *(placeholder)* Multivariate Normative Model                          | G3              | 📋     |
 | 24    | *(placeholder)* Failure-Mode Discovery & Typed Reference Set          | G8              | 📋     |
 | 25    | *(placeholder)* Segmenter-Native Perturbations                        | G2              | 📋     |
-| 26    | Carried-Defect Remediation (pre-real-data)*(runs next)*               | G2, G7          | 🚧     |
+| 26    | Carried-Defect Remediation (pre-real-data)*(runs next)*               | G2, G7          | ✅     |
 | 27    | Feature Schema Taxonomy & Coordinate System                             | G8              | 📋     |
 
 > **Supersession 2026-07-25.** Stages 0–14 are history and are not reopened. Stage 15 is
@@ -741,7 +741,7 @@ numbers, wrong. Must land before any real-segmenter number is computed.
   including this item's changes; not independently re-observed by a live CI
   run from this execution environment — no `gh` CLI / CI access available
   here. See item 097's Decisions log.)*
-- [ ] A real segmenter output round-trips with correct level names. *(Unticked
+- [x] A real segmenter output round-trips with correct level names. *(Unticked
   because no real SPINEPS output is available in this execution environment
   — `SEGFACET_SPINEPS_FIXTURE` is unset. The round-trip **mechanics** are
   unconditionally verified via a committed synthetic TPTBox-labeled fixture
@@ -1012,7 +1012,7 @@ failures.*
 
 ---
 
-## Stage 26 — Carried-Defect Remediation (pre-real-data) (G2, G7) — 🚧
+## Stage 26 — Carried-Defect Remediation (pre-real-data) (G2, G7) — ✅
 
 **Goal.** Clear the defects Stages 17–19 recorded but were (correctly) forbidden from
 fixing in scope, **before** Stage 20 audits those surfaces and before Stage 21 produces
@@ -1053,7 +1053,7 @@ discovery.
   inferior) that D2's affine-derived mapping replaces; migrate the synthetic corpus
   RAS-native (bodies along axis 2, truthful affine, load as array-identity) and
   regenerate fixtures, manifest and goldens. *(Item 116)*
-- 🚧 Stage 26 end-to-end validation: per-defect red-then-green replay, fresh-clone suite
+- ✅ Stage 26 end-to-end validation: per-defect red-then-green replay, fresh-clone suite
   run, fence-retirement audit, and verification-row closure. *(Item 115)*
 
 **Acceptance.**
@@ -1079,7 +1079,7 @@ discovery.
   *(Item 115: `extract_feature_record` populates `stage3.per_label_neighbourhood`
   and `catalogue.build_catalogue()` lists those entries with `status: "unwired"`,
   confirmed by `tests/test_115_stage26_validation.py`'s AC7 tests, 4/4 passing.)*
-- [ ] No `_PRE_NNN_*` byte-hash fence remains, and the diff-based scope check that replaces
+- [x] No `_PRE_NNN_*` byte-hash fence remains, and the diff-based scope check that replaces
   it flags a deliberately out-of-scope edit on a scratch branch (**G7**).
   *(Unticked because one `_PRE_NNN_*`-named byte-hash fence still remains --
   `tests/test_098_stray_components.py`'s `_PRE_098_REFERENCE_VERSE_V1_SHA256`,
