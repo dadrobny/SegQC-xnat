@@ -741,7 +741,7 @@ numbers, wrong. Must land before any real-segmenter number is computed.
   including this item's changes; not independently re-observed by a live CI
   run from this execution environment — no `gh` CLI / CI access available
   here. See item 097's Decisions log.)*
-- [x] A real segmenter output round-trips with correct level names. *(Unticked
+- [ ] A real segmenter output round-trips with correct level names. *(Unticked
   because no real SPINEPS output is available in this execution environment
   — `SEGFACET_SPINEPS_FIXTURE` is unset. The round-trip **mechanics** are
   unconditionally verified via a committed synthetic TPTBox-labeled fixture
@@ -1079,7 +1079,7 @@ discovery.
   *(Item 115: `extract_feature_record` populates `stage3.per_label_neighbourhood`
   and `catalogue.build_catalogue()` lists those entries with `status: "unwired"`,
   confirmed by `tests/test_115_stage26_validation.py`'s AC7 tests, 4/4 passing.)*
-- [x] No `_PRE_NNN_*` byte-hash fence remains, and the diff-based scope check that replaces
+- [ ] No `_PRE_NNN_*` byte-hash fence remains, and the diff-based scope check that replaces
   it flags a deliberately out-of-scope edit on a scratch branch (**G7**).
   *(Unticked because one `_PRE_NNN_*`-named byte-hash fence still remains --
   `tests/test_098_stray_components.py`'s `_PRE_098_REFERENCE_VERSE_V1_SHA256`,
