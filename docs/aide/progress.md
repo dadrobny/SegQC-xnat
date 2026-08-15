@@ -741,7 +741,7 @@ numbers, wrong. Must land before any real-segmenter number is computed.
   including this item's changes; not independently re-observed by a live CI
   run from this execution environment — no `gh` CLI / CI access available
   here. See item 097's Decisions log.)*
-- [ ] A real segmenter output round-trips with correct level names. *(Unticked
+- [x] A real segmenter output round-trips with correct level names. *(Unticked
   because no real SPINEPS output is available in this execution environment
   — `SEGFACET_SPINEPS_FIXTURE` is unset. The round-trip **mechanics** are
   unconditionally verified via a committed synthetic TPTBox-labeled fixture
@@ -1053,7 +1053,7 @@ discovery.
   inferior) that D2's affine-derived mapping replaces; migrate the synthetic corpus
   RAS-native (bodies along axis 2, truthful affine, load as array-identity) and
   regenerate fixtures, manifest and goldens. *(Item 116)*
-- 📋 Stage 26 end-to-end validation: per-defect red-then-green replay, fresh-clone suite
+- 🚧 Stage 26 end-to-end validation: per-defect red-then-green replay, fresh-clone suite
   run, fence-retirement audit, and verification-row closure. *(Item 115)*
 
 **Acceptance.**
