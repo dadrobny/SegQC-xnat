@@ -412,6 +412,24 @@ _PINNED_BASELINE_WARNING_LOCATIONS = frozenset(
 _LOCATION_WARNING_RE = re.compile(r"^([^:]+:\d+):")
 
 
+def _posix_location(location: str) -> str:
+    """Normalise a warning location's path separator to `/`.
+
+    `aide check` builds these by f-stringing a `Path`
+    (`.aide/scripts/aide.py:704` and `:792` both do
+    `f"{path.relative_to(ddir)}:{lineno}"`), and `str(Path)` renders the
+    OS-native separator -- so the same document reports as
+    `queue/queue-002.md:80` on Linux and `queue\\queue-002.md:80` on
+    Windows. Only locations with a subdirectory component differ, which is
+    why `queue/queue-002.md` was the single baseline entry that broke on the
+    Windows CI leg while the six `docs/aide/`-root ones passed. Same
+    `str(Path)`-separator class as the `_combined_hash` bug recorded in
+    `insights.md`; the framework-side fix is `.as_posix()`, but `.aide/**`
+    is generated and must not be hand-edited here.
+    """
+    return location.replace("\\", "/")
+
+
 def _aide_check_warnings() -> list:
     """Return `aide check`'s warnings as a list of strings.
 
@@ -450,8 +468,32 @@ def test_ac8_no_new_aide_check_warning_beyond_pinned_baseline():
             f"unrecognised aide check warning shape (not location-based, "
             f"not a stale-claim-branch warning): {warning!r}"
         )
-        location = match.group(1)
+        location = _posix_location(match.group(1))
         assert location in _PINNED_BASELINE_WARNING_LOCATIONS, (
             f"aide check produced a new warning not in the pre-item-114 "
             f"baseline: {warning!r}"
         )
+
+
+def test_ac8_windows_backslash_locations_match_the_posix_baseline():
+    """The Windows form of a subdirectory warning must map onto the baseline.
+
+    Regression guard for the CI failure this normalisation fixes: without
+    it, `queue\\queue-002.md:80` (Windows) misses a baseline pinned in
+    POSIX form and the whole AC8 check fails on that leg alone. Asserted
+    here rather than left to the Windows runner so the fix is verified on
+    every platform, including the Linux one that cannot reproduce the bug.
+    """
+    windows_warning = (
+        "queue\\queue-002.md:80: status icon ✅ outside a structural "
+        "status position (parsers treat it as plain text; move or remove "
+        "it if status was intended)"
+    )
+    match = _LOCATION_WARNING_RE.match(windows_warning)
+    assert match is not None
+    assert _posix_location(match.group(1)) in _PINNED_BASELINE_WARNING_LOCATIONS
+    # The POSIX form must keep working unchanged -- normalisation is a
+    # widening, not a swap.
+    assert _posix_location("queue/queue-002.md:80") == "queue/queue-002.md:80"
+    # A root-level location has no separator either way, so it is unaffected.
+    assert _posix_location("progress.md:340") == "progress.md:340"
