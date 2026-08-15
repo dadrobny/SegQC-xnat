@@ -134,4 +134,42 @@ None.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Expression chosen** (`test-numpy-majors`'s `Test` step, applied verbatim):
+
+  ```
+  python -m pytest \
+    --ignore=tests/test_066_dockerfile.py \
+    --ignore=tests/test_069_container_smoke.py \
+    --ignore=tests/test_070_acceptance_stage9.py \
+    --deselect tests/test_features_radiomics.py::TestPresentPath
+  ```
+
+- **`--ignore` for the Docker modules, `--deselect` for the radiomics class.**
+  The three Docker modules are wholly gated by `@requires_docker`
+  (`tests/conftest.py`) or are pure text/JSON assertions with no array
+  computation — none of them exercises numpy, so a whole-module `--ignore`
+  does not violate AC3, and it is the narrowest expression that fully removes
+  them (`test_070_acceptance_stage9.py` has 14 non-Docker-gated tests, but
+  they are Dockerfile/manifest content assertions, not numpy-sensitive
+  coverage). `tests/test_features_radiomics.py`, by contrast, is mostly
+  numpy-sensitive builtin-backend coverage (the torch-free first-order
+  fallback) that must stay collected per AC3 — only its
+  `TestPresentPath` class (autouse `pytest.importorskip("radiomics")`
+  fixture) exercises the real PyRadiomics backend, so that class alone is
+  `--deselect`ed rather than ignoring the whole module.
+- **`--ignore`/`--deselect` over a pytest marker taxonomy.** Per the
+  Assumptions: no `markers` section exists in `pyproject.toml` today, and
+  adding one would require touching every gated test module, which is out of
+  this item's authorised paths (`.github/workflows/ci.yml`, this spec, and
+  the test file only).
+- **Measured collection counts** (this machine, full dev venv incl.
+  PyRadiomics installed): unscoped `--collect-only` collects **5016** tests;
+  the scoped expression collects **4945** selected + 5 deselected (4950
+  addressed), a removal of **71** tests overall — the 3 Docker modules plus
+  the 5-test `TestPresentPath` class (68 + 5 lines up cleanly with the
+  3-module + 1-class exclusion set; the absolute totals differ slightly from
+  a from-clean-checkout run since this venv already carries this item's own
+  25-test module, `tests/test_113_ci_numpy_matrix_scope.py`, in its
+  collection). AC7's committed test re-derives this delta from the workflow
+  file itself (not a hardcoded count) so it cannot silently drift as new
+  tests are added elsewhere in the repo.

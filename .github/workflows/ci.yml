@@ -105,6 +105,18 @@ jobs:
   # above -- see CLAUDE.md's note that the golden-file/reference comparisons
   # are numeric-tolerance (`reports_close`), not byte-identical against a
   # pinned numpy, which is what makes running across numpy majors safe here.
+  #
+  # Item 113: this job's Test step deliberately excludes the Docker- and
+  # PyRadiomics-gated tests. The job proves numpy-major agnosticism only --
+  # the environment-gated paths (Docker, PyRadiomics) are owned by
+  # verify-environment-gated below, which already installs and verifies both
+  # for real. Running them here instead buys zero additional numpy
+  # verification (none of the excluded coverage exercises numpy at all) while
+  # adding pure incidental risk: GitHub's ubuntu-latest runners have a real
+  # Docker daemon, so the Docker-gated tests attempt a real `docker build`
+  # against Docker Hub and have failed here on anonymous-pull rate-limiting /
+  # `dial tcp ... i/o timeout` network flakiness, unrelated to numpy -- and
+  # the two-numpy-leg matrix doubles that exposure on every push.
   test-numpy-majors:
     name: test (numpy ${{ matrix.numpy-version }})
     runs-on: ubuntu-latest
@@ -122,7 +134,18 @@ jobs:
       - name: Pin numpy leg
         run: pip install numpy==${{ matrix.numpy-version }}
       - name: Test
-        run: python -m pytest
+        # Item 113: --ignore the Docker-gated modules wholesale (none of
+        # them exercise numpy; verify-environment-gated owns real Docker
+        # verification) and --deselect only the PyRadiomics-present-path
+        # class inside test_features_radiomics.py, since the rest of that
+        # module is numpy-sensitive builtin-backend coverage that must stay
+        # collected.
+        run: |
+          python -m pytest \
+            --ignore=tests/test_066_dockerfile.py \
+            --ignore=tests/test_069_container_smoke.py \
+            --ignore=tests/test_070_acceptance_stage9.py \
+            --deselect tests/test_features_radiomics.py::TestPresentPath
 
   # This project has two optional capabilities -- pyradiomics (Stage 8) and
   # the Docker container path (Stage 9) -- whose tests skip cleanly when the
