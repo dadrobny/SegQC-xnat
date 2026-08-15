@@ -386,12 +386,39 @@ scratch branch (`git branch -D aide/115-scratch-ac10-violation`).
 `git clone` the local checkout
 (`/mnt/data/spine/codes/SegFACET`) into a scratch directory whose path
 differs from this checkout's (outside the repo entirely, under the
-session's scratchpad), checked out
+session's scratchpad, `.../scratchpad/segfacet-clone-ac11`), checked out
 `aide/115-validate-stage-26-carried-defect` there, built a fresh `.venv`
 with `python -m venv .venv` + `.venv/bin/pip install -e .[dev]`, and ran
 `.venv/bin/python -m pytest -q`.
 
-<!-- AC11_RESULT_PLACEHOLDER -->
+The first pass (before this item's own progress.md/insights.md/spec
+Decisions edits were committed) ran against the branch's prior commit and
+correctly caught that gap: **1 failed, 5017 passed, 55 skipped in 557.47s**
+— the single failure was `test_ac12_every_stage26_box_ticked_implies_
+evidence_or_unticked_implies_reason`, expected, since `git clone` copies
+committed history only and the acceptance-box annotations were still
+uncommitted working-tree changes at that point. After committing this
+item's Decisions/acceptance-box/insights edits (commit `78f4244`), the
+clone was updated in place (`git fetch origin
+aide/115-validate-stage-26-carried-defect && git reset --hard FETCH_HEAD`,
+reusing the already-built `.venv` rather than rebuilding it) and
+`.venv/bin/python -m pytest -q` re-run against the real final commit:
+
+```
+5018 passed, 55 skipped, 6 warnings in 554.35s (0:09:14)
+[exited with code 0]
+```
+
+Fully green, no failures, no unexpected skips (all 55 are the documented
+environment-gated skips: Docker, CuPy/GPU, PyRadiomics, real-VerSe-cohort,
+real-SPINEPS-fixture, git-diff-against-main-unavailable). Also ran the full
+local suite (same commit, same working tree, no clone) concurrently as a
+cross-check: **5019 passed, 54 skipped, 6 warnings in 559.78s** — the
+one-passed/one-skipped difference between the two runs is
+`test_074_benchmark.py`'s `git diff against main unavailable in this
+environment` skip, which fires only in the clone (no local `main` ref
+exists there) and legitimately passes in the original checkout (which does
+have `main`) -- not a discrepancy in the item's own code paths.
 
 Per the spec's own stated limit (Assumptions): a different-directory clone
 catches the absolute-path class of bug (item 099's), not the line-ending or
