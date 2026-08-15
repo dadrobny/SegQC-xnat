@@ -32,7 +32,19 @@ jobs:
           # Item branches are named aide/NNN-... (see .aide/conventions.md's
           # claim protocol); pull the leading item number out of the branch
           # name and match it to its docs/aide/items/NNN-*.md spec.
-          item_number=$(echo "$HEAD_REF" | grep -oE '[0-9]{3}' | head -n1 || true)
+          #
+          # Anchor on that exact shape rather than grepping for any 3-digit
+          # run anywhere in the name. A queue branch is `aide/queue-NNN`,
+          # where NNN is a *queue* number sharing a namespace with item
+          # numbers: an unanchored match read `aide/queue-016` as item 016
+          # and resolved the unrelated docs/aide/items/016-*.md, a
+          # queue-002-era spec that predates the `## Authorised paths`
+          # convention -- so the checker hard-errored on a missing section
+          # for an item the branch had nothing to do with. A queue or specs
+          # branch has no single owning item and correctly resolves to
+          # nothing here; per-item scope is already enforced on each item
+          # branch as it merges into the queue branch.
+          item_number=$(echo "$HEAD_REF" | sed -n 's|^aide/\([0-9]\{3\}\)-.*|\1|p')
           if [ -z "$item_number" ]; then
             echo "could not extract a 3-digit item number from branch '$HEAD_REF'; skipping scope check"
             echo "spec=" >> "$GITHUB_OUTPUT"

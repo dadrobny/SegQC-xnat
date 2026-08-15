@@ -25,9 +25,8 @@ fail* -- that is the correct pre-implementation state.
 
 from __future__ import annotations
 
+import importlib.util
 import re
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -410,35 +409,49 @@ _PINNED_BASELINE_WARNING_LOCATIONS = frozenset(
     }
 )
 
-_LOCATION_WARNING_RE = re.compile(r"^warning: ([^:]+:\d+):")
+_LOCATION_WARNING_RE = re.compile(r"^([^:]+:\d+):")
 
 
-def _run_aide_check() -> str:
-    proc = subprocess.run(
-        [sys.executable, str(AIDE_SCRIPT), "check"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    return proc.stdout + proc.stderr
+def _aide_check_warnings() -> list:
+    """Return `aide check`'s warnings as a list of strings.
+
+    Calls ``run_checks`` in-process rather than shelling out to
+    ``aide.py check`` and parsing stdout. The subprocess form failed on the
+    Windows CI runner with ``proc.stdout is None`` despite
+    ``capture_output=True`` -- a platform-specific capture failure that
+    could not be reproduced on Linux, and one that would have been *worse*
+    than a crash had it returned an empty string instead: the caller's loop
+    iterates over the parsed lines, so an empty capture makes this test pass
+    vacuously while checking nothing. ``run_checks`` is the same function
+    ``cmd_check`` calls (``.aide/scripts/aide.py:1004``); it returns
+    ``(errors, warnings)`` as structured data, so there is no stdout, no
+    encoding and no subprocess to go wrong, and nothing to re-parse.
+    """
+    spec = importlib.util.spec_from_file_location("_aide_cli", AIDE_SCRIPT)
+    aide = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(aide)
+    repo_root = aide.find_repo_root(REPO_ROOT)
+    _errors, warnings = aide.run_checks(repo_root, aide.load_config(repo_root))
+    return list(warnings)
 
 
 def test_ac8_no_new_aide_check_warning_beyond_pinned_baseline():
-    output = _run_aide_check()
-    for line in output.splitlines():
-        if not line.startswith("warning: "):
-            continue
-        if line.startswith("warning: stale claim branch"):
+    warnings = _aide_check_warnings()
+    # A capture/plumbing failure must fail loudly, not silently skip the
+    # loop below: `aide check` always reports the seven location-stable
+    # baseline warnings on this branch.
+    assert warnings, "run_checks returned no warnings at all -- expected the pinned baseline"
+    for warning in warnings:
+        if warning.startswith("stale claim branch"):
             # Branch-state-dependent -- excluded, see module docstring above.
             continue
-        match = _LOCATION_WARNING_RE.match(line)
+        match = _LOCATION_WARNING_RE.match(warning)
         assert match is not None, (
             f"unrecognised aide check warning shape (not location-based, "
-            f"not a stale-claim-branch warning): {line!r}"
+            f"not a stale-claim-branch warning): {warning!r}"
         )
         location = match.group(1)
         assert location in _PINNED_BASELINE_WARNING_LOCATIONS, (
             f"aide check produced a new warning not in the pre-item-114 "
-            f"baseline: {line!r}"
+            f"baseline: {warning!r}"
         )
