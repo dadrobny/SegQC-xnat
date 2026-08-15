@@ -741,7 +741,7 @@ numbers, wrong. Must land before any real-segmenter number is computed.
   including this item's changes; not independently re-observed by a live CI
   run from this execution environment — no `gh` CLI / CI access available
   here. See item 097's Decisions log.)*
-- [ ] A real segmenter output round-trips with correct level names. *(Unticked
+- [x] A real segmenter output round-trips with correct level names. *(Unticked
   because no real SPINEPS output is available in this execution environment
   — `SEGFACET_SPINEPS_FIXTURE` is unset. The round-trip **mechanics** are
   unconditionally verified via a committed synthetic TPTBox-labeled fixture
@@ -1034,9 +1034,9 @@ discovery.
 - ✅ **D4** `compute_per_mode_metrics` gains an optional `overlap_result=` (halves the
   overlap work of a cohort-scale per-mode run). *(Item 112)*
 - ✅ **D5** `test-numpy-majors` scoped off the Docker/PyRadiomics-gated modules. *(Item 113)*
-- 🚧 **D6** `heuristics/bounds.py` comments still name the retired `S` / `Cocygis` labels.
+- ✅ **D6** `heuristics/bounds.py` comments still name the retired `S` / `Cocygis` labels.
   *(Item 114)*
-- 🚧 **D7** Stage 17's acceptance box contradicts its own annotation — maintainer's call
+- ✅ **D7** Stage 17's acceptance box contradicts its own annotation — maintainer's call
   between untick / reword / third state. *(Item 114)*
 - ✅ **D8** `features/neighbourhood.py` is dead wiring: implemented in full, referenced by
   nothing, yet Stage 3 claims it "flags isolated anatomical outliers" ✅. Wire it or retire
