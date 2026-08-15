@@ -40,8 +40,14 @@ __all__ = ["BoundsRule", "DEFAULT_BOUNDS", "reference_bounds_for_level", "DEFAUL
 # Level-group resolution
 # --------------------------------------------------------------------------- #
 
-# Derive the level_name → group map from CANONICAL_ORDER so it stays in step
-# with the label convention.  S and Cocygis are intentionally omitted (unbounded).
+# Derive the level_name → group map from CANONICAL_ORDER by name prefix so it
+# stays in step with the label convention. Only C+digit / T / L prefixes match
+# a branch below, so S1-S6 (no branch matches "S") and Cocc (starts with "C"
+# but its second character is not a digit, so it fails the cervical branch's
+# isdigit() guard) fall through unclassified and are omitted from the map —
+# intentionally unbounded. That isdigit() guard is the one subtle thing
+# keeping Cocc out of the cervical group; dropping it would silently
+# reclassify Cocc as cervical.
 _LEVEL_GROUP: Dict[str, str] = {}
 for _name in CANONICAL_ORDER:
     if _name.startswith("C") and len(_name) > 1 and _name[1].isdigit():
@@ -50,14 +56,15 @@ for _name in CANONICAL_ORDER:
         _LEVEL_GROUP[_name] = "thoracic"
     elif _name.startswith("L"):
         _LEVEL_GROUP[_name] = "lumbar"
-    # S, Cocygis → unbounded; omitted from the map
+    # S1-S6, Cocc → match no branch above (see comment) → unbounded; omitted
 
 
 def _level_group(level_name: str) -> Optional[str]:
     """Return the bounds group for *level_name*, or None for unbounded labels.
 
-    Returns ``None`` for ``S``, ``Cocygis``, ``unknown``, and any custom or
-    unrecognised level name — these are silently skipped by the rule (AC11).
+    Returns ``None`` for ``S1``-``S6``, ``Cocc``, ``unknown``, and any custom
+    or unrecognised level name — these are silently skipped by the rule
+    (AC11).
     """
     return _LEVEL_GROUP.get(level_name)
 
@@ -265,8 +272,8 @@ class BoundsRule(Rule):
     For each vertebra label present in the feature record the rule:
 
     1. Resolves the anatomical level group (cervical / thoracic / lumbar) from
-       ``level_name``; labels in unbounded groups (S, Cocygis, unknown, custom)
-       are silently skipped.
+       ``level_name`` by name prefix; labels that match no prefix (``S1``-``S6``,
+       ``Cocc``, ``unknown``, custom) are unbounded and silently skipped.
     2. Reads per-group bounds from config, falling back to DEFAULT_BOUNDS per
        key (partial config overrides are supported).
     3. Compares ``physical_volume_mm3`` and ``extent_{x,y,z}_mm`` against
@@ -348,7 +355,7 @@ class BoundsRule(Rule):
             level_name: str = entry.get("level_name", "unknown")
             group = _level_group(level_name)
             if group is None:
-                # Unbounded group (S, Cocygis, unknown, custom) — skip (AC11).
+                # Unbounded (S1-S6, Cocc, unknown, custom) — skip (AC11).
                 continue
 
             # Merge config group dict over defaults per key; config wins where

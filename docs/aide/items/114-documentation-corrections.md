@@ -135,5 +135,38 @@ item's comment edit would otherwise force a re-pin of.
   trips three `heuristics/**` package digests plus `_PRE_105_SRC_HASH`. That
   cost ratio — four re-pins for a comment — is one of the clearest arguments in
   item 107's case, and is recorded here as evidence.
-
-To be updated during implementation.
+- **Five comment sites, not three.** The Description names lines ~44, ~53,
+  ~59; the actual retired-label mentions are at lines 44, 53, 59, 268 and 351
+  (docstring step-list and the inline skip comment inside `evaluate`). All
+  five were rewritten; the Description undercounted them.
+- **AC2 wording chosen to make the fragile guard legible.** Rather than a
+  drive-by name swap, the `_LEVEL_GROUP` comment (lines 43-53) now spells out
+  the prefix-matching mechanism and calls out explicitly that `Cocc` starts
+  with `C` but is excluded only by the cervical branch's
+  `_name[1].isdigit()` guard — the one line a future "simplification" could
+  silently break. `_level_group`'s docstring, `BoundsRule`'s class docstring,
+  and the inline skip comment in `evaluate` were updated to name `S1`-`S6`
+  and `Cocc` instead of the retired `S`/`Cocygis`.
+- **Behaviour confirmed unchanged (AC3).** `_LEVEL_GROUP`'s construction and
+  `_level_group()` were not touched — only comments. Verified by running
+  `tests/test_027_level_aware_bounds.py` (83 tests, incl. `test_027`'s own
+  bounds-rule suite) and `tests/test_heuristics_bounds_source.py` together:
+  83 passed. The pre-existing AC3 behavioural-pin tests in
+  `test_114_documentation_corrections.py` (which assert `_level_group` on
+  every `CANONICAL_ORDER` name plus the `Cocc`/unknown/custom adversarial
+  cases) also pass unchanged.
+- **AC9 empirical answer: `aide check` does NOT mechanically pressure a ✅
+  stage into ticking every acceptance box.** Ran
+  `python .aide/scripts/aide.py check` both before (per the task's AC8
+  baseline) and after unticking Stage 17's fourth acceptance box while
+  leaving the Stage 17 section heading and stage-summary row at ✅. Both runs
+  produced the identical 9 warnings and `aide check: OK (9 warning(s))`:
+  - `progress.md:340`, `progress.md:459`, `progress.md:638` — status icon
+    outside a structural status position
+  - `queue/queue-002.md:80` — same
+  - `insights.md:51`, `insights.md:58`, `insights.md:60` — entry format
+  - `stale claim branch aide/queue-016`, `stale claim branch
+    aide/specs-queue-015` — local branch state, unrelated to this edit
+  No new warning appeared and no warning about an unticked box in a ✅ stage
+  was raised. Since the rollup applies no such pressure, there is no
+  framework defect to log to `insights.md` for this item.
