@@ -155,8 +155,11 @@ item's comment edit would otherwise force a re-pin of.
   `test_114_documentation_corrections.py` (which assert `_level_group` on
   every `CANONICAL_ORDER` name plus the `Cocc`/unknown/custom adversarial
   cases) also pass unchanged.
-- **AC9 empirical answer: `aide check` does NOT mechanically pressure a ✅
-  stage into ticking every acceptance box.** Ran
+- **AC9 empirical answer, corrected: the answer is YES — something does
+  mechanically pressure a ✅ stage into re-ticking every acceptance box, but
+  the pressure lives in `aide progress set`, not in `aide check`.**
+
+  The verb `aide check` is genuinely inert here. Ran
   `python .aide/scripts/aide.py check` both before (per the task's AC8
   baseline) and after unticking Stage 17's fourth acceptance box while
   leaving the Stage 17 section heading and stage-summary row at ✅. Both runs
@@ -167,6 +170,49 @@ item's comment edit would otherwise force a re-pin of.
   - `insights.md:51`, `insights.md:58`, `insights.md:60` — entry format
   - `stale claim branch aide/queue-016`, `stale claim branch
     aide/specs-queue-015` — local branch state, unrelated to this edit
-  No new warning appeared and no warning about an unticked box in a ✅ stage
-  was raised. Since the rollup applies no such pressure, there is no
-  framework defect to log to `insights.md` for this item.
+  No new warning appeared, and none of the 9 mentions an unticked box in a ✅
+  stage. That half of the original answer stands.
+
+  But `aide progress set` — a different verb, invoked routinely by this very
+  item's own workflow (`progress set 114 in-progress`) — silently re-ticked
+  line 744 back to `- [x]` mid-build, discovered only because the full test
+  module was re-run afterward and `test_ac4_fourth_acceptance_box_is_unticked`
+  failed. The item spec's Description frames AC9 verb-agnostically
+  ("checking whether anything mechanically pressures a ✅ stage into ticking
+  every box"), and this is exactly that pressure. Mechanism, confirmed by
+  reading `.aide/scripts/aide.py`: `set_item_status` (line 580) recomputes
+  the rollup for *every* stage in `progress.md` on *every* call, and at
+  lines 611-612 runs `if derived == "complete": _tick_acceptance(lines,
+  start, end)`; `_tick_acceptance` (line 502) unconditionally flips every
+  `- [ ]` inside a complete stage's line range to `- [x]`, with no exemption
+  mechanism. Stage 17 is ✅/complete, so this fires on *any* `progress set`
+  call, for *any* item, in *any* stage — not only calls that touch Stage 17
+  or item 114. A pure-function probe against the real `progress.md` (no
+  repo mutation) confirmed: with line 744 at `- [ ]`, simulating
+  `progress set 114 complete` re-ticked it; simulating `progress set 115
+  in-progress` re-ticked it too; simulating `progress set 042 complete` — an
+  unrelated item in a different stage entirely — also re-ticked it. A real
+  `progress set 114 done` call changed exactly 3 lines (line 744 plus the
+  two Stage-26 D6/D7 deliverable bullets it was meant to touch), confirming
+  the re-tick is a genuine side effect of this repo's own commit, not a
+  probe artifact.
+
+  Consequence for this item: because `.aide/**` is generated and must never
+  be hand-edited in a consumer repo (CLAUDE.md), item 114(b)'s untick of
+  line 744 **cannot be made durable from inside SegFACET**. It will hold
+  until the next `aide progress set` invocation by anyone, for any item, and
+  then silently revert. `tests/test_114_documentation_corrections.py::test_ac4_fourth_acceptance_box_is_unticked`
+  will fail the moment that happens — this is a deliberate tripwire that
+  makes the framework defect visible, not test flakiness. Whoever hits that
+  failure should re-untick `progress.md:744` and check whether the
+  `aide-loop` fix below has landed, rather than treating the test as broken.
+
+  Per AC9's own clause ("if it does, that pressure is itself a defect and is
+  logged to `insights.md` rather than worked around"), this is logged as a
+  `framework` entry in `docs/aide/insights.md` (dated 2026-08-15) describing
+  the mechanism, the three-call probe evidence, and that the fix belongs in
+  `aide-loop`: `_tick_acceptance` should not force-tick a box that was
+  deliberately left unticked, honoring the same precedent already
+  established for Stage 14 (closed ✅ with two `❌ Not met` Outcome targets)
+  — a stage may legitimately be ✅ with a recorded unmet criterion, and the
+  tooling should stop erasing that record.
