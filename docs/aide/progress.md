@@ -1058,14 +1058,35 @@ discovery.
 
 **Acceptance.**
 
-- [ ] Each defect has a regression test that fails before its fix (**G7**).
-- [ ] `border`/`fov` findings carry anatomically correct face names under RAS (**G2**).
-- [ ] Per-mode attribution distinguishes a large move from a small one on a fixture built
+- [x] Each defect has a regression test that fails before its fix (**G7**).
+  *(Item 115: the pinning test for each of items 107-114/116 is named in a
+  table in item 115's Decisions log; red-then-green was directly observed in
+  a scratch tree, then reverted, for items 108/109/111 — the three
+  cheapest-to-stage defects per the item's Assumptions — and items
+  107/110/112/113/114/116 were verified by inspection of their own committed
+  tests, per the same Assumptions' documented trade-off.)*
+- [x] `border`/`fov` findings carry anatomically correct face names under RAS (**G2**).
+  *(Item 115: a real `segfacet run` on `tests/corpus/fixtures/mode6_crop_at_border_seg.nii.gz`
+  emitted "Partial vertebra clipped by FOV: label 22 (L3) touches image
+  face(s): anterior", matching the perturbation's actual crop face.)*
+- [x] Per-mode attribution distinguishes a large move from a small one on a fixture built
   to have both.
-- [ ] `neighbourhood.py` is reachable from `extract_feature_record` and present in the
+  *(Item 115: a real `compare_runs()` call with mode 1 = 0.1 / mode 4 = 0.9
+  attributed mode 4; reversing to mode 1 = 0.9 / mode 4 = 0.1 attributed
+  mode 1 — attribution followed magnitude both ways, not mode number.)*
+- [x] `neighbourhood.py` is reachable from `extract_feature_record` and present in the
   regenerated catalogue, or removed with Stage 3's deliverable reworded.
+  *(Item 115: `extract_feature_record` populates `stage3.per_label_neighbourhood`
+  and `catalogue.build_catalogue()` lists those entries with `status: "unwired"`,
+  confirmed by `tests/test_115_stage26_validation.py`'s AC7 tests, 4/4 passing.)*
 - [ ] No `_PRE_NNN_*` byte-hash fence remains, and the diff-based scope check that replaces
   it flags a deliberately out-of-scope edit on a scratch branch (**G7**).
+  *(Unticked because one `_PRE_NNN_*`-named byte-hash fence still remains --
+  `tests/test_098_stray_components.py`'s `_PRE_098_REFERENCE_VERSE_V1_SHA256`,
+  outside this item's authorised paths to retire -- even though the diff-based
+  checker's out-of-scope-detection half is independently verified live on a
+  scratch branch (AC10). See item 115's Decisions log for the full AC8 audit
+  and why this box is left honestly unticked rather than ticked around.)*
 
 ---
 
