@@ -199,6 +199,12 @@ BLOCK_OWNERS: Tuple[Tuple[str, str, str, str], ...] = (
         "segfacet.features.consistency",
     ),
     (
+        "stage3.per_label_neighbourhood",
+        "Local Neighbourhood Comparison",
+        "Stage 3 · items 024, 110",
+        "segfacet.features.neighbourhood",
+    ),
+    (
         "image_features.per_label.{label}.first_order",
         "Intensity — First-Order",
         "Stage 8 · item 059",
@@ -277,6 +283,14 @@ GROUP_INTROS: Mapping[str, str] = MappingProxyType(
             "Inter-vertebra centroid spacing regularity and whether each "
             "vertebra's closest-spline-parameter u increases along the "
             "anatomical order, both derived from the same fitted spline."
+        ),
+        "Local Neighbourhood Comparison": (
+            "Sliding-window leave-one-out comparison of each vertebra against "
+            "its immediate neighbours in the anatomical order, for a "
+            "caller-named feature set (item 110 generalised item 024's "
+            "hardcoded three-feature mechanism); computed and serialised for "
+            "every case with >= 2 labels, but consumed by no rule yet -- "
+            "status unwired."
         ),
         "Intensity — First-Order": (
             "The first feature family to read scan intensities rather than "
@@ -1448,6 +1462,108 @@ FEATURE_DOCS: Mapping[str, FeatureDoc] = MappingProxyType(
             computation='The closest_u value computed for every vertebra in the ordered centroid sequence.',
             units='',
             scale_sensitivity='dimensionless',
+        ),
+        'stage3.per_label_neighbourhood[].deviation_score': FeatureDoc(
+            measures="How anomalous the focal vertebra's scored features are relative to its sliding-window neighbours.",
+            computation='max() of the leave-one-out z-scores (per scored feature) of the focal vertebra against the other window members.',
+            units='',
+            scale_sensitivity='dimensionless',
+        ),
+        'stage3.per_label_neighbourhood[].is_outlier': FeatureDoc(
+            measures='Whether the focal vertebra is flagged as a local neighbourhood outlier.',
+            computation='deviation_score >= the configured outlier_threshold (default 2.0).',
+            units='',
+            scale_sensitivity='boolean',
+        ),
+        'stage3.per_label_neighbourhood[].label': FeatureDoc(
+            measures='Integer label of the focal vertebra in this neighbourhood entry.',
+            computation='Copied verbatim from the focal centroid.',
+            units='',
+            scale_sensitivity='identifier',
+        ),
+        'stage3.per_label_neighbourhood[].level_name': FeatureDoc(
+            measures='Anatomical level name of the focal vertebra in this neighbourhood entry.',
+            computation='Copied verbatim from the focal centroid.',
+            units='',
+            scale_sensitivity='identifier',
+        ),
+        'stage3.per_label_neighbourhood[].stats.offset_mm.mean': FeatureDoc(
+            measures='Mean spline offset (mm) over the sliding window (including the focal vertebra).',
+            computation='Mean of per_label_offsets[].offset_mm over the window indices.',
+            units='mm',
+            scale_sensitivity='scales with spacing',
+        ),
+        'stage3.per_label_neighbourhood[].stats.offset_mm.median': FeatureDoc(
+            measures='Median spline offset (mm) over the sliding window (including the focal vertebra).',
+            computation='Median of per_label_offsets[].offset_mm over the window indices.',
+            units='mm',
+            scale_sensitivity='scales with spacing',
+        ),
+        'stage3.per_label_neighbourhood[].stats.offset_mm.std': FeatureDoc(
+            measures='Standard deviation of spline offset (mm) over the sliding window (including the focal vertebra).',
+            computation='Population std (ddof=0) of per_label_offsets[].offset_mm over the window indices.',
+            units='mm',
+            scale_sensitivity='scales with spacing',
+        ),
+        'stage3.per_label_neighbourhood[].stats.offset_mm.z_score': FeatureDoc(
+            measures="The focal vertebra's spline offset expressed as a leave-one-out z-score against its window neighbours.",
+            computation='abs(focal offset_mm - mean of neighbour offset_mm) / max(std of neighbour offset_mm, _MIN_STD).',
+            units='',
+            scale_sensitivity='dimensionless',
+        ),
+        'stage3.per_label_neighbourhood[].stats.spacing_mm.mean': FeatureDoc(
+            measures='Mean per-element inter-centroid spacing (mm) over the sliding window (including the focal vertebra).',
+            computation='Mean, over the window, of a caller-supplied per-element spacing value: the distance to the next vertebra in the ordered sequence (the last vertebra reuses the distance to its previous neighbour).',
+            units='mm',
+            scale_sensitivity='scales with spacing',
+        ),
+        'stage3.per_label_neighbourhood[].stats.spacing_mm.median': FeatureDoc(
+            measures='Median per-element inter-centroid spacing (mm) over the sliding window (including the focal vertebra).',
+            computation='Median, over the window, of the same per-element spacing value used for the mean.',
+            units='mm',
+            scale_sensitivity='scales with spacing',
+        ),
+        'stage3.per_label_neighbourhood[].stats.spacing_mm.std': FeatureDoc(
+            measures='Standard deviation of per-element inter-centroid spacing (mm) over the sliding window (including the focal vertebra).',
+            computation='Population std (ddof=0), over the window, of the same per-element spacing value used for the mean.',
+            units='mm',
+            scale_sensitivity='scales with spacing',
+        ),
+        'stage3.per_label_neighbourhood[].stats.spacing_mm.z_score': FeatureDoc(
+            measures="The focal vertebra's per-element spacing expressed as a leave-one-out z-score against its window neighbours. Reported but deliberately unscored by default -- see UNSCORED_RATIONALE in segfacet.features.neighbourhood.",
+            computation='abs(focal spacing_mm - mean of neighbour spacing_mm) / max(std of neighbour spacing_mm, _MIN_STD).',
+            units='',
+            scale_sensitivity='dimensionless',
+        ),
+        'stage3.per_label_neighbourhood[].stats.volume_mm3.mean': FeatureDoc(
+            measures='Mean per-label physical volume (mm3) over the sliding window (including the focal vertebra).',
+            computation='Mean of per_label.{label}.geometry.physical_volume_mm3 over the window indices.',
+            units='mm3',
+            scale_sensitivity='scales with spacing',
+        ),
+        'stage3.per_label_neighbourhood[].stats.volume_mm3.median': FeatureDoc(
+            measures='Median per-label physical volume (mm3) over the sliding window (including the focal vertebra).',
+            computation='Median of per_label.{label}.geometry.physical_volume_mm3 over the window indices.',
+            units='mm3',
+            scale_sensitivity='scales with spacing',
+        ),
+        'stage3.per_label_neighbourhood[].stats.volume_mm3.std': FeatureDoc(
+            measures='Standard deviation of per-label physical volume (mm3) over the sliding window (including the focal vertebra).',
+            computation='Population std (ddof=0) of per_label.{label}.geometry.physical_volume_mm3 over the window indices.',
+            units='mm3',
+            scale_sensitivity='scales with spacing',
+        ),
+        'stage3.per_label_neighbourhood[].stats.volume_mm3.z_score': FeatureDoc(
+            measures="The focal vertebra's physical volume expressed as a leave-one-out z-score against its window neighbours.",
+            computation='abs(focal volume_mm3 - mean of neighbour volume_mm3) / max(std of neighbour volume_mm3, _MIN_STD).',
+            units='',
+            scale_sensitivity='dimensionless',
+        ),
+        'stage3.per_label_neighbourhood[].window_labels[]': FeatureDoc(
+            measures='Integer labels of every vertebra in the focal vertebra\'s sliding window (including itself).',
+            computation='Labels of the elements at window indices max(0, i - window_n//2) .. min(n-1, i + window_n//2).',
+            units='',
+            scale_sensitivity='identifier',
         ),
         'stage3.per_label_offsets[].closest_u': FeatureDoc(
             measures="Spline parameter (0-1) of the point on the curve nearest this vertebra's centroid.",

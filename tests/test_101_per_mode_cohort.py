@@ -28,16 +28,31 @@ Covers Acceptance Criteria AC1-AC22, AC26-AC27 (AC23-AC25, the CLI, live in
 - AC10: ``compare_runs`` returns eight deltas in mode order with
         ``delta == value_b - value_a`` (``None`` when either side is
         ``None``).
-- AC11: ``scale``/``normalised_delta`` follow the stated formula, including
-        the ``scale == 0.0`` -> ``normalised_delta == 0.0`` branch.
+- AC11: ``scale``/``normalised_delta`` follow the stated formula. **Reconciled
+        for item 109** (2026-08-14): the formula item 101 shipped with --
+        ``scale = max(abs(value_a - baseline), abs(value_b - baseline))`` --
+        saturated ``normalised_delta`` to exactly +/-1.0 whenever either run
+        sat on baseline (seven of the eight metrics' documented clean-control
+        value). Item 109 replaces it with a per-metric-class rule: the three
+        bounded ``*_fraction`` metrics (modes 1/2/4) scale by their fixed,
+        derivable full swing (baseline to the far range bound); the five
+        unbounded ``*_count`` metrics (3/5/6/7/8) are raw by default
+        (``normalised_delta is None``, raw ``delta`` still available) unless
+        a reviewed ``reference_excursion`` is set (none are, in this item).
+        See ``tests/test_109_attribution_scale.py`` for the new rule's own
+        coverage; the tests below are updated only where item 101 pinned the
+        now-superseded formula's numeric output.
 - AC12: ``worsened`` is direction-aware; mode 2 is not reported backwards.
 - AC13: ``attributed_mode`` is the largest normalised move, ties to the
         lowest mode, ``None`` when every mode is ``None``/``0.0``.
 - AC14: comparing a run against itself is an all-zero report.
 - AC15: mismatched cohorts raise ``FacetInputError``; reordered-same-set
         cohorts compare successfully.
-- AC16: the demonstrator -- island stripping attributes to mode 3 while
-        aggregate Dice barely moves (Stage 18's thesis).
+- AC16: the demonstrator -- island stripping attributes to mode 2 (item 109
+        reconciliation: mode 3/rogue_island_count is raw by default under the
+        new rule and can no longer be the attributed mode itself, though its
+        raw delta stays visible and excluded_modes names it) while aggregate
+        Dice barely moves (Stage 18's thesis).
 - AC17: both records round-trip through JSON and back into dataclasses.
 - AC18: both ``to_dict()``s are plain JSON, no numpy leakage.
 - AC19: the evaluation report gains an optional additive ``per_mode_magnitude``
@@ -62,7 +77,6 @@ identical ``run_id``s on both sides (allowed).
 from __future__ import annotations
 
 import dataclasses
-import hashlib
 import json
 import math
 import time
@@ -781,22 +795,38 @@ def test_ac10_mode_absent_in_a_present_in_b_delta_none_not_zero():
 
 
 def test_ac11_scale_and_normalised_delta_general_case():
+    # Reconciled for item 109: mode 1 (unanchored_foreground_fraction) is a
+    # bounded [0, 1] fraction, so its scale is now the metric's fixed,
+    # declared full swing (1.0 -- the distance from baseline 0.0 to the far
+    # bound 1.0), not the old adaptive
+    # max(abs(value_a - baseline), abs(value_b - baseline)) (which gave 0.8
+    # here and saturated whenever either run touched baseline). delta is
+    # unchanged (0.6); normalised_delta is now delta/1.0 == 0.6, not 0.75.
     pmc = _pmc()
     a = _summary("a", ("c1",), {**_full(0.0), 1: 0.2})
     b = _summary("b", ("c1",), {**_full(0.0), 1: 0.8})
     cmp = pmc.compare_runs(a, b)
     d1 = cmp.by_mode(1)
-    assert d1.scale == pytest.approx(0.8)
-    assert d1.normalised_delta == pytest.approx(0.75)
+    assert d1.scale == pytest.approx(1.0)
+    assert d1.normalised_delta == pytest.approx(0.6)
 
 
 def test_ac11_scale_zero_yields_normalised_delta_exactly_zero_not_zerodivision():
+    # Reconciled for item 109: mode 1's scale is now the metric's fixed
+    # full swing (1.0), never literally 0.0 -- none of the eight shipped
+    # metrics can produce scale == 0.0 any more (bounded metrics always
+    # swing baseline<->far-bound == 1.0; unbounded metrics carry no scale at
+    # all, i.e. None, rather than a computed 0.0). The "no ZeroDivisionError"
+    # guarantee this test names is still real (ordinary division by a
+    # nonzero fixed scale), it just no longer needs a special zero-scale
+    # branch to prove it -- delta == 0.0 still yields normalised_delta ==
+    # 0.0 via plain division.
     pmc = _pmc()
     a = _summary("a", ("c1",), {**_full(0.0), 1: 0.0})
     b = _summary("b", ("c1",), {**_full(0.0), 1: 0.0})
     cmp = pmc.compare_runs(a, b)
     d1 = cmp.by_mode(1)
-    assert d1.scale == 0.0
+    assert d1.scale == pytest.approx(1.0)
     assert d1.normalised_delta == 0.0
 
 
@@ -866,26 +896,27 @@ def test_ac12_worsened_direction_matrix(mode, value_a, value_b, expected_worsene
 
 
 def test_ac13_attributed_mode_is_the_largest_normalised_move():
-    # Mode 1's value_a is deliberately offset *away* from its own baseline
-    # (0.0) rather than left exactly on it: `normalised_delta` saturates to
-    # +/-1.0 whenever either side of a delta sits exactly on the mode's
-    # baseline (scale == abs(the other side - baseline)), so leaving a
-    # non-target mode pinned on baseline risks an accidental tie with the
-    # target mode instead of unambiguously testing "largest". With mode 1
-    # offset to 0.1->0.5 (normalised_delta == 0.8) and mode 3 driven fully
-    # off its own baseline 0.0->0.9 (normalised_delta == 1.0), mode 3 is the
-    # strictly largest move with no tie-break involved.
+    # Reconciled for item 109: mode 3 (rogue_island_count) is an unbounded
+    # count metric and is now raw by default (normalised_delta is always
+    # None -- item 109 AC2), so it can no longer be the attributed mode; the
+    # differential-attribution fixture is rebuilt on mode 4
+    # (mislabelled_volume_fraction), a bounded [0, 1] fraction like mode 1.
+    # Both now scale by their fixed, declared full swing (1.0), not the old
+    # adaptive max(abs(value_a - baseline), abs(value_b - baseline)) that
+    # saturated to +/-1.0 whenever either side touched baseline -- so mode
+    # 1's normalised_delta is exactly its delta (0.4), and mode 4's is
+    # exactly its delta (0.9); 0.9 > 0.4 with no accidental tie.
     pmc = _pmc()
     a_values = {**_full(0.0), 1: 0.1}
-    b_values = {**_full(0.0), 3: 0.9, 1: 0.5}
+    b_values = {**_full(0.0), 4: 0.9, 1: 0.5}
     a = _summary("a", ("c1",), a_values)
     b = _summary("b", ("c1",), b_values)
     cmp = pmc.compare_runs(a, b)
-    assert abs(cmp.by_mode(1).normalised_delta) == pytest.approx(0.8)
-    assert abs(cmp.by_mode(3).normalised_delta) == pytest.approx(1.0)
-    assert cmp.attributed_mode == 3
-    assert cmp.attributed_mode_name == PER_MODE_METRIC_SPECS[3].failure_mode_name
-    assert cmp.attributed_metric_name == PER_MODE_METRIC_SPECS[3].metric_name
+    assert abs(cmp.by_mode(1).normalised_delta) == pytest.approx(0.4)
+    assert abs(cmp.by_mode(4).normalised_delta) == pytest.approx(0.9)
+    assert cmp.attributed_mode == 4
+    assert cmp.attributed_mode_name == PER_MODE_METRIC_SPECS[4].failure_mode_name
+    assert cmp.attributed_metric_name == PER_MODE_METRIC_SPECS[4].metric_name
 
 
 def test_ac13_exact_tie_breaks_to_lowest_mode():
@@ -925,12 +956,23 @@ def test_ac13_all_none_normalised_deltas_yield_no_attribution():
 
 
 def test_ac14_self_comparison_is_all_zero():
+    # Reconciled for item 109: delta and worsened are unaffected by the fix
+    # (both computed independently of scale) and stay 0.0/False for every
+    # mode. normalised_delta no longer does, though -- modes 3/5/6/7/8 are
+    # unbounded count metrics, raw by default (item 109 AC2), so a
+    # self-comparison's zero delta there now yields normalised_delta is
+    # None (no scale to divide by at all), not a computed 0.0. Only the
+    # three bounded fraction metrics (1/2/4) still report an honest
+    # normalised_delta of 0.0.
     pmc = _pmc()
     s = _summary("r", ("c1", "c2"), {1: 0.3, 2: 0.7, 3: 4.0, 4: 0.1, 5: 2.0, 6: 1.0, 7: 3.0, 8: 500.0}, mean_dice=0.9, volume_weighted_dice=0.85)
     cmp = pmc.compare_runs(s, s)
     for d in cmp.per_mode:
         assert d.delta == 0.0, d.failure_mode
-        assert d.normalised_delta == 0.0, d.failure_mode
+        if d.failure_mode in (1, 2, 4):
+            assert d.normalised_delta == 0.0, d.failure_mode
+        else:
+            assert d.normalised_delta is None, d.failure_mode
         assert d.worsened is False, d.failure_mode
     assert cmp.mean_dice_delta == 0.0
     assert cmp.volume_weighted_dice_delta == 0.0
@@ -1028,54 +1070,77 @@ def demonstrator_comparison():
     return pmc.compare_runs(summary_a, summary_b)
 
 
-def test_ac16_attributed_mode_is_three():
-    # Deliberately NOT built on the shared `demonstrator_comparison` fixture:
-    # driving the real `mode3_inject_islands` corpus case through
-    # `_strip_stray_islands` reconstructs the candidate to *exactly* GT, so
-    # modes 1 (unanchored_foreground_fraction), 2
-    # (min_dominant_component_fraction) and 3 (rogue_island_count) ALL
-    # independently land on their own baseline and all saturate
-    # `abs(normalised_delta)` to 1.0 -- a genuine three-way tie that AC13's
-    # documented tie-break ("ties to the lowest mode") then resolves to mode
-    # 1, not mode 3 (see docs/aide/insights.md, item 101). That collision is
-    # a property of this specific fixture, not of attribution itself, so
-    # this test instead hand-builds the two runs AC16 describes: a
-    # mode-3-specific change (rogue islands present, then removed) attributed
-    # to mode 3 while unrelated modes 1/2 move only slightly and never touch
-    # their own baseline, so there is no tie to break.
+def test_ac16_attributed_mode_is_two():
+    # Reconciled for item 109: mode 3 (rogue_island_count) is now raw by
+    # default (item 109 AC2/AC4 -- unbounded, no reference_excursion set),
+    # so it can never carry a normalised_delta and can never be
+    # `attributed_mode` any more, regardless of how large its raw movement
+    # is. That is a deliberate, documented trade-off of item 109 (Decisions
+    # log: "rogue_island_count's scale is a threshold, not a ratio ... TBC"),
+    # not a bug -- and it is exactly why the original (pre-109) version of
+    # this test could not safely rely on the shared `demonstrator_comparison`
+    # fixture either (see that fixture's real-data three-way saturation tie,
+    # itself a symptom of the very bug item 109 fixes).
+    #
+    # The demonstrator's *thesis* -- a mode-specific magnitude signal beats
+    # aggregate Dice when islands are injected/removed -- still holds: mode 2
+    # (min_dominant_component_fraction) is directly caused by the same
+    # stray-island fragmentation (a dominant component's fraction of its
+    # label's volume shrinks whenever a stray island exists), it is bounded,
+    # and it is not swamped by aggregate Dice. This rebuilds the two runs on
+    # mode 2 as the attributed metric, with mode 3 given a large raw
+    # movement of its own to prove it is visibly excluded (AC8) rather than
+    # silently dropped.
     pmc = _pmc()
-    a_values = {**_full(0.0), 1: 0.05, 2: 0.9, 3: 8.0}
-    b_values = {**_full(0.0), 1: 0.03, 2: 0.95, 3: 0.0}
+    a_values = {**_full(0.0), 1: 0.05, 2: 0.85, 3: 8.0}
+    b_values = {**_full(0.0), 1: 0.03, 2: 1.0, 3: 0.0}
     a = _summary("runA_islands_on", ("islands",), a_values)
     b = _summary("runB_islands_stripped", ("islands",), b_values)
     cmp = pmc.compare_runs(a, b)
     assert abs(cmp.by_mode(1).normalised_delta) < 1.0
-    assert abs(cmp.by_mode(2).normalised_delta) < 1.0
-    assert abs(cmp.by_mode(3).normalised_delta) == pytest.approx(1.0)
-    assert cmp.attributed_mode == 3
-    assert cmp.attributed_mode_name == PER_MODE_METRIC_SPECS[3].failure_mode_name
-    assert cmp.attributed_metric_name == PER_MODE_METRIC_SPECS[3].metric_name
+    assert cmp.by_mode(2).normalised_delta == pytest.approx(0.15)
+    assert cmp.by_mode(3).normalised_delta is None
+    assert cmp.by_mode(3).delta == pytest.approx(-8.0)
+    assert 3 in cmp.excluded_modes
+    assert cmp.attributed_mode == 2
+    assert cmp.attributed_mode_name == PER_MODE_METRIC_SPECS[2].failure_mode_name
+    assert cmp.attributed_metric_name == PER_MODE_METRIC_SPECS[2].metric_name
 
 
 def test_ac16_mode3_worsened_is_false_islands_removed_is_an_improvement(demonstrator_comparison):
+    # worsened is computed from delta's sign and the metric's declared
+    # direction, independently of scale/normalised_delta -- unaffected by
+    # item 109's fix.
     d3 = demonstrator_comparison.by_mode(3)
     assert d3.worsened is False
 
 
-def test_ac16_normalised_delta_exceeds_mean_dice_delta(demonstrator_comparison):
+def test_ac16_mode3_raw_delta_is_visible_though_unnormalisable(demonstrator_comparison):
+    # Reconciled for item 109, replacing the old
+    # "normalised_delta exceeds mean_dice_delta" / "is a large fraction of
+    # its excursion" assertions: on this real corpus fixture, mode 3's own
+    # bounded-metric neighbours (modes 1/2) move by single-voxel-scale
+    # amounts (see docs/aide/items/109-magnitude-sensitive-attribution.md's
+    # own analysis), so their genuine, un-saturated normalised_delta is not
+    # "large" either -- the old test's ">0.5"/">mean_dice_delta" claims for
+    # mode 3 specifically were an artefact of the saturation bug (modes 1/2/3
+    # all coincidentally landing exactly on their own baseline in run B),
+    # not a real signal. Item 109 correctly stops reporting a fabricated
+    # normalised_delta for mode 3 (an unbounded, raw-by-default metric) at
+    # all. What the fix preserves, and this test pins, is that mode 3's raw
+    # per-case signal remains visible and non-zero on the record (AC2) even
+    # though it is excluded from magnitude-ranked attribution (AC8).
     d3 = demonstrator_comparison.by_mode(3)
-    assert abs(d3.normalised_delta) > abs(demonstrator_comparison.mean_dice_delta)
+    assert d3.normalised_delta is None
+    assert d3.delta is not None
+    assert d3.delta != 0.0
+    assert 3 in demonstrator_comparison.excluded_modes
 
 
 def test_ac16_mean_dice_delta_is_small_in_absolute_terms(demonstrator_comparison):
     """The negative half: aggregate Dice genuinely fails to attribute what
     the per-mode delta attributes -- it barely moves."""
     assert abs(demonstrator_comparison.mean_dice_delta) < 0.05
-
-
-def test_ac16_mode3_normalised_delta_is_a_large_fraction_of_its_excursion(demonstrator_comparison):
-    d3 = demonstrator_comparison.by_mode(3)
-    assert abs(d3.normalised_delta) > 0.5
 
 
 # =========================================================================== #
@@ -1496,60 +1561,10 @@ def test_ac26_compare_runs_opens_no_file_and_reads_no_clock(monkeypatch):
 
 
 # =========================================================================== #
-# AC27: the scope fence holds
+# AC27: (byte-hash scope fences formerly here were removed by item 107; see
+# docs/aide/items/107-retire-byte-hash-scope-fences.md. Diff-time scope is
+# now checked by scripts/check_item_scope.py on the branch.)
 # =========================================================================== #
-
-_SEGFACET_SRC = Path(__import__("segfacet").__file__).resolve().parent
-_REPO_ROOT = _SEGFACET_SRC.parent.parent
-_CORPUS_DIR = _REPO_ROOT / "tests" / "corpus"
-
-_PRE_101_HASHES = {
-    "eval/per_mode.py": "5fd77f74b33dccbe32c3b899a9d2a4e1f051df03a5deb9a3a0cda7058ff0d9c6",
-    "eval/metrics.py": "15a21e7d9c8d738bfe5755637f736e60fd86d620c6117dd39a5d3b3bfa8bff8a",
-    "eval/overlap.py": "aafeee545c2a719ba7f25e6ef03abeb3c2b845105691ca9114d121479b39d5b5",
-    "eval/severity_ladder.py": "9921eede59824ca596452a9a7ea80d8995e591a168d775b195d10396a0916b08",
-    "eval/calibrate.py": "cc15c377ce6199c5ad88375f07ad206b9c4711560cc0397ff756c0767fc2c760",
-    "report_schema_v0.json": "8c7b48c1fcfc82edf49187c8aa912ac42470b20f53fd739c9b65f0bbf76f4a4b",
-}
-_PRE_101_HEURISTICS_HASH = "92cdc63e9a9bcef3c4ebd6c9b5567e80c30a3077bd3613d635c443bf055d19c4"
-_PRE_101_FEATURES_HASH = "92cc4fba7269f8c77c33441ea870b7eb6224d561a03c192028fa03560a6f60ce"
-_PRE_101_SYNTH_HASH = "8ed4d4d5d1d26c36077eef2a35569d8db6687d51d7551e94f38e76f8d7323205"
-_PRE_101_CORPUS_HASH = "aad04c1b0e42074a11342b24dc94c7f2ec896cda1664efeee7c5fc5b0ec4f547"
-
-
-def _combined_hash(files, base: Path) -> str:
-    h = hashlib.sha256()
-    for f in sorted(files):
-        h.update(f.relative_to(base).as_posix().encode())
-        h.update(f.read_bytes())
-    return h.hexdigest()
-
-
-@pytest.mark.parametrize("relpath", sorted(_PRE_101_HASHES))
-def test_ac27_named_untouched_file_byte_identical_to_pre_101_state(relpath):
-    path = _SEGFACET_SRC / relpath
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    assert digest == _PRE_101_HASHES[relpath], relpath
-
-
-def test_ac27_heuristics_package_byte_identical_to_pre_101_state():
-    files = sorted((_SEGFACET_SRC / "heuristics").rglob("*.py"))
-    assert _combined_hash(files, _SEGFACET_SRC) == _PRE_101_HEURISTICS_HASH
-
-
-def test_ac27_features_package_byte_identical_to_pre_101_state():
-    files = sorted((_SEGFACET_SRC / "features").rglob("*.py"))
-    assert _combined_hash(files, _SEGFACET_SRC) == _PRE_101_FEATURES_HASH
-
-
-def test_ac27_synth_package_byte_identical_to_pre_101_state():
-    files = sorted((_SEGFACET_SRC / "synth").rglob("*.py"))
-    assert _combined_hash(files, _SEGFACET_SRC) == _PRE_101_SYNTH_HASH
-
-
-def test_ac27_corpus_byte_identical_to_pre_101_state():
-    files = sorted(p for p in _CORPUS_DIR.rglob("*") if p.is_file())
-    assert _combined_hash(files, _CORPUS_DIR) == _PRE_101_CORPUS_HASH
 
 
 # =========================================================================== #

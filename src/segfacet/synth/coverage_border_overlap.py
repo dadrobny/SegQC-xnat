@@ -19,9 +19,10 @@ well-formed :class:`~segfacet.synth.perturbation.Expectation` naming the induced
   label-attributed ``"Partial vertebra clipped by FOV:"`` finding (§6 mode
   6).
 * :class:`ForceOverlapPerturbation` (``"force_overlap"``) -- shifts an
-  entire target body along the stacking axis (axis 0) toward an adjacent
-  neighbour, reassigning the contested overhang voxels from the neighbour to
-  the target. Because a single-integer label map cannot store a voxel
+  entire target body along the stacking (superior-inferior) axis -- resolved
+  from the target volume's own affine (item 116), not a hardcoded index --
+  toward an adjacent neighbour, reassigning the contested overhang voxels
+  from the neighbour to the target. Because a single-integer label map cannot store a voxel
   belonging to two labels, this overlap is **not** visible through the
   normal ``run_qc`` one-hot pipeline -- it is asserted via a reconstructed
   two-channel mask stack fed to :func:`segfacet.features.overlap.detect_overlaps`
@@ -46,6 +47,7 @@ import nibabel as nib
 
 from segfacet.io import FacetInputError
 from segfacet.labels import LabelConvention
+from segfacet.synth.axes import FACE_NAMES, resolve_face, si_axis
 from segfacet.synth.perturbation import (
     Expectation,
     FAILURE_MODE_NAMES,
@@ -119,38 +121,27 @@ def _level_name(label: int) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Face -> (axis, side) resolver
+# Face -> (axis, side) resolution -- delegated to segfacet.synth.axes
+# (item 116, AC5): the axis is resolved from each fixture's own affine via
+# nibabel.aff2axcodes, not a hardcoded index, so this operator behaves
+# identically regardless of a fixture's array-axis order.
 # --------------------------------------------------------------------------- #
-
-# axis 0 = superior-inferior (stacking), axis 1 = left-right,
-# axis 2 = anterior-posterior (matches segfacet.features.geometry / clean_gt).
-_FACE_AXIS_SIDE = {
-    "inferior": (0, "low"),
-    "superior": (0, "high"),
-    "left": (1, "low"),
-    "right": (1, "high"),
-    "anterior": (2, "low"),
-    "posterior": (2, "high"),
-}
 
 _IN_PLANE_FACES = frozenset({"left", "right", "anterior", "posterior"})
 
 
-def _resolve_face(face: str) -> Tuple[int, str]:
-    """Return ``(axis, side)`` for *face*.
+def _validate_face_name(face: str) -> None:
+    """Eagerly validate *face* is a known face name (no affine needed yet).
 
     Raises
     ------
     FacetInputError
         If *face* is not one of the six recognised geometry face names.
     """
-    resolved = _FACE_AXIS_SIDE.get(face)
-    if resolved is None:
+    if face not in FACE_NAMES:
         raise FacetInputError(
-            f"Unknown face {face!r}. Known faces: "
-            f"{sorted(_FACE_AXIS_SIDE.keys())!r}."
+            f"Unknown face {face!r}. Known faces: {sorted(FACE_NAMES)!r}."
         )
-    return resolved
 
 
 # --------------------------------------------------------------------------- #
@@ -235,9 +226,12 @@ class CropAtBorderPerturbation(Perturbation):
     clips the overhang outside ``[0, shape[axis))``, so the retained body
     touches the face (driving :class:`~segfacet.heuristics.border.BorderRule`,
     §6 mode 6) while its retained volume stays inside the level group's
-    ``bounds``. Defaults to an in-plane face (``"anterior"``) so the clip is
-    always classified unexpected regardless of the target's terminal
-    position. Rejects an unknown face string.
+    ``bounds``. The axis/side for the requested face is resolved from the
+    target volume's own affine at ``apply()`` time (item 116, AC5) via
+    :func:`segfacet.synth.axes.resolve_face` -- not a hardcoded index.
+    Defaults to an in-plane face (``"anterior"``) so the clip is always
+    classified unexpected regardless of the target's terminal position.
+    Rejects an unknown face string.
     """
 
     name = "crop_at_border"
@@ -249,9 +243,10 @@ class CropAtBorderPerturbation(Perturbation):
         face: str = "anterior",
         crop_depth: int = 5,
     ):
-        # Validate the face eagerly so a bad string raises at construction
-        # time as well as at apply() time (apply() re-resolves it below).
-        _resolve_face(face)
+        # Validate the face name eagerly (a bad string raises at
+        # construction time too); the axis it resolves to is not known until
+        # apply() has the target volume's affine.
+        _validate_face_name(face)
         if crop_depth < 1:
             raise FacetInputError(
                 f"CropAtBorderPerturbation requires crop_depth >= 1, got "
@@ -262,7 +257,7 @@ class CropAtBorderPerturbation(Perturbation):
         self._crop_depth = int(crop_depth)
 
     def apply(self, labelmap: nib.Nifti1Image, seed: int) -> PerturbationResult:
-        axis, side = _resolve_face(self._face)
+        axis, side = resolve_face(labelmap.affine, self._face)
 
         labels = _present_labels(labelmap)
         if not labels:
@@ -330,8 +325,11 @@ class ForceOverlapPerturbation(Perturbation):
     """Shift a target body toward an adjacent neighbour to force overlap.
 
     Registered under ``"force_overlap"``. Shifts the whole target body along
-    the stacking axis (axis 0) toward an adjacent neighbour by
-    ``gap + overlap_depth`` voxels; the contested overhang voxels are
+    the stacking (superior-inferior) axis -- resolved from the target
+    volume's own affine at ``apply()`` time (item 116) via
+    :func:`segfacet.synth.axes.si_axis`, not a hardcoded index -- toward an
+    adjacent neighbour by ``gap + overlap_depth`` voxels; the contested
+    overhang voxels are
     reassigned from the neighbour to the target in the single-integer output
     array (the target stays a single solid block of unchanged volume). This
     overlap is *not* visible through the normal ``run_qc`` one-hot pipeline
@@ -392,26 +390,27 @@ class ForceOverlapPerturbation(Perturbation):
 
         data = np.array(np.asanyarray(labelmap.dataobj), copy=True)
         shape = data.shape
+        axis = si_axis(labelmap.affine)
 
         t_mins, t_maxs = _label_bbox(data, target)
         n_mins, n_maxs = _label_bbox(data, neighbour)
 
-        # Direction along axis 0 (the stacking axis) from target toward
-        # neighbour, and the current inter-body gap along that axis.
-        if n_mins[0] > t_maxs[0]:
+        # Direction along the stacking axis from target toward neighbour,
+        # and the current inter-body gap along that axis.
+        if n_mins[axis] > t_maxs[axis]:
             direction = 1
-            gap = int(n_mins[0]) - int(t_maxs[0]) - 1
+            gap = int(n_mins[axis]) - int(t_maxs[axis]) - 1
         else:
             direction = -1
-            gap = int(t_mins[0]) - int(n_maxs[0]) - 1
+            gap = int(t_mins[axis]) - int(n_maxs[axis]) - 1
         gap = max(0, gap)
 
         shift = direction * (gap + self._overlap_depth)
 
         target_coords = np.argwhere(data == target)
         new_coords = target_coords.copy()
-        new_coords[:, 0] += shift
-        valid = (new_coords[:, 0] >= 0) & (new_coords[:, 0] < shape[0])
+        new_coords[:, axis] += shift
+        valid = (new_coords[:, axis] >= 0) & (new_coords[:, axis] < shape[axis])
         new_coords = new_coords[valid]
         if new_coords.shape[0] != target_coords.shape[0]:
             raise FacetInputError(
@@ -438,9 +437,9 @@ class ForceOverlapPerturbation(Perturbation):
             expected_verdict="flagged-for-review",
             detail=(
                 f"force_overlap: shifted label {target} by {shift} voxel(s) "
-                f"along axis 0 toward neighbour label {neighbour}, "
-                f"reassigning the contested overhang from {neighbour} to "
-                f"{target}."
+                f"along the stacking axis (array axis {axis}) toward "
+                f"neighbour label {neighbour}, reassigning the contested "
+                f"overhang from {neighbour} to {target}."
             ),
         )
         return PerturbationResult(labelmap=out_img, expectation=expectation)

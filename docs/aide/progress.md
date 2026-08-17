@@ -49,7 +49,7 @@
 | 23    | *(placeholder)* Multivariate Normative Model                          | G3              | 📋     |
 | 24    | *(placeholder)* Failure-Mode Discovery & Typed Reference Set          | G8              | 📋     |
 | 25    | *(placeholder)* Segmenter-Native Perturbations                        | G2              | 📋     |
-| 26    | Carried-Defect Remediation (pre-real-data)*(runs next)*               | G2, G7          | 📋     |
+| 26    | Carried-Defect Remediation (pre-real-data)*(runs next)*               | G2, G7          | ✅     |
 | 27    | Feature Schema Taxonomy & Coordinate System                             | G8              | 📋     |
 
 > **Supersession 2026-07-25.** Stages 0–14 are history and are not reopened. Stage 15 is
@@ -253,14 +253,14 @@ mislabelling heuristics.
 - ✅ Neighbour-consistency metrics (spacing regularity, monotonic progression). *(Item 020)*
 - ✅ Optional sagittal projection of centroids + spline for the human report. *(Item 021)*
 - ✅ Stage 3 feature serialisation & GT-vs-perturbed regression tests. *(Item 022)*
-- ✅ Local vertebra neighbourhood comparison (sliding window, n=3–5): per-vertebra deviation from neighbourhood mean/median of centroid spacing, spline offset, and volume; flags isolated anatomical outliers. *(Item 024)* ⚠️ **Correction, 2026-08-11:** the module (`features/neighbourhood.py`) is implemented in full but **wired into nothing** — absent from `pipeline.py`, `feature_report.py` and all 10 rules, which is why it never appeared in item 103's 111-entry catalogue. The "flags isolated anatomical outliers" half of this claim has never been true of any case's report or verdict. The ✅ is left in place deliberately (flipping item 024 would reopen queue-002 and change what `claim_scope = "live-queue"` resolves to — a maintainer's call); the work is carried as **Stage 26 D8**, wire it or retire it.
+- ✅ Local vertebra neighbourhood comparison (sliding window, n=3–5): per-vertebra deviation from neighbourhood mean/median of centroid spacing, spline offset, and volume, plus a deviation score and outlier flag. *(Item 024)* ⚠️ **Correction, 2026-08-11:** the module (`features/neighbourhood.py`) was implemented in full but **wired into nothing** — absent from `pipeline.py`, `feature_report.py` and all 10 rules, which is why it never appeared in item 103's 111-entry catalogue. ✅ **Wired, 2026-08-14 (Item 110):** the module was generalised to an arbitrary named-feature API and wired into `extract_feature_record`/`feature_report.py` as `stage3.per_label_neighbourhood[]` (computed and serialised for every case with ≥ 2 labels). It is **consumed by no rule** — `status == "unwired"` in the regenerated feature catalogue, confirmed by Item 110's AC11 (every corpus case's verdict and findings are unchanged by the wiring). No outlier this module computes is ever flagged to a verdict; that remains Stage 20's call, same as any other unwired feature.
 
 **Acceptance.**
 
 - [X] Spline fits cleanly on GT fixtures; offsets near-zero for GT, large for displaced/mislabelled.
 - [X] Robust to a deliberately missing level (no crash, sensible fit).
 - [X] Orientation / curvature features in JSON; tests pass. *(Item 019)*
-- [X] Neighbour-consistency features in JSON. *(Item 020)* *(Item 024: neighbourhood-comparison module implemented but not wired into pipeline — absent from JSON output; see Stage 26 D8.)*
+- [X] Neighbour-consistency features in JSON. *(Item 020)* *(Item 024: neighbourhood-comparison module generalised and wired into pipeline as of Item 110 — `stage3.per_label_neighbourhood[]` is computed and serialised for every ≥2-label case, but consumed by no rule; status "unwired" in the feature catalogue.)*
 - [X] Regression tests over GT + perturbed cases pass. *(Item 022)*
 
 ---
@@ -741,12 +741,12 @@ numbers, wrong. Must land before any real-segmenter number is computed.
   including this item's changes; not independently re-observed by a live CI
   run from this execution environment — no `gh` CLI / CI access available
   here. See item 097's Decisions log.)*
-- [x] A real segmenter output round-trips with correct level names. *(Not
-  ticked: no real SPINEPS output is available in this execution environment
+- [ ] A real segmenter output round-trips with correct level names. *(Unticked
+  because no real SPINEPS output is available in this execution environment
   — `SEGFACET_SPINEPS_FIXTURE` is unset. The round-trip **mechanics** are
   unconditionally verified via a committed synthetic TPTBox-labeled fixture
   (item 097 AC4); the real-SPINEPS check is a genuine, cleanly-skipping
-  `skipif` (item 097 AC5) that has not yet run for real. See the new "Real
+  `skipif` (item 097 AC5) that has not yet run for real. See the "Real
   SPINEPS-output label-convention round-trip" row in [Environment-Gated
   Capability Verification](#environment-gated-capability-verification).)*
 
@@ -1012,7 +1012,7 @@ failures.*
 
 ---
 
-## Stage 26 — Carried-Defect Remediation (pre-real-data) (G2, G7) — 📋
+## Stage 26 — Carried-Defect Remediation (pre-real-data) (G2, G7) — ✅
 
 **Goal.** Clear the defects Stages 17–19 recorded but were (correctly) forbidden from
 fixing in scope, **before** Stage 20 audits those surfaces and before Stage 21 produces
@@ -1021,33 +1021,72 @@ discovery.
 
 **Deliverables.**
 
-- 📋 **D1** `normalised_delta` saturates to ±1.0 whenever one run sits on baseline (7 of 8
+- ✅ **D1** `normalised_delta` saturates to ±1.0 whenever one run sits on baseline (7 of 8
   metric baselines are `0.0`), so Stage 18's run-vs-run attribution is decided by the
-  lowest-mode tie-break rather than by magnitude. `eval/per_mode_cohort.py`.
-- 📋 **D2** `touches_*` face mapping is anatomically wrong under RAS since item 094
+  lowest-mode tie-break rather than by magnitude. `eval/per_mode_cohort.py`. *(Item 109)*
+- ✅ **D2** `touches_*` face mapping is anatomically wrong under RAS since item 094
   (`x == 0 → touches_inferior` names the left-right axis) — every `border`/`fov` finding on
-  data read through `segfacet.io` is mislabelled. Must land before real data.
-- 📋 **D3** Golden-fixture test hygiene: `tests/golden/*.json` unpinned in `.gitattributes`
+  data read through `segfacet.io` is mislabelled. Must land before real data. *(Item 108)*
+- ✅ **D3** Golden-fixture test hygiene: `tests/golden/*.json` unpinned in `.gitattributes`
   (latent Windows-CI break); `test_022_stage3_serialisation.py::test_ac8_golden_snapshot`
   writes its own golden and skips when missing, so deleting the file makes it pass.
-- 📋 **D4** `compute_per_mode_metrics` gains an optional `overlap_result=` (halves the
-  overlap work of a cohort-scale per-mode run).
-- 📋 **D5** `test-numpy-majors` scoped off the Docker/PyRadiomics-gated modules.
-- 📋 **D6** `heuristics/bounds.py` comments still name the retired `S` / `Cocygis` labels.
-- 📋 **D7** Stage 17's acceptance box contradicts its own annotation — maintainer's call
-  between untick / reword / third state.
-- 📋 **D8** `features/neighbourhood.py` is dead wiring: implemented in full, referenced by
+  *(Item 111)*
+- ✅ **D4** `compute_per_mode_metrics` gains an optional `overlap_result=` (halves the
+  overlap work of a cohort-scale per-mode run). *(Item 112)*
+- ✅ **D5** `test-numpy-majors` scoped off the Docker/PyRadiomics-gated modules. *(Item 113)*
+- ✅ **D6** `heuristics/bounds.py` comments still name the retired `S` / `Cocygis` labels.
+  *(Item 114)*
+- ✅ **D7** Stage 17's acceptance box contradicts its own annotation — maintainer's call
+  between untick / reword / third state. *(Item 114)*
+- ✅ **D8** `features/neighbourhood.py` is dead wiring: implemented in full, referenced by
   nothing, yet Stage 3 claims it "flags isolated anatomical outliers" ✅. Wire it or retire
-  it and correct the claim.
+  it and correct the claim. Generalised to a named-feature API and wired into
+  `extract_feature_record`/`feature_report.py` as `stage3.per_label_neighbourhood[]`
+  (status "unwired" — computed and serialised, consumed by no rule); the Stage 3 claim is
+  corrected above. *(Item 110)*
+- ✅ **D9** The `_PRE_NNN_*` byte-hash scope fences (items 099/100/101/103/105, plus item
+  106's `progress.md` row digests) encode a diff-time property as a permanent runtime
+  invariant: six documented failures, no recorded true positive, and a re-pin toll on every
+  later item that edits source. Retire them and land the deterministic diff-based scope
+  check they were reaching for. *(Item 107)*
+- ✅ **D10** `synth/` implements a documented array-axis convention (axis 0 = superior-
+  inferior) that D2's affine-derived mapping replaces; migrate the synthetic corpus
+  RAS-native (bodies along axis 2, truthful affine, load as array-identity) and
+  regenerate fixtures, manifest and goldens. *(Item 116)*
+- ✅ Stage 26 end-to-end validation: per-defect red-then-green replay, fresh-clone suite
+  run, fence-retirement audit, and verification-row closure. *(Item 115)*
 
 **Acceptance.**
 
-- [ ] Each defect has a regression test that fails before its fix (**G7**).
-- [ ] `border`/`fov` findings carry anatomically correct face names under RAS (**G2**).
-- [ ] Per-mode attribution distinguishes a large move from a small one on a fixture built
+- [x] Each defect has a regression test that fails before its fix (**G7**).
+  *(Item 115: the pinning test for each of items 107-114/116 is named in a
+  table in item 115's Decisions log; red-then-green was directly observed in
+  a scratch tree, then reverted, for items 108/109/111 — the three
+  cheapest-to-stage defects per the item's Assumptions — and items
+  107/110/112/113/114/116 were verified by inspection of their own committed
+  tests, per the same Assumptions' documented trade-off.)*
+- [x] `border`/`fov` findings carry anatomically correct face names under RAS (**G2**).
+  *(Item 115: a real `segfacet run` on `tests/corpus/fixtures/mode6_crop_at_border_seg.nii.gz`
+  emitted "Partial vertebra clipped by FOV: label 22 (L3) touches image
+  face(s): anterior", matching the perturbation's actual crop face.)*
+- [x] Per-mode attribution distinguishes a large move from a small one on a fixture built
   to have both.
-- [ ] `neighbourhood.py` is reachable from `extract_feature_record` and present in the
+  *(Item 115: a real `compare_runs()` call with mode 1 = 0.1 / mode 4 = 0.9
+  attributed mode 4; reversing to mode 1 = 0.9 / mode 4 = 0.1 attributed
+  mode 1 — attribution followed magnitude both ways, not mode number.)*
+- [x] `neighbourhood.py` is reachable from `extract_feature_record` and present in the
   regenerated catalogue, or removed with Stage 3's deliverable reworded.
+  *(Item 115: `extract_feature_record` populates `stage3.per_label_neighbourhood`
+  and `catalogue.build_catalogue()` lists those entries with `status: "unwired"`,
+  confirmed by `tests/test_115_stage26_validation.py`'s AC7 tests, 4/4 passing.)*
+- [ ] No `_PRE_NNN_*` byte-hash fence remains, and the diff-based scope check that replaces
+  it flags a deliberately out-of-scope edit on a scratch branch (**G7**).
+  *(Unticked because one `_PRE_NNN_*`-named byte-hash fence still remains --
+  `tests/test_098_stray_components.py`'s `_PRE_098_REFERENCE_VERSE_V1_SHA256`,
+  outside this item's authorised paths to retire -- even though the diff-based
+  checker's out-of-scope-detection half is independently verified live on a
+  scratch branch (AC10). See item 115's Decisions log for the full AC8 audit
+  and why this box is left honestly unticked rather than ticked around.)*
 
 ---
 

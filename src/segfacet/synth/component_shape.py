@@ -9,7 +9,8 @@ well-formed :class:`~segfacet.synth.perturbation.Expectation` naming the induced
 
 * :class:`FragmentPerturbation` (``"fragment"``) -- splits one label's body
   into >= 2 comparable disconnected pieces via a thin interior slab cut
-  perpendicular to the stacking axis (axis 0), preserving the label's
+  perpendicular to the stacking axis -- resolved from the target volume's own
+  affine (item 116), not a hardcoded index -- preserving the label's
   bounding box. Drives the fragmentation-kind ``"fragmentation"`` finding.
 * :class:`FusePerturbation` (``"fuse"``) -- merges an adjacent label pair:
   the neighbour's voxels are re-labelled onto the target, leaving the target
@@ -38,6 +39,7 @@ import numpy as np
 import nibabel as nib
 
 from segfacet.io import FacetInputError
+from segfacet.synth.axes import si_axis
 from segfacet.synth.perturbation import (
     Expectation,
     FAILURE_MODE_NAMES,
@@ -118,7 +120,9 @@ class FragmentPerturbation(Perturbation):
 
     Registered under ``"fragment"``. Carves ``n_pieces - 1`` thin (1-voxel)
     interior slabs through the target label, perpendicular to the stacking
-    axis (image axis 0), so the label becomes ``n_pieces`` disconnected
+    axis -- resolved from the target volume's own affine at ``apply()`` time
+    (item 116, via :func:`segfacet.synth.axes.si_axis`) rather than a
+    hardcoded index -- so the label becomes ``n_pieces`` disconnected
     components while its bounding box (and therefore ``bounds`` findings)
     stays unchanged (§6 mode 2).
     """
@@ -149,30 +153,34 @@ class FragmentPerturbation(Perturbation):
 
         data = np.array(np.asanyarray(labelmap.dataobj), copy=True)
         mask = data == target
+        axis = si_axis(labelmap.affine)
         mins, maxs = _label_bbox(data, target)
-        x_min, x_max = int(mins[0]), int(maxs[0])
-        span = x_max - x_min
+        axis_min, axis_max = int(mins[axis]), int(maxs[axis])
+        span = axis_max - axis_min
 
         if span < self._n_pieces:
             raise FacetInputError(
                 f"FragmentPerturbation: target label {target!r} spans only "
-                f"{span + 1} voxels along axis 0, too thin to carve "
-                f"{self._n_pieces} disconnected pieces."
+                f"{span + 1} voxels along the stacking axis (array axis "
+                f"{axis}), too thin to carve {self._n_pieces} disconnected "
+                "pieces."
             )
 
-        # Evenly spaced interior split planes (strictly between x_min/x_max
-        # so the union bounding box -- and thus extent_x/y/z_mm -- is
-        # preserved, keeping the "bounds" rule silent).
+        # Evenly spaced interior split planes (strictly between
+        # axis_min/axis_max so the union bounding box -- and thus
+        # extent_x/y/z_mm -- is preserved, keeping the "bounds" rule silent).
         splits = sorted(
             {
-                x_min + max(1, min(span - 1, round(i * span / self._n_pieces)))
+                axis_min + max(1, min(span - 1, round(i * span / self._n_pieces)))
                 for i in range(1, self._n_pieces)
             }
         )
 
-        for split_x in splits:
-            slab = mask[split_x]
-            data[split_x][slab] = 0
+        for split_idx in splits:
+            idx = tuple(split_idx if a == axis else slice(None) for a in range(3))
+            slab = mask[idx]
+            view = data[idx]
+            view[slab] = 0
 
         out_img = _new_image(data, labelmap)
 
@@ -184,7 +192,8 @@ class FragmentPerturbation(Perturbation):
             expected_verdict="flagged-for-review",
             detail=(
                 f"fragment: split label {target} into {self._n_pieces} pieces "
-                f"via interior slab cut(s) at axis-0 index(es) {splits}."
+                f"via interior slab cut(s) at stacking-axis (array axis "
+                f"{axis}) index(es) {splits}."
             ),
         )
         return PerturbationResult(labelmap=out_img, expectation=expectation)
@@ -275,9 +284,14 @@ class InjectIslandsPerturbation(Perturbation):
     Registered under ``"inject_islands"``. Each island is a small solid
     block (a cube when ``island_voxels`` is a perfect cube, else a 1-voxel-
     wide line of ``island_voxels`` length) placed in confirmed-empty voxels
-    adjacent to the target body along image axis 1 (the clean GT's generous
-    inter-body/margin space): >= 1 empty voxel from the body (disconnected
-    under 6-connectivity) and >= 1 voxel from every FOV face (§6 mode 3).
+    adjacent to the target body along array axis 1 (the clean GT's margin
+    space on that axis): >= 1 empty voxel from the body (disconnected under
+    6-connectivity) and >= 1 voxel from every FOV face (§6 mode 3). This
+    placement is purely geometric (internal margin space, not a named
+    anatomical face), so it is unaffected by which array axis carries which
+    anatomical direction -- see the module/item-116 note on ``fragment``
+    for the one operator in this file that does resolve an axis from the
+    affine.
     """
 
     name = "inject_islands"

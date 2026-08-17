@@ -905,27 +905,48 @@ _PRE_098_GOLDEN_VERDICT_AND_FINDINGS = {
 }
 
 
+#: Case whose finding ``reason`` text names an anatomical face
+#: (``crop_at_border``'s ``border`` finding). Item 116 makes both
+#: ``compute_label_geometry`` and the synth face resolver derive that name
+#: from the volume's affine rather than a hardcoded axis index, so the exact
+#: face word is a property of the (unchanged) affine-derived contract, not of
+#: this frozen pre-098 snapshot -- compare structure (rule_id/severity/
+#: labels) for it and leave free-text reason pinning to the face-aware
+#: assertions in tests/test_108_affine_faces.py and
+#: tests/test_116_ras_native_corpus.py. Every other case's reason text is
+#: unaffected by the item 116 migration and stays pinned exactly.
+_FACE_NAME_SENSITIVE_CASES = frozenset({"mode6_crop_at_border"})
+
+
+def _finding_summary(f, *, include_reason: bool) -> dict:
+    summary = {
+        "rule_id": f["rule_id"],
+        "severity": f["severity"],
+        "labels": sorted(f["labels"]),
+    }
+    if include_reason:
+        summary["reason"] = f["reason"]
+    return summary
+
+
 @pytest.mark.parametrize(
     "case_id", sorted(_PRE_098_GOLDEN_VERDICT_AND_FINDINGS.keys())
 )
 def test_ac15_golden_verdict_and_findings_unchanged(case_id):
     """AC15: the regenerated golden's top-level verdict and findings array
-    (length, order, rule_id/severity/reason/labels) are identical to the
+    (length, order, rule_id/severity/labels, and -- except for the one
+    face-name-sensitive case, item 116 -- reason) are identical to the
     pre-098 committed golden's -- only the features block grew."""
     golden = load_golden(case_id)
     expected = _PRE_098_GOLDEN_VERDICT_AND_FINDINGS[case_id]
     assert golden["verdict"] == expected["verdict"]
 
-    got_findings = [
-        {
-            "rule_id": f["rule_id"],
-            "severity": f["severity"],
-            "labels": sorted(f["labels"]),
-            "reason": f["reason"],
-        }
-        for f in golden["findings"]
+    include_reason = case_id not in _FACE_NAME_SENSITIVE_CASES
+    got_findings = [_finding_summary(f, include_reason=include_reason) for f in golden["findings"]]
+    expected_findings = [
+        _finding_summary(f, include_reason=include_reason) for f in expected["findings"]
     ]
-    assert got_findings == expected["findings"]
+    assert got_findings == expected_findings
 
 
 # =========================================================================== #

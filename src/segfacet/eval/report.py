@@ -616,13 +616,27 @@ def render_run_comparison(comparison: "RunComparison") -> str:
     lines.append("")
 
     if comparison.attributed_mode is None:
-        # Degenerate (all-zero/None) comparison: say so explicitly rather
-        # than printing a per-mode table that would name every mode without
-        # any of them actually being implicated (AC22).
-        lines.append(
-            "Attribution: no single mode dominates this comparison "
-            "(every mode's normalised delta is zero or unavailable)."
-        )
+        # Degenerate comparison: say so explicitly rather than printing a
+        # per-mode table that would name every mode without any of them
+        # actually being implicated (AC22). Item 109 (AC12): distinguish "no
+        # metric here is normalisable" from "every normalisable metric
+        # normalised to 0.0" -- these are different findings and the old
+        # single message conflated them.
+        normalisable = [
+            entry for entry in comparison.per_mode if entry.normalised_delta is not None
+        ]
+        if not normalisable:
+            excluded = ", ".join(str(m) for m in comparison.excluded_modes)
+            lines.append(
+                "Attribution: not normalisable -- no mode in this comparison "
+                "carries a normalised delta"
+                + (f" (excluded: {excluded})." if excluded else ".")
+            )
+        else:
+            lines.append(
+                "Attribution: no single mode dominates this comparison "
+                "(every normalisable mode's delta normalised to 0.0)."
+            )
         lines.append("")
         return "\n".join(lines)
 
@@ -650,6 +664,19 @@ def render_run_comparison(comparison: "RunComparison") -> str:
         f"accounts for the largest normalised move "
         f"(normalised_delta={_fmt_metric(top.normalised_delta)})."
     )
+
+    if comparison.excluded_modes:
+        # Item 109 (AC8b): even when attribution succeeds, name any mode
+        # that carried real data but no normalised_delta -- the per-mode
+        # table above already shows "n/a" for each such entry, which by
+        # itself does not tell a reader whether "n/a" means "excluded from
+        # ranking because unbounded/no reviewed scale" or "missing data".
+        excluded = ", ".join(str(m) for m in comparison.excluded_modes)
+        lines.append(
+            f"Excluded from attribution ranking (not normalisable, raw "
+            f"delta only): mode(s) {excluded}."
+        )
+
     lines.append("")
 
     return "\n".join(lines)

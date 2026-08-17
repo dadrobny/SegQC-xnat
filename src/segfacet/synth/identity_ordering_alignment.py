@@ -9,8 +9,10 @@ each returning a well-formed :class:`~segfacet.synth.perturbation.Expectation`
 naming the induced §6 failure mode and the offending label(s):
 
 * :class:`DisplacePerturbation` (``"displace"``) -- translates a target
-  vertebra's whole mask off the fitted spinal curve while keeping its label.
-  Targets the misalignment detector of
+  vertebra's whole mask off the fitted spinal curve (along the two array axes
+  that are NOT the stacking axis, resolved from the target volume's own
+  affine -- item 116) while keeping its label. Targets the misalignment
+  detector of
   :class:`~segfacet.heuristics.mislabel.MislabelRule` (item 033, Detector A,
   §6 mode 1). Because the real pipeline refits an *interpolating* spline
   through **all** present centroids in ascending-label order every time
@@ -55,6 +57,7 @@ import numpy as np
 import nibabel as nib
 
 from segfacet.io import FacetInputError
+from segfacet.synth.axes import non_stacking_axes
 from segfacet.synth.perturbation import (
     Expectation,
     FAILURE_MODE_NAMES,
@@ -143,11 +146,14 @@ class DisplacePerturbation(Perturbation):
     """Translate a target vertebra's whole mask off the fitted spinal curve.
 
     Registered under ``"displace"``. Translates the target body diagonally
-    toward the higher-index axis-1 (left-right) and axis-2
-    (anterior-posterior) faces by ``displacement_mm`` (split evenly across
-    the two axes, spacing-aware), keeping the body >= 1 voxel inset from
-    every face so it stays a single solid block with no bounds /
-    fragmentation / border side-effect (§6 mode 1). Because the real
+    toward the higher-index end of the two array axes that are NOT the
+    stacking (superior-inferior) axis -- resolved from the target volume's
+    own affine at ``apply()`` time (item 116, via
+    :func:`segfacet.synth.axes.non_stacking_axes`), not a hardcoded index --
+    by ``displacement_mm`` (split evenly across the two axes, spacing-aware),
+    keeping the body >= 1 voxel inset from every face so it stays a single
+    solid block with no bounds / fragmentation / border side-effect (§6 mode
+    1). Because the real
     pipeline's interpolating spline refit absorbs the displaced centroid
     (see the module docstring), the misalignment finding is asserted via a
     reconstructed leave-one-out ``per_label_offsets`` record fed to
@@ -188,20 +194,23 @@ class DisplacePerturbation(Perturbation):
 
         data = np.array(np.asanyarray(labelmap.dataobj), copy=True)
         shape = data.shape
-        _sx, sy, sz = (float(z) for z in labelmap.header.get_zooms()[:3])
+        zooms = labelmap.header.get_zooms()[:3]
+        axis_a, axis_b = non_stacking_axes(labelmap.affine)
+        spacing_a = float(zooms[axis_a])
+        spacing_b = float(zooms[axis_b])
 
         mask = data == target
         _mins, maxs = _label_bbox(data, target)
 
         per_axis_mm = self._displacement_mm / math.sqrt(2.0)
-        dx1_vox = max(1, int(round(per_axis_mm / sy))) if sy > 0 else 1
-        dx2_vox = max(1, int(round(per_axis_mm / sz))) if sz > 0 else 1
+        da_vox = max(1, int(round(per_axis_mm / spacing_a))) if spacing_a > 0 else 1
+        db_vox = max(1, int(round(per_axis_mm / spacing_b))) if spacing_b > 0 else 1
 
-        # Keep >= 1 voxel inset from the higher-index axis-1/axis-2 faces
-        # after the shift.
-        new_end1 = int(maxs[1]) + dx1_vox
-        new_end2 = int(maxs[2]) + dx2_vox
-        if new_end1 > shape[1] - 2 or new_end2 > shape[2] - 2:
+        # Keep >= 1 voxel inset from the higher-index faces of the two
+        # non-stacking axes after the shift.
+        new_end_a = int(maxs[axis_a]) + da_vox
+        new_end_b = int(maxs[axis_b]) + db_vox
+        if new_end_a > shape[axis_a] - 2 or new_end_b > shape[axis_b] - 2:
             raise FacetInputError(
                 f"DisplacePerturbation: displacement_mm="
                 f"{self._displacement_mm!r} is too large for target label "
@@ -211,8 +220,8 @@ class DisplacePerturbation(Perturbation):
 
         coords = np.argwhere(mask)
         new_coords = coords.copy()
-        new_coords[:, 1] += dx1_vox
-        new_coords[:, 2] += dx2_vox
+        new_coords[:, axis_a] += da_vox
+        new_coords[:, axis_b] += db_vox
 
         data[mask] = 0
         data[new_coords[:, 0], new_coords[:, 1], new_coords[:, 2]] = target
@@ -225,8 +234,9 @@ class DisplacePerturbation(Perturbation):
             expected_labels=frozenset({target}),
             expected_verdict="flagged-for-review",
             detail=(
-                f"displace: translated label {target} by ({dx1_vox}, "
-                f"{dx2_vox}) voxels along (axis-1, axis-2), off the spinal "
+                f"displace: translated label {target} by ({da_vox}, "
+                f"{db_vox}) voxels along (array axis {axis_a}, array axis "
+                f"{axis_b}) -- the two non-stacking axes -- off the spinal "
                 "curve defined by the remaining vertebrae. Not surfaced by "
                 "plain run_qc (the interpolating spline refit absorbs the "
                 "displaced centroid) -- asserted via a reconstructed "

@@ -784,15 +784,12 @@ def test_ac8_golden_snapshot():
         _empty_verdict(), "golden-case-022", _config(), features=block
     )
 
-    if not GOLDEN_PATH.exists():
-        GOLDEN_PATH.parent.mkdir(parents=True, exist_ok=True)
-        GOLDEN_PATH.write_text(produced, encoding="utf-8")
-        pytest.skip(f"Golden snapshot written to {GOLDEN_PATH.name}; re-run to verify.")
-
     golden = GOLDEN_PATH.read_text(encoding="utf-8")
     assert produced == golden, (
         "Golden snapshot drift detected. If this change is intentional, "
-        f"delete {GOLDEN_PATH.name} and re-run to regenerate it."
+        f"regenerate {GOLDEN_PATH.name} by writing `produced` to "
+        f"{GOLDEN_PATH} and committing the result -- this test no longer "
+        "does that for you."
     )
 
 

@@ -105,6 +105,7 @@ import numpy as np
 
 from segfacet.eval.overlap import OverlapResult, compute_overlap
 from segfacet.heuristics.fov import derive_fov_coverage
+from segfacet.io import FacetInputError
 from segfacet.labels import LabelConvention
 from segfacet.synth.perturbation import FAILURE_MODE_NAMES
 
@@ -538,6 +539,60 @@ def _mode8_overlapping_voxel_count(record: Any) -> Tuple[Optional[float], Option
     return float(total), None
 
 
+
+def _validate_overlap_result(
+    overlap_result: OverlapResult, cand_arr: np.ndarray, gt_arr: np.ndarray
+) -> None:
+    """Cheaply verify a caller-supplied overlap_result plausibly
+    corresponds to cand_arr/gt_arr (item 112).
+
+    Checks exactly two invariants, both O(voxels) -- comparable in cost to a
+    single np.unique/bincount pass, far cheaper than a full
+    compute_overlap call (which additionally computes per-label
+    intersections and Dice/Jaccard):
+
+    - label set: the set of label values overlap_result.per_label covers
+      must equal set(cand_arr) | set(gt_arr) (background excluded).
+    - shape: each entry's candidate_voxels/gt_voxels must equal the actual
+      per-label voxel count in cand_arr/gt_arr -- the cheap proxy for "was
+      this computed from arrays of this shape/content" without touching
+      OverlapResult (which stores no shape field of its own).
+
+    Raises
+    ------
+    segfacet.io.FacetInputError
+        If either invariant disagrees. The message names overlap_result.
+
+    Deliberately NOT checked (trust boundary): dice/jaccard/intersection
+    values are never recomputed to verify -- a caller-supplied result that
+    passes both checks above is trusted verbatim beyond them, including
+    when it was computed with different spacing (OverlapResult carries no
+    spacing field, so spacing agreement is not a checkable invariant).
+    """
+    actual_labels = (
+        {int(v) for v in np.unique(cand_arr)} | {int(v) for v in np.unique(gt_arr)}
+    ) - {0}
+    result_labels = {entry.value for entry in overlap_result.per_label}
+    if result_labels != actual_labels:
+        raise FacetInputError(
+            "compute_per_mode_metrics: overlap_result's label set "
+            f"{sorted(result_labels)!r} does not match the given "
+            f"candidate/gt label set {sorted(actual_labels)!r}."
+        )
+    for entry in overlap_result.per_label:
+        expected_cand = int(np.count_nonzero(cand_arr == entry.value))
+        expected_gt = int(np.count_nonzero(gt_arr == entry.value))
+        if entry.candidate_voxels != expected_cand or entry.gt_voxels != expected_gt:
+            raise FacetInputError(
+                "compute_per_mode_metrics: overlap_result's per-label voxel "
+                f"counts for label {entry.value} disagree with the shape of "
+                f"the given candidate/gt. Expected candidate_voxels="
+                f"{expected_cand}, gt_voxels={expected_gt}, got "
+                f"candidate_voxels={entry.candidate_voxels}, "
+                f"gt_voxels={entry.gt_voxels}."
+            )
+
+
 # --------------------------------------------------------------------------- #
 # compute_per_mode_metrics -- the single public entry point
 # --------------------------------------------------------------------------- #
@@ -551,6 +606,7 @@ def compute_per_mode_metrics(
     spacing: Tuple[float, float, float] = (1.0, 1.0, 1.0),
     island_size_ratio: float = 0.10,
     convention: Optional[LabelConvention] = None,
+    overlap_result: Optional[OverlapResult] = None,
 ) -> PerModeMetrics:
     """Compute all eight per-mode magnitude metrics for one case.
 
@@ -575,6 +631,27 @@ def compute_per_mode_metrics(
     convention:
         Passed through to :func:`~segfacet.eval.overlap.compute_overlap`
         (label naming/ordering only; never affects value-based matching).
+        Ignored when overlap_result is supplied (the internal call is
+        skipped entirely, so convention has nothing left to reach).
+    overlap_result:
+        Keyword-only. Optional precomputed
+        :class:`~segfacet.eval.overlap.OverlapResult` for this exact
+        candidate/gt pair. When supplied, the internal
+        :func:`~segfacet.eval.overlap.compute_overlap` call is skipped
+        entirely and the caller's result is used verbatim (never mutated).
+        Before use it is validated cheaply -- not exhaustively: only the
+        supplied result's label set and per-label voxel-count shape are
+        checked against candidate/gt (see _validate_overlap_result). A
+        mismatch raises FacetInputError naming overlap_result. Beyond those
+        two checks the value is trusted -- dice/jaccard/intersection fields
+        are never recomputed to verify them, and a same-shape,
+        same-label-set but otherwise-wrong result would silently
+        propagate. Voxel spacing is not one of the checked invariants
+        (OverlapResult stores no spacing field), so a result computed with
+        different spacing than the spacing argument is accepted, not
+        rejected. Ignored (no effect) when candidate or gt is None.
+        Defaults to None, in which case the default path is exactly as if
+        this parameter did not exist.
 
     Returns
     -------
@@ -587,18 +664,32 @@ def compute_per_mode_metrics(
     segfacet.io.FacetInputError
         If both ``candidate`` and ``gt`` are supplied and their shapes
         differ (propagated from the one shared ``compute_overlap`` call --
-        a caller error, not a degradation).
+        a caller error, not a degradation). Also raised, naming
+        ``overlap_result`` in the message, when a caller-supplied
+        ``overlap_result``'s label set or per-label voxel-count shape
+        disagrees with the given ``candidate``/``gt`` -- see the
+        ``overlap_result`` parameter above for exactly what is checked and
+        what is trusted beyond that.
     """
-    overlap_result: Optional[OverlapResult] = None
     cand_arr: Optional[np.ndarray] = None
     gt_arr: Optional[np.ndarray] = None
 
     if candidate is not None and gt is not None:
         cand_arr = np.asarray(candidate)
         gt_arr = np.asarray(gt)
-        # Raises FacetInputError on shape mismatch -- lets it propagate
-        # immediately, before any per-mode entry is built (AC24).
-        overlap_result = compute_overlap(cand_arr, gt_arr, spacing, convention=convention)
+        if overlap_result is not None:
+            # Cheap invariant check only (label set, per-label voxel-count
+            # shape) -- never recomputes dice/jaccard/intersections, which
+            # would defeat the point of the short-circuit (item 112).
+            _validate_overlap_result(overlap_result, cand_arr, gt_arr)
+        else:
+            # Raises FacetInputError on shape mismatch -- lets it propagate
+            # immediately, before any per-mode entry is built (AC24).
+            overlap_result = compute_overlap(
+                cand_arr, gt_arr, spacing, convention=convention
+            )
+    else:
+        overlap_result = None
 
     entries: List[PerModeMetric] = []
     for mode in range(1, 9):

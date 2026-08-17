@@ -80,7 +80,6 @@ from __future__ import annotations
 import ast
 import copy
 import dataclasses
-import hashlib
 import importlib.util
 import json
 import re
@@ -127,8 +126,6 @@ def _feature_docs():
 # =========================================================================== #
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_SEGFACET_SRC = _REPO_ROOT / "src" / "segfacet"
-_CORPUS_DIR = Path(__file__).resolve().parent / "corpus"
 
 _MANIFEST = load_manifest()
 _CASES = {c["case_id"]: c for c in _MANIFEST["cases"]}
@@ -341,7 +338,7 @@ def test_ac4_clean_control_leaf_paths(catalogue_module):
         for segment in re.split(r"[.\[\]]+", path):
             assert not re.fullmatch(r"\d+", segment), path
 
-    assert len(paths) == 67
+    assert len(paths) == 84
 
 
 def test_ac4_empty_list_yields_container_bracket_path(catalogue_module):
@@ -942,66 +939,10 @@ def test_ac24_markdown_rows_are_in_catalogue_order(catalogue_module, full_catalo
 
 
 # =========================================================================== #
-# AC25: the scope fence holds
+# AC25: (byte-hash scope fences formerly here were removed by item 107; see
+# docs/aide/items/107-retire-byte-hash-scope-fences.md. Diff-time scope is
+# now checked by scripts/check_item_scope.py on the branch.)
 # =========================================================================== #
-
-_PRE_103_HASHES = {
-    "pipeline.py": "dc51ed5e5d462628697bf0aacf59a795e8e075f5f823d49c9dd9f61d0e5c8bf1",
-    "feature_report.py": "2756ff57b3535c69bde19d2b49e973c26545b5a6ed36f88d099f0f0f3e03826f",
-    "cli.py": "0284d05b819c384ebb3fead90d256d46466a390812e73b379b1880ad12f28b32",
-    "report_schema_v0.json": "8c7b48c1fcfc82edf49187c8aa912ac42470b20f53fd739c9b65f0bbf76f4a4b",
-}
-_PRE_103_FEATURES_HASH = "92cc4fba7269f8c77c33441ea870b7eb6224d561a03c192028fa03560a6f60ce"
-_PRE_103_HEURISTICS_HASH = "92cdc63e9a9bcef3c4ebd6c9b5567e80c30a3077bd3613d635c443bf055d19c4"
-_PRE_103_EVAL_HASH = "e7b53cd4c2331173b72141fd92addd25adced32cc997081ab8ddd0b525cc0316"
-_PRE_103_SYNTH_HASH = "8ed4d4d5d1d26c36077eef2a35569d8db6687d51d7551e94f38e76f8d7323205"
-_PRE_103_REFERENCE_HASH = "cd70a0be647eeebb2b216fe856c3aab3efecc684e7431c8e21639e0d2c03b4bc"
-_PRE_103_CORPUS_HASH = "aad04c1b0e42074a11342b24dc94c7f2ec896cda1664efeee7c5fc5b0ec4f547"
-
-
-def _combined_hash(files, base: Path) -> str:
-    h = hashlib.sha256()
-    for f in sorted(files):
-        h.update(f.relative_to(base).as_posix().encode())
-        h.update(f.read_bytes())
-    return h.hexdigest()
-
-
-@pytest.mark.parametrize("relpath", sorted(_PRE_103_HASHES))
-def test_ac25_named_file_byte_identical_to_pre_103_state(relpath):
-    path = _SEGFACET_SRC / relpath
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    assert digest == _PRE_103_HASHES[relpath], relpath
-
-
-def test_ac25_features_package_byte_identical_to_pre_103_state():
-    files = sorted((_SEGFACET_SRC / "features").rglob("*.py"))
-    assert _combined_hash(files, _SEGFACET_SRC) == _PRE_103_FEATURES_HASH
-
-
-def test_ac25_heuristics_package_byte_identical_to_pre_103_state():
-    files = sorted((_SEGFACET_SRC / "heuristics").rglob("*.py"))
-    assert _combined_hash(files, _SEGFACET_SRC) == _PRE_103_HEURISTICS_HASH
-
-
-def test_ac25_eval_package_byte_identical_to_pre_103_state():
-    files = sorted((_SEGFACET_SRC / "eval").rglob("*.py"))
-    assert _combined_hash(files, _SEGFACET_SRC) == _PRE_103_EVAL_HASH
-
-
-def test_ac25_synth_package_byte_identical_to_pre_103_state():
-    files = sorted((_SEGFACET_SRC / "synth").rglob("*.py"))
-    assert _combined_hash(files, _SEGFACET_SRC) == _PRE_103_SYNTH_HASH
-
-
-def test_ac25_reference_package_byte_identical_to_pre_103_state():
-    files = sorted((_SEGFACET_SRC / "reference").rglob("*.py"))
-    assert _combined_hash(files, _SEGFACET_SRC) == _PRE_103_REFERENCE_HASH
-
-
-def test_ac25_corpus_byte_identical_to_pre_103_state():
-    files = sorted(p for p in _CORPUS_DIR.rglob("*") if p.is_file())
-    assert _combined_hash(files, _CORPUS_DIR) == _PRE_103_CORPUS_HASH
 
 
 # =========================================================================== #

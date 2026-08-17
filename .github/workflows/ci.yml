@@ -6,6 +6,62 @@ on:
   pull_request:
 
 jobs:
+  # Item 107: diff-based scope check, replacing the byte-hash "scope fence"
+  # pytests it retired. Pure git -- no venv, no Docker, no network beyond the
+  # checkout -- so it stays fast and dependency-free. Resolves the item spec
+  # for the PR branch from its own filename convention
+  # (docs/aide/items/NNN-*.md) using the PR title/branch name's leading
+  # item number, and runs scripts/check_item_scope.py against the PR's base
+  # ref (github.base_ref) so a changed file outside that item's declared
+  # `## Authorised paths` fails the build.
+  scope-check:
+    name: item scope check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve item spec for this branch
+        id: spec
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -e
+          # Item branches are named aide/NNN-... (see .aide/conventions.md's
+          # claim protocol); pull the leading item number out of the branch
+          # name and match it to its docs/aide/items/NNN-*.md spec.
+          #
+          # Anchor on that exact shape rather than grepping for any 3-digit
+          # run anywhere in the name. A queue branch is `aide/queue-NNN`,
+          # where NNN is a *queue* number sharing a namespace with item
+          # numbers: an unanchored match read `aide/queue-016` as item 016
+          # and resolved the unrelated docs/aide/items/016-*.md, a
+          # queue-002-era spec that predates the `## Authorised paths`
+          # convention -- so the checker hard-errored on a missing section
+          # for an item the branch had nothing to do with. A queue or specs
+          # branch has no single owning item and correctly resolves to
+          # nothing here; per-item scope is already enforced on each item
+          # branch as it merges into the queue branch.
+          item_number=$(echo "$HEAD_REF" | sed -n 's|^aide/\([0-9]\{3\}\)-.*|\1|p')
+          if [ -z "$item_number" ]; then
+            echo "could not extract a 3-digit item number from branch '$HEAD_REF'; skipping scope check"
+            echo "spec=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          spec=$(ls docs/aide/items/${item_number}-*.md 2>/dev/null | head -n1 || true)
+          if [ -z "$spec" ]; then
+            echo "no docs/aide/items/${item_number}-*.md spec found; skipping scope check"
+            echo "spec=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "spec=$spec" >> "$GITHUB_OUTPUT"
+      - name: Run scope check
+        if: steps.spec.outputs.spec != ''
+        run: |
+          python scripts/check_item_scope.py "${{ steps.spec.outputs.spec }}" --base "origin/${{ github.base_ref }}"
+
   test:
     name: test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -61,6 +117,18 @@ jobs:
   # above -- see CLAUDE.md's note that the golden-file/reference comparisons
   # are numeric-tolerance (`reports_close`), not byte-identical against a
   # pinned numpy, which is what makes running across numpy majors safe here.
+  #
+  # Item 113: this job's Test step deliberately excludes the Docker- and
+  # PyRadiomics-gated tests. The job proves numpy-major agnosticism only --
+  # the environment-gated paths (Docker, PyRadiomics) are owned by
+  # verify-environment-gated below, which already installs and verifies both
+  # for real. Running them here instead buys zero additional numpy
+  # verification (none of the excluded coverage exercises numpy at all) while
+  # adding pure incidental risk: GitHub's ubuntu-latest runners have a real
+  # Docker daemon, so the Docker-gated tests attempt a real `docker build`
+  # against Docker Hub and have failed here on anonymous-pull rate-limiting /
+  # `dial tcp ... i/o timeout` network flakiness, unrelated to numpy -- and
+  # the two-numpy-leg matrix doubles that exposure on every push.
   test-numpy-majors:
     name: test (numpy ${{ matrix.numpy-version }})
     runs-on: ubuntu-latest
@@ -78,7 +146,18 @@ jobs:
       - name: Pin numpy leg
         run: pip install numpy==${{ matrix.numpy-version }}
       - name: Test
-        run: python -m pytest
+        # Item 113: --ignore the Docker-gated modules wholesale (none of
+        # them exercise numpy; verify-environment-gated owns real Docker
+        # verification) and --deselect only the PyRadiomics-present-path
+        # class inside test_features_radiomics.py, since the rest of that
+        # module is numpy-sensitive builtin-backend coverage that must stay
+        # collected.
+        run: |
+          python -m pytest \
+            --ignore=tests/test_066_dockerfile.py \
+            --ignore=tests/test_069_container_smoke.py \
+            --ignore=tests/test_070_acceptance_stage9.py \
+            --deselect tests/test_features_radiomics.py::TestPresentPath
 
   # This project has two optional capabilities -- pyradiomics (Stage 8) and
   # the Docker container path (Stage 9) -- whose tests skip cleanly when the

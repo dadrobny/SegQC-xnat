@@ -66,6 +66,7 @@ if TYPE_CHECKING:
     from segfacet.features.consistency import MonotonicConsistency, SpacingConsistency
     from segfacet.features.geometry import BBox, LabelGeometry
     from segfacet.features.intensity import LabelIntensity
+    from segfacet.features.neighbourhood import VertebralNeighbourhood
     from segfacet.features.orientation import SpineCurvature, VertebralOrientation
     from segfacet.features.overlap import OverlapPair
     from segfacet.features.relationships import SpineRelationships
@@ -82,6 +83,7 @@ __all__ = [
     "curvature_to_dict",
     "spacing_consistency_to_dict",
     "monotonic_consistency_to_dict",
+    "neighbourhood_to_dict",
     "build_features_block",
     "FEATURES_VERSION",
     "FEATURES_VERSION_STAGE3",
@@ -296,6 +298,33 @@ def monotonic_consistency_to_dict(m: "MonotonicConsistency") -> dict:
     }
 
 
+def neighbourhood_to_dict(nb: "VertebralNeighbourhood") -> dict:
+    """Convert a :class:`~segfacet.features.neighbourhood.VertebralNeighbourhood`
+    to a dict (item 110).
+
+    ``window_labels`` becomes a list; ``stats`` (a mapping of feature name to
+    ``FeatureWindowStats``) becomes a nested ``{name: {mean, median, std,
+    z_score}}`` dict, one entry per feature the caller passed to
+    ``compute_neighbourhood_features``.
+    """
+    return {
+        "label": nb.label,
+        "level_name": nb.level_name,
+        "window_labels": list(nb.window_labels),
+        "stats": {
+            name: {
+                "mean": stat.mean,
+                "median": stat.median,
+                "std": stat.std,
+                "z_score": stat.z_score,
+            }
+            for name, stat in nb.stats.items()
+        },
+        "deviation_score": nb.deviation_score,
+        "is_outlier": bool(nb.is_outlier),
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Assembler
 # --------------------------------------------------------------------------- #
@@ -314,6 +343,7 @@ def build_features_block(
     curvature: "Optional[SpineCurvature]" = None,
     spacing_consistency: "Optional[SpacingConsistency]" = None,
     monotonic_consistency: "Optional[MonotonicConsistency]" = None,
+    neighbourhood: "Optional[Sequence[VertebralNeighbourhood]]" = None,
     features_version: str = FEATURES_VERSION,
 ) -> dict:
     """Assemble the ``features`` block from pre-computed Stage 2 (and optional
@@ -361,6 +391,12 @@ def build_features_block(
         Optional :class:`~segfacet.features.consistency.MonotonicConsistency`
         (item 020). When non-``None``, serialised as
         ``stage3.monotonic_consistency``.
+    neighbourhood:
+        Optional sequence of
+        :class:`~segfacet.features.neighbourhood.VertebralNeighbourhood`
+        (item 110). When non-``None``, serialised as
+        ``stage3.per_label_neighbourhood`` sorted by label. Unwired: no rule
+        consumes this block yet.
     features_version:
         Version discriminator embedded in the block; defaults to
         :data:`FEATURES_VERSION`. Overridden to :data:`FEATURES_VERSION_STAGE3`
@@ -402,7 +438,7 @@ def build_features_block(
     has_stage3 = any(
         arg is not None
         for arg in (spline_offsets, orientations, curvature,
-                    spacing_consistency, monotonic_consistency)
+                    spacing_consistency, monotonic_consistency, neighbourhood)
     )
 
     # Promote features_version to "0.2" when Stage 3 data is present, unless
@@ -445,6 +481,12 @@ def build_features_block(
             stage3["monotonic_consistency"] = monotonic_consistency_to_dict(
                 monotonic_consistency
             )
+
+        if neighbourhood is not None:
+            stage3["per_label_neighbourhood"] = [
+                neighbourhood_to_dict(nb)
+                for nb in sorted(neighbourhood, key=lambda nb: nb.label)
+            ]
 
         block["stage3"] = stage3
 

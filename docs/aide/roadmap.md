@@ -988,6 +988,25 @@ a named location — this stage does no discovery.
   and no verdict has ever been influenced by it. Wire it (deciding whether it needs a
   consuming rule, and reconciling its mean/std deviation score with the percentile-based
   `robust_z` machinery), or retire it and correct the Stage 3 claim.
+- **D9 — the byte-hash scope fences are the wrong instrument, and are now a tax on every
+  item in this stage.** Five items (099, 100, 101, 103, 105) pin SHA-256 digests of
+  committed source as "untouched" fences, and item 106 extends the pattern to individual
+  `progress.md` rows. A fence encodes a **diff-time** property (*"item N did not modify file
+  X"*) as a **permanent runtime invariant** (*"X equals these bytes forever"*) — a different
+  and false claim as soon as a later item is legitimately authorised to edit X, which is the
+  normal case. Record to date: **six documented failures** — three Windows-CI-only and
+  invisible to every local gate, one where the pinned digest was never reproducible even on
+  an unchanged tree (`rglob("*")` swept `__pycache__`), two collisions with a later item's
+  authorised edit — and **no recorded true positive**. Item 104's Decisions log already
+  reached this verdict and made its equivalents "git-diff obligations on the validator, not
+  pytests"; 104 and 106 use that pattern, the rest are legacy. Retire the fences and land
+  the deterministic check they were reaching for: a spec-declared authorised-path list
+  diffed against `git diff --name-only $(git merge-base main HEAD)`. **The check belongs to
+  the branch, never to pytest** — a diff-scope assertion has nothing to assert once merged,
+  and forgetting that is what produced the fences. Preserve what is *not* a fence: intra-run
+  determinism assertions, item 104's drift test, item 098's expected-value baselines. The
+  durable home for the check is the framework (`aide-loop`); this stage prototypes it here
+  so the upstream change is a port of something proven rather than a design sketch.
 
 **Dependencies.** None. **Runs next, ahead of Stage 20** — D1/D2/D8 change surfaces Stage
 20 audits, so auditing first records findings that are about to move. D2 is additionally a
@@ -997,7 +1016,9 @@ prerequisite for any real-data claim (Stages 16/21).
 (**G7**); `border`/`fov` findings carry anatomically correct face names under RAS (**G2**);
 per-mode attribution distinguishes a large move from a small one on a fixture built to have
 both; `neighbourhood.py` is either reachable from `extract_feature_record` and present in
-the regenerated catalogue, or removed with the Stage 3 deliverable reworded.
+the regenerated catalogue, or removed with the Stage 3 deliverable reworded; no
+`_PRE_NNN_*` byte-hash fence remains, and the diff-based scope check that replaces it flags
+a deliberately out-of-scope edit on a scratch branch (**G7**).
 
 ---
 
@@ -1079,3 +1100,32 @@ changes on the corpus except where a retune is explicitly authorised.
 - **Multichannel / probabilistic segmentation input.** Not planned. Recorded because it is
   the precondition that would make §6 mode 8 (overlap) observable on real data at all — see
   Stage 20's evidence rungs.
+- **Feature and metric normalisation policy** *(2026-08-12)*. Two rules govern every scaling
+  decision, and they are project-wide rather than specific to any one metric:
+  1. **A normalisation factor must never introduce a supervision dependency.** Anything
+     derived from ground truth — "the levels this scan *should* have", a GT label count, a
+     reference annotation — is supervision, not a feature. Scaling by it produces a number
+     that cannot be computed on real segmenter output, which is the setting FACET exists to
+     analyse, and quietly mixes supervision into the feature space. This holds even for
+     metrics that are themselves defined as a candidate-vs-GT comparison: that a metric
+     *needs* GT does not license its **scale** to import further GT-derived quantities.
+  2. **Normalisation is human-reviewed, or it does not happen.** The exception is a scaling
+     that is intrinsic by construction — a metric already dimensionless, or bounded 0..1 with
+     a derivable full swing, where the denominator comes from the metric's own definition and
+     no judgement is exercised. Everything else needs an explicitly reviewed and recorded
+     constant or threshold, in the manner of item 106's steering review. **The default, absent
+     review, is no normalisation**: report the raw value.
+
+  Applied to the per-mode metrics: the fraction-valued ones scale intrinsically;
+  `rogue_island_count` (a *maximum over per-label entries*, so a scan-level denominator would
+  change the quantity anyway) and `missing_level_count` (whose only natural denominator is
+  GT-derived, barred by rule 1) both stay **raw** until a reviewed threshold exists. For rogue
+  islands the clean expectation is *none*, so a small declared threshold is the plausible
+  candidate — value **TBC**, and item 109 ships the mechanism without setting it.
+
+  Where no reviewable global constant is defensible at all, the fallback is
+  **neighbourhood-relative** comparison — a vertebra measured against its own neighbours
+  rather than against anything global or supervised. Item 110's generalised neighbourhood API
+  (arbitrary named features, selectable scored subset) is the mechanism; coupling `eval/` to a
+  `features/` refactor was deliberately kept out of Stage 26. A natural fit for **Stage 27**,
+  which is already generalising `reference_delta` off its single hardcoded tracked feature.

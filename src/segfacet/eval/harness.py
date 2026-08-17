@@ -163,25 +163,44 @@ def _resolve_seg(source: SegSource, spacing: Optional[Tuple[float, float, float]
 
     if isinstance(source, np.ndarray):
         sx, sy, sz = (float(s) for s in (spacing or _DEFAULT_SPACING))
-        affine = np.diag([sx, sy, sz, 1.0]).astype(np.float64)
+
+        # AC9 guard (item 116): a zero (or otherwise degenerate) spacing
+        # component makes the diagonal affine singular. Item 108 made
+        # segfacet.features.geometry derive the touches_* face mapping from
+        # the affine via nib.aff2axcodes, which raises ValueError when it
+        # cannot resolve a distinct anatomical direction for every axis --
+        # correct for real acquisition data, but this harness's bare-ndarray
+        # path is also used to probe deliberately-degenerate spacing values
+        # that were never meant to carry real orientation information.
+        # Substitute a unit placeholder for any degenerate affine-diagonal
+        # component (orientation resolution only -- forces the default
+        # identity/RAS axcodes so run_qc's affine-derived features resolve
+        # without raising) while recording the *true* requested spacing
+        # (zero included) on the header, so every physical-volume/extent
+        # computation -- which reads header.get_zooms(), never the affine
+        # magnitude -- still sees the exact requested spacing and correctly
+        # zeroes out (rather than silently fabricating a non-zero volume).
+        affine_sx = sx if sx != 0.0 else 1.0
+        affine_sy = sy if sy != 0.0 else 1.0
+        affine_sz = sz if sz != 0.0 else 1.0
+        affine = np.diag([affine_sx, affine_sy, affine_sz, 1.0]).astype(np.float64)
         data = np.asanyarray(source)
         try:
-            return nib.Nifti1Image(data, affine, dtype=source.dtype)
+            img = nib.Nifti1Image(data, affine, dtype=source.dtype)
         except nib.spatialimages.HeaderDataError:
-            # A degenerate affine (e.g. a zero spacing component) is
-            # singular and cannot be decomposed into a qform rotation --
-            # nibabel raises trying to derive one during construction.
-            # ``spacing`` carries no documented non-zero restriction, so
-            # degrade gracefully instead: build the image without an
-            # implicit qform, set the affine directly via sform, and record
-            # the exact requested spacing on the header so downstream
-            # ``header.get_zooms()`` reads (e.g. for physical-volume
-            # calculations) still see the degenerate component.
+            # The placeholder affine is still singular for some other
+            # reason (e.g. a negative spacing component) -- nibabel raises
+            # trying to derive a qform rotation during construction. Degrade
+            # gracefully: build the image without an implicit qform, set the
+            # affine directly via sform, and record the true spacing.
             img = nib.Nifti1Image(data, None, dtype=source.dtype)
             img.set_sform(affine, code=1)
             img.set_qform(None, code=0)
+            img.header.set_zooms((affine_sx, affine_sy, affine_sz))
+
+        if (affine_sx, affine_sy, affine_sz) != (sx, sy, sz):
             img.header.set_zooms((sx, sy, sz))
-            return img
+        return img
 
     # Path-like: load a single seg NIfTI, integer labels preserved.
     return nib.load(os.fspath(source))
@@ -438,8 +457,16 @@ def evaluate_case(
         from segfacet.eval.per_mode import compute_per_mode_metrics
 
         if candidate_present:
+            # candidate_present's earlier compute_overlap call above already
+            # produced this exact OverlapResult for `.overlap` -- item 112
+            # supplies it here so compute_per_mode_metrics does not pay a
+            # second full pass over the label map for the same computation.
             per_mode_metrics = compute_per_mode_metrics(
-                subject_block, candidate=candidate_arr, gt=gt_arr, spacing=gt_spacing
+                subject_block,
+                candidate=candidate_arr,
+                gt=gt_arr,
+                spacing=gt_spacing,
+                overlap_result=overlap,
             )
         else:
             pm_spacing = tuple(float(z) for z in gt_img.header.get_zooms()[:3])

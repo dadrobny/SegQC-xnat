@@ -13,9 +13,11 @@ The covered span is ``[present_levels[0] .. present_levels[-1]]``
 item 004's :data:`segfacet.labels.CANONICAL_ORDER`). A span end is **truncated**
 when its extremal segmented vertebra's geometry touches the corresponding
 cranio-caudal image face (``touches_superior`` / ``touches_inferior``, item
-011's fixed cranio-caudal = ``x``-axis convention) — an *exact* border-contact
-flag, not a voxel-margin proximity (the record carries no image shape to
-compute a margin against; see item 089's Assumptions).
+011/108 — these two flags are always the affine-derived superior/inferior
+faces, whichever array axis that turns out to be for a given volume; this
+module never assumes a fixed axis) — an *exact* border-contact flag, not a
+voxel-margin proximity (the record carries no image shape to compute a
+margin against; see item 089's Assumptions).
 
 This module registers no rule (mirrors no ``Rule`` subclass, no
 ``register_rule`` call) — it is a plain, pure, non-mutating helper that
