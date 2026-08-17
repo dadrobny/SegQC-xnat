@@ -531,9 +531,17 @@ def _is_checked(item_text: str) -> bool:
 
 def _has_annotation(item_text: str) -> bool:
     """A `*(...)*` parenthetical trailing the box text -- evidence when
-    ticked, a reason when unticked (the Stage 17 tripwire box at
-    progress.md:744, `- [ ] ... *(Unticked because ...)*`, is the model for
-    the unticked-plus-reason shape)."""
+    ticked, a reason when unticked (the Stage 17 box at progress.md:744,
+    `- [ ] ... *(Unticked because ...)*`, is the model for the
+    unticked-plus-reason shape).
+
+    Engine 1.5.0 made that shape durable: `aide progress set` no longer
+    derives acceptance ticks, so an unticked-with-reason box survives any
+    later status change, and ticking is the explicit `aide progress accept`.
+    Before that, both this box and Stage 26's fifth were re-ticked by any
+    `progress set` call for any item, which is why the Stage 17 one was
+    described here as a tripwire.
+    """
     return bool(_EVIDENCE_NOTE_RE.search(item_text))
 
 

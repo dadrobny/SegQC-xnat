@@ -103,7 +103,10 @@ _Flat bullets only — one per deliverable, each with its item reference. See
 
 **Acceptance.**
 
-_One checkbox per acceptance criterion from the matching roadmap stage._
+_One checkbox per acceptance criterion from the matching roadmap stage. Ticked
+only by `aide progress accept <stage> --criterion N`, by whoever verified it —
+never derived from the rollup. A stage may be ✅ with a box left unticked; when
+it is, annotate the box with why._
 
 - [ ] {{acceptance check}}
 

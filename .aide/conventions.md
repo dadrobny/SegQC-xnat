@@ -9,7 +9,7 @@ heuristics), the **claim protocol** (how "in progress" is signalled), and the
 
 ## 1. Format contract — `docs/aide/` documents
 
-`.aide/scripts/aide.py` (`check`, `progress set`, `queue tidy`) and
+`.aide/scripts/aide.py` (`check`, `progress set`, `progress accept`, `queue tidy`) and
 `scripts/aide_status_report.py` parse these files by exact shape. Deviating from
 the shapes below breaks the tooling, so the templates in `.aide/templates/`
 model them and `aide check` enforces them.
@@ -67,8 +67,8 @@ Mandatory, in order (consumer in brackets):
      `- <icon> <text>. *(Item NNN)*` — one status icon, one item ref, no nested
      status-bearing sub-bullets (keep rollup unambiguous). *(builder, validator,
      aide progress, status report)*
-   - an **Acceptance** block of `- [ ]` / `- [x]` checkboxes. *(validator, aide
-     check rollup)*
+   - an **Acceptance** block of `- [ ]` / `- [x]` checkboxes, ticked only by
+     `aide progress accept` — never derived. *(validator)*
 
 **Item references on a deliverable bullet.** The `*(Item NNN)*` suffix is what
 ties an item to the bullet whose status it moves — `aide progress set NNN` finds
@@ -90,12 +90,28 @@ read as a typo and contributes only its endpoints. Prefer the explicit list when
 the items are not contiguous; a range is only shorthand for one.
 
 **Rollup rule (deterministic — `aide progress` and `aide check` both apply it):**
-a stage is ✅ if *every* Deliverables bullet in it is ✅; then all its Acceptance
-boxes are `[x]`, and its summary-table row, section header, and any Objective row
-delivered solely by complete stages read ✅ (unless the objective is linked to an
-Outcome target that is not `✅ Met` — see below). If any bullet is ✅/🚧 but not all,
-the stage is 🚧. Otherwise 📋. Acceptance boxes are ticked **only** at stage
-completion (per-item AC ticking is not deterministic).
+a stage is ✅ if *every* Deliverables bullet in it is ✅; then its summary-table
+row, section header, and any Objective row delivered solely by complete stages
+read ✅ (unless the objective is linked to an Outcome target that is not
+`✅ Met` — see below). If any bullet is ✅/🚧 but not all, the stage is 🚧.
+Otherwise 📋.
+
+**Acceptance boxes are attestations, and no rollup ever ticks one.** They are
+outside the derivation entirely: the rollup skips checkbox lines, `aide check`
+never gates a ✅ stage on them, and `aide progress set` leaves them exactly as
+the author wrote them. A box is ticked only by a human — or by an agent acting
+on a check it actually performed — via:
+
+```
+aide progress accept <stage> (--criterion N | --all) [--evidence "<text>"]
+```
+
+The reason is that a derived tick is not an attestation. While `progress set`
+auto-ticked, a box deliberately left `[ ]` in a ✅ stage — the honest record of
+a criterion that shipped unmet — was silently flipped back on the next status
+change for *any* item in *any* stage, converting a recorded shortfall into a
+false claim that nobody had made. A stage may be ✅ with an unticked box; say
+why in an annotation beside it.
 
 **What a stage's ✅ means — and what it deliberately does not.** The rollup
 makes stage status track exactly one thing: *the planned work shipped*. An
@@ -103,9 +119,8 @@ Acceptance box is therefore an observable check **of the built thing** (the
 CLI runs, the artifact validates) — something completing the deliverables can
 guarantee. A **measured outcome** the work aims for but cannot guarantee by
 construction (an error-rate target, a benchmark result) must NOT be an
-Acceptance box: it would either be auto-ticked into an over-claim or hold the
-stage 🚧 forever against work that genuinely shipped. Such goals go in the
-**Outcome targets** table below.
+Acceptance box: it would hold the stage's honest record hostage to a result the
+work cannot promise. Such goals go in the **Outcome targets** table below.
 
 **Outcome targets (optional, additive).** A `## Outcome targets` section in
 `progress.md` with one row per measured goal:
@@ -174,9 +189,12 @@ of scope. Any role, at any time, appends **one line** and returns to its task:
 with `<type>` one of **knowledge** (document it), **defect** (fix it), **gap**
 (plan it), **automation** (a recurring manual/agent action deterministic code
 could replace — script it), **framework** (belongs to AIDE itself). The item
-ref is optional for roles outside an item. The file is **append-only**;
-`aide check` shape-checks entries (warning, never error — capture must stay
-cheap). Template: `.aide/templates/insights.md` (copy verbatim).
+ref is optional for roles outside an item. The file is **append-only, with
+exactly two exceptions** — ticking an entry's checkbox and appending its
+`→ where it landed` pointer, both performed at triage (below). Nothing else
+about a captured line may be rewritten, and no line is ever reordered or
+deleted. `aide check` shape-checks entries (warning, never error — capture must
+stay cheap). Template: `.aide/templates/insights.md` (copy verbatim).
 
 **Triage** happens at the queue boundary (the feedback loop): each unchecked
 entry is routed — `knowledge` → the owning document; `defect`/`gap` →

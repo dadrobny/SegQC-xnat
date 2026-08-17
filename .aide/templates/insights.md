@@ -22,7 +22,9 @@
   to its destination, then ticked in place with a pointer:
     - [x] <type> — <one line> *(item NNN, YYYY-MM-DD)* → <where it landed>
 
-  Append-only: never rewrite, reorder, or delete existing lines.
+  Append-only, with exactly two exceptions: ticking an entry's checkbox and
+  appending its "→ where it landed" pointer, both at triage. Nothing else about
+  a captured line may be rewritten, and no line is ever reordered or deleted.
 -->
 # Insight Inbox
 
