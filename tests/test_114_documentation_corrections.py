@@ -7,6 +7,16 @@ builder's empirical evidence recorded in the item spec/Decisions log --
 deliberately not pinned here, since the answer is not yet known at test-write
 time and a test pinning the wrong answer would be worse than no test.
 
+AC9's answer is now settled upstream rather than inferred: engine 1.5.0 took
+acceptance boxes out of the derivation entirely -- the rollup skips checkbox
+lines, no ``aide check`` rule gates a ``✅`` stage on them, and
+``aide progress set`` leaves them as the author wrote them
+(``.aide/conventions.md`` §1). A stage may be ``✅`` with an unticked box, and
+ticking is the explicit ``aide progress accept``. So AC4 below is a plain
+durable assertion; until 1.5.0 landed here it doubled as a deliberate tripwire
+for the force-tick defect, since any ``progress set`` call for any item would
+re-tick the box (``insights.md``, item 114/115 entries → aide-loop PR #32).
+
 Two unrelated fixes, batched (see item spec):
 
 (a) ``src/segfacet/heuristics/bounds.py`` comments still name labels retired
@@ -391,12 +401,20 @@ def test_adv_missing_acceptance_box_raises_assertion():
 #
 # Pinned baseline (captured on this branch before item 114's changes landed,
 # one commit after f9cb63f which fixed an unrelated item-113 insights.md
-# entry that `aide check` hard-errors on): 9 warnings total, 7 of which are
-# location-stable (progress.md/queue/insights.md format warnings unrelated
-# to this item) and 2 of which are stale-claim-branch warnings that depend
-# on local branch state and would differ on a fresh checkout or in CI -- so
-# those are excluded from the pinned set entirely rather than risk a flaky
-# CI failure for reasons unrelated to this item.
+# entry that `aide check` hard-errors on): 7 location-stable warnings
+# (progress.md/queue/insights.md format warnings unrelated to this item).
+# Branch-state-dependent warnings are excluded entirely -- see
+# `_BRANCH_STATE_WARNING_PREFIXES` below -- rather than risk a flaky CI
+# failure for reasons unrelated to this item.
+#
+# Locations are pinned in POSIX form and compared as-is: engine 1.5.0 renders
+# them with `.as_posix()`, so the same document reports identically on every
+# platform. Before that fix they were built by f-stringing a `Path`, whose
+# `str()` is OS-native, and `queue/queue-002.md:80` -- the one baseline entry
+# with a subdirectory component -- was the single warning that broke the
+# Windows CI leg while the six `docs/aide/`-root ones passed. This module
+# carried a `_posix_location()` normaliser for that, retired once the engine
+# fix landed here (insights.md, 2026-08-15 → aide-loop PR #32).
 _PINNED_BASELINE_WARNING_LOCATIONS = frozenset(
     {
         "progress.md:340",
@@ -411,23 +429,15 @@ _PINNED_BASELINE_WARNING_LOCATIONS = frozenset(
 
 _LOCATION_WARNING_RE = re.compile(r"^([^:]+:\d+):")
 
-
-def _posix_location(location: str) -> str:
-    """Normalise a warning location's path separator to `/`.
-
-    `aide check` builds these by f-stringing a `Path`
-    (`.aide/scripts/aide.py:704` and `:792` both do
-    `f"{path.relative_to(ddir)}:{lineno}"`), and `str(Path)` renders the
-    OS-native separator -- so the same document reports as
-    `queue/queue-002.md:80` on Linux and `queue\\queue-002.md:80` on
-    Windows. Only locations with a subdirectory component differ, which is
-    why `queue/queue-002.md` was the single baseline entry that broke on the
-    Windows CI leg while the six `docs/aide/`-root ones passed. Same
-    `str(Path)`-separator class as the `_combined_hash` bug recorded in
-    `insights.md`; the framework-side fix is `.as_posix()`, but `.aide/**`
-    is generated and must not be hand-edited here.
-    """
-    return location.replace("\\", "/")
+# Warnings that depend on which branches happen to exist in the local
+# checkout, in both shapes `run_checks` emits them (`.aide/scripts/aide.py`,
+# the claim-branch agreement loop): a leftover claim branch for a finished
+# item, and a prefixed branch matching neither the item nor the queue naming
+# shape. Neither is location-based, and neither says anything about this
+# item's documents -- a fresh checkout or a CI runner has different branches
+# than any developer's working clone, so pinning them would be flaky for
+# reasons unrelated to item 114.
+_BRANCH_STATE_WARNING_PREFIXES = ("stale claim branch", "unrecognised branch")
 
 
 def _aide_check_warnings() -> list:
@@ -441,7 +451,7 @@ def _aide_check_warnings() -> list:
     than a crash had it returned an empty string instead: the caller's loop
     iterates over the parsed lines, so an empty capture makes this test pass
     vacuously while checking nothing. ``run_checks`` is the same function
-    ``cmd_check`` calls (``.aide/scripts/aide.py:1004``); it returns
+    ``cmd_check`` calls (``.aide/scripts/aide.py:1086``); it returns
     ``(errors, warnings)`` as structured data, so there is no stdout, no
     encoding and no subprocess to go wrong, and nothing to re-parse.
     """
@@ -460,40 +470,15 @@ def test_ac8_no_new_aide_check_warning_beyond_pinned_baseline():
     # baseline warnings on this branch.
     assert warnings, "run_checks returned no warnings at all -- expected the pinned baseline"
     for warning in warnings:
-        if warning.startswith("stale claim branch"):
-            # Branch-state-dependent -- excluded, see module docstring above.
+        if warning.startswith(_BRANCH_STATE_WARNING_PREFIXES):
+            # Branch-state-dependent -- excluded, see the note above.
             continue
         match = _LOCATION_WARNING_RE.match(warning)
         assert match is not None, (
             f"unrecognised aide check warning shape (not location-based, "
-            f"not a stale-claim-branch warning): {warning!r}"
+            f"not a branch-state warning): {warning!r}"
         )
-        location = _posix_location(match.group(1))
-        assert location in _PINNED_BASELINE_WARNING_LOCATIONS, (
+        assert match.group(1) in _PINNED_BASELINE_WARNING_LOCATIONS, (
             f"aide check produced a new warning not in the pre-item-114 "
             f"baseline: {warning!r}"
         )
-
-
-def test_ac8_windows_backslash_locations_match_the_posix_baseline():
-    """The Windows form of a subdirectory warning must map onto the baseline.
-
-    Regression guard for the CI failure this normalisation fixes: without
-    it, `queue\\queue-002.md:80` (Windows) misses a baseline pinned in
-    POSIX form and the whole AC8 check fails on that leg alone. Asserted
-    here rather than left to the Windows runner so the fix is verified on
-    every platform, including the Linux one that cannot reproduce the bug.
-    """
-    windows_warning = (
-        "queue\\queue-002.md:80: status icon ✅ outside a structural "
-        "status position (parsers treat it as plain text; move or remove "
-        "it if status was intended)"
-    )
-    match = _LOCATION_WARNING_RE.match(windows_warning)
-    assert match is not None
-    assert _posix_location(match.group(1)) in _PINNED_BASELINE_WARNING_LOCATIONS
-    # The POSIX form must keep working unchanged -- normalisation is a
-    # widening, not a swap.
-    assert _posix_location("queue/queue-002.md:80") == "queue/queue-002.md:80"
-    # A root-level location has no separator either way, so it is unaffected.
-    assert _posix_location("progress.md:340") == "progress.md:340"
