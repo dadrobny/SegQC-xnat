@@ -89,12 +89,24 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
 
 - **PASS** only when every check holds. Then, in order:
   1. **Reconcile `progress.md` via the CLI** — it flips the item's row to done,
-     ticks the stage's acceptance boxes, rolls up the stage/objective status, and
-     commits, all deterministically:
+     rolls up the stage/objective status, and commits, all deterministically:
      ```
      python .aide/scripts/aide.py progress set NNN done
      ```
-  2. **Merge via the CLI** — it honours `git.mode` (direct-merge + re-test +
+     It deliberately does **not** touch acceptance checkboxes — see step 2.
+  2. **Attest any acceptance criterion you actually verified.** An Acceptance
+     box is a claim that an observable check holds, so it is ticked only by the
+     role that performed the check, one criterion at a time:
+     ```
+     python .aide/scripts/aide.py progress accept <stage> --criterion N \
+         --evidence "what you ran, and when"
+     ```
+     Tick **only** what you verified in this run. If a criterion is not met,
+     leave it `- [ ]` and annotate why beside it: a stage may be ✅ with an
+     unticked box, and that record is the point — nothing will re-tick it.
+     Nothing forces you to tick anything, and a criterion you cannot evaluate
+     is not yours to claim.
+  3. **Merge via the CLI** — it honours `git.mode` (direct-merge + re-test +
      claim-branch cleanup for `auto-merge`; push-and-stop for `pr`; local merge
      for `local`):
      ```
@@ -102,7 +114,7 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
      ```
      **Run this synchronously in the foreground too** (see step 1) — under
      `auto-merge` it re-runs the full suite before merging, so it takes the
-     same several minutes as step 1 did; wait for it to actually exit and
+     same several minutes as the test run did; wait for it to actually exit and
      report the real output, don't background it.
      If the CLI reports `pr` mode (pushed, awaiting a PR), surface that to the
      orchestrator as a stop — do not attempt to merge by hand.

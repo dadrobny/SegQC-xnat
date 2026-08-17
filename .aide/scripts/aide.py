@@ -499,11 +499,72 @@ def _set_stage_header(lines: List[str], start: int, status: str) -> None:
         lines[start] = _TRAILING_ICON_RE.sub(STATUS_TO_ICON[status], line)
 
 
-def _tick_acceptance(lines: List[str], start: int, end: int) -> None:
-    for i in range(start, end):
+def _same_stage(a: str, b: str) -> bool:
+    """Compare two stage numbers, ignoring zero-padding when both are numeric."""
+    sa, sb = str(a).strip(), str(b).strip()
+    if sa.isdigit() and sb.isdigit():
+        return int(sa) == int(sb)
+    return sa == sb
+
+
+def acceptance_boxes(lines: List[str], start: int, end: int) -> List[int]:
+    """Line indices of the acceptance checkboxes in one stage section, in order.
+
+    An acceptance box is an *attestation*: a human states that an observable
+    criterion holds. It is deliberately not derived from anything — the rollup
+    skips checkbox lines (see ``stage_deliverable_statuses``), no ``aide check``
+    rule gates a ✅ stage on them, and nothing else reads them. That is why
+    ``set_item_status`` no longer ticks them as a side effect of a status
+    change: a rollup cannot attest, and auto-ticking made the honest state
+    "shipped, but this criterion is not met" impossible to keep — the same
+    state Outcome targets exist to express at the objective level.
+
+    Ticking now goes through ``aide progress accept``, which is deliberate,
+    logged, and cannot be undone by an unrelated item's status change.
+    """
+    return [i for i in range(start, end) if _CHECKBOX_RE.match(lines[i])]
+
+
+def accept_criteria(text: str, stage: str, criteria: Optional[List[int]],
+                    evidence: Optional[str] = None) -> Tuple[str, List[str]]:
+    """Tick acceptance boxes in *stage*; return (updated text, messages).
+
+    ``criteria`` is a list of 1-based box indices, or None for every box in the
+    stage. An already-ticked box is reported and left alone rather than being
+    silently counted as newly accepted. Raises ``ValueError`` when the stage or
+    an index does not exist — a typo'd stage must not pass as a no-op.
+
+    The stage is matched numerically, so ``accept 6`` finds a section headed
+    ``## Stage 06`` — ``stage_sections`` reports the header text verbatim, and
+    a caller typing the correct number should not have to guess its padding.
+    """
+    lines = text.splitlines()
+    section = next((s for s in stage_sections(lines)
+                    if _same_stage(s[2], stage)), None)
+    if section is None:
+        raise ValueError(f"no Stage {stage} section in progress.md")
+    start, end, _ = section
+    boxes = acceptance_boxes(lines, start, end)
+    if not boxes:
+        raise ValueError(f"Stage {stage} has no acceptance checkboxes")
+    wanted = list(range(1, len(boxes) + 1)) if criteria is None else criteria
+    for n in wanted:
+        if not 1 <= n <= len(boxes):
+            raise ValueError(
+                f"Stage {stage} has {len(boxes)} acceptance criteria; {n} is out of range")
+    messages: List[str] = []
+    for n in wanted:
+        i = boxes[n - 1]
         m = _CHECKBOX_RE.match(lines[i])
-        if m and m.group("mark") == " ":
-            lines[i] = m.group("pre") + "x" + m.group("post")
+        if m.group("mark") != " ":
+            messages.append(f"criterion {n}: already ticked, unchanged")
+            continue
+        post = m.group("post")
+        if evidence:
+            post = post.rstrip() + f" *({evidence})*"
+        lines[i] = m.group("pre") + "x" + post
+        messages.append(f"criterion {n}: accepted")
+    return "\n".join(lines) + ("\n" if text.endswith("\n") else ""), messages
 
 
 def _objective_stages(delivered_by: str) -> List[str]:
@@ -580,9 +641,10 @@ def insert_item_reference(text: str, number: int, stage: str, title: str) -> Opt
 def set_item_status(text: str, num: int, status: str) -> str:
     """Flip item NNN's deliverable bullet(s) to ``status`` and roll stages up.
 
-    ``status`` is ``in-progress`` or ``complete``. Ticks acceptance boxes and
-    updates summary/header/objective rows only for stages that fully complete.
-    Never downgrades an existing status (additive log).
+    ``status`` is ``in-progress`` or ``complete``. Updates summary/header/
+    objective rows only for stages that fully complete. Never downgrades an
+    existing status (additive log), and never touches an acceptance checkbox —
+    those are human attestations, ticked only by ``aide progress accept``.
     """
     lines = text.splitlines()
     # Flip the owning bullet's icon for every line that references this item.
@@ -608,8 +670,6 @@ def set_item_status(text: str, num: int, status: str) -> str:
         stage_status[stage_num] = derived
         _set_stage_header(lines, start, derived)
         _set_summary_row(lines, stage_num, derived)
-        if derived == "complete":
-            _tick_acceptance(lines, start, end)
     _apply_objective_rollup(lines, stage_status)
 
     return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
@@ -682,7 +742,20 @@ def tidy_queue_text(text: str, superseded_by: int, date: str) -> str:
 # --------------------------------------------------------------------------- #
 # check
 # --------------------------------------------------------------------------- #
-_TEMPLATE_SLOT_RE = re.compile(r"\{\{[^}]*\}\}")
+#: An AIDE slot is a bare ``{{name}}``. The negative lookbehind exempts a `$`
+#: immediately before the braces — GitHub Actions expression syntax, which is
+#: foreign syntax a living document may legitimately quote when it documents a
+#: workflow. Without it, an item spec explaining what a CI step runs, or an
+#: insight recording a workflow's arguments, turns `aide check` red on prose
+#: that is correct as written, and the only remedy is to stop naming the real
+#: syntax — making the documentation worse exactly where accuracy matters.
+#:
+#: Suppressing matches inside backtick code spans would be the wrong fix: the
+#: item template's own `Suggested branch` line carries a genuine slot inside a
+#: code span (``aide/{{nnn}}-descriptive-name``), so that rule would make a
+#: real unfilled slot invisible. AIDE slots are never `$`-prefixed, so keying
+#: on the `$` is precise in both directions.
+_TEMPLATE_SLOT_RE = re.compile(r"(?<!\$)\{\{[^}]*\}\}")
 
 
 def template_residue_errors(ddir: Path) -> List[str]:
@@ -701,7 +774,8 @@ def template_residue_errors(ddir: Path) -> List[str]:
         for lineno, line in enumerate(text.splitlines(), start=1):
             for m in _TEMPLATE_SLOT_RE.finditer(line):
                 errors.append(
-                    f"{path.relative_to(ddir)}:{lineno}: unfilled template slot {m.group(0)}"
+                    f"{path.relative_to(ddir).as_posix()}:{lineno}: "
+                    f"unfilled template slot {m.group(0)}"
                 )
     return errors
 
@@ -789,7 +863,7 @@ def stray_icon_warnings(ddir: Path) -> List[str]:
         for lineno, line in enumerate(path.read_text(encoding=_ENCODING).splitlines(), start=1):
             for icon in _stray_icons_in_line(line):
                 out.append(
-                    f"{path.relative_to(ddir)}:{lineno}: status icon {icon} outside a "
+                    f"{path.relative_to(ddir).as_posix()}:{lineno}: status icon {icon} outside a "
                     f"structural status position (parsers treat it as plain text; move "
                     f"or remove it if status was intended)"
                 )
@@ -925,14 +999,22 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
             spec_nums[n] = ipath.name
 
     # Claim-branch <-> status agreement (best effort).
+    prefix = str(config["git"].get("branch_prefix", "aide/"))
     if branches is None:
-        branches = _list_claim_branches(repo_root, str(config["git"].get("branch_prefix", "aide/")))
+        branches = _list_claim_branches(repo_root, prefix)
     _, _, item_status = _parse_item_status(lines)
     for br in branches:
-        m = re.search(r"/(\d+)-", br) or re.search(r"(\d+)", br.rsplit("/", 1)[-1])
-        if not m:
+        n = _branch_item_number(br, prefix)
+        if n is None:
+            # Not a claim branch. A queue branch is expected and silent; anything
+            # else carrying the prefix is reported rather than ignored, so a real
+            # stale claim named unconventionally cannot hide behind the anchor.
+            if not _is_queue_branch(br, prefix):
+                warnings.append(
+                    f"unrecognised branch {br}: carries the claim prefix but is "
+                    f"not '{prefix}NNN-short-name' (conventions.md §4), so no "
+                    f"item status is tracked for it")
             continue
-        n = int(m.group(1))
         if item_status.get(n) == "complete":
             warnings.append(f"stale claim branch {br}: item {n:03d} is already ✅")
 
@@ -1014,7 +1096,12 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 
 def cmd_progress(args: argparse.Namespace) -> int:
+    if args.action == "accept":
+        return _cmd_progress_accept(args)
     if args.action != "set":
+        print("usage: aide progress set NNN <in-progress|done>", file=sys.stderr)
+        return 2
+    if args.status is None:
         print("usage: aide progress set NNN <in-progress|done>", file=sys.stderr)
         return 2
     status_map = {"in-progress": "in-progress", "done": "complete"}
@@ -1062,12 +1149,56 @@ def cmd_progress(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_progress_accept(args: argparse.Namespace) -> int:
+    """``aide progress accept STAGE --criterion N`` — tick an acceptance box.
+
+    The explicit counterpart to the auto-tick ``set_item_status`` used to
+    perform. An acceptance criterion is attested by a human who checked it, so
+    it takes a deliberate command that records what was accepted and, with
+    ``--evidence``, on what basis.
+    """
+    if args.criterion is None and not args.all_criteria:
+        print("usage: aide progress accept STAGE (--criterion N | --all) "
+              "[--evidence TEXT]", file=sys.stderr)
+        return 2
+    if args.criterion is not None and args.all_criteria:
+        print("aide progress accept: pass --criterion or --all, not both", file=sys.stderr)
+        return 2
+    repo_root = find_repo_root(args.repo)
+    config = load_config(repo_root)
+    progress_path = docs_dir(repo_root, config) / "progress.md"
+    if not progress_path.is_file():
+        print(f"error: {progress_path} not found", file=sys.stderr)
+        return 1
+    text = progress_path.read_text(encoding=_ENCODING)
+    criteria = None if args.all_criteria else [args.criterion]
+    try:
+        updated, messages = accept_criteria(text, str(args.number), criteria, args.evidence)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    for msg in messages:
+        print(f"stage {args.number}: {msg}")
+    if updated == text:
+        return 0
+    progress_path.write_text(updated, encoding="utf-8")
+    if not args.no_commit and (repo_root / ".git").exists():
+        what = "all criteria" if args.all_criteria else f"criterion {args.criterion}"
+        _commit_progress_file(
+            repo_root, config, f"progress(aide): stage {args.number} accept {what}")
+    return 0
+
+
 def _commit_progress(repo_root: Path, config, number: int, status: str) -> None:
-    main = str(config["git"].get("main_branch", "main"))
+    _commit_progress_file(
+        repo_root, config, f"progress(aide): item {number:03d} -> {status}")
+
+
+def _commit_progress_file(repo_root: Path, config, message: str) -> None:
     git(["pull", "--rebase"], repo_root, check=False)
     rel = str(config["project"].get("docs_dir", "docs/aide")) + "/progress.md"
     git(["add", rel], repo_root, check=False)
-    res = git(["commit", "-m", f"progress(aide): item {number:03d} -> {status}"], repo_root, check=False)
+    res = git(["commit", "-m", message], repo_root, check=False)
     if res.returncode != 0 and "nothing to commit" not in (res.stdout + res.stderr):
         print(res.stderr.strip(), file=sys.stderr)
 
@@ -1328,8 +1459,7 @@ def cmd_claim(args: argparse.Namespace) -> int:
 
 def _find_claim_branch(repo_root: Path, prefix: str, number: int) -> Optional[str]:
     for br in _list_claim_branches(repo_root, prefix):
-        cm = re.search(r"/(\d+)-", br) or re.search(r"(\d+)", br.rsplit("/", 1)[-1])
-        if cm and int(cm.group(1)) == number:
+        if _branch_item_number(br, prefix) == number:
             return br
     return None
 
@@ -1412,9 +1542,37 @@ def _remote_branches(repo_root: Path) -> List[str]:
     return names
 
 
-def _branch_item_number(branch: str) -> Optional[int]:
-    m = re.search(r"/(\d+)-", branch) or re.search(r"(\d+)", branch.rsplit("/", 1)[-1])
+def _branch_item_number(branch: str, prefix: str) -> Optional[int]:
+    """Item number claimed by *branch*, or None when it is not a claim branch.
+
+    A claim branch is ``<branch_prefix>NNN-short-name`` (conventions.md §4), so
+    the number must sit *immediately* after the prefix. Anchoring is what makes
+    this correct: queue numbers and item numbers share one namespace with no
+    syntactic marker between them, so an unanchored digit search reads
+    ``aide/queue-016`` as item 016 — an unrelated, usually long-finished work
+    item — and ``aide/specs-queue-015`` likewise.
+
+    That misread is not cosmetic. ``gc`` targets any branch whose item is ✅ and
+    deletes it with ``git branch -D`` plus a remote delete, independently of
+    ``--merged``; under the old unanchored match that destroyed an in-flight
+    queue branch, and the unreviewed queue file and item specs living only on it.
+    """
+    m = re.match(re.escape(prefix) + r"0*(\d+)(?:-|$)", branch)
     return int(m.group(1)) if m else None
+
+
+#: Branches the framework itself tells authors to create that are deliberately
+#: NOT item claims: `/aide-create-queue`'s hand-off and `/aide-run-roadmap` name
+#: `<prefix>queue-NNN`, `/aide-spec-queue` names `<prefix>specs-queue-NNN`.
+#: Recognised positively so they are reported as what they are, rather than
+#: lumped in with a branch nothing can parse.
+_QUEUE_BRANCH_RE = re.compile(r"(?:specs-)?queue-\d+$")
+
+
+def _is_queue_branch(branch: str, prefix: str) -> bool:
+    """True when *branch* is a queue/specs-queue branch rather than a claim."""
+    return (branch.startswith(prefix)
+            and _QUEUE_BRANCH_RE.match(branch[len(prefix):]) is not None)
 
 
 def _has_origin(repo_root: Path) -> bool:
@@ -1544,11 +1702,14 @@ def cmd_status(args: argparse.Namespace) -> int:
     branches = _list_claim_branches(repo_root, prefix)
     if branches:
         for br in branches:
-            num = _branch_item_number(br)
-            st = item_status.get(num, "planned") if num is not None else "?"
+            num = _branch_item_number(br, prefix)
+            if num is None:
+                kind = "queue branch" if _is_queue_branch(br, prefix) else "unrecognised"
+                print(f"  branch: {br} ({kind} — not an item claim)")
+                continue
+            st = item_status.get(num, "planned")
             stale = " — STALE (item ✅; run 'aide gc')" if st == "complete" else ""
-            print(f"  claim: {br} (item {num:03d}: {st}){stale}" if num is not None
-                  else f"  claim: {br}")
+            print(f"  claim: {br} (item {num:03d}: {st}){stale}")
     else:
         print("  claims: none")
 
@@ -1602,7 +1763,13 @@ def cmd_gc(args: argparse.Namespace) -> int:
 
     targets: Dict[str, str] = {}  # branch -> reason
     for br in sorted(set(local) | set(remote)):
-        num = _branch_item_number(br)
+        # Only a positively-identified item claim is deletable on the "item is
+        # ✅" ground. A queue branch shares the number namespace but not the
+        # lifecycle: it aggregates many items and lands as one reviewed PR, so
+        # deleting it because some same-numbered item finished would discard
+        # unreviewed work. It stays eligible under --merged, where the ground
+        # is "already merged into main" and is checked against git itself.
+        num = _branch_item_number(br, prefix)
         if num is not None and item_status.get(num) == "complete":
             targets[br] = f"item {num:03d} is ✅"
         elif br in merged_local:
@@ -1647,10 +1814,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_check = sub.add_parser("check", help="consistency gate over docs/aide")
     p_check.set_defaults(func=cmd_check)
 
-    p_prog = sub.add_parser("progress", help="edit progress.md status")
-    p_prog.add_argument("action", choices=["set"])
-    p_prog.add_argument("number", type=int)
-    p_prog.add_argument("status", help="in-progress | done")
+    p_prog = sub.add_parser("progress", help="edit progress.md status / acceptance")
+    p_prog.add_argument("action", choices=["set", "accept"])
+    p_prog.add_argument("number", type=int,
+                        help="item number (set) | stage number (accept)")
+    p_prog.add_argument("status", nargs="?", default=None, help="set: in-progress | done")
+    p_prog.add_argument("--criterion", type=int, default=None,
+                        help="accept: 1-based acceptance-criterion index within the stage")
+    p_prog.add_argument("--all", action="store_true", dest="all_criteria",
+                        help="accept: every acceptance criterion in the stage")
+    p_prog.add_argument("--evidence", default=None,
+                        help="accept: annotation appended to the ticked criterion")
     p_prog.add_argument("--no-commit", action="store_true", help="edit only, do not git commit")
     p_prog.set_defaults(func=cmd_progress)
 

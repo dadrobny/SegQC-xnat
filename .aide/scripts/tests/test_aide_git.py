@@ -456,6 +456,67 @@ def test_gc_merged_deletes_merged_branch(tmp_path: Path):
     assert "aide/027-bounds-rules" not in branches
 
 
+# --------------------------------------------------------------------------- #
+# branch parsing — queue numbers and item numbers share one namespace
+# --------------------------------------------------------------------------- #
+def test_branch_item_number_reads_a_claim_branch():
+    assert aide._branch_item_number("aide/026-rule-engine-core", "aide/") == 26
+    assert aide._branch_item_number("aide/007-x", "aide/") == 7
+    assert aide._branch_item_number("aide/026", "aide/") == 26
+
+
+def test_branch_item_number_rejects_a_queue_branch():
+    """The defect this anchoring exists to prevent.
+
+    `aide/queue-016` used to resolve to item 016 — an unrelated, long-finished
+    work item — because the fallback searched anywhere in the branch name for a
+    digit run. `gc` deletes a branch whose item is ✅ using `git branch -D` plus
+    a remote delete, independently of `--merged`, so that misread could destroy
+    an in-flight queue branch carrying unreviewed specs.
+    """
+    assert aide._branch_item_number("aide/queue-016", "aide/") is None
+    assert aide._branch_item_number("aide/specs-queue-015", "aide/") is None
+    assert aide._is_queue_branch("aide/queue-016", "aide/")
+    assert aide._is_queue_branch("aide/specs-queue-015", "aide/")
+
+
+def test_branch_item_number_rejects_an_unnumbered_branch():
+    assert aide._branch_item_number("aide/fix-the-thing", "aide/") is None
+    assert not aide._is_queue_branch("aide/fix-the-thing", "aide/")
+
+
+def test_branch_item_number_honours_a_custom_prefix():
+    assert aide._branch_item_number("wip/031-x", "wip/") == 31
+    assert aide._branch_item_number("aide/031-x", "wip/") is None
+
+
+def test_gc_never_deletes_a_queue_branch_for_a_same_numbered_item(tmp_path: Path, capsys):
+    """Item 026 is ✅, but `aide/queue-026` is not item 026's claim branch."""
+    root = _init_repo(tmp_path / "r", mode="local")
+    _make_item_branch(root, "aide/queue-026", "queue.txt")
+    rc = aide.main(["--repo", str(root), "gc", "--yes"])
+    assert rc == 0
+    branches = _run(["git", "branch"], root).stdout
+    assert "aide/queue-026" in branches
+    assert "deleted" not in capsys.readouterr().out
+
+
+def test_check_does_not_report_a_queue_branch_as_a_stale_claim(tmp_path: Path):
+    root = _init_repo(tmp_path / "r", mode="local")
+    cfg = aide.load_config(root)
+    _, warnings = aide.run_checks(root, cfg, branches=["aide/queue-026"])
+    assert not any("stale claim" in w for w in warnings)
+    assert not any("unrecognised" in w for w in warnings)
+
+
+def test_check_reports_a_prefixed_branch_it_cannot_parse(tmp_path: Path):
+    """Anchoring must not turn a real stale claim into a silent skip."""
+    root = _init_repo(tmp_path / "r", mode="local")
+    cfg = aide.load_config(root)
+    _, warnings = aide.run_checks(root, cfg, branches=["aide/rule-engine-core"])
+    assert any("unrecognised branch aide/rule-engine-core" in w for w in warnings)
+
+
 def _mkbare(path: Path) -> Path:
     subprocess.run(["git", "init", "--bare", "-b", "main", str(path)], check=True,
                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
