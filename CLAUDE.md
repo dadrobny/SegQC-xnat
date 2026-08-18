@@ -190,9 +190,12 @@ already written down there rather than in `docs/aide/`.
   there or unattended runs stall on permission prompts.
 - **Document templates** — [`.aide/templates/`](.aide/templates/).
 - **CLI** — `python .aide/scripts/aide.py
-  {check,progress,queue,claim,merge,env,sync,gc,status}`. If a verb covers it,
-  the raw git form is wrong: session preflight is `sync`, branch clean-up is
-  `gc`, the state report is `status`.
+  {check,progress,gate,queue,claim,merge,env,sync,gc,status,scope}`. If a verb
+  covers it, the raw git form is wrong: session preflight is `sync`, branch
+  clean-up is `gc`, the state report is `status`, and the item's diff-vs-scope
+  check is `scope` (**not** this repo's older `scripts/check_item_scope.py`,
+  which predates the verb — see below). `check --queue NNN` adds the cross-spec
+  checks; `gate` resolves human gates, and only a person may run it.
 - **Insight inbox** — [`docs/aide/insights.md`](docs/aide/insights.md): append a
   one-line `- [ ] <type> — …` when you learn something out of scope, then return
   to your task. Triaged at the queue boundary by `/aide-feedback-loop`.
@@ -248,6 +251,20 @@ from the local working tree):
    separate, optional step for sharing the framework itself.
 
 ## Gotchas
+
+- **`scripts/check_item_scope.py` has been superseded by `aide scope`.** Item
+  107 built it here, and engine 1.7.0 then promoted the same idea into the
+  framework — with both of this repo's recorded defects fixed (glob support for
+  `dir/*.ext`, and a merge-base default instead of a bare local `main`, the
+  local-invocation footgun recorded in `insights.md`) plus three things the
+  project script lacks: it resolves the item from the claim branch via the
+  anchored branch→item helper (so a queue branch skips instead of matching an
+  unrelated item), it distinguishes **May change** from **Asserts against**, and
+  it authorises loop bookkeeping without every spec having to list it. The
+  project script and its CI job (`.github/workflows/ci.yml`, `scope-check`) are
+  still in place and still correct; **prefer `aide scope` for local invocation**,
+  and retiring the script — with `tests/test_107_item_scope_check.py` — is a
+  work item of its own, not something to do halfway.
 
 - **Byte-reproducible committed fixtures need a `.gitattributes` LF pin.** This
   repo commits generated data whose tests assert byte-identity between a

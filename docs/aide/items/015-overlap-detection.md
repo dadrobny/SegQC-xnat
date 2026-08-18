@@ -1,7 +1,8 @@
-# Item 015: Overlap detection between labels
+# Item 015 — Overlap detection between labels
 
-**Branch:** `aide/015-overlap-detection`
-**Stage:** 2 — Geometric & Topological Feature Extraction
+> **Branch:** `aide/015-overlap-detection` · status tracked in [`progress.md`](../progress.md)
+> **Stage:** 2 — Geometric & Topological Feature Extraction
+> **Queue:** [`../queue/queue-002.md`](../queue/queue-002.md) · Item 015
 
 ---
 

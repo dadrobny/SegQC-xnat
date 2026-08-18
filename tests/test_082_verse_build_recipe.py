@@ -440,7 +440,7 @@ def test_adv_scope_guard_only_derived_verse_artifacts_committed():
         assert dist.levels, path.name
 
     # Raw VerSe imaging data is never committed (the whole point of the policy).
-    raw = sorted(str(p.relative_to(repo_root)) for p in reference_dir.rglob("*.nii*"))
+    raw = sorted(p.relative_to(repo_root).as_posix() for p in reference_dir.rglob("*.nii*"))
     assert raw == [], f"raw imaging data must never be committed: {raw}"
 
     # The versioned-artifact filename pattern stays LF-pinned for CRLF hygiene.

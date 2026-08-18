@@ -415,6 +415,16 @@ def test_adv_missing_acceptance_box_raises_assertion():
 # Windows CI leg while the six `docs/aide/`-root ones passed. This module
 # carried a `_posix_location()` normaliser for that, retired once the engine
 # fix landed here (insights.md, 2026-08-15 → aide-loop PR #32).
+#
+# Re-pin audit, engine 1.5.0 → 1.14.0 (2026-08-18): the upgrade raised five new
+# location-based warnings from the five conventions rules 1.14.0 began
+# enforcing. None was pinned -- every one was a real finding and was fixed in
+# the same commit, so the baseline set below is unchanged: a `str(Path)` in
+# `test_082_verse_build_recipe.py` (§6, OS separator), and a missing header
+# blockquote plus a `# Item NNN: Title` heading in items 014 and 015, the two
+# specs predating the template (the colon form makes the status report's title
+# parse return nothing). The sixth new warning names no location; see
+# `_AGGREGATED_WARNING_RES`.
 _PINNED_BASELINE_WARNING_LOCATIONS = frozenset(
     {
         "progress.md:340",
@@ -428,6 +438,18 @@ _PINNED_BASELINE_WARNING_LOCATIONS = frozenset(
 )
 
 _LOCATION_WARNING_RE = re.compile(r"^([^:]+:\d+):")
+
+# Whole-corpus warnings that name no single location, so they cannot be pinned
+# by one. Engine 1.14.0 added the first of them: the mandatory `## Assumptions`
+# block, reported as ONE aggregated line because 32 of this repo's specs
+# predate the convention and 32 separate warnings would bury the substantive
+# ones. Back-filling them is explicitly not required (aide-loop CHANGELOG
+# 1.6.0, "expected but not required"), so this is a standing, healthy state --
+# and the count is matched loosely because it falls as new specs are written
+# to the current template.
+_AGGREGATED_WARNING_RES = (
+    re.compile(r"^\d+ item spec\(s\) have no mandatory '## Assumptions' block:"),
+)
 
 # Warnings that depend on which branches happen to exist in the local
 # checkout, in both shapes `run_checks` emits them (`.aide/scripts/aide.py`,
@@ -472,6 +494,9 @@ def test_ac8_no_new_aide_check_warning_beyond_pinned_baseline():
     for warning in warnings:
         if warning.startswith(_BRANCH_STATE_WARNING_PREFIXES):
             # Branch-state-dependent -- excluded, see the note above.
+            continue
+        if any(pattern.match(warning) for pattern in _AGGREGATED_WARNING_RES):
+            # Whole-corpus, location-free -- excluded, see the note above.
             continue
         match = _LOCATION_WARNING_RE.match(warning)
         assert match is not None, (
