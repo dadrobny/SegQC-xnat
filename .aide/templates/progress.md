@@ -67,7 +67,7 @@ _One row per vision objective._
 _One row per capability gated behind an optional package or external tool.
 Status is `❓ Unverified` until a human or CI runner with the dependency
 present actually exercises the gated path (not inferred from a skip-clean
-pytest run), then `✅ Verified ({{yyyy-mm-dd}}, {{host/CI description}})`._
+pytest run), then `✅ Verified (YYYY-MM-DD, host/CI description)`._
 
 | Capability | Package / Tool | Introduced by | Status | Notes |
 |------------|-----------------|----------------|--------|-------|
@@ -77,8 +77,8 @@ pytest run), then `✅ Verified ({{yyyy-mm-dd}}, {{host/CI description}})`._
 
 _One row per measured outcome the roadmap commits to (an empirical result —
 an error rate, a benchmark — that shipped work enables but cannot guarantee).
-Status is `❓ Unverified` until measured, then `✅ Met ({{yyyy-mm-dd}},
-{{evidence}})` or `❌ Not met ({{measured result}} → {{follow-up}})`. A target
+Status is `❓ Unverified` until measured, then `✅ Met (YYYY-MM-DD,
+evidence)` or `❌ Not met (measured result → follow-up)`. A target
 never holds its stage open — stages track shipped work — but an objective
 linked to a target that is not ✅ Met cannot roll up to ✅. When marking a
 target ❌ Not met, append a `- [ ] gap — …` insight in the same edit so the
@@ -87,6 +87,38 @@ feedback loop plans the follow-on work._
 | Target | Objective | Attempted by | Status | Evidence / follow-up |
 |--------|-----------|--------------|--------|----------------------|
 | {{measurable target}} | G{{n}} | Stage {{n}} | ❓ Unverified | {{notes}} |
+
+---
+
+## Human gates  <!-- OPTIONAL: delete if no work waits on a person's decision -->
+
+_One row per decision only a person can make, blocking work until they make it
+— a steering review before dependent work proceeds, sign-off on an
+irreversible change, or an out-of-band prerequisite (data access, credentials,
+an expensive run authorised). Not an acceptance box: those are observable
+checks of the built thing, which a decision is not._
+
+_**Blocks** names item numbers (`106`, `110, 111`, `106–108`) to hold just
+those, `stage N` to hold every item that stage's deliverables reference, or
+`all` for a programme-level stop. Never a queue: a queue is an incidental batch
+boundary, so it names different work week to week while the decision has not
+changed. Reach `stage N` when the pending decision could **invalidate** that
+stage's work; otherwise racing ahead is waste to throw away._
+
+_Status is `⏳ Awaiting`, then `✅ Approved (YYYY-MM-DD)` or `❌ Declined
+(YYYY-MM-DD)` — and a decline **keeps blocking**, since releasing the work
+would run exactly what was refused; re-plan instead._
+
+_Raised wherever noticed — a roadmap stage for a known prerequisite, an item
+spec for one found while specifying — but the row here is authoritative: a gate
+that exists only as prose blocks nothing. Any role may raise one._
+
+_Resolved only by a person, only via `aide gate approve <n> --evidence "…"`
+(or `gate decline`). No agent may resolve one._
+
+| Gate | Blocks | Status | Decision / evidence |
+|------|--------|--------|---------------------|
+| {{what must be decided}} | {{item numbers, stage N, or all}} | ⏳ Awaiting | {{notes}} |
 
 ---
 

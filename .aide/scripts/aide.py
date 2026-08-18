@@ -8,11 +8,12 @@ It is **venv-independent** (it must run before/without the project venv) and
 
 Subcommands::
 
-    python .aide/scripts/aide.py check                 # consistency gate over docs/aide
+    python .aide/scripts/aide.py check [--queue NNN]   # consistency gate over docs/aide
+    python .aide/scripts/aide.py scope [NNN]           # branch diff vs the item's authorised paths
     python .aide/scripts/aide.py progress set NNN <in-progress|done>
     python .aide/scripts/aide.py queue tidy NNN        # mark a superseded queue as completed
     python .aide/scripts/aide.py claim [--queue NNN]   # pick + claim the next 📋 item
-    python .aide/scripts/aide.py merge NNN             # merge a validated item per git.mode
+    python .aide/scripts/aide.py merge NNN [--base R]  # merge a validated item per git.mode
     python .aide/scripts/aide.py env                   # venv existence / import check + bootstrap
     python .aide/scripts/aide.py sync [--item NNN]     # preflight: fetch, clean-tree check, right branch
     python .aide/scripts/aide.py gc [--merged] [--yes] # delete claim branches whose work landed
@@ -24,6 +25,9 @@ touching git or the real filesystem (see ``.aide/scripts/tests``).
 from __future__ import annotations
 
 import argparse
+import ast
+import fnmatch
+import json
 import os
 import re
 import subprocess
@@ -420,6 +424,147 @@ class OutcomeTarget(NamedTuple):
     kind: Optional[str]      # "met" | "not-met" | "unverified" | None (unrecognised)
 
 
+#: The optional `## Human gates` table — a decision only a person can make,
+#: blocking work until they make it. Kept separate from acceptance boxes
+#: deliberately: conventions.md §1 defines those as observable checks OF THE
+#: BUILT THING, which a steering decision is not. Same reasoning that gave
+#: Outcome targets their own table rather than overloading the checkboxes.
+_GATES_HEADING_RE = re.compile(r"^#{1,2}\s+Human gates\b", re.IGNORECASE)
+#: Table-local vocabulary, like Outcome targets': the LEADING mark decides.
+_GATE_STATUS_KIND = {"⏳": "awaiting", "✅": "approved", "❌": "declined"}
+#: A gate whose Blocks cell says this halts every item, everywhere — for a
+#: programme-level decision ("no work proceeds until sign-off").
+_GATE_BLOCKS_ALL = "all"
+#: `stage N` — every item the named stage's deliverables reference. Blocking is
+#: tied to a STAGE, never to a queue: a queue is an incidental batch boundary
+#: (part of a stage, a stage, or several small ones), so "the live queue" names
+#: different work from one week to the next while the decision has not changed.
+#: A stage is the roadmap's own unit and means the same thing over time.
+_GATE_BLOCKS_STAGE_RE = re.compile(r"^stage\s+0*(\d+)$", re.IGNORECASE)
+
+
+class HumanGate(NamedTuple):
+    lineno: int              # 1-based line number in progress.md
+    text: str                # the Gate cell
+    blocks: List[int]        # item numbers named directly (empty for stage/all)
+    stage: Optional[str]     # stage number when the cell reads "stage N"
+    blocks_all: bool         # True when the cell reads "all"
+    kind: Optional[str]      # "awaiting" | "approved" | "declined" | None
+
+    @property
+    def reach(self) -> str:
+        """How far this gate reaches, for a human-readable report."""
+        if self.blocks_all:
+            return "all items"
+        if self.stage is not None:
+            return f"stage {self.stage}"
+        return ("items " + ", ".join(f"{i:03d}" for i in self.blocks)
+                if self.blocks else "nothing named")
+
+
+def stage_item_numbers(lines: List[str], stage: str) -> List[int]:
+    """Item numbers referenced by *stage*'s deliverable bullets in progress.md.
+
+    Reuses the §1 rule that only a deliverable bullet (and its wrapped
+    continuation lines) carries an item reference, so a Notes cell or an
+    acceptance checkbox naming an item does not widen a stage gate's reach.
+    """
+    section = next((sec for sec in stage_sections(lines)
+                    if _same_stage(sec[2], stage)), None)
+    if section is None:
+        return []
+    start, end, _ = section
+    return sorted(_parse_item_status(lines[start:end])[2])
+
+
+def _blocked_item_numbers(cell: str) -> List[int]:
+    """Item numbers in a gate's ``Blocks`` cell.
+
+    Accepts the §1 reference forms (``Items 106, 110–112``) *and* the bare
+    numbers an author naturally writes in a column already headed "Blocks"
+    (``106``, ``110, 111``). The shared extractor keys off the word "Item", so
+    a bare list would parse as **nothing** — and a gate blocking nothing is a
+    gate that silently does not work, the one failure mode this table exists to
+    prevent. Normalising the cell first reuses that extractor's list/range
+    handling rather than growing a second dialect.
+    """
+    text = cell if re.search(r"\bitems?\b", cell, re.IGNORECASE) else f"Items {cell}"
+    return _referenced_item_numbers(text)
+
+
+def human_gates(lines: List[str]) -> List[HumanGate]:
+    """Rows of the optional ``## Human gates`` table in progress.md.
+
+    A gate is a decision only a person can make — approving a direction,
+    signing off an irreversible change, confirming an out-of-band prerequisite
+    arrived. It blocks work until resolved, and **no agent may resolve one**:
+    that is the entire point, and the reason the state lives in a CLI-written
+    table rather than a checkbox any role could tick.
+
+    ``Blocks`` accepts the item-reference forms of §1 (``106``, ``106, 107``,
+    ``106–108``), ``stage N`` for every item that stage's deliverables
+    reference, or ``all`` for a programme-level stop.
+    """
+    out: List[HumanGate] = []
+    in_section = False
+    for i, line in enumerate(lines):
+        if _GATES_HEADING_RE.match(line):
+            in_section = True
+            continue
+        if not in_section:
+            continue
+        if _ANY_HEADER_RE.match(line):
+            break  # next section — the table is over
+        if not line.strip().startswith("|"):
+            continue
+        cells = _split_row(line)
+        if _is_gate_table_furniture(cells) or len(cells) != 4:
+            continue
+        kind = next((k for icon, k in _GATE_STATUS_KIND.items()
+                     if cells[2].startswith(icon)), None)
+        blocks_cell = cells[1].strip()
+        blocks_all = blocks_cell.lower() == _GATE_BLOCKS_ALL
+        sm = _GATE_BLOCKS_STAGE_RE.match(blocks_cell)
+        stage = sm.group(1) if sm else None
+        blocks = [] if (blocks_all or stage) else _blocked_item_numbers(blocks_cell)
+        out.append(HumanGate(i + 1, cells[0], blocks, stage, blocks_all, kind))
+    return out
+
+
+def blocking_gates(lines: List[str]) -> List[HumanGate]:
+    """Gates still holding work up — every gate that is not ``✅ Approved``.
+
+    **A declined gate keeps blocking.** It is *resolved* — a person decided —
+    but the decision was "no", so releasing the work it guards would run
+    exactly what was refused. The remedy is to re-plan (drop the item, or
+    change what the gate asks), not to let the loop proceed. Only approval
+    opens a gate.
+
+    An unrecognised status also blocks: a typo in the mark must not silently
+    open one.
+    """
+    return [g for g in human_gates(lines) if g.kind != "approved"]
+
+
+def gate_blocked_items(lines: List[str]) -> Tuple[set, List[HumanGate]]:
+    """``(blocked item numbers, block-everything gates)`` from the blocking gates.
+
+    A ``stage N`` gate resolves through progress.md to the items that stage's
+    deliverables reference, so its reach follows the roadmap as the stage's
+    contents change — which is the whole reason reach is anchored to a stage
+    rather than to whichever queue happens to be live.
+    """
+    blocked, everything = set(), []
+    for g in blocking_gates(lines):
+        if g.blocks_all:
+            everything.append(g)
+        elif g.stage is not None:
+            blocked.update(stage_item_numbers(lines, g.stage))
+        else:
+            blocked.update(g.blocks)
+    return blocked, everything
+
+
 def outcome_targets(lines: List[str]) -> List[OutcomeTarget]:
     """Rows of the optional ``## Outcome targets`` table in progress.md.
 
@@ -810,6 +955,417 @@ def insight_warnings(ddir: Path) -> List[str]:
     return out
 
 
+def absolute_path_test_warnings(repo_root: Path,
+                                config: Dict[str, Dict[str, object]]) -> List[str]:
+    """Warn on a test file containing the repository's own absolute path.
+
+    The one portability rule of conventions.md §6 a script can decide, and the
+    one whose recorded instance was invisible to every other gate for weeks: a
+    test pinned the authoring sandbox's own filesystem path instead of
+    resolving relative to the test file. Because that path *is* where the
+    project sits on that machine, it passed the builder's run, both validator
+    rounds, and even a fresh clone into a different directory — an absolute
+    path ignores where the process runs from. On every CI runner the glob
+    matched nothing, the digest collapsed to SHA-256 of empty input, and all
+    four legs failed.
+
+    Matching the repo root literally keeps this exact: a test that hardcodes
+    the path of the repository it lives in is wrong on any other machine, with
+    no judgement call and no false positive to argue about.
+    """
+    tests_dir = repo_root / str(config["project"].get("tests_dir", "tests"))
+    if not tests_dir.is_dir():
+        return []
+    # Three spellings, because the offending literal is whatever the authoring
+    # platform wrote and this check must fire wherever it runs. On POSIX all
+    # three collapse to one string; on Windows they are genuinely different:
+    #   as_posix()  C:/path/to/repo    — a forward-slash literal
+    #   str()       C:\path\to\repo    — a raw string, r"C:\path\to\repo"
+    #   escaped     C:\\path\\to\\repo — an ordinary literal, the COMMON form
+    # Omitting the third would make this portability lint miss the most likely
+    # Windows spelling of the very defect it exists to catch.
+    root = repo_root.resolve()
+    needles = {root.as_posix(), str(root), str(root).replace("\\", "\\\\")}
+    out: List[str] = []
+    for path in sorted(tests_dir.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        try:
+            text = path.read_text(encoding=_ENCODING)
+        except (OSError, UnicodeDecodeError):
+            continue
+        for lineno, line in enumerate(text.splitlines(), start=1):
+            if any(n in line for n in needles):
+                rel = _rel_display(path, repo_root)
+                out.append(
+                    f"{rel}:{lineno}: contains this repository's absolute path — "
+                    f"it passes here and matches nothing on any other checkout; "
+                    f"resolve from the test file instead "
+                    f"(Path(__file__).resolve().parents[N]). See conventions.md §6")
+                break   # one warning per file is enough to act on
+    return out
+
+
+def _is_gate_table_furniture(cells: List[str]) -> bool:
+    """True for the gates table's header or separator row — never for data.
+
+    The separator test requires a NON-EMPTY cell. `set("") <= set("-: ")` is
+    true, so an empty first cell used to read as a separator: a malformed row
+    like `| | 028 | ⏳ Awaiting | a | pipe |` was skipped *silently*, which is
+    precisely the vanishing-gate failure the warning below exists to catch.
+    """
+    if not cells:
+        return True
+    first = cells[0]
+    return first.lower() == "gate" or bool(first.strip()) and set(first) <= set("-: ")
+
+
+def _malformed_gate_row_warnings(lines: List[str]) -> List[str]:
+    """Rows inside the gates table the parser had to skip.
+
+    A gate is only useful if it is read, so a row with the wrong column count
+    must not vanish in silence — that turns "a person must decide this" into
+    "nothing is blocking", which is the most dangerous way this feature can
+    fail. The CLI refuses to write a `|` into a cell; this catches the rest
+    (a hand edit, a paste).
+    """
+    out: List[str] = []
+    in_section = False
+    for i, line in enumerate(lines):
+        if _GATES_HEADING_RE.match(line):
+            in_section = True
+            continue
+        if not in_section:
+            continue
+        if _ANY_HEADER_RE.match(line):
+            break
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        cells = _split_row(line)
+        if _is_gate_table_furniture(cells) or len(cells) == 4:
+            continue
+        out.append(
+            f"progress.md:{i + 1}: human-gate row has {len(cells)} columns, not 4 — "
+            f"it is being SKIPPED, so whatever it was meant to block is not "
+            f"blocked. A '|' inside a cell is the usual cause.")
+    return out
+
+
+def gate_warnings(lines: List[str]) -> List[str]:
+    """One warning per unresolved human gate, plus one per unreadable row.
+
+    A warning, never an error: an outstanding gate is a normal state — work is
+    waiting on a person, which is what it is for. The point is that the state
+    is *visible* rather than buried in an item spec's prose.
+    """
+    out: List[str] = []
+    out.extend(_malformed_gate_row_warnings(lines))
+    for n, g in enumerate(human_gates(lines), start=1):
+        if g.kind == "approved":
+            continue
+        if g.kind is None:
+            out.append(
+                f"progress.md:{g.lineno}: human gate {n} ({g.text}) has an "
+                f"unrecognised status — use ⏳ Awaiting, ✅ Approved or ❌ Declined; "
+                f"until it reads one of those the gate counts as unresolved")
+            continue
+        if g.kind == "declined":
+            out.append(
+                f"progress.md:{g.lineno}: human gate {n} ({g.text}) was DECLINED "
+                f"and still blocks {g.reach} — a refusal does not release the "
+                f"work it guards; drop those items or change what the gate asks")
+            continue
+        if g.stage is not None and not stage_item_numbers(lines, g.stage):
+            # A typo here is invisible otherwise: the gate looks like it guards
+            # a stage while holding nothing at all.
+            reach = (f"stage {g.stage} — which has no deliverable referencing "
+                     f"any item, so this gate holds NOTHING; check the stage "
+                     f"number")
+        elif g.blocks or g.stage or g.blocks_all:
+            reach = g.reach
+        else:
+            reach = ("nothing named — the Blocks cell names no item, no "
+                     "'stage N', and is not 'all', so this gate holds nothing")
+        out.append(f"progress.md:{g.lineno}: human gate {n} ({g.text}) is "
+                   f"awaiting a decision — blocks {reach}")
+    return out
+
+
+#: A deliverable bullet must be FLAT (conventions.md §1). `_BULLET_RE` allows
+#: leading whitespace, so a nested bullet is read as a **full deliverable** —
+#: not ignored. That is the hazard: nesting implies subordination to a reader
+#: while the rollup counts it as a peer, so a `📋` child silently drags its ✅
+#: parent's stage to 🚧. Verified: ['complete', 'planned'] -> in-progress.
+_NESTED_DELIVERABLE_RE = re.compile(r"^\s+[-*]\s*(?P<icon>" + _ICON_ALT + r")")
+
+#: Documents whose template carries a header blockquote. Not every file under
+#: docs_dir: a generated artifact or a project note is not a living document,
+#: and insights.md's template deliberately opens with a comment instead.
+_BLOCKQUOTE_DOCS = ("vision.md", "roadmap.md", "progress.md")
+
+#: A status FIELD in an item header: `**Status:** x` or `**Status**: x`. The
+#: colon is required, so bold emphasis on the word in prose is not a match.
+_ITEM_STATUS_FIELD_RE = re.compile(
+    r"\*\*\s*(?P<name>Status|Completed)\s*(?::\s*\*\*|\*\*\s*:)")
+
+
+#: Calls that spawn a process. Matched through the AST, never by line text: the
+#: one occurrence in the consumer measured against was a DOCSTRING explaining
+#: why the author had removed a subprocess — a line-based lint flags the file
+#: documenting the correct practice.
+_SUBPROCESS_FUNCS = frozenset({"run", "Popen", "check_output", "check_call", "call"})
+
+
+def _rel_display(path: Path, repo_root: Path) -> str:
+    """*path* relative to the repo for a message, falling back to absolute.
+
+    `tests_dir` may be configured absolute or resolve outside the repo via a
+    symlink, and `relative_to` raises then. Shared by every test-hygiene lint:
+    fixing this once in `absolute_path_test_warnings` and then hand-writing the
+    same call in two new ones is exactly how it came back.
+    """
+    try:
+        return path.relative_to(repo_root).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def _test_files(repo_root: Path, config: Dict[str, Dict[str, object]]) -> List[Path]:
+    tests_dir = repo_root / str(config["project"].get("tests_dir", "tests"))
+    if not tests_dir.is_dir():
+        return []
+    return [p for p in sorted(tests_dir.rglob("*.py"))
+            if "__pycache__" not in p.parts]
+
+
+def separator_dependent_test_warnings(repo_root: Path,
+                                      config: Dict[str, Dict[str, object]]) -> List[str]:
+    """Tests stringifying a relative `Path` into a value that gets compared.
+
+    conventions.md §6: any `Path` entering a hash, comparison or match must be
+    `.as_posix()`. Narrowed to `.relative_to(`, the shape all four recorded
+    CI-only failures took, reached two ways — an explicit `str(...)` and an
+    f-string, which calls `str()` for you.
+
+    Matched through the AST, because a regex cannot tell an f-string's `{...}`
+    from a dict or set literal: `{p.relative_to(root): 1}` never stringifies the
+    Path and must not be flagged. A lint that cries wolf stops being read.
+    """
+    out: List[str] = []
+    for path in _test_files(repo_root, config):
+        try:
+            tree = ast.parse(path.read_text(encoding=_ENCODING))
+        except (OSError, UnicodeDecodeError, SyntaxError):
+            continue
+
+        def _ends_in_relative_to(node) -> bool:
+            """True when the OUTERMOST call of *node* is `.relative_to(...)`.
+
+            Deliberately the outermost, not anywhere in the subtree: searching
+            the subtree flags `str(p.relative_to(root).as_posix())`, which is
+            already separator-stable and is exactly what the rule asks for.
+            Flagging compliant code is how a lint stops being read, so this
+            errs narrow — it reports the recorded shape and stays quiet on
+            anything already normalised.
+            """
+            return (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr == "relative_to")
+
+        for node in ast.walk(tree):
+            hit = False
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and node.func.id == "str" and len(node.args) == 1):
+                hit = _ends_in_relative_to(node.args[0])
+            elif isinstance(node, ast.JoinedStr):
+                hit = any(_ends_in_relative_to(v.value) for v in node.values
+                          if isinstance(v, ast.FormattedValue))
+            if hit:
+                out.append(
+                    f"{_rel_display(path, repo_root)}:{node.lineno}: a relative "
+                    f"Path rendered with str() carries the OS separator, so this "
+                    f"value differs on Windows — use .as_posix() "
+                    f"(conventions.md §6)")
+                break
+    return out
+
+
+def cli_subprocess_test_warnings(repo_root: Path,
+                                 config: Dict[str, Dict[str, object]]) -> List[str]:
+    """Tests shelling out to `aide.py` instead of calling its function.
+
+    conventions.md §6: prefer calling the function over shelling out to the
+    command that calls it. The logic is importable and returns structured data;
+    the subprocess adds stdout encoding, platform quirks, and a re-parse of what
+    was structured a moment earlier. The recorded instance returned
+    ``stdout is None`` on a Windows runner — and had it returned ``""`` the test
+    would have passed while checking nothing.
+    """
+    out: List[str] = []
+    for path in _test_files(repo_root, config):
+        try:
+            tree = ast.parse(path.read_text(encoding=_ENCODING))
+        except (OSError, UnicodeDecodeError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+            if name not in _SUBPROCESS_FUNCS:
+                continue
+            if any(isinstance(c, ast.Constant) and isinstance(c.value, str)
+                   and "aide.py" in c.value for c in ast.walk(node)):
+                rel = _rel_display(path, repo_root)
+                out.append(
+                    f"{rel}:{node.lineno}: shells out to aide.py — call the "
+                    f"function instead (e.g. run_checks); a subprocess adds a "
+                    f"stdout/encoding surface that has failed on Windows only, "
+                    f"and can pass while checking nothing (conventions.md §6)")
+                break
+    return out
+
+
+def nested_deliverable_warnings(lines: List[str]) -> List[str]:
+    """Status-bearing bullets nested anywhere inside a stage section.
+
+    The parser matches indented bullets, so a nested one counts as a full
+    deliverable in the rollup and in item-status parsing. The nesting says
+    "subordinate" to a reader while the tooling says "peer" — so a `📋` child
+    quietly holds its ✅ parent's stage open, and nothing reconciles the two
+    readings.
+
+    **Scanned across the whole stage section, deliberately, not just the
+    Deliverables block.** `stage_deliverable_statuses` reads `lines[start:end]`
+    — every leading-icon bullet in the section, skipping only checkboxes — so an
+    indented status bullet under **Acceptance** drags the stage exactly the same
+    way. Verified: such a bullet turns `['complete']` into
+    `['complete', 'planned']` and a ✅ stage into 🚧. Narrowing this to the
+    Deliverables block would under-report a bullet that really does break the
+    rollup.
+    """
+    out: List[str] = []
+    for start, end, num in stage_sections(lines):
+        for i in range(start, end):
+            m = _NESTED_DELIVERABLE_RE.match(lines[i])
+            if m:
+                out.append(
+                    f"progress.md:{i + 1}: stage {num} has a nested status bullet "
+                    f"({m.group('icon')}) — the rollup counts it as a full "
+                    f"deliverable despite the indent, so it can hold the stage "
+                    f"open while reading as subordinate. Flatten it, or drop "
+                    f"its icon.")
+    return out
+
+
+def _line_after_title(lines: List[str]) -> str:
+    """The first content line after the `#` title, or "" if there is none.
+
+    Two subtleties. A multi-line HTML comment must be skipped **whole** — only
+    its opening line starts with `<!--`, so testing line-by-line lets its body
+    read as content. And the search stops at the first line after the title
+    rather than skipping further headings: "opens with a blockquote" means the
+    next thing, so `# Title` / `## Intro` / `> …` does not satisfy it.
+    """
+    in_comment = False
+    seen_title = False
+    for line in lines:
+        stripped = line.strip()
+        if in_comment:
+            if "-->" in stripped:
+                in_comment = False
+            continue
+        if stripped.startswith("<!--"):
+            if "-->" not in stripped:
+                in_comment = True
+            continue
+        if not stripped:
+            continue
+        if not seen_title:
+            if stripped.startswith("#"):
+                seen_title = True
+            continue
+        return stripped
+    return ""
+
+
+def header_blockquote_warnings(ddir: Path) -> List[str]:
+    """Living documents that do not open with their header blockquote.
+
+    The blockquote carries the document's place in the loop and what it derives
+    from — structural facts a reader landing anywhere needs (conventions.md §1).
+    """
+    out: List[str] = []
+    targets = [ddir / name for name in _BLOCKQUOTE_DOCS]
+    for sub in ("queue", "items"):
+        if (ddir / sub).is_dir():
+            targets.extend(sorted((ddir / sub).glob("*.md")))
+    for path in targets:
+        if not path.is_file():
+            continue
+        first = _line_after_title(path.read_text(encoding=_ENCODING).splitlines())
+        if not first.startswith(">"):
+            # Relative to docs_dir, matching `progress.md:12` and `items/…`.
+            rel = path.relative_to(ddir).as_posix()
+            out.append(f"{rel}: no header blockquote — the line after the title "
+                       f"should carry this document's place in the loop and what "
+                       f"it derives from")
+    return out
+
+
+def item_spec_warnings(ddir: Path) -> List[str]:
+    """Item specs that break the shapes §1 and §5 fix.
+
+    Three rules, none previously checked: the `# Item NNN — Title` heading must
+    agree with the filename (the status report parses the title from it); the
+    header must carry NO status field (status lives only in progress.md, and a
+    duplicate has no owner and only drifts); and the **Assumptions** block is
+    mandatory, since it is what the validator surfaces for audit.
+
+    The missing-Assumptions finding is reported as ONE aggregated line. Specs
+    predating the rule are common — 32 of 112 in the consumer this was measured
+    against — and 32 separate warnings would bury the substantive ones, which is
+    the failure mode issue #13 was filed for.
+    """
+    idir = ddir / "items"
+    if not idir.is_dir():
+        return []
+    out: List[str] = []
+    missing_assumptions: List[str] = []
+    for path in sorted(idir.glob("*.md")):
+        m = re.match(r"0*(\d+)", path.name)
+        if not m:
+            continue
+        num = int(m.group(1))
+        text = path.read_text(encoding=_ENCODING)
+        if not re.search(rf"^#\s+Item\s+0*{num}\s*[—–-]\s*\S", text, re.MULTILINE):
+            out.append(f"items/{path.name}: no '# Item {num:03d} — Title' heading "
+                       f"matching the filename")
+        head = text.split("\n---", 1)[0]
+        # A FIELD, not bold emphasis. Two conditions keep this precise: the line
+        # is part of the header blockquote, and a colon sits beside the bold —
+        # inside it (`**Status:**`, the template's own spelling) or right after
+        # (`**Status**:`). Matching bare `**Status**` anywhere would flag prose
+        # that merely emphasises the word.
+        sm = next((m for line in head.splitlines() if line.lstrip().startswith(">")
+                   for m in [_ITEM_STATUS_FIELD_RE.search(line)] if m), None)
+        if sm:
+            out.append(f"items/{path.name}: header carries a '{sm.group('name')}' field — "
+                       f"status lives only in progress.md; a duplicate has no owner "
+                       f"and only drifts")
+        if not re.search(r"^##\s+Assumptions", text, re.MULTILINE):
+            missing_assumptions.append(f"{num:03d}")
+    if missing_assumptions:
+        shown = ", ".join(missing_assumptions[:8])
+        more = (f" (+{len(missing_assumptions) - 8} more)"
+                if len(missing_assumptions) > 8 else "")
+        out.append(f"{len(missing_assumptions)} item spec(s) have no mandatory "
+                   f"'## Assumptions' block: {shown}{more} — it is what the "
+                   f"validator surfaces for audit at the queue boundary")
+    return out
+
+
 def _stray_icons_in_line(line: str) -> List[str]:
     """Status icons on this line that sit where one could plausibly be
     mistaken for a structural status declaration.
@@ -881,11 +1437,18 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
     errors.extend(template_residue_errors(ddir))
     warnings.extend(stray_icon_warnings(ddir))
     warnings.extend(insight_warnings(ddir))
-
+    warnings.extend(absolute_path_test_warnings(repo_root, config))
+    warnings.extend(separator_dependent_test_warnings(repo_root, config))
+    warnings.extend(cli_subprocess_test_warnings(repo_root, config))
+    warnings.extend(header_blockquote_warnings(ddir))
+    warnings.extend(item_spec_warnings(ddir))
     if not progress_path.is_file():
         return [f"missing {progress_path}"], warnings
+    # One read, reused: two reads can disagree if the file changes between them.
     text = progress_path.read_text(encoding=_ENCODING)
     lines = text.splitlines()
+    warnings.extend(gate_warnings(lines))
+    warnings.extend(nested_deliverable_warnings(lines))
 
     # Mandatory sections.
     has_stage_table = any(
@@ -1013,7 +1576,9 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
                 warnings.append(
                     f"unrecognised branch {br}: carries the claim prefix but is "
                     f"not '{prefix}NNN-short-name' (conventions.md §4), so no "
-                    f"item status is tracked for it")
+                    f"item status is tracked for it — rename it to the claim "
+                    f"shape, or once it is merged run 'aide gc --merged' to "
+                    f"delete it")
             continue
         if item_status.get(n) == "complete":
             warnings.append(f"stale claim branch {br}: item {n:03d} is already ✅")
@@ -1080,10 +1645,240 @@ def _list_claim_branches(repo_root: Path, prefix: str) -> List[str]:
 # --------------------------------------------------------------------------- #
 # command handlers
 # --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# Cross-spec queue check — do a queue's specs conflict, before any is built?
+# --------------------------------------------------------------------------- #
+class SpecFinding(NamedTuple):
+    """One cross-item conflict between the specs on a queue."""
+
+    severity: str          # "error" | "warning"
+    kind: str              # machine-readable class, for the --report seam
+    items: Tuple[int, ...]
+    message: str
+
+
+def patterns_overlap(a: str, b: str) -> bool:
+    """True when two ``## Authorised paths`` patterns can cover the same file.
+
+    Deliberately decides only the cases a script *can* decide: an identical
+    pattern, a subtree wildcard swallowing the other, and a literal path
+    covered by the other's glob. Two unrelated globs that would happen to
+    intersect on some file neither spec has thought of are not modelled —
+    reporting those would mean guessing at a future tree, and this check exists
+    to be trusted, not to be argued with.
+    """
+    a = _strip_dot_slash(a.strip())
+    b = _strip_dot_slash(b.strip())
+    if a == b:
+        return True
+    for x, y in ((a, b), (b, a)):
+        if x.endswith("/**"):
+            prefix = x[: -len("/**")]
+            if y == prefix or y.startswith(prefix + "/"):
+                return True
+    if not any(c in a for c in "*?[") and path_matches(a, b):
+        return True
+    if not any(c in b for c in "*?[") and path_matches(b, a):
+        return True
+    return False
+
+
+def _dependency_cycles(graph: Dict[int, List[int]]) -> List[List[int]]:
+    """Every dependency cycle in *graph*, each reported once.
+
+    A cycle deadlocks `aide claim` outright: every item in it is blocked by
+    another item in it, so none is ever claimable and the queue silently stops
+    producing work rather than failing.
+    """
+    cycles: List[List[int]] = []
+    seen: set = set()
+    state: Dict[int, int] = {}   # 0 = visiting, 1 = done
+
+    def walk(node: int, stack: List[int]) -> None:
+        state[node] = 0
+        stack.append(node)
+        for nxt in graph.get(node, []):
+            if state.get(nxt) == 0:
+                cycle = stack[stack.index(nxt):]
+                key = tuple(sorted(cycle))
+                if key not in seen:
+                    seen.add(key)
+                    cycles.append(cycle)
+            elif nxt not in state and nxt in graph:
+                walk(nxt, stack)
+        stack.pop()
+        state[node] = 1
+
+    for node in sorted(graph):
+        if node not in state:
+            walk(node, [])
+    return cycles
+
+
+def queue_spec_findings(repo_root: Path, config: Dict[str, Dict[str, object]],
+                        queue_number: int) -> Tuple[List[SpecFinding], List[int]]:
+    """``(findings, unspecced)`` for every spec on queue *queue_number*.
+
+    Runs in the window `/aide-spec-queue` creates and currently leaves
+    unguarded: N specs authored on one branch before any is built, where every
+    cross-item conflict is both possible and cheap to fix. The invariant it
+    enforces is the one a consumer's post-mortem arrived at — *predicting the
+    one collision a spec happens to name is not the same as proving no sibling
+    assertion depends on state this item's authorised edit changes.*
+    """
+    ddir = docs_dir(repo_root, config)
+    qpath = ddir / "queue" / f"queue-{queue_number:03d}.md"
+    if not qpath.is_file():
+        return ([SpecFinding("error", "missing-queue", (),
+                             f"no queue file at {qpath.relative_to(repo_root).as_posix()}")],
+                [])
+
+    numbers = queue_item_numbers(qpath.read_text(encoding=_ENCODING))
+    idir = ddir / "items"
+    findings: List[SpecFinding] = []
+    unspecced: List[int] = []
+    declared: Dict[int, AuthorisedPaths] = {}
+
+    for num in numbers:
+        specs = sorted(idir.glob(f"{num:03d}-*.md")) if idir.is_dir() else []
+        if not specs:
+            # Normal mid-queue state, not a conflict: /aide-spec-queue exists to
+            # fill these. Counted and reported, never silently dropped.
+            unspecced.append(num)
+            continue
+        parsed = parse_authorised_paths(specs[0].read_text(encoding=_ENCODING))
+        rel = specs[0].relative_to(repo_root).as_posix()
+        if declares_nothing(parsed):
+            findings.append(SpecFinding(
+                "warning", "undeclared-scope", (num,),
+                f"item {num:03d} ({rel}) declares no '## Authorised paths' — its "
+                f"scope cannot be compared with its siblings'. Add the section "
+                f"(conventions.md §1); until then this item needs a human scope "
+                f"review, and `aide scope` cannot check it either"))
+            continue
+        declared[num] = parsed
+
+    # The loop bookkeeping every item writes anyway (`aide scope` authorises
+    # these without them being listed). Specs often list them redundantly, and
+    # two items "conflicting" over progress.md is not a conflict — it is the
+    # claim protocol working. Excluded from the overlap check, never from the
+    # pinned-state check: pinning progress.md would be a real assertion.
+    ddir_rel = ddir.relative_to(repo_root).as_posix()
+    bookkeeping = {f"{ddir_rel}/{name}" for name in _ALWAYS_AUTHORISED}
+
+    ordered = sorted(declared)
+    for i, a in enumerate(ordered):
+        for b in ordered[i + 1:]:
+            # Row 1 — two items claim edit rights on the same file.
+            for pa in declared[a].may_change:
+                if pa in bookkeeping:
+                    continue
+                for pb in declared[b].may_change:
+                    if patterns_overlap(pa, pb):
+                        findings.append(SpecFinding(
+                            "warning", "may-change-overlap", (a, b),
+                            f"items {a:03d} and {b:03d} both claim '{pa}'"
+                            + (f" / '{pb}'" if pa != pb else "")
+                            + " under May change — whichever builds second "
+                              "inherits the first's edits; confirm that is intended"))
+        # Rows 2+3 — one item may change what another pins. Under the
+        # `## Authorised paths` vocabulary these are one check: an "Asserts
+        # against" entry covers a byte-hash pin and a live recomputation alike,
+        # which is the point — the live-recomputed case is the one a survey
+        # hunting fragile-looking hashes missed.
+        for b in ordered:
+            if a == b:
+                continue
+            for pa in declared[a].may_change:
+                for pb in declared[b].asserts_against:
+                    if patterns_overlap(pa, pb):
+                        findings.append(SpecFinding(
+                            "error", "changes-pinned-state", (a, b),
+                            f"item {a:03d} may change '{pa}', which item {b:03d} "
+                            f"pins as '{pb}' under Asserts against — item {b:03d}'s "
+                            f"assertion breaks when item {a:03d} lands. Decide now "
+                            f"which side is wrong: widen the pin, or narrow the edit"))
+
+    # Row 5 — the dependency graph. A cycle deadlocks `aide claim`: every item
+    # in it is blocked by another in it, so the queue silently stops producing
+    # work rather than failing.
+    graph = {num: _item_dependencies(repo_root, config, num)
+             for num in numbers if num not in unspecced}
+    for cycle in _dependency_cycles(graph):
+        chain = " → ".join(f"{n:03d}" for n in cycle + [cycle[0]])
+        findings.append(SpecFinding(
+            "error", "dependency-cycle", tuple(cycle),
+            f"dependency cycle {chain} — every item in it is blocked by another "
+            f"in it, so `aide claim` will never offer any of them"))
+
+    known = set(numbers)
+    for num, deps in graph.items():
+        for dep in deps:
+            if dep in known:
+                continue
+            has_spec = bool(sorted(idir.glob(f"{dep:03d}-*.md"))) if idir.is_dir() else False
+            in_a_queue = any(dep in queue_item_numbers(p.read_text(encoding=_ENCODING))
+                             for p in _queue_paths(ddir / "queue"))
+            if not has_spec and not in_a_queue:
+                findings.append(SpecFinding(
+                    "warning", "unknown-dependency", (num, dep),
+                    f"item {num:03d} depends on item {dep:03d}, which has no spec "
+                    f"and appears in no queue — a typo here blocks the item forever"))
+
+    return findings, unspecced
+
+
+def _write_findings_report(path: Path, queue_number: int,
+                           findings: List[SpecFinding],
+                           unspecced: List[int]) -> None:
+    """Write the machine-readable report — the seam a reviewer pass consumes as
+    its worklist rather than re-deriving what this check already decided."""
+    payload = {
+        "queue": queue_number,
+        "unspecced_items": unspecced,
+        "findings": [
+            {"severity": f.severity, "kind": f.kind,
+             "items": list(f.items), "message": f.message}
+            for f in findings
+        ],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Plain utf-8, NOT `_ENCODING`: that is utf-8-sig, which writes a BOM. A BOM
+    # is right for the markdown documents (Windows editors add one and the
+    # parsers must tolerate it) and wrong here — `json.loads` rejects a leading
+    # BOM outright, so the seam would be unreadable by the very consumer it
+    # exists for.
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8")
+
+
 def cmd_check(args: argparse.Namespace) -> int:
+    queue_number = getattr(args, "queue", None)
+    if getattr(args, "report", None) and queue_number is None:
+        # Silently ignoring it would be worse than refusing: the caller asked
+        # for a file that would never appear, and only the missing file would
+        # ever say so.
+        print("aide check: --report needs --queue; there are no cross-spec "
+              "findings to report without one", file=sys.stderr)
+        return 2
+
     repo_root = find_repo_root(args.repo)
     config = load_config(repo_root)
     errors, warnings = run_checks(repo_root, config)
+
+    if queue_number is not None:
+        findings, unspecced = queue_spec_findings(repo_root, config, queue_number)
+        for f in findings:
+            (errors if f.severity == "error" else warnings).append(f.message)
+        if unspecced:
+            listed = ", ".join(f"{n:03d}" for n in unspecced)
+            print(f"aide check: queue {queue_number:03d} — {len(unspecced)} item(s) "
+                  f"not yet specced, so not compared: {listed}")
+        report = getattr(args, "report", None)
+        if report:
+            _write_findings_report(Path(report), queue_number, findings, unspecced)
+            print(f"aide check: wrote {report}")
+
     for w in warnings:
         print(f"warning: {w}")
     for e in errors:
@@ -1092,6 +1887,86 @@ def cmd_check(args: argparse.Namespace) -> int:
         print(f"aide check: FAIL ({len(errors)} error(s), {len(warnings)} warning(s))")
         return 1
     print(f"aide check: OK ({len(warnings)} warning(s))")
+    return 0
+
+
+def set_gate_status(text: str, index: int, kind: str,
+                    note: Optional[str] = None, today: Optional[str] = None) -> str:
+    """Resolve the *index*-th (1-based) row of the ``## Human gates`` table.
+
+    Writes the decision and the date into the Status cell, and *note* into the
+    last cell. Raises ``ValueError`` for a missing table or an out-of-range
+    index — a typo must not pass as a silent no-op, which is exactly how a
+    hand-edited gate went wrong before there was a verb for it.
+    """
+    lines = text.splitlines()
+    gates = human_gates(lines)
+    if not gates:
+        raise ValueError("no '## Human gates' table in progress.md")
+    if not 1 <= index <= len(gates):
+        raise ValueError(f"there are {len(gates)} human gate(s); {index} is out of range")
+    gate = gates[index - 1]
+    if note and ("|" in note or "\n" in note or "\r" in note):
+        raise ValueError(
+            "the note may not contain '|' or a line break — either breaks the "
+            "row's shape, and a row the parser cannot read is skipped, making a "
+            "still-blocking gate silently disappear")
+    icon = {"approved": "✅ Approved", "declined": "❌ Declined"}[kind]
+    import datetime as _dt
+    stamp = today or _dt.date.today().isoformat()
+    i = gate.lineno - 1
+    cells = _split_row(lines[i])
+    cells[2] = f"{icon} ({stamp})"
+    if note:
+        cells[3] = note
+    lines[i] = "| " + " | ".join(cells) + " |"
+    return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+
+
+def cmd_gate(args: argparse.Namespace) -> int:
+    """List or resolve the human gates in progress.md.
+
+    Resolving a gate is a **person's** act. No agent may run `approve` or
+    `decline`: a gate exists precisely because the decision is not derivable
+    from the work, so an agent resolving one destroys the only thing it was
+    protecting.
+    """
+    repo_root = find_repo_root(args.repo)
+    config = load_config(repo_root)
+    ppath = docs_dir(repo_root, config) / "progress.md"
+    if not ppath.is_file():
+        print(f"aide gate: missing {ppath}", file=sys.stderr)
+        return 2
+    text = ppath.read_text(encoding=_ENCODING)
+    gates = human_gates(text.splitlines())
+
+    if args.action == "list":
+        if not gates:
+            print("aide gate: no '## Human gates' table (nothing gated)")
+            return 0
+        for n, g in enumerate(gates, start=1):
+            reach = g.reach
+            mark = {"approved": "✅", "declined": "❌", "awaiting": "⏳"}.get(g.kind, "⚠")
+            print(f"  {n}. {mark} {g.text} — blocks {reach}")
+        outstanding = len(blocking_gates(text.splitlines()))
+        print(f"aide gate: {len(gates)} gate(s), {outstanding} still blocking")
+        return 0
+
+    if args.number is None:
+        print(f"aide gate: '{args.action}' needs a gate number — see `aide gate list`",
+              file=sys.stderr)
+        return 2
+    kind = "approved" if args.action == "approve" else "declined"
+    try:
+        updated = set_gate_status(text, args.number, kind, args.note)
+    except ValueError as exc:
+        print(f"aide gate: {exc}", file=sys.stderr)
+        return 2
+    ppath.write_text(updated, encoding=_ENCODING)
+    print(f"gate {args.number}: {kind}")
+    if not args.no_commit:
+        _commit_progress_file(repo_root, config,
+                              f"docs: human gate {args.number} {kind}")
     return 0
 
 
@@ -1362,20 +2237,36 @@ def _item_dependencies(repo_root: Path, config, number: int) -> List[int]:
 
 def _pick_item(repo_root: Path, config, queue_text: str,
                claim_branches: List[str]) -> Optional[Tuple[int, str]]:
-    """First queue item that is planned, unclaimed, and unblocked. (number, title)."""
-    _, _, item_status = _parse_item_status(
-        (docs_dir(repo_root, config) / "progress.md").read_text(encoding=_ENCODING).splitlines()
-    ) if (docs_dir(repo_root, config) / "progress.md").is_file() else ([], [], {})
-    claimed_nums = set()
-    for br in claim_branches:
-        cm = re.search(r"/(\d+)-", br) or re.search(r"(\d+)", br.rsplit("/", 1)[-1])
-        if cm:
-            claimed_nums.add(int(cm.group(1)))
+    """First queue item that is planned, unclaimed, and unblocked. (number, title).
+
+    "Unblocked" covers three things: its `## Dependencies` are all under way,
+    no claim branch exists for it, and **no unresolved human gate holds it**. A
+    gate naming items (directly, or via `stage N`) skips just those, so the
+    queue keeps producing other work; an `all` gate stops everything, which is
+    the point of declaring one — a pending decision that could invalidate what
+    comes next must not have the loop racing ahead of it.
+    """
+    ppath = docs_dir(repo_root, config) / "progress.md"
+    plines = ppath.read_text(encoding=_ENCODING).splitlines() if ppath.is_file() else []
+    _, _, item_status = _parse_item_status(plines) if plines else ([], [], {})
+    gate_blocked, block_everything = gate_blocked_items(plines)
+    if block_everything:
+        return None
+    # Anchored resolution, like every other branch->item call site since 1.5.0.
+    # The old unanchored search read `aide/queue-016` as item 016 and
+    # `aide/specs-queue-015` as item 015, marking those items permanently
+    # "claimed" and therefore unclaimable — a queue branch is not an item claim.
+    # This call site was missed when the shared helper landed.
+    prefix = str(config["git"].get("branch_prefix", "aide/"))
+    claimed_nums = {n for n in (_branch_item_number(br, prefix) for br in claim_branches)
+                    if n is not None}
     titles = _queue_titles(queue_text)
     for num in queue_item_numbers(queue_text):
         if item_status.get(num, "planned") != "planned":
             continue
         if num in claimed_nums:
+            continue
+        if num in gate_blocked:
             continue
         deps = _item_dependencies(repo_root, config, num)
         if any(item_status.get(d, "planned") in ("planned", "in-progress") for d in deps):
@@ -1443,17 +2334,76 @@ def cmd_claim(args: argparse.Namespace) -> int:
         if pick is not None:
             break
     if pick is None:
+        # "none left" is a claim about the ground checked, not the repository —
+        # an unresolved gate is the one reason nothing is claimable that a
+        # reader would otherwise have no way to see (conventions.md §8).
+        ppath = docs_dir(repo_root, config) / "progress.md"
+        plines = ppath.read_text(encoding=_ENCODING).splitlines() if ppath.is_file() else []
+        # Attribute the empty result to a gate ONLY when a gate actually
+        # explains it: an `all` gate, or a gate reaching an item that is still
+        # open in a queue we just scanned. A gate holding unrelated items — or
+        # naming nothing — is not why this run found no work, and blaming it
+        # would be a false explanation, which is worse than none.
+        _, _, gate_item_status = _parse_item_status(plines) if plines else ([], [], {})
+        queued = set()
+        for qt in candidates:
+            queued.update(queue_item_numbers(qt))
+        open_items = {n for n in queued
+                      if gate_item_status.get(n, "planned") == "planned"}
+        def _reached(g):
+            if g.blocks_all:
+                return set(open_items)
+            if g.stage is not None:
+                return set(stage_item_numbers(plines, g.stage)) & open_items
+            return set(g.blocks) & open_items
+
+        relevant = [(n, g) for n, g in enumerate(human_gates(plines), start=1)
+                    if g.kind != "approved" and (g.blocks_all or _reached(g))]
+        if relevant:
+            print("none left — held by an unresolved human gate:")
+            for n, g in relevant:
+                held = sorted(_reached(g))
+                where = "everything" if g.blocks_all else (
+                    f"{g.reach} — holding " + ", ".join(f"{i:03d}" for i in held))
+                print(f"  gate {n}: {g.text} — blocks {where}")
+            print("  A person decides these, never an agent. Once decided: "
+                  "aide gate approve <n> --evidence \"…\" (or gate decline <n>).")
+            return 0
         print("none left")
         return 0
     number, title = pick
     branch = f"{prefix}{number:03d}-{_slug(title)}"
+
+    # What this claim branches off, and what its `merge` will return it to.
+    # `switch -c` already branches from whatever is checked out, so claiming
+    # from a queue branch has always branched correctly — only the merge target
+    # was fixed. Inferring the base from a *recognised queue branch* (never from
+    # an arbitrary branch, which would silently retarget a merge) closes that
+    # half without asking every caller to pass a flag it cannot know.
+    current = _current_branch(repo_root)
+    base = args.base or (current if _is_queue_branch(current, prefix)
+                         else str(config["git"].get("main_branch", "main")))
+
+    if not _local_branch_exists(repo_root, base):
+        print(f"aide claim: base '{base}' is not a local branch — an item is "
+              f"branched from its base and merged back into it, so the base "
+              f"must be a branch this checkout can update", file=sys.stderr)
+        return 1
+
     if args.dry_run:
-        print(f"would claim item {number:03d} -> {branch} ({title})")
+        print(f"would claim item {number:03d} -> {branch} ({title}); base {base}")
         return 0
-    git(["switch", "-c", branch], repo_root)
+    # Branch FROM the base, explicitly. `switch -c` with no start point uses
+    # HEAD, which would let the branch's actual starting point disagree with
+    # the base it records — claiming with `--base main` while a queue branch is
+    # checked out would start from the queue branch and then merge the whole of
+    # it into main. Naming the start point makes the two agree by construction.
+    git(["switch", "-c", branch, base], repo_root)
+    _record_branch_base(repo_root, branch, base)
     if mode != "local":
         git(["push", "-u", "origin", branch], repo_root)
-    print(f"claimed item {number:03d}: {branch} — {title}")
+    note = "" if base == str(config["git"].get("main_branch", "main")) else f" (base {base})"
+    print(f"claimed item {number:03d}: {branch} — {title}{note}")
     return 0
 
 
@@ -1469,16 +2419,31 @@ def cmd_merge(args: argparse.Namespace) -> int:
     config = load_config(repo_root)
     prefix = str(config["git"].get("branch_prefix", "aide/"))
     mode = str(config["git"].get("mode", "auto-merge"))
-    main = str(config["git"].get("main_branch", "main"))
     branch = args.branch or _find_claim_branch(repo_root, prefix, args.number)
     if not branch:
         print(f"aide merge: no claim branch found for item {args.number:03d}", file=sys.stderr)
         return 1
 
+    # Where this item lands: --base > what the claim recorded > main_branch.
+    # Hard-wiring main_branch is what forced a consumer to merge every item of a
+    # queue by hand — the queue file, a roadmap deliverable and nine item specs
+    # lived only on the queue branch and had to land as one reviewed PR, so each
+    # item needed to merge *back into* that branch.
+    main = resolve_base(repo_root, config, args.base, branch)
+    if not _local_branch_exists(repo_root, main):
+        detail = ("it resolves, but not to a local branch — `git switch` would "
+                  "detach HEAD, and a merge into a detached HEAD updates no "
+                  "branch while still reporting success"
+                  if _ref_exists(repo_root, main) else "no such local branch")
+        print(f"aide merge: base '{main}' cannot be merged into: {detail}. "
+              f"Pass a local branch as --base.", file=sys.stderr)
+        return 1
+
     if mode == "pr":
         git(["push", "-u", "origin", branch], repo_root)
-        print(f"aide merge (pr mode): pushed {branch}. Open a PR to land it "
-              f"(e.g. 'gh pr create'); merge is left to the human review gate.")
+        print(f"aide merge (pr mode): pushed {branch}. Open a PR against {main} "
+              f"to land it (e.g. 'gh pr create'); merge is left to the human "
+              f"review gate.")
         return 0
 
     git(["switch", main], repo_root)
@@ -1580,6 +2545,376 @@ def _has_origin(repo_root: Path) -> bool:
     return "origin" in out.split()
 
 
+# --------------------------------------------------------------------------- #
+# Base refs — what a claim branched from, and what its merge returns to
+# --------------------------------------------------------------------------- #
+#: Where a claim branch remembers its base. A git-config key under the branch's
+#: own section, so it travels with the branch through switch/rebase and needs no
+#: file in the repo. It is deliberately *local* config: the base is a fact about
+#: this checkout's branching, not something to commit and share. A machine that
+#: never ran the `claim` falls back to `main_branch`, and `--base` is always
+#: available — nothing silently merges somewhere unexpected.
+_BASE_CONFIG_KEY = "aide-base"
+
+
+def _record_branch_base(repo_root: Path, branch: str, base: str) -> None:
+    git(["config", f"branch.{branch}.{_BASE_CONFIG_KEY}", base],
+        repo_root, check=False)
+
+
+def _recorded_branch_base(repo_root: Path, branch: str) -> Optional[str]:
+    if not branch:
+        return None
+    res = git(["config", "--get", f"branch.{branch}.{_BASE_CONFIG_KEY}"],
+              repo_root, check=False)
+    value = res.stdout.strip()
+    return value or None
+
+
+def _current_branch(repo_root: Path) -> str:
+    return git(["rev-parse", "--abbrev-ref", "HEAD"],
+               repo_root, check=False).stdout.strip()
+
+
+def _ref_exists(repo_root: Path, ref: str) -> bool:
+    return git(["rev-parse", "--verify", "--quiet", ref],
+               repo_root, check=False).returncode == 0
+
+
+def _local_branch_exists(repo_root: Path, ref: str) -> bool:
+    """True only for an existing **local branch**, not any resolvable ref.
+
+    A base must be a local branch, and merely resolving is not enough: `git
+    switch` on a tag, a raw commit or a remote-tracking ref like `origin/main`
+    detaches HEAD. A merge into a detached HEAD updates no branch at all, yet
+    still reports success and lets the claim branch be deleted — the work
+    survives only as an unreferenced commit. So the check is on the ref's
+    *kind*, not its existence.
+    """
+    return git(["show-ref", "--verify", "--quiet", f"refs/heads/{ref}"],
+               repo_root, check=False).returncode == 0
+
+
+def _remote_or_local(repo_root: Path, ref: str) -> str:
+    """``origin/<ref>`` when it resolves, else *ref* unchanged.
+
+    Used where the question is "what has this branch actually diverged from" —
+    the remote-tracking ref is what CI compares against and what the branch will
+    merge into, and a local ref sitting behind the work answers that wrongly.
+    """
+    if _has_origin(repo_root):
+        remote = f"origin/{ref}"
+        if _ref_exists(repo_root, remote):
+            return remote
+    return ref
+
+
+def resolve_base(repo_root: Path, config: Dict[str, Dict[str, object]],
+                 explicit: Optional[str] = None,
+                 branch: Optional[str] = None) -> str:
+    """The base ref for a branch: explicit ``--base`` > recorded > config.
+
+    ``main_branch`` stays the default and is never removed as one — this only
+    adds the two ways a branch can legitimately have a *different* base, which
+    is what stacked work produces: a queue branch's items branch off it and must
+    merge back into it, so the whole queue lands as one reviewed PR.
+    """
+    if explicit:
+        return explicit
+    if branch is None:
+        branch = _current_branch(repo_root)
+    recorded = _recorded_branch_base(repo_root, branch)
+    if recorded:
+        return recorded
+    return str(config["git"].get("main_branch", "main"))
+
+
+# --------------------------------------------------------------------------- #
+# Scope check — a branch's diff against its item's `## Authorised paths`
+# --------------------------------------------------------------------------- #
+_AUTHORISED_HEADING = "## Authorised paths"
+#: The two sub-lists of that section (conventions.md §1), matched case- and
+#: punctuation-insensitively so `**May change:**`, `**May change**` and
+#: `May change:` all read the same.
+_MAY_CHANGE_LABEL = "may change"
+_ASSERTS_LABEL = "asserts against"
+
+#: Loop bookkeeping the `aide` CLI and the agent roles are mandated to write on
+#: *any* item, whatever that item is about — so a change to one is never
+#: evidence of scope creep, and listing them would force every spec to repeat
+#: the same boilerplate bullets just to pass. Kept explicit and wildcard-free so
+#: the set cannot silently grow into a scope hole:
+#:
+#: - ``progress.md`` — rewritten by ``aide progress set`` on every item.
+#: - ``insights.md`` — the compound-engineering inbox; conventions.md §1 names
+#:   appending to it as the one write allowed outside an agent's edit scope, so
+#:   flagging it would punish exactly the behaviour the framework requires.
+#:
+#: The item's own spec is authorised separately, by number, in ``cmd_scope`` —
+#: the builder records Decisions & Trade-offs there on every item.
+_ALWAYS_AUTHORISED = ("progress.md", "insights.md")
+
+
+class AuthorisedPaths(NamedTuple):
+    """The two lists of an item spec's ``## Authorised paths`` section."""
+
+    may_change: List[str]
+    asserts_against: List[str]
+
+
+def _strip_dot_slash(path: str) -> str:
+    """Drop a leading ``./``, and only that.
+
+    Never ``lstrip("./")``, which strips leading *characters* from that set and
+    so silently renames the dotfiles specs routinely authorise —
+    ``.gitattributes`` to ``gitattributes``, ``.github/workflows/ci.yml`` to
+    ``github/workflows/ci.yml`` — turning a declared path into one that matches
+    nothing git ever reports.
+    """
+    while path.startswith("./"):
+        path = path[2:]
+    return path
+
+
+def _sub_list_label(line: str) -> Optional[str]:
+    """The normalised sub-list label on *line*, or None if it is not one."""
+    text = line.strip().strip("*_").strip().rstrip(":").strip().lower()
+    if text == _MAY_CHANGE_LABEL:
+        return _MAY_CHANGE_LABEL
+    if text == _ASSERTS_LABEL:
+        return _ASSERTS_LABEL
+    return None
+
+
+def _bullet_path(line: str) -> Optional[str]:
+    """The repo-relative path a section bullet declares, or None.
+
+    A bullet is ``- `path` — why``: the path is the FIRST backtick span, never
+    the whole body, because the reason that follows it is prose. Falls back to
+    the text before the first dash/colon separator for a bullet written without
+    backticks. Returns None for a bullet that declares no path — an unfilled
+    ``{{slot}}`` (``aide check`` already errors on those, so failing here as
+    well would report one authoring slip twice) or a literal "None."
+    """
+    stripped = line.strip()
+    if not stripped or stripped[0] not in "-*+":
+        return None
+    body = stripped[1:].strip()
+    if not body or "{{" in body:
+        return None
+    m = re.search(r"`([^`]+)`", body)
+    if m:
+        candidate = m.group(1)
+    else:
+        candidate = re.split(r"\s+[—–-]\s+|:", body, maxsplit=1)[0]
+    candidate = candidate.strip().strip("`").strip()
+    if not candidate or candidate.rstrip(".").lower() == "none":
+        return None
+    return _strip_dot_slash(candidate)
+
+
+def declares_nothing(parsed: Optional[AuthorisedPaths]) -> bool:
+    """True when a spec's scope cannot be compared with anything.
+
+    An **empty May change is not the same as nothing declared**: a
+    stage-validation item legitimately changes only the loop bookkeeping every
+    item may write, while still pinning the tree it validates under *Asserts
+    against*. Treating that as undeclared would drop exactly the specs whose
+    whole purpose is to assert — so the test is that *both* lists are empty.
+    """
+    return parsed is None or not (parsed.may_change or parsed.asserts_against)
+
+
+def parse_authorised_paths(text: str) -> Optional[AuthorisedPaths]:
+    """Parse an item spec's ``## Authorised paths`` section.
+
+    Returns None when the section is absent — distinct from a present-but-empty
+    section (``AuthorisedPaths([], [])``), because the two need different
+    remedies and neither may be read as "unconstrained" (conventions.md §1).
+
+    Bullets appearing before either sub-list label are read as **May change**,
+    which is what makes the flat single-list form — the shape consumers wrote
+    before the labels existed — parse correctly rather than silently empty.
+    """
+    lines = text.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if line.strip() == _AUTHORISED_HEADING:
+            start = i + 1
+            break
+    if start is None:
+        return None
+
+    end = len(lines)
+    for i in range(start, len(lines)):
+        if _ANY_HEADER_RE.match(lines[i]) and lines[i].strip() != _AUTHORISED_HEADING:
+            end = i
+            break
+
+    may_change: List[str] = []
+    asserts_against: List[str] = []
+    current = may_change
+    for line in lines[start:end]:
+        label = _sub_list_label(line)
+        if label is not None:
+            current = may_change if label == _MAY_CHANGE_LABEL else asserts_against
+            continue
+        path = _bullet_path(line)
+        if path is not None:
+            current.append(path)
+    return AuthorisedPaths(may_change, asserts_against)
+
+
+def path_matches(changed: str, pattern: str) -> bool:
+    """True when repo-relative *changed* is covered by *pattern*.
+
+    Three forms, per conventions.md §1:
+
+    - ``dir/**`` — the directory and anything at any depth below it.
+    - any other pattern containing ``*``, ``?`` or ``[`` — an ordinary shell
+      glob matched **per path segment**, so ``tests/golden/*.json`` covers a
+      JSON file in that directory but not one a level deeper. Anchoring per
+      segment is the point: ``fnmatch``'s ``*`` crosses ``/`` and would quietly
+      widen every glob a spec writes into a subtree wildcard.
+    - anything else — an exact path.
+    """
+    pattern = _strip_dot_slash(pattern.strip())
+    if pattern.endswith("/**"):
+        prefix = pattern[: -len("/**")]
+        return changed == prefix or changed.startswith(prefix + "/")
+    if any(ch in pattern for ch in "*?["):
+        pat_parts = pattern.split("/")
+        path_parts = changed.split("/")
+        if len(pat_parts) != len(path_parts):
+            return False
+        return all(fnmatch.fnmatchcase(p, g) for p, g in zip(path_parts, pat_parts))
+    return changed == pattern
+
+
+def scope_findings(changed: List[str], authorised: AuthorisedPaths,
+                   always: Tuple[str, ...] = ()) -> Tuple[List[str], List[str]]:
+    """``(unauthorised, contradictions)`` for a branch's *changed* paths.
+
+    A contradiction is a path the spec declared under **Asserts against** — "my
+    tests pin this without changing it" — and then changed anyway. It is
+    reported separately from an unauthorised path because the remedy differs:
+    one widens a list, the other means an assertion in this very item is now
+    asserting against state the item moved.
+    """
+    unauthorised = [p for p in changed
+                    if p not in always
+                    and not any(path_matches(p, g) for g in authorised.may_change)]
+    contradictions = [p for p in changed
+                      if any(path_matches(p, g) for g in authorised.asserts_against)]
+    return unauthorised, contradictions
+
+
+def _scope_base_ref(repo_root: Path, config, explicit: Optional[str]) -> str:
+    """The ref ``scope`` diffs against: ``--base`` > the branch's recorded base
+    > ``main_branch``.
+
+    An explicit ``--base`` is used **verbatim** — the caller named a ref, so
+    silently substituting ``origin/`` for it would make ``--base main`` mean
+    something the caller did not write, and leave no way to ask for the local
+    ref at all. The two *derived* answers do prefer their ``origin/``
+    counterpart, since neither was chosen by anyone.
+
+    The remote-tracking preference is the footgun this exists to avoid: on a
+    checkout whose local ``main`` sits behind the work, the merge-base with it
+    *is* it, so every file the earlier items touched gets reported against the
+    current item's spec. Consulting the recorded base first is what makes the
+    verb correct on stacked work — an item claimed from a queue branch has
+    diverged from *that*, not from ``main``, and diffing against ``main`` would
+    report every sibling item already merged into the queue.
+    """
+    if explicit:
+        return explicit
+    return _remote_or_local(repo_root, resolve_base(repo_root, config))
+
+
+def cmd_scope(args: argparse.Namespace) -> int:
+    """Check that this branch's changed files stay inside the item's spec.
+
+    The diff-time counterpart to a byte-hash "scope fence": it asserts the
+    claim the fence encoded — "item N changed only these files" — once, on the
+    branch, instead of enshrining it as a suite assertion that outlives its
+    truth and goes red the moment a later item is authorised to touch the
+    pinned file (conventions.md §1).
+
+    Exit 0 in scope · 1 something changed outside it · 2 could not check.
+    """
+    repo_root = find_repo_root(args.repo)
+    config = load_config(repo_root)
+    prefix = str(config["git"].get("branch_prefix", "aide/"))
+
+    number = args.number
+    if number is None:
+        branch = _current_branch(repo_root)
+        if _is_queue_branch(branch, prefix):
+            print(f"aide scope: {branch} is a queue branch, not an item claim — "
+                  "per-item scope is checked on each claim branch as it merges "
+                  "here, and a queue branch legitimately aggregates many items' "
+                  "authorised paths. Nothing to check.")
+            return 0
+        number = _branch_item_number(branch, prefix)
+        if number is None:
+            print(f"aide scope: cannot tell which item to check — branch "
+                  f"'{branch}' is not {prefix}NNN-short-name. Name the item "
+                  f"explicitly: aide scope NNN", file=sys.stderr)
+            return 2
+
+    idir = docs_dir(repo_root, config) / "items"
+    specs = sorted(idir.glob(f"{number:03d}-*.md")) if idir.is_dir() else []
+    if not specs:
+        print(f"aide scope: no spec for item {number:03d} under {idir}",
+              file=sys.stderr)
+        return 2
+    spec = specs[0]
+    rel_spec = spec.relative_to(repo_root).as_posix()
+
+    authorised = parse_authorised_paths(spec.read_text(encoding=_ENCODING))
+    if declares_nothing(authorised):
+        what = ("has no '## Authorised paths' section" if authorised is None
+                else "declares no path under '## Authorised paths'")
+        print(f"aide scope: {rel_spec} {what} — cannot check scope. This is "
+              "reported, never passed silently: an undeclared spec is not an "
+              "unconstrained one. Add the section (see conventions.md §1) and "
+              "re-run.", file=sys.stderr)
+        return 2
+
+    base = _scope_base_ref(repo_root, config, args.base)
+    mb = git(["merge-base", base, "HEAD"], repo_root, check=False)
+    if mb.returncode != 0:
+        print(f"aide scope: could not resolve a merge-base with '{base}' — "
+              f"{mb.stderr.strip()}", file=sys.stderr)
+        return 2
+    diff = git(["diff", "--name-only", mb.stdout.strip()], repo_root, check=False)
+    if diff.returncode != 0:
+        print(f"aide scope: git diff failed — {diff.stderr.strip()}",
+              file=sys.stderr)
+        return 2
+
+    changed = [ln.strip() for ln in diff.stdout.splitlines() if ln.strip()]
+    ddir_rel = docs_dir(repo_root, config).relative_to(repo_root).as_posix()
+    always = tuple(f"{ddir_rel}/{name}" for name in _ALWAYS_AUTHORISED) + (rel_spec,)
+    unauthorised, contradictions = scope_findings(changed, authorised, always)
+
+    for path in contradictions:
+        print(f"error: {path} changed, but {rel_spec} lists it under "
+              "'Asserts against' as pinned-not-changed")
+    for path in unauthorised:
+        print(f"error: {path} not authorised by {rel_spec}")
+
+    total = len(unauthorised) + len(contradictions)
+    if total:
+        print(f"aide scope: FAIL (item {number:03d}, {total} of {len(changed)} "
+              f"changed file(s) outside scope, vs {base})")
+        return 1
+    print(f"aide scope: OK (item {number:03d}, {len(changed)} changed file(s) "
+          f"all authorised, vs {base})")
+    return 0
+
+
 def cmd_sync(args: argparse.Namespace) -> int:
     """Deterministic preflight: fetch, verify a clean start point, land on the
     right branch. Replaces the exploratory ``git status``/``git branch``/
@@ -1649,12 +2984,14 @@ def cmd_status(args: argparse.Namespace) -> int:
     config = load_config(repo_root)
     prefix = str(config["git"].get("branch_prefix", "aide/"))
     mode = str(config["git"].get("mode", "auto-merge"))
-    main = str(config["git"].get("main_branch", "main"))
 
     if not args.no_fetch and mode != "local" and _has_origin(repo_root):
         git(["fetch", "--all", "--prune"], repo_root, check=False)
 
-    branch = git(["rev-parse", "--abbrev-ref", "HEAD"], repo_root, check=False).stdout.strip()
+    branch = _current_branch(repo_root)
+    # Report divergence from the base this branch actually has, not always from
+    # main — on stacked work the interesting distance is to the queue branch.
+    main = resolve_base(repo_root, config, args.base, branch)
     line = f"branch: {branch or '(unknown)'}"
     if mode != "local" and _has_origin(repo_root):
         counts = git(["rev-list", "--left-right", "--count", f"{main}...origin/{main}"],
@@ -1691,6 +3028,13 @@ def cmd_status(args: argparse.Namespace) -> int:
     ppath = docs_dir(repo_root, config) / "progress.md"
     if ppath.is_file():
         plines = ppath.read_text(encoding=_ENCODING).splitlines()
+        for n, g in enumerate(human_gates(plines), start=1):
+            if g.kind == "approved":
+                continue
+            reach = g.reach
+            label = {"declined": "❌ declined", "awaiting": "⏳ awaiting a decision"}.get(
+                g.kind, "⚠ unrecognised status")
+            print(f"  gate {n}: {g.text} [blocks {reach}] — {label}")
         for t in outcome_targets(plines):
             if t.kind == "met":
                 continue
@@ -1731,6 +3075,51 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _merged_prefixed_branches(repo_root: Path, main: str, prefix: str) -> List[str]:
+    """Prefixed local branches already merged into *main*, per git itself."""
+    out = git(["branch", "--merged", main, "--format=%(refname:short)"],
+              repo_root, check=False).stdout
+    return [l.strip() for l in out.splitlines() if l.strip().startswith(prefix)]
+
+
+def _plural(n: int, one: str, many: str) -> str:
+    return f"{n} {one}" if n == 1 else f"{n} {many}"
+
+
+def _gc_empty_notes(repo_root: Path, prefix: str, main: str,
+                    merged_flag: bool, local: List[str],
+                    remote: List[str]) -> List[str]:
+    """Why an empty ``gc`` result may still leave cleanup available.
+
+    Two things the bare message hides. First, the default invocation checks
+    only the item ground, so a branch that no longer resolves to an item —
+    every queue and specs-queue branch — is structurally invisible to it while
+    ``--merged`` would take it. Second, `gc` only ever looks at branches under
+    ``prefix``, so a merged branch named anything else is never considered on
+    either ground.
+
+    Returns [] when there is genuinely nothing further to say, so the common
+    case stays a single terse line. The ``--merged`` probe runs only on this
+    empty path, never in the normal one.
+    """
+    notes: List[str] = []
+    if not merged_flag and (local or remote):
+        extra = _merged_prefixed_branches(repo_root, main, prefix)
+        if extra:
+            notes.append(
+                f"{_plural(len(extra), 'branch', 'branches')} under '{prefix}' "
+                f"{'is' if len(extra) == 1 else 'are'} merged into {main} — "
+                f"'aide gc --merged' will take {'it' if len(extra) == 1 else 'them'}")
+    others = [b for b in _local_branches(repo_root)
+              if not b.startswith(prefix) and b != main]
+    if others:
+        notes.append(
+            f"{_plural(len(others), 'local branch', 'local branches')} outside "
+            f"the '{prefix}' scope {'was' if len(others) == 1 else 'were'} not "
+            f"considered — gc only ever manages claim branches")
+    return notes
+
+
 def cmd_gc(args: argparse.Namespace) -> int:
     """Delete claim branches whose work has landed (item ✅ in progress.md, or
     ``--merged`` branches already merged into main). Dry-run by default; pass
@@ -1740,7 +3129,10 @@ def cmd_gc(args: argparse.Namespace) -> int:
     config = load_config(repo_root)
     prefix = str(config["git"].get("branch_prefix", "aide/"))
     mode = str(config["git"].get("mode", "auto-merge"))
-    main = str(config["git"].get("main_branch", "main"))
+    # The `--merged` ground is "already merged into <base>", so it takes a base
+    # like everything else: on stacked work the branches that have landed have
+    # landed into the queue branch, and asking about `main` finds none of them.
+    main = resolve_base(repo_root, config, args.base)
 
     if mode != "local" and _has_origin(repo_root):
         git(["fetch", "--all", "--prune"], repo_root, check=False)
@@ -1756,10 +3148,7 @@ def cmd_gc(args: argparse.Namespace) -> int:
 
     merged_local: List[str] = []
     if args.merged:
-        out = git(["branch", "--merged", main, "--format=%(refname:short)"],
-                  repo_root, check=False).stdout
-        merged_local = [l.strip() for l in out.splitlines()
-                        if l.strip().startswith(prefix)]
+        merged_local = _merged_prefixed_branches(repo_root, main, prefix)
 
     targets: Dict[str, str] = {}  # branch -> reason
     for br in sorted(set(local) | set(remote)):
@@ -1776,7 +3165,16 @@ def cmd_gc(args: argparse.Namespace) -> int:
             targets[br] = f"merged into {main}"
 
     if not targets:
+        # "Nothing to clean" is a claim about the ground and the scope this run
+        # actually checked, not about the repository — say which. The default
+        # invocation checks only the item ground, and every invocation ignores
+        # branches outside `prefix` (deliberately: gc is the one destructive
+        # verb and must not delete branches it does not own). Left unqualified,
+        # the message reads as "no cleanup is available here" and the next
+        # reach is the raw `git branch -d` the CLI exists to replace.
         print("aide gc: nothing to clean")
+        for note in _gc_empty_notes(repo_root, prefix, main, args.merged, local, remote):
+            print(f"  {note}")
         return 0
 
     current = git(["rev-parse", "--abbrev-ref", "HEAD"], repo_root, check=False).stdout.strip()
@@ -1812,6 +3210,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_check = sub.add_parser("check", help="consistency gate over docs/aide")
+    p_check.add_argument("--queue", type=int, default=None,
+                         help="also check this queue's specs against each other "
+                              "(scope overlaps, pinned state, dependency graph)")
+    p_check.add_argument("--report", default=None,
+                         help="with --queue: write the findings as JSON to this path")
     p_check.set_defaults(func=cmd_check)
 
     p_prog = sub.add_parser("progress", help="edit progress.md status / acceptance")
@@ -1828,6 +3231,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_prog.add_argument("--no-commit", action="store_true", help="edit only, do not git commit")
     p_prog.set_defaults(func=cmd_progress)
 
+    p_gate = sub.add_parser("gate", help="list / resolve human gates in progress.md")
+    p_gate.add_argument("action", choices=["list", "approve", "decline"])
+    p_gate.add_argument("number", type=int, nargs="?", default=None,
+                        help="1-based gate row (approve/decline); see `aide gate list`")
+    p_gate.add_argument("--evidence", "--reason", dest="note", default=None,
+                        help="decision note written into the gate's last cell")
+    p_gate.add_argument("--no-commit", action="store_true", help="edit only, do not git commit")
+    p_gate.set_defaults(func=cmd_gate)
+
     p_queue = sub.add_parser("queue", help="queue maintenance")
     p_queue.add_argument("action", choices=["tidy"])
     p_queue.add_argument("number", type=int)
@@ -1843,12 +3255,19 @@ def register_git_subcommands(sub) -> None:
     p_claim = sub.add_parser("claim", help="pick + claim the next unclaimed 📋 item")
     p_claim.add_argument("--queue", type=int, default=None,
                          help="queue number (default: the lowest-numbered open queue)")
+    p_claim.add_argument("--base", default=None,
+                         help="branch this claim off, and merge it back into "
+                              "(default: the current branch when it is a queue "
+                              "branch, else main_branch)")
     p_claim.add_argument("--dry-run", action="store_true", help="print the pick, do not create/push a branch")
     p_claim.set_defaults(func=cmd_claim)
 
     p_merge = sub.add_parser("merge", help="merge a validated item per git.mode")
     p_merge.add_argument("number", type=int)
     p_merge.add_argument("branch", nargs="?", default=None, help="claim branch (default: found from number)")
+    p_merge.add_argument("--base", default=None,
+                         help="merge into this ref (default: what the claim "
+                              "recorded, else main_branch)")
     p_merge.add_argument("--no-test", action="store_true", help="skip the post-merge test run")
     p_merge.set_defaults(func=cmd_merge)
 
@@ -1865,13 +3284,28 @@ def register_git_subcommands(sub) -> None:
 
     p_gc = sub.add_parser("gc", help="delete claim branches whose work has landed (dry-run by default)")
     p_gc.add_argument("--merged", action="store_true",
-                      help="also delete claim branches already merged into main")
+                      help="also delete claim branches already merged into the base")
+    p_gc.add_argument("--base", default=None,
+                      help="ref --merged is measured against (default: the "
+                           "current branch's recorded base, else main_branch)")
     p_gc.add_argument("--yes", action="store_true", help="actually delete (default: dry run)")
     p_gc.set_defaults(func=cmd_gc)
 
     p_status = sub.add_parser("status", help="one-call roadmap-state report (branch, queues, claims, PRs)")
     p_status.add_argument("--no-fetch", action="store_true", help="skip the fetch --all --prune preflight")
+    p_status.add_argument("--base", default=None,
+                          help="ref to report ahead/behind against (default: the "
+                               "current branch's recorded base, else main_branch)")
     p_status.set_defaults(func=cmd_status)
+
+    p_scope = sub.add_parser("scope",
+                             help="check this branch's diff against the item's authorised paths")
+    p_scope.add_argument("number", type=int, nargs="?", default=None,
+                         help="item number (default: read from the current claim branch)")
+    p_scope.add_argument("--base", default=None,
+                         help="base ref to diff against (default: origin/<main_branch>, "
+                              "falling back to the local ref)")
+    p_scope.set_defaults(func=cmd_scope)
 
 
 def main(argv: Optional[List[str]] = None) -> int:

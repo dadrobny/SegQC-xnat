@@ -59,6 +59,8 @@
       "Bash(gh pr status:*)",
       "Bash(gh pr diff:*)",
       "Bash(gh pr checks:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
       "Edit(docs/aide/items/**)",
       "Write(docs/aide/items/**)",
       "Edit(docs/aide/progress.md)",

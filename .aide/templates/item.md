@@ -8,6 +8,7 @@
     - Acceptance Criteria — atomic, one testable statement each  [test-writer, validator]
     - Assumptions                     [validator surfaces these at the queue boundary]
     - Implementation Steps            [builder]
+    - Authorised paths — what this item may change, and what it pins  [builder, validator]
     - Testing Strategy                [test-writer]
     - Dependencies                    [orchestrator ordering]
     - Decisions & Trade-offs          [builder records as it goes]
@@ -59,6 +60,26 @@ hand back if reality diverged. Write "None." if the item was fully specified._
 ## Implementation Steps
 
 _The intended code path in `source_dir` (see `aide.toml`). Ordered, specific._
+
+## Authorised paths
+
+_The files this item may change, and the ones its tests pin without changing —
+repo-relative, one per bullet, narrowest form that covers the work. Recognised:
+an exact path, `dir/**` (whole subtree), `dir/*.ext` (one extension in one
+directory). See conventions.md §1 — scope is proved by the diff against this
+list, not by hashing another file's bytes._
+
+**May change:**
+
+- `{{path or glob}}` — {{why this item needs it}}
+
+**Asserts against:**
+
+_Files or derived artifacts this item's tests read and pin without changing —
+including anything recomputed live from committed state. Write "None." if the
+item pins nothing outside what it changes._
+
+- `{{path}}` — {{which AC pins it, and how}}
 
 ## Testing Strategy
 

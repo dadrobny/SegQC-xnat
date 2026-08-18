@@ -2,9 +2,12 @@
 # (gitignored) and edit. Nothing here is shared or committed.
 #
 # Two independent consumers read this file:
-#   [loop]      — the loop supervisor (.aide/loop/loop.py).
-#   [framework] — the Claude adapter's command-hygiene guard (only when that
-#                 adapter is installed). Set both, either, or neither.
+#   [loop]                  — the loop supervisor (.aide/loop/loop.py).
+#   [framework] [hygiene]   — the Claude adapter's command-hygiene guard (only
+#                             when that adapter is installed). Set any, all, or
+#                             none. [framework] names the framework clone
+#                             specifically; [hygiene] names other repos this
+#                             project spans.
 
 [loop]
 # Stop once the 7-day utilization reaches this percent (0 disables).
@@ -63,3 +66,27 @@ command = ""
 # Empty/absent = the workflow's `git -C` step stays blocked (the default,
 # safe posture for anyone not actively developing the framework).
 local_path = ""
+
+[hygiene]
+# Other git repos this project legitimately spans, for the Claude adapter's
+# command-hygiene guard. One project can span two repos developed together —
+# a library and a sibling programme repo, say. Without a declaration the guard
+# refuses every git operation against the sibling, while `git init` and plain
+# file writes (both take a path argument) sail through: an agent can create
+# the repo and write into it but never `add`/`commit`, leaving the work
+# uncommitted for a human to finish by hand.
+#
+# Named for its only consumer — this guard. Listing a path here RELAXES ONE
+# LINT AND GRANTS NO PERMISSION: the command still has to match the
+# allow-list to auto-approve, and `git -C …` matches none of the
+# `Bash(git <subcommand>:*)` rules, so it prompts. That is intended — the
+# guard exists to stop shapes that would stall an unattended run, not to be a
+# trust boundary.
+#
+# Two different repos in ONE command stay blocked even when both are listed:
+# history read from one repo and applied to another's working tree is a shape
+# no legitimate workflow needs.
+#
+# Machine-specific paths, so they live here and never in the committed
+# aide.toml. Empty/absent (the default) = every repo-override form blocked.
+extra_repos = []

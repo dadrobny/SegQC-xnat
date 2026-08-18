@@ -53,7 +53,31 @@ _One bullet per concrete artifact or capability._
 
 - {{deliverable}}
 
-**Dependencies.** {{stage numbers, or "None"}}
+**Dependencies.** {{blocking stage numbers, or "None"}}
+
+_The slot holds **blocking** stages only: what must be complete before this
+stage can start. Anything about *ordering without blocking* is a separate sentence
+after it, e.g. `**Dependencies.** None. Independent of Stage 17 — may be queued
+in either order.`_
+
+_Two phrasings a planner can act on, and one it cannot:_
+
+- _**Independence** — "independent of Stage N; may be queued in either order."
+  Tells the planner the two need nothing from each other, so it may queue them
+  in any order, or as one batch if they fit the cap._
+- _**Ordering without blocking** — "queue before Stage N, whose retuning is
+  safer once this exists." A preference the planner can honour, with its reason._
+- _**Avoid "run alongside" / "in parallel"** for stages. One queue is live at a
+  time (the queue boundary is the human checkpoint), so a planner cannot act on
+  it and will queue sequentially regardless — the phrase only makes the roadmap
+  and the queues look like they disagree. Note this is about **stages**; saying
+  two *items within one queue* may be worked in parallel is accurate and useful._
+
+**Human gate.** _OPTIONAL — delete unless this stage's work waits on a
+decision or an out-of-band prerequisite a person must supply (data access, a
+sign-off, an authorised spend). Name what must be decided; the authoritative
+row goes in `progress.md`'s `## Human gates` table, usually with
+`Blocks: stage N`. A gate written only here blocks nothing._
 
 **Validation / acceptance.**
 

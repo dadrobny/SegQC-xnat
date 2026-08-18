@@ -34,7 +34,7 @@ parallel*.
 
 | Concern | Owner | Notes |
 |---|---|---|
-| Claim the next 📋 item | `aide claim` (CLI) | `python .aide/scripts/aide.py claim [--queue NNN]` — syncs, checks `aide/*` branches, picks the first unclaimed unblocked 📋 item, creates + pushes `aide/NNN-*`; prints item number + branch + title. Deterministic, no subagent. |
+| Claim the next 📋 item | `aide claim` (CLI) | `python .aide/scripts/aide.py claim [--queue NNN]` — syncs, checks `aide/*` branches, picks the first unclaimed unblocked 📋 item, creates + pushes `aide/NNN-*`; prints item number + branch + title, and the base when it is not `main`. Deterministic, no subagent. **Run it from the branch the queue's work belongs on**: claiming while a queue branch is checked out records that branch as each item's base, so `aide merge` returns the item to it and the whole queue still lands as one reviewed PR. |
 | Run one item end-to-end | **`/aide-run-item NNN`** | spec-author (Opus) → test-writer → builder → validator+merge, incl. the ≤3-round validate cycle. See that command for the per-item detail. |
 | Approval gates, looping | *orchestrator* | stays in the main thread |
 | Generating the **next** queue | **not here** | only `/aide-run-roadmap` (or a manual `/aide-create-queue`) does that |
@@ -117,6 +117,12 @@ prompts (it also **rotates** the log).
 
 ## When the orchestrator must stop and ask the user
 
+- **`aide claim` reports an unresolved human gate.** Stop and surface it verbatim —
+  do not prompt an unattended run for a decision nobody is there to make, and
+  never run `aide gate approve` yourself. A gate exists because the decision is
+  not derivable from the work; resolving it destroys the thing it protects. A
+  gate naming items — directly or via `stage N` — skips only those, so the queue
+  may keep going; an `all` gate stops everything.
 - `/aide-run-item` hands back needing a **PR**, **force-push**, or history rewrite.
 - An item needs a **major structural change** or an edit to a framework/process
   file (`CLAUDE.md`, `aide.toml`, `.aide/**`, `vision.md`, `roadmap.md`,

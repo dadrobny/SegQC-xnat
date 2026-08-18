@@ -517,6 +517,72 @@ def test_check_reports_a_prefixed_branch_it_cannot_parse(tmp_path: Path):
     assert any("unrecognised branch aide/rule-engine-core" in w for w in warnings)
 
 
+def test_unrecognised_branch_warning_names_the_remedy(tmp_path: Path):
+    """A warning that explains the convention but not the fix sends the reader
+    to raw git, which is what the CLI's own convention says to avoid."""
+    root = _init_repo(tmp_path / "r", mode="local")
+    cfg = aide.load_config(root)
+    _, warnings = aide.run_checks(root, cfg, branches=["aide/rule-engine-core"])
+    warning = next(w for w in warnings if "unrecognised branch" in w)
+    assert "rename" in warning
+    assert "aide gc --merged" in warning
+
+
+# --------------------------------------------------------------------------- #
+# gc signposting — an empty result is about a ground and a scope, not the repo
+# --------------------------------------------------------------------------- #
+def test_gc_empty_default_points_at_merged_when_it_would_find_something(
+        tmp_path: Path, capsys):
+    """The item ground structurally cannot see a queue branch; --merged can.
+
+    Reporting a bare "nothing to clean" while `aide gc --merged` would offer
+    three branches is a true statement about the ground checked read as a false
+    one about the repository.
+    """
+    root = _init_repo(tmp_path / "r", mode="local")
+    _make_item_branch(root, "aide/queue-026", "queue.txt")
+    _run(["git", "merge", "--no-edit", "aide/queue-026"], root)
+    rc = aide.main(["--repo", str(root), "gc"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "nothing to clean" in out
+    assert "aide gc --merged" in out
+
+
+def test_gc_empty_result_stays_terse_when_there_is_nothing_to_add(
+        tmp_path: Path, capsys):
+    root = _init_repo(tmp_path / "r", mode="local")
+    rc = aide.main(["--repo", str(root), "gc"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert out.strip() == "aide gc: nothing to clean"
+
+
+def test_gc_states_its_scope_when_branches_sit_outside_the_prefix(
+        tmp_path: Path, capsys):
+    """gc only ever looks at branches under the prefix -- correctly, since it
+    must not delete branches it does not own. The defect is that the
+    restriction was silent, so "nothing to clean" read as "no cleanup exists"
+    for a merged branch gc had never even considered."""
+    root = _init_repo(tmp_path / "r", mode="local")
+    _make_item_branch(root, "fix/33-signposting", "fix.txt")
+    _run(["git", "merge", "--no-edit", "fix/33-signposting"], root)
+    rc = aide.main(["--repo", str(root), "gc"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "nothing to clean" in out
+    assert "1 local branch outside the 'aide/' scope was not considered" in out
+
+
+def test_gc_does_not_probe_merged_when_the_flag_was_passed(tmp_path: Path, capsys):
+    """With --merged already given, naming --merged again would be nonsense."""
+    root = _init_repo(tmp_path / "r", mode="local")
+    rc = aide.main(["--repo", str(root), "gc", "--merged"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "aide gc --merged" not in out
+
+
 def _mkbare(path: Path) -> Path:
     subprocess.run(["git", "init", "--bare", "-b", "main", str(path)], check=True,
                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
