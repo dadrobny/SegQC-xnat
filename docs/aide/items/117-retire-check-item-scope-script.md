@@ -439,4 +439,42 @@ whole dependency set.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+**Parity check (2026-08-19, before deletion).** Ran both checkers head-to-head
+on `chore/framework-1.14.0` with the same explicit `--base b2fb55c`, before
+`scripts/check_item_scope.py` was removed:
+
+- **Clean state** (tree as committed at `655432f`, item 117's own changes only):
+  - `python scripts/check_item_scope.py docs/aide/items/117-retire-check-item-scope-script.md --base b2fb55c`
+    → **exit 1**, reporting all 10 changed files (including the spec itself)
+    as "not authorised by docs/aide/items/117-retire-check-item-scope-script.md".
+  - `python .aide/scripts/aide.py scope 117 --base b2fb55c` → **exit 0**,
+    "OK (item 117, 10 changed file(s) all authorised, vs b2fb55c)".
+  - **Divergence, and why it is expected**: the old script predates engine
+    1.6.0's **May change** / **Asserts against** sub-list syntax that this
+    spec's own `## Authorised paths` section uses. Its parser only understood
+    flat bullets, so on this spec it parses zero authorised paths and reports
+    every changed file — including the spec itself, since the old script never
+    exempted the item's own spec — as a violation. This is exactly the two
+    accepted deltas in combination: sub-list awareness, and the wider
+    always-authorised set that includes the item's own spec.
+- **Violating state**: committed a scratch one-line edit to `README.md` (a
+  file outside item 117's **May change** list), re-ran both, then reverted the
+  scratch commit with a forward commit (`git checkout <prior-commit> --
+  README.md` + commit, not a history rewrite):
+  - `python scripts/check_item_scope.py docs/aide/items/117-retire-check-item-scope-script.md --base b2fb55c`
+    → **exit 1**, `README.md not authorised by docs/aide/items/117-retire-check-item-scope-script.md`
+    (plus the same 10 false positives as the clean-state run above, for the
+    same sub-list-unaware-parser reason).
+  - `python .aide/scripts/aide.py scope 117 --base b2fb55c` → **exit 1**,
+    `error: README.md not authorised by docs/aide/items/117-retire-check-item-scope-script.md`,
+    `aide scope: FAIL (item 117, 1 of 11 changed file(s) outside scope, vs b2fb55c)`.
+  - Both checkers correctly flag `README.md` by name in the violating state —
+    the "still has teeth" property survives the swap.
+
+**Conclusion**: the verb correctly authorises the clean state (exit 0) where
+the script false-positives on the whole change set due to its sub-list
+blindness, and both correctly reject the same out-of-scope file in the
+violating state. The two accepted deltas from the Assumptions section — the
+wider always-authorised set (the item's own spec) and sub-list awareness (May
+change vs. Asserts against) — fully account for the clean-state divergence;
+no unexplained behaviour difference was observed.

@@ -6,14 +6,18 @@ on:
   pull_request:
 
 jobs:
-  # Item 107: diff-based scope check, replacing the byte-hash "scope fence"
-  # pytests it retired. Pure git -- no venv, no Docker, no network beyond the
-  # checkout -- so it stays fast and dependency-free. Resolves the item spec
-  # for the PR branch from its own filename convention
-  # (docs/aide/items/NNN-*.md) using the PR title/branch name's leading
-  # item number, and runs scripts/check_item_scope.py against the PR's base
-  # ref (github.base_ref) so a changed file outside that item's declared
-  # `## Authorised paths` fails the build.
+  # Item 107 built this as a diff-based scope check, replacing the byte-hash
+  # "scope fence" pytests it retired; item 117 retargeted it onto the
+  # framework verb `aide scope`, which supersedes the project-local script
+  # (both did the same framework-shaped work -- enforcing a framework
+  # convention, on framework documents, in the framework's own loop -- but
+  # only the verb keeps a fix landing upstream applying here too). Pure git
+  # plus a stdlib Python -- no venv, no Docker, no network beyond the
+  # checkout -- so it stays fast and dependency-free. Resolves the item
+  # number for the PR branch from its own naming convention (aide/NNN-...)
+  # and runs `aide.py scope` against the PR's base ref (github.base_ref) so a
+  # changed file outside that item's declared `## Authorised paths` fails the
+  # build.
   scope-check:
     name: item scope check
     runs-on: ubuntu-latest
@@ -22,45 +26,55 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Resolve item spec for this branch
-        id: spec
+      - uses: actions/setup-python@v5
+        with:
+          # aide.py needs tomllib (stdlib since 3.11); the job otherwise
+          # relies only on whatever `python` the runner image provides.
+          python-version: "3.11"
+      - name: Resolve item number for this branch
+        id: item
         env:
-          BASE_REF: ${{ github.base_ref }}
           HEAD_REF: ${{ github.head_ref }}
         run: |
           set -e
           # Item branches are named aide/NNN-... (see .aide/conventions.md's
           # claim protocol); pull the leading item number out of the branch
-          # name and match it to its docs/aide/items/NNN-*.md spec.
+          # name.
           #
           # Anchor on that exact shape rather than grepping for any 3-digit
           # run anywhere in the name. A queue branch is `aide/queue-NNN`,
           # where NNN is a *queue* number sharing a namespace with item
           # numbers: an unanchored match read `aide/queue-016` as item 016
-          # and resolved the unrelated docs/aide/items/016-*.md, a
-          # queue-002-era spec that predates the `## Authorised paths`
-          # convention -- so the checker hard-errored on a missing section
-          # for an item the branch had nothing to do with. A queue or specs
+          # and resolved the unrelated queue-002-era spec for item 016, which
+          # predates the `## Authorised paths` convention -- so the checker
+          # hard-errored on a missing section for an item the branch had
+          # nothing to do with. A queue or specs
           # branch has no single owning item and correctly resolves to
           # nothing here; per-item scope is already enforced on each item
           # branch as it merges into the queue branch.
           item_number=$(echo "$HEAD_REF" | sed -n 's|^aide/\([0-9]\{3\}\)-.*|\1|p')
           if [ -z "$item_number" ]; then
             echo "could not extract a 3-digit item number from branch '$HEAD_REF'; skipping scope check"
-            echo "spec=" >> "$GITHUB_OUTPUT"
+            echo "item=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          spec=$(ls docs/aide/items/${item_number}-*.md 2>/dev/null | head -n1 || true)
-          if [ -z "$spec" ]; then
-            echo "no docs/aide/items/${item_number}-*.md spec found; skipping scope check"
-            echo "spec=" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "spec=$spec" >> "$GITHUB_OUTPUT"
+          echo "item=$item_number" >> "$GITHUB_OUTPUT"
       - name: Run scope check
-        if: steps.spec.outputs.spec != ''
+        if: steps.item.outputs.item != ''
+        # Always pass the item number positionally rather than relying on
+        # `aide scope`'s own branch inference: `actions/checkout` leaves a
+        # detached HEAD on `pull_request` events, so `_current_branch` has
+        # nothing to anchor on and the verb exits 2 -- a red PR on every
+        # item. The number resolved above is passed explicitly instead.
+        #
+        # The one intentional behaviour change from the retired script: it
+        # also skipped when no item spec existed for the branch's number.
+        # That case now reaches the verb and exits 2 ("no spec for item
+        # NNN"). This is correct and deliberate -- an aide/NNN- branch with
+        # no spec is a real defect, and exit 2 is the framework's "reported,
+        # never silently passed" contract.
         run: |
-          python scripts/check_item_scope.py "${{ steps.spec.outputs.spec }}" --base "origin/${{ github.base_ref }}"
+          python .aide/scripts/aide.py scope "${{ steps.item.outputs.item }}" --base "origin/${{ github.base_ref }}"
 
   test:
     name: test (${{ matrix.os }})
