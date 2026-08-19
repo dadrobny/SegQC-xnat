@@ -1313,8 +1313,8 @@ def test_ac24_shape_mismatch_is_a_caller_error_not_a_silent_none():
 # AC25: structural / public-API checks (the byte-hash scope fences that used
 # to sit here were removed by item 107 -- see docs/aide/insights.md and
 # docs/aide/items/107-retire-byte-hash-scope-fences.md for the rationale;
-# diff-time scope is now checked by scripts/check_item_scope.py on the
-# branch, not re-asserted forever as a runtime invariant).
+# diff-time scope is now checked by `aide scope` (.aide/scripts/aide.py) on
+# the branch, not re-asserted forever as a runtime invariant).
 # =========================================================================== #
 
 

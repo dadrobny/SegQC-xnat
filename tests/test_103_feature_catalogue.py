@@ -941,7 +941,7 @@ def test_ac24_markdown_rows_are_in_catalogue_order(catalogue_module, full_catalo
 # =========================================================================== #
 # AC25: (byte-hash scope fences formerly here were removed by item 107; see
 # docs/aide/items/107-retire-byte-hash-scope-fences.md. Diff-time scope is
-# now checked by scripts/check_item_scope.py on the branch.)
+# now checked by `aide scope` (.aide/scripts/aide.py) on the branch.)
 # =========================================================================== #
 
 

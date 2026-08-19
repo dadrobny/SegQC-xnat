@@ -12,8 +12,10 @@ asserted in-suite:
 - AC8:  no byte-hash fence remains, searched by assertion *shape* (see
         `_classify_sha256_compares` below), not by the `_PRE_[0-9]` name.
 - AC9:  every queue-016 spec (107-116) declares a non-empty
-        `## Authorised paths`, and `scripts/check_item_scope.py`'s own parser
-        reads each without error.
+        `## Authorised paths`, and the framework's `parse_authorised_paths`
+        (`.aide/scripts/aide.py`) reads each without error. Retargeted by
+        item 117 from a since-deleted project-local scope-check script's own
+        copy of the parser.
 - AC12: Stage 26's five acceptance boxes are each either ticked *and*
         followed by an evidence annotation, or unticked *and* followed by a
         reason (the tick-implies-evidence biconditional item 106 established).
@@ -29,6 +31,7 @@ log and the Validation section, not to a test module.
 from __future__ import annotations
 
 import ast
+import importlib.util
 import re
 from pathlib import Path
 
@@ -37,7 +40,7 @@ import pytest
 _TESTS_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _TESTS_DIR.parent
 _PROGRESS_PATH = _REPO_ROOT / "docs" / "aide" / "progress.md"
-_CHECKER_PATH = _REPO_ROOT / "scripts" / "check_item_scope.py"
+_AIDE_SCRIPT = _REPO_ROOT / ".aide" / "scripts" / "aide.py"
 _THIS_FILE = Path(__file__).resolve()
 
 _QUEUE_016_SPEC_NUMBERS = (107, 108, 109, 110, 111, 112, 113, 114, 115, 116)
@@ -353,23 +356,30 @@ def test_adv_shape_based_classifier_flags_a_synthetic_fence(tmp_path):
 
 
 # =========================================================================== #
-# AC9: every queue-016 spec declares `## Authorised paths`; the checker
-# parses each without error.
+# AC9: every queue-016 spec declares `## Authorised paths`; the framework's
+# parser reads each without error. Retargeted by item 117 (AC13) from an
+# `exec()` of the now-deleted project-local scope-check script at module
+# import time -- that exec was a collection-error hazard: get it wrong and
+# the whole module silently drops out of the suite instead of failing four
+# tests.
 # =========================================================================== #
 
-_CHECKER_SOURCE = _CHECKER_PATH.read_text(encoding="utf-8")
-_CHECKER_NS: dict = {"__name__": "check_item_scope_under_test"}
-exec(compile(_CHECKER_SOURCE, str(_CHECKER_PATH), "exec"), _CHECKER_NS)
-_parse_authorised_paths = _CHECKER_NS["_parse_authorised_paths"]
+_aide_spec = importlib.util.spec_from_file_location("_aide_cli_115", _AIDE_SCRIPT)
+_aide = importlib.util.module_from_spec(_aide_spec)
+_aide_spec.loader.exec_module(_aide)
+parse_authorised_paths = _aide.parse_authorised_paths
+declares_nothing = _aide.declares_nothing
+AuthorisedPaths = _aide.AuthorisedPaths
 
 
 @pytest.mark.parametrize("number", _QUEUE_016_SPEC_NUMBERS)
 def test_ac9_spec_declares_nonempty_authorised_paths(number):
     spec_path = _spec_path(number)
     text = spec_path.read_text(encoding="utf-8")
-    globs = _parse_authorised_paths(text)
-    assert globs is not None, f"{spec_path.name} has no '## Authorised paths' section"
-    assert globs != [], f"{spec_path.name}'s '## Authorised paths' section is empty"
+    parsed = parse_authorised_paths(text)
+    assert not declares_nothing(parsed), (
+        f"{spec_path.name}'s '## Authorised paths' section declares nothing"
+    )
 
 
 @pytest.mark.parametrize("number", _QUEUE_016_SPEC_NUMBERS)
@@ -378,8 +388,8 @@ def test_ac9_checker_parses_spec_without_error(number):
     text = spec_path.read_text(encoding="utf-8")
     # "Parses without error" -- the parser itself never raises; a missing
     # section is signalled by returning None, not an exception.
-    result = _parse_authorised_paths(text)
-    assert result is None or isinstance(result, list)
+    result = parse_authorised_paths(text)
+    assert result is None or isinstance(result, AuthorisedPaths)
 
 
 def test_ac9_all_ten_queue_016_items_covered():
@@ -387,17 +397,22 @@ def test_ac9_all_ten_queue_016_items_covered():
 
 
 def test_adv_authorised_paths_heading_with_no_bullets_is_distinguished_from_missing():
-    """Adversarial: a spec with the heading but zero bullets parses to `[]`,
-    not `None` -- a real spec in that state must be treated as an error
-    (empty, not simply absent), matching the checker's own AC8 contract."""
+    """Adversarial: a spec with the heading but zero bullets parses to a
+    present-but-empty `AuthorisedPaths([], [])`, not `None` -- a real spec in
+    that state must still be treated as an error by `declares_nothing`
+    (empty, not simply absent), matching the framework's AC8-equivalent
+    contract (`aide scope` exit 2)."""
     text = (
         "# Synthetic item spec\n\n"
         "## Description\n\nSynthetic.\n\n"
         "## Authorised paths\n\n"
         "## Decisions & Trade-offs\n\nNone.\n"
     )
-    result = _parse_authorised_paths(text)
-    assert result == []
+    result = parse_authorised_paths(text)
+    assert result == AuthorisedPaths([], [])
+    assert declares_nothing(result)
+    assert parse_authorised_paths("# Item\n\n## Description\n\nx\n") is None
+    assert declares_nothing(None)
 
 
 # =========================================================================== #
