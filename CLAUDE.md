@@ -273,6 +273,52 @@ from the local working tree):
   `.claude/settings.local.json`, `docs/aide/permissions/*.jsonl`,
   `docs/aide/status/*`, credentials. Never commit credentials.
 
+## Branching, and what it means for the scope check
+
 Framework/process changes (`.aide/**`, `aide.toml`, `CLAUDE.md`, `vision.md`,
-`roadmap.md`, `.claude/**`) land via a **reviewed PR**; work-item execution
-merges straight to `main` per the merge policy in `.aide/README.md`.
+`roadmap.md`, `.claude/**`) land via a **reviewed PR**. Work-item execution
+follows the merge policy in [`.aide/README.md`](.aide/README.md). Two settings
+vary independently, and conflating them is easy:
+
+**1. Where an item lands (the branch shape).** `aide claim` branches from
+whatever is checked out and *records that base*; `aide merge NNN` returns the
+item there. So both shapes work with no flag and no config:
+
+```
+main                          main
+ └── aide/NNN-item             └── aide/queue-NNN        ← one reviewed PR per stage/queue
+                                    ├── aide/NNN-item-a  ← claimed from the queue branch,
+                                    └── aide/NNN-item-b     merged back into it
+```
+
+The stacked shape on the right keeps `main` cohesive — one review per batch
+instead of per item — and is what engine 1.8.0's `--base` was built for.
+Inference is narrow by design: only a recognised `aide/queue-NNN` /
+`aide/specs-queue-NNN` branch is inferred as a base, never an arbitrary
+checked-out branch.
+
+**2. Whether a PR is opened per item (`[git] mode` in `aide.toml`).** Currently
+`auto-merge`. Per [`.aide/conventions.md`](.aide/conventions.md) §4:
+
+| mode | on validator PASS | item branch becomes a PR? |
+|---|---|---|
+| `auto-merge` *(current)* | direct-merges to the recorded base, deletes the branch | no |
+| `pr` | pushes and stops for a human to open the PR | **yes** |
+| `local` | local merge, no pushes at all | no |
+
+**The consequence for CI.** The `scope-check` job in
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) fires only on a
+`pull_request` whose `head_ref` is an `aide/NNN-` claim branch. Under **`pr`**
+mode that is exactly what appears, and the job works as designed — including
+against a queue branch, since it passes `origin/${{ github.base_ref }}`. Under
+**`auto-merge`** (and `local`) no item branch ever becomes a PR, so the job
+matches nothing: a queue PR's head is `aide/queue-NNN`, which the anchored
+`sed` resolves to nothing **by design**, because a queue branch legitimately
+aggregates many items' authorised paths.
+
+So *while this repo stays on `auto-merge`*, a green `item scope check` means
+**skipped, not passed** — treat it as no signal. Per-item scope is still
+enforced, by `validator.md` step 3 running `aide scope` in-loop. Evidence and
+the three options are recorded in
+[`docs/aide/insights.md`](docs/aide/insights.md) (2026-08-20, item 117);
+switching to `pr` mode is one of the things that would resolve it.
