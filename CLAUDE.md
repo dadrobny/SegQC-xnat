@@ -228,6 +228,22 @@ what each version changed. The framework bumps its version on every commit that
 touches what a consumer installs, so a matching version now genuinely means
 up to date.
 
+**Read `$AIDE_LOOP/CLAUDE.md` before changing anything there — it is not in
+context.** An agent's instruction files are loaded for the *working directory's*
+repo only: this file is read automatically, `aide-loop`'s is not, even though it
+is a declared additional working directory. So a session that edits the framework
+from here has none of that repo's rules in hand, and they are not inferable from
+its code. At minimum it carries a versioning rule enforced by its own suite
+(any commit touching `core/` or `adapters/` must bump `core/VERSION` *and* add a
+`CHANGELOG.md` entry), a PR-only merge policy, and one trap worth stating twice:
+paths like `.aide/…` and `python .aide/scripts/aide.py …` appearing inside
+`core/` and `adapters/` are **consumer** paths and are correct — never "fix" them
+to that repo's own layout.
+
+The same applies to any sibling repo in this workspace. A general mechanism for
+this is proposed upstream; until it exists, read the target repo's `CLAUDE.md`
+first.
+
 Clean workflow to change the framework (no push required — the installer copies
 from the local working tree):
 
