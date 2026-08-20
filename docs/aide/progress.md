@@ -167,6 +167,30 @@ over a `❌ Not met` target. `aide status` prints every target not yet Met._
 
 ---
 
+## Human gates
+
+_One row per decision only a person can make, blocking work until they make it.
+Not an acceptance box (those are observable checks of the built thing) and not
+an Environment-Gated row (that asks "did the real path ever run?", after the
+fact). This asks "may the work start yet?", and the answer is out-of-band._
+
+_Both rows below are the same **kind** of gate: an external-data prerequisite
+this repo cannot satisfy from inside itself. Per the 2026-07-25 pivot, the GPU
+/ SPINEPS / GSTT half of the programme lives in a separate private repo — so
+every real-segmenter and real-clinical input arrives here as a hand-off, on
+someone's decision, not as something a loop can go and fetch._
+
+_Resolved only by a person, only via `aide gate approve <n> --evidence "…"`
+(or `gate decline`). A decline **keeps blocking** — re-plan instead. No agent
+may resolve one._
+
+| Gate | Blocks | Status | Decision / evidence |
+|------|--------|--------|---------------------|
+| Real segmenter output on real CT handed over to this repo — SPINEPS (primary) and/or TotalSegmentator label maps + manifest, produced in the programme repo, sufficient to build the real candidate-vs-GT cohort | stage 16 | ⏳ Awaiting | Blocks the whole of Stage 16, and transitively Stage 25, whose deliverables are "deliberately unspecified until Stage 16 has characterised real failures". Closes the "Real automatic-segmentation failure corpus" Environment-Gated row and the G2 Outcome target. Not the same prerequisite as the Stage 21 rung-2 corpus, which needs only real VerSe GT — already ✅ Verified and **not** gated. |
+| Access approved for the curated challenging-case source data — real pathology / post-op / atypical anatomy ([`vision.md`](vision.md) §8), `VerSe_fracture_grading.xlsx` a natural seed, plus any clinical cohort requiring an ethics/data-sharing sign-off | stage 16 | ⏳ Awaiting | Independent of the row above: real *segmenter output* does not supply the *challenging cases*, and either arriving alone leaves a Stage 16 deliverable unbuildable. Kept a separate row so approving one does not silently read as approving both. |
+
+---
+
 # Phase 1 — Complete MVP Pipeline
 
 ## Stage 0 — Project Scaffolding & I/O Foundation — ✅

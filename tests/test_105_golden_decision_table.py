@@ -581,7 +581,7 @@ def test_ac13_divergences_section_names_exactly_the_keep_rows(
 # =========================================================================== #
 # AC14: (byte-hash scope fences formerly here were removed by item 107; see
 # docs/aide/items/107-retire-byte-hash-scope-fences.md. Diff-time scope is
-# now checked by scripts/check_item_scope.py on the branch.)
+# now checked by `aide scope` (.aide/scripts/aide.py) on the branch.)
 # =========================================================================== #
 
 

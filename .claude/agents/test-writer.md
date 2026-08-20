@@ -72,7 +72,18 @@ never assume a package name.
 - Do **not** modify shared `conftest.py` unless a fixture is genuinely necessary
   and cannot be handled with inline `tmp_path`.
 - Tests must be deterministic and cross-platform (Windows + macOS + Linux). No
-  network calls, no absolute paths.
+  network calls. The specifics are in
+  [`.aide/conventions.md` §6](../../.aide/conventions.md) — read it before
+  writing a test that touches a path, hashes a file, or parses output. Every
+  rule there was earned by a defect that passed every gate this loop runs and
+  reached `main` anyway.
+- **A test that cannot fail is worse than no test.** Before you assert on
+  anything you derived — a captured stdout, a globbed file list, a parsed
+  field — assert it is non-empty and recognisable *first*. A glob that matched
+  nothing, a capture that came back empty, a slice taken from a failed `find()`:
+  each leaves a value that flows into the assertion and passes while checking
+  nothing at all. That shape has reached `main` repeatedly; it is the single
+  most expensive mistake available here.
 - Match the surrounding test style exactly. No extra imports, no dead code.
 
 ## Out-of-scope insights (compound engineering)

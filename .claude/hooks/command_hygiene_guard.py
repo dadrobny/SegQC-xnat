@@ -112,6 +112,90 @@ def _framework_local_path():
     return None
 
 
+def _hygiene_extra_repos():
+    """``[hygiene] extra_repos`` from ``.aide/loop/loop.local.toml``, as a list.
+
+    One project can legitimately span two repos developed together — a library
+    and a sibling programme repo, say. Without a declaration the guard refuses
+    every git operation against the sibling, while `git init` and plain file
+    writes (which take a path argument) sail through: an agent could create the
+    repo and write into it but never `add`/`commit`, leaving the work
+    uncommitted for a human to finish by hand.
+
+    Named ``[hygiene]`` for its only consumer — *this guard*. The section
+    relaxes one lint and grants no permission: a command against a declared
+    repo still has to match the allow-list to auto-approve, and `git -C …`
+    matches none of the `Bash(git <subcommand>:*)` rules, so it prompts. That
+    is the intended posture — the guard exists to stop shapes that would stall
+    an unattended run, not to be a trust boundary, and unblocking the honest
+    spelling of a legitimate operation is the whole point.
+
+    Deliberately NOT read from the shared, committed ``aide.toml``: these are
+    machine-specific filesystem paths, same reasoning as
+    ``[framework] local_path``.
+    """
+    try:
+        with open(".aide/loop/loop.local.toml", encoding="utf-8") as fh:
+            text = fh.read()
+    except OSError:
+        return []
+
+    in_hygiene = False
+    buf = None
+    for line in text.splitlines():
+        stripped = line.split("#", 1)[0].strip()
+        if buf is None:
+            if stripped.startswith("["):
+                in_hygiene = stripped == "[hygiene]"
+                continue
+            # Require the `=` before splitting on it. A bare `extra_repos` line
+            # would otherwise IndexError, and because the hook fails open that
+            # would silently disable the ENTIRE guard — every rule, not just
+            # this key — off the back of one typo in a personal config file.
+            if not in_hygiene or "=" not in stripped:
+                continue
+            key, _, value = stripped.partition("=")
+            if key.strip() != "extra_repos":
+                continue
+            buf = value.strip()
+            # Documented as an array, so anything else is a config we do not
+            # understand. Inferring a grant from an undocumented shape is the
+            # wrong default for a key that relaxes a guard: no array, no grant.
+            if not buf.startswith("["):
+                return []
+        else:
+            # A new section header ends the array whether or not it closed.
+            # Without this the header's own `]` satisfies the check below and
+            # an unterminated array yields a PARTIAL grant — the real paths
+            # plus a junk `[loop` entry — which is precisely the "malformed
+            # config grants nothing" posture inverted. A hand parser cannot be
+            # exhaustive here; this covers the shape a truncated array actually
+            # takes, and anything it still cannot parse grants nothing.
+            if stripped.startswith("[") and stripped.endswith("]"):
+                return []
+            buf += " " + stripped
+        # A TOML array may span lines; keep accumulating until it closes. An
+        # array left unterminated falls out of the loop and grants nothing.
+        if "]" not in buf:
+            continue
+        inner = buf[1:buf.index("]")]
+        return [p for p in
+                (item.strip().strip("\"'") for item in inner.split(","))
+                if p]
+    return []
+
+
+def _declared_repo_paths():
+    """Every repo path rule 1 tolerates: the framework clone plus any
+    ``[hygiene] extra_repos``. Empty when nothing is declared, which keeps the
+    default posture — every repo-override form blocked — exactly as it was."""
+    paths = list(_hygiene_extra_repos())
+    framework = _framework_local_path()
+    if framework:
+        paths.append(framework)
+    return paths
+
+
 #: Every syntax git (or the shell, ahead of git) accepts for "operate on a
 #: repo/working-tree other than cwd" — `-C` is only one of four. A regex that
 #: recognised `-C` alone left `--git-dir`/`--work-tree` (git's own flags) and
@@ -171,33 +255,42 @@ def _git_repo_override_paths(cmd):
 
 def _git_repo_override_all_declared(cmd):
     """True iff *cmd* names at least one repo-override path and every one of
-    them resolves to the declared `[framework] local_path` (see
-    `_framework_local_path`) — `--git-dir`/`GIT_DIR=` accept `<declared>` or
-    `<declared>/.git` (see `_GIT_DIR_FLAVOURED_GROUPS`); every other form must
-    equal `<declared>` exactly. A command mixing a declared and an undeclared
-    path (e.g. `--git-dir` on one repo, `--work-tree` on another) is NOT
-    declared — that combination is exactly the confusing, dangerous shape
-    (git history read from one repo, applied to another's working tree) the
-    documented workflow never needs, so it stays blocked outright rather than
-    guessing which half the agent meant."""
+    them resolves to **the same** declared repo — `[framework] local_path` or
+    one of `[hygiene] extra_repos` (see `_declared_repo_paths`).
+    `--git-dir`/`GIT_DIR=` accept `<declared>` or `<declared>/.git` (see
+    `_GIT_DIR_FLAVOURED_GROUPS`); every other form must equal `<declared>`
+    exactly.
+
+    **One repo per command, even with several declared.** A command mixing two
+    paths stays blocked whether or not both are declared: git history read from
+    one repo and applied to another's working tree is exactly the confusing,
+    dangerous shape no legitimate workflow needs, and widening the declaration
+    list must not turn it into an approved combination. So each declared repo
+    is tried in turn and the command must satisfy one of them wholly — never a
+    union across them.
+    """
     paths = _git_repo_override_paths(cmd)
     if not paths:
         return False
-    declared = _framework_local_path()
-    if not declared:
+    declared_paths = _declared_repo_paths()
+    if not declared_paths:
         return False
     import os
     norm = lambda p: os.path.normcase(os.path.normpath(os.path.abspath(p)))
-    declared_norm = norm(declared)
-    declared_dotgit_norm = norm(os.path.join(declared, ".git"))
 
-    def _matches(group, path):
-        target = norm(path)
-        if group in _GIT_DIR_FLAVOURED_GROUPS:
-            return target in (declared_norm, declared_dotgit_norm)
-        return target == declared_norm
+    def _all_match(declared):
+        declared_norm = norm(declared)
+        declared_dotgit_norm = norm(os.path.join(declared, ".git"))
 
-    return all(_matches(group, path) for group, path in paths)
+        def _matches(group, path):
+            target = norm(path)
+            if group in _GIT_DIR_FLAVOURED_GROUPS:
+                return target in (declared_norm, declared_dotgit_norm)
+            return target == declared_norm
+
+        return all(_matches(group, path) for group, path in paths)
+
+    return any(_all_match(d) for d in declared_paths)
 
 
 def violations(cmd):
@@ -209,10 +302,13 @@ def violations(cmd):
     #    `GIT_WORK_TREE=` pointing git at a repo other than cwd — the Bash
     #    tool's cwd is already the repo root, and a directory prefix breaks
     #    allow-list prefix matching (this repo's path has spaces).
-    #    Exception: every repo-override path in the command resolves to the
-    #    declared `[framework] local_path` — the documented framework-update
-    #    workflow legitimately targets that second repo. Sourced from the
-    #    personal .aide/loop/loop.local.toml, never aide.toml.
+    #    Exception: every repo-override path in the command resolves to ONE
+    #    declared repo — `[framework] local_path` (the documented
+    #    framework-update workflow) or one of `[hygiene] extra_repos` (a
+    #    project that legitimately spans several repos). Both are sourced from
+    #    the personal .aide/loop/loop.local.toml, never aide.toml. Two
+    #    different repos in one command stay blocked even when both are
+    #    declared — see `_git_repo_override_all_declared`.
     has_override = bool(_GIT_REPO_OVERRIDE_TRIGGER_RE.search(bare))
     if re.match(r"\s*cd\s", cmd) or (
         has_override and not _git_repo_override_all_declared(cmd)
@@ -223,9 +319,11 @@ def violations(cmd):
             "than cwd, which is already the repo root; a directory prefix "
             "breaks allow-list matching. Run the bare command. (Exception: "
             "every repo-override path in the command targeting the SAME "
-            "[framework] local_path, declared in .aide/loop/loop.local.toml — "
-            "a personal, gitignored file; copy "
-            ".aide/loop/loop.local.toml.example to set it up.)"
+            "declared repo — [framework] local_path, or one of "
+            "[hygiene] extra_repos, in .aide/loop/loop.local.toml, a personal, "
+            "gitignored file; copy .aide/loop/loop.local.toml.example to set "
+            "it up. Two different repos in one command stay blocked even when "
+            "both are declared.)"
         )
 
     # 2. One command per Bash call — `&&`, `||`, `;` sequencing isn't

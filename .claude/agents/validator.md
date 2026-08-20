@@ -55,14 +55,42 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
 2. **Tests cover all AC.** Every Acceptance Criterion in the spec must have at
    least one test that directly exercises it. An uncovered AC is a FAIL (report
    which).
-3. **Code stays within scope.** The builder's changes must be limited to what the
-   work item describes. Flag any unrelated edits as out-of-scope.
+3. **Code stays within scope.** Run the check rather than eyeballing the diff:
+
+   ```
+   python .aide/scripts/aide.py scope
+   ```
+
+   It reads the item from the claim branch and compares every changed file
+   against the spec's `## Authorised paths`. Exit **0** in scope; **1** lists
+   each file outside it — an automatic FAIL, report the paths; **2** means it
+   could not check (usually a spec predating the convention, with no section) —
+   then fall back to reading the Description, and **say so in your report**
+   rather than passing in silence. Flag any unrelated edits as out-of-scope.
 4. **Serves the vision.** Re-read `docs/aide/vision.md`; confirm the
    implementation advances the project intent and its guiding principles and
    doesn't contradict them or the Out-of-scope list.
 5. **Assumptions are sound.** Re-read the spec's **Assumptions** block; if a
    pinned interface diverged from reality, that is a FAIL — hand back.
-6. **The Validation section was executed, honestly.** If the spec has a
+6. **Real CI, once a push exists.** A green local suite is evidence about *one*
+   platform, *one* checkout and *one* working directory — the only conditions
+   any role in this loop ever sees. Five defects have reached a consumer's
+   `main` through that blind spot, every one found by a human reading the
+   Actions tab. So once the branch is pushed, look at what CI actually said:
+   ```
+   gh run list --branch <branch> --limit 1
+   ```
+   (`gh run view <id>` for the detail, or `gh pr checks` when a PR exists —
+   under `git.mode = "auto-merge"` there is no PR, which is why `gh run` is the
+   form named here. All three are pre-approved.)
+   Report the real answer, including **"no CI is configured"** or **"it had not
+   finished"** — those are honest results; a local pass silently standing in for
+   them is not. A leg that is red where local was green is a **portability
+   finding** (`.aide/conventions.md` §6) until its log says otherwise, not a
+   flake: every recorded instance looked like a content problem and was a
+   platform one. If `gh` is unavailable or the repo has no remote, say so and
+   move on — this check informs your report, it does not block the verdict.
+7. **The Validation section was executed, honestly.** If the spec has a
    `## Validation` section, **run it** — the command, the output inspection,
    the use-case replay — and report what you observed; green tests alone do
    not satisfy it. If it names a `[validation]` environment profile, check it
@@ -108,10 +136,15 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
      is not yours to claim.
   3. **Merge via the CLI** — it honours `git.mode` (direct-merge + re-test +
      claim-branch cleanup for `auto-merge`; push-and-stop for `pr`; local merge
-     for `local`):
+     for `local`), and lands the item on the base its claim recorded, which is
+     the queue branch when the item was claimed from one:
      ```
      python .aide/scripts/aide.py merge NNN
      ```
+     Read the base it reports back. It is `main_branch` unless the item was
+     claimed from a queue branch; if it is not what the run intends, hand back
+     rather than passing `--base` on your own initiative — a wrong merge target
+     is not yours to choose.
      **Run this synchronously in the foreground too** (see step 1) — under
      `auto-merge` it re-runs the full suite before merging, so it takes the
      same several minutes as the test run did; wait for it to actually exit and

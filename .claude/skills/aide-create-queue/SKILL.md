@@ -32,6 +32,18 @@ Read vision, roadmap, and progress, then write the queue from the template
    - A stage needing more than the cap spans multiple queues.
    The cap is a **context budget, not a target**. Prioritise by roadmap order and
    unblocked dependencies.
+
+   **"Run alongside" in a roadmap means independence, not concurrency.** One
+   queue is live at a time, by design — the queue boundary is the human
+   checkpoint. So a roadmap saying two stages "should run alongside" or "in
+   parallel" is telling you they do **not** depend on each other's results, and
+   may therefore be queued in either order or merged into one batch if they fit
+   the cap. It is not asking for two live queues, and you cannot produce them.
+   **Queue next, sequentially, and say nothing about it** — do not spend a
+   paragraph explaining why you are not honouring an instruction that was never
+   given. (Item-level independence *within* one queue is a different thing and
+   works already: `aide claim` offers any unblocked item, so noting that two
+   items may be picked up in any order is useful and correct.)
 2. **No duplicates** — check existing `docs/aide/queue/queue-*.md` to avoid
    re-queuing completed or already-queued items.
 3. **Sequential numbering** — item numbers are sequential across **all** queues;

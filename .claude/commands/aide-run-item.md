@@ -103,6 +103,8 @@ prefer the right shape first time.
 
 ## When to stop and ask the user
 
+- **A human gate blocks this item** (`aide check` warns; `aide gate list` shows
+  it). Report it and stop. Never run `aide gate approve` — a person decides.
 - A `spec-author`, `builder`, or `validator` hands back needing a **PR**,
   **force-push**, or history rewrite.
 - The item needs a **major structural change** or an edit to a framework/process

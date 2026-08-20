@@ -68,6 +68,11 @@ with its downstream consumer):
   its dependency is implemented. "None." if fully specified.
 - **Implementation Steps** — the intended code path in `project.source_dir`
   (from `aide.toml`).
+- **Authorised paths** — the files this item may change, at the narrowest glob
+  that covers the work, plus anything its tests pin without changing (**Asserts
+  against**). Scope is proved by the diff against this list, so never specify a
+  test that hashes another file's bytes against a hardcoded literal instead —
+  see `.aide/conventions.md` §1.
 - **Testing Strategy** — one test per AC plus adversarial/edge cases.
 - **Dependencies** — item numbers this relies on (must be ✅/🚧).
 - **Decisions & Trade-offs** — initialise with "To be updated during

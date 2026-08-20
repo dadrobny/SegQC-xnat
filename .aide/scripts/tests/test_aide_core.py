@@ -730,6 +730,38 @@ def test_check_locations_use_posix_separators(tmp_path: Path):
     assert "\\" not in location
 
 
+def test_run_checks_output_never_carries_a_native_separator(tmp_path: Path):
+    """The whole machine-consumable surface stays separator-free, on any host.
+
+    `run_checks` returns (errors, warnings), which is what a consumer parses,
+    so any Path rendered into one with str() leaks the host's separator into a
+    value someone compares. That class has cost four separate CI-only failures,
+    every one invisible to a Linux checkout and every one found by a human
+    reading the Actions tab rather than by a gate.
+
+    Only findings in a SUBDIRECTORY diverge — which is exactly why a single
+    `queue/queue-002.md` location once broke a Windows leg while six
+    `docs/aide/`-root locations passed — so the tree below puts a finding of
+    every kind under `queue/` and `items/` as well as at the root.
+    """
+    root = _docs(tmp_path)
+    ddir = root / "docs" / "aide"
+    (ddir / "queue").mkdir(exist_ok=True)
+    (ddir / "queue" / "queue-002.md").write_text(
+        "# Queue 002 — {{title}}\n\nA stray ✅ icon in prose.\n", encoding="utf-8")
+    (ddir / "items" / "004-x.md").write_text(
+        "# Item 004 — {{title}}\n", encoding="utf-8")
+
+    errors, warnings = aide.run_checks(root, aide.load_config(root), branches=[])
+    assert errors, "fixture must actually produce findings, or this proves nothing"
+
+    for finding in errors + warnings:
+        assert "\\" not in finding, (
+            f"a native path separator reached run_checks output: {finding!r}. "
+            f"Render Path components with .as_posix() when the result is "
+            f"compared, hashed, or matched.")
+
+
 # --------------------------------------------------------------------------- #
 # acceptance criteria — attested by a human, never by a rollup
 # --------------------------------------------------------------------------- #

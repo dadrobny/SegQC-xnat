@@ -954,7 +954,7 @@ def test_ac25_unregistered_operator_raises_key_error_not_skipped():
 # =========================================================================== #
 # AC26: (byte-hash scope fences formerly here were removed by item 107; see
 # docs/aide/items/107-retire-byte-hash-scope-fences.md. Diff-time scope is
-# now checked by scripts/check_item_scope.py on the branch.)
+# now checked by `aide scope` (.aide/scripts/aide.py) on the branch.)
 # =========================================================================== #
 
 

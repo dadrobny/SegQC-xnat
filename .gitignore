@@ -239,6 +239,9 @@ docs/aide/status/*.jpg
 docs/aide/status/*.jpeg
 docs/aide/status/*.xml
 docs/aide/status/results.xml
+#   Derived reports written into the same directory by `aide check --queue
+#   --report` and consumed by the spec-reviewer agent (engine 1.9.0/1.10.0).
+docs/aide/status/*.json
 
 # Editor workspace files (per-machine, not shared)
 *.code-workspace

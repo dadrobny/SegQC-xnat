@@ -190,9 +190,12 @@ already written down there rather than in `docs/aide/`.
   there or unattended runs stall on permission prompts.
 - **Document templates** — [`.aide/templates/`](.aide/templates/).
 - **CLI** — `python .aide/scripts/aide.py
-  {check,progress,queue,claim,merge,env,sync,gc,status}`. If a verb covers it,
-  the raw git form is wrong: session preflight is `sync`, branch clean-up is
-  `gc`, the state report is `status`.
+  {check,progress,gate,queue,claim,merge,env,sync,gc,status,scope}`. If a verb
+  covers it, the raw git form is wrong: session preflight is `sync`, branch
+  clean-up is `gc`, the state report is `status`, and the item's diff-vs-scope
+  check is `scope` — the CI job's `scope-check` step (`.github/workflows/ci.yml`)
+  invokes it directly. `check --queue NNN` adds the cross-spec checks; `gate`
+  resolves human gates, and only a person may run it.
 - **Insight inbox** — [`docs/aide/insights.md`](docs/aide/insights.md): append a
   one-line `- [ ] <type> — …` when you learn something out of scope, then return
   to your task. Triaged at the queue boundary by `/aide-feedback-loop`.
@@ -261,6 +264,27 @@ from the local working tree):
   bytes with `\n` (`write_bytes`, not `write_text`, since Python 3.9 can't set
   `newline=` on `Path.write_text`).
 
+## Durable artifacts must read cold
+
+Anything that outlives the session it was written in — item specs, commit
+messages, `insights.md` entries, `aide-loop` issues, code comments — has to make
+sense to someone who never saw the conversation that produced it. Its context is
+this repo and its tracker, not a chat log.
+
+- **No chat-local identifiers.** Labels coined for conversational convenience
+  ("A1–A4", "Wave 1", "the D-series") are scaffolding, not names. A reader sees
+  "A1" and cannot tell what the A-series was or what happened to B. Name a thing
+  by what it *is*, and title by the change, not the batch it was scheduled in.
+- **Cross-reference by resolvable identity** — `#25`, a file path, a dated
+  `insights.md` entry. Never "the conventions issue" or "the companion PR",
+  which resolve only inside the conversation.
+- **Record the decision and why it holds, not the route to it.** "My earlier
+  lean was wrong", "agreed direction", "settled while drafting" narrate process
+  and age badly.
+
+Reread anything before publishing as a person who has never seen the session:
+every identifier must be defined in the document or resolvable in the repo.
+
 ## Shared vs. personal
 
 - **Shared (committed):** `.aide/` (minus `loop/loop.local.toml`), `aide.toml`,
@@ -270,6 +294,52 @@ from the local working tree):
   `.claude/settings.local.json`, `docs/aide/permissions/*.jsonl`,
   `docs/aide/status/*`, credentials. Never commit credentials.
 
+## Branching, and what it means for the scope check
+
 Framework/process changes (`.aide/**`, `aide.toml`, `CLAUDE.md`, `vision.md`,
-`roadmap.md`, `.claude/**`) land via a **reviewed PR**; work-item execution
-merges straight to `main` per the merge policy in `.aide/README.md`.
+`roadmap.md`, `.claude/**`) land via a **reviewed PR**. Work-item execution
+follows the merge policy in [`.aide/README.md`](.aide/README.md). Two settings
+vary independently, and conflating them is easy:
+
+**1. Where an item lands (the branch shape).** `aide claim` branches from
+whatever is checked out and *records that base*; `aide merge NNN` returns the
+item there. So both shapes work with no flag and no config:
+
+```
+main                          main
+ └── aide/NNN-item             └── aide/queue-NNN        ← one reviewed PR per stage/queue
+                                    ├── aide/NNN-item-a  ← claimed from the queue branch,
+                                    └── aide/NNN-item-b     merged back into it
+```
+
+The stacked shape on the right keeps `main` cohesive — one review per batch
+instead of per item — and is what engine 1.8.0's `--base` was built for.
+Inference is narrow by design: only a recognised `aide/queue-NNN` /
+`aide/specs-queue-NNN` branch is inferred as a base, never an arbitrary
+checked-out branch.
+
+**2. Whether a PR is opened per item (`[git] mode` in `aide.toml`).** Currently
+`auto-merge`. Per [`.aide/conventions.md`](.aide/conventions.md) §4:
+
+| mode | on validator PASS | item branch becomes a PR? |
+|---|---|---|
+| `auto-merge` *(current)* | direct-merges to the recorded base, deletes the branch | no |
+| `pr` | pushes and stops for a human to open the PR | **yes** |
+| `local` | local merge, no pushes at all | no |
+
+**The consequence for CI.** The `scope-check` job in
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) fires only on a
+`pull_request` whose `head_ref` is an `aide/NNN-` claim branch. Under **`pr`**
+mode that is exactly what appears, and the job works as designed — including
+against a queue branch, since it passes `origin/${{ github.base_ref }}`. Under
+**`auto-merge`** (and `local`) no item branch ever becomes a PR, so the job
+matches nothing: a queue PR's head is `aide/queue-NNN`, which the anchored
+`sed` resolves to nothing **by design**, because a queue branch legitimately
+aggregates many items' authorised paths.
+
+So *while this repo stays on `auto-merge`*, a green `item scope check` means
+**skipped, not passed** — treat it as no signal. Per-item scope is still
+enforced, by `validator.md` step 3 running `aide scope` in-loop. Evidence and
+the three options are recorded in
+[`docs/aide/insights.md`](docs/aide/insights.md) (2026-08-20, item 117);
+switching to `pr` mode is one of the things that would resolve it.

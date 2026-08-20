@@ -1563,7 +1563,7 @@ def test_ac26_compare_runs_opens_no_file_and_reads_no_clock(monkeypatch):
 # =========================================================================== #
 # AC27: (byte-hash scope fences formerly here were removed by item 107; see
 # docs/aide/items/107-retire-byte-hash-scope-fences.md. Diff-time scope is
-# now checked by scripts/check_item_scope.py on the branch.)
+# now checked by `aide scope` (.aide/scripts/aide.py) on the branch.)
 # =========================================================================== #
 
 
