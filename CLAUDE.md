@@ -264,6 +264,27 @@ from the local working tree):
   bytes with `\n` (`write_bytes`, not `write_text`, since Python 3.9 can't set
   `newline=` on `Path.write_text`).
 
+## Durable artifacts must read cold
+
+Anything that outlives the session it was written in — item specs, commit
+messages, `insights.md` entries, `aide-loop` issues, code comments — has to make
+sense to someone who never saw the conversation that produced it. Its context is
+this repo and its tracker, not a chat log.
+
+- **No chat-local identifiers.** Labels coined for conversational convenience
+  ("A1–A4", "Wave 1", "the D-series") are scaffolding, not names. A reader sees
+  "A1" and cannot tell what the A-series was or what happened to B. Name a thing
+  by what it *is*, and title by the change, not the batch it was scheduled in.
+- **Cross-reference by resolvable identity** — `#25`, a file path, a dated
+  `insights.md` entry. Never "the conventions issue" or "the companion PR",
+  which resolve only inside the conversation.
+- **Record the decision and why it holds, not the route to it.** "My earlier
+  lean was wrong", "agreed direction", "settled while drafting" narrate process
+  and age badly.
+
+Reread anything before publishing as a person who has never seen the session:
+every identifier must be defined in the document or resolvable in the repo.
+
 ## Shared vs. personal
 
 - **Shared (committed):** `.aide/` (minus `loop/loop.local.toml`), `aide.toml`,
