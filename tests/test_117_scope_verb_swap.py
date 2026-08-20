@@ -422,3 +422,60 @@ def test_ac18_parity_check_entry_recorded_in_decisions_log():
         f"expected at least two reported exit codes in the Parity check "
         f"entry, found {len(exit_codes)}"
     )
+
+
+# --------------------------------------------------------------------------- #
+# AC19: the retired coverage is replaced, not merely relocated.
+#
+# AC10 removed 17 tests that exercised the deleted script's behaviour. Of this
+# module's own tests only four exercise the verb (AC16, AC17 and two
+# adversarial cases); the rest are structural. The real replacement is the
+# framework's `.aide/scripts/tests/test_aide_scope.py`, which `testpaths =
+# ["tests"]` did not collect -- so a bare `python -m pytest` would have gone
+# from 17 behavioural tests over the scope check to four while this item
+# claimed a like-for-like swap. Collecting the framework suite is what makes
+# the claim true, so it is pinned here rather than left to convention.
+# --------------------------------------------------------------------------- #
+
+_FRAMEWORK_TESTS_PATH = ".aide/scripts/tests"
+
+
+def test_ac19_testpaths_collects_the_framework_suite():
+    pyproject = _REPO_ROOT / "pyproject.toml"
+    text = pyproject.read_text(encoding="utf-8")
+
+    marker = "[tool.pytest.ini_options]"
+    assert marker in text, "pyproject.toml has no pytest configuration section"
+    section = text.split(marker, 1)[1]
+    testpaths_lines = [
+        line for line in section.splitlines() if line.strip().startswith("testpaths")
+    ]
+    assert testpaths_lines, "pytest configuration declares no testpaths"
+
+    assert _FRAMEWORK_TESTS_PATH in testpaths_lines[0], (
+        f"testpaths must include {_FRAMEWORK_TESTS_PATH!r} -- it is the only "
+        f"live coverage of the scope verb this item swapped to; got "
+        f"{testpaths_lines[0]!r}"
+    )
+
+
+def test_ac19_the_framework_scope_suite_actually_exists_and_has_tests():
+    """A path in `testpaths` proves nothing if it holds no scope tests.
+
+    The AC is about coverage, not configuration, so assert the file is there
+    and defines a recognisable number of tests before believing the entry
+    above means anything.
+    """
+    suite = _REPO_ROOT / _FRAMEWORK_TESTS_PATH / "test_aide_scope.py"
+    assert suite.is_file(), f"{_FRAMEWORK_TESTS_PATH}/test_aide_scope.py is missing"
+
+    tree = ast.parse(suite.read_text(encoding="utf-8"))
+    test_functions = [
+        node.name
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")
+    ]
+    assert len(test_functions) >= 20, (
+        f"expected the framework scope suite to carry substantive coverage; "
+        f"found only {len(test_functions)} test function(s)"
+    )

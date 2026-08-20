@@ -85,5 +85,13 @@ path = "src/segfacet/__init__.py"
 packages = ["src/segfacet"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+# `.aide/scripts/tests` is the AIDE framework's own suite, installed here by
+# `install.py` and never hand-edited. It is collected deliberately (item 117):
+# `aide.py` is a real dependency of this repo's loop and CI, so an engine update
+# that breaks a verb should go red here rather than in the middle of a run. It
+# is the only live coverage of `aide scope` since item 117 retired this repo's
+# `scripts/check_item_scope.py` in favour of it. Stdlib-only and ~6s, so it
+# costs nothing to run on every leg. A red test here is fixed by updating or
+# rolling back the engine, never by editing `.aide/**`.
+testpaths = ["tests", ".aide/scripts/tests"]
 addopts = "-ra"

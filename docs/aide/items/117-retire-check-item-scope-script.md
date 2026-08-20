@@ -116,6 +116,16 @@ that takes the whole module out of the suite. AC13-AC15 exist for this.
   known-violating state and for a known-clean state, and naming the two expected
   deltas (the wider always-authorised set; **Asserts against** contradictions
   reported as their own finding).
+- [ ] **AC19: the coverage this item retires is actually replaced, not just
+  relocated.** `pyproject.toml`'s `testpaths` includes `.aide/scripts/tests`, so
+  a bare `python -m pytest` collects the framework suite that now owns the
+  behaviour AC10 removed 17 local tests for. Added after validation surfaced the
+  gap: of this item's 19 new tests only four exercise the verb's behaviour
+  (AC16, AC17 and two adversarial cases) — the rest are structural — while the
+  real replacement, `.aide/scripts/tests/test_aide_scope.py`'s 28 tests, sat in
+  a directory `testpaths = ["tests"]` never collected. Without this the item
+  takes local behavioural coverage of the scope check from 17 tests to four and
+  calls it a like-for-like swap.
 
 ## Assumptions
 
@@ -311,7 +321,8 @@ and the deletion is last.
 - `tests/test_103_feature_catalogue.py` — one stale comment naming the deleted script (AC2)
 - `tests/test_105_golden_decision_table.py` — one stale comment naming the deleted script (AC2)
 - `CLAUDE.md` — the Gotchas bullet and the CLI bullet's parenthetical (AC3)
-- `docs/aide/insights.md` — the two entries describing the retired script (AC4)
+- `docs/aide/insights.md` — the two entries describing the retired script (AC4), plus the `testpaths` entry AC19 closes
+- `pyproject.toml` — `testpaths` gains `.aide/scripts/tests` (AC19)
 
 **Asserts against:**
 
