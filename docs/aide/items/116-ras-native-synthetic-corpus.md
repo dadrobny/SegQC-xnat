@@ -181,6 +181,20 @@ as anatomically sensible end to end. Record the output. Confirm
 `python scripts/check_item_scope.py docs/aide/items/116-ras-native-synthetic-corpus.md --base aide/108-ras-correct-touches-face-mapping`
 exits 0.
 
+> **Corrected 2026-08-25.** Two lines above are wrong as written, and the item
+> passed validation regardless; the record is kept and annotated rather than
+> rewritten.
+>
+> 1. The designated `mode6_crop_at_border` case crops toward the **anterior**
+>    face, not a cranio-caudal one — before and after this item's migration
+>    alike, so nothing here changed it. Running `segfacet run` on the
+>    regenerated fixture gives `touches image face(s): anterior`, which matches
+>    the case's own `perturbation_params.face` and is anatomically sensible.
+>    Only this sentence was wrong, not the behaviour or the case design.
+> 2. `scripts/check_item_scope.py` no longer exists — item 117 retired it in
+>    favour of the framework verb. The equivalent today is
+>    `python .aide/scripts/aide.py scope 116 --base <ref>`.
+
 ## Dependencies
 
 Item 108 — this branch is stacked on it and completes the convention migration it

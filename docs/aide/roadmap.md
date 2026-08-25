@@ -1129,3 +1129,62 @@ changes on the corpus except where a retune is explicitly authorised.
   (arbitrary named features, selectable scored subset) is the mechanism; coupling `eval/` to a
   `features/` refactor was deliberately kept out of Stage 26. A natural fit for **Stage 27**,
   which is already generalising `reference_delta` off its single hardcoded tracked feature.
+
+- **Does the Stage 18 thesis have any real-data demonstrator left?** *(2026-08-14)*. Item
+  109's AC16 demonstrator turned out to rest on the very saturation bug that item fixed:
+  stripping stray islands from `mode3_inject_islands` reconstructs the candidate to exactly
+  GT, so modes 1/2/3 all land on their own baseline and every one saturates to
+  `abs(normalised_delta) == 1.0` under the pre-109 formula. The "large fraction of its
+  excursion" that made the demonstrator look convincing was an artefact, not a signal: under
+  the fix, mode 2's genuine movement on that real fixture is ~0.0007, single-voxel scale.
+  The headline claim — a *real* corpus case where an unbounded per-mode metric's magnitude
+  dramatically beats aggregate Dice — currently has only a hand-built synthetic fixture
+  behind it. Demonstrating it on real data again needs a corpus case designed for genuinely
+  large per-case magnitude, which makes this a natural rider on **Stage 21**'s perturbation
+  corpus rather than an idea in its own right.
+
+# Carried defects — no stage owns them yet
+
+> Distinct from the ideas above: each is a **known, located defect** that survived its
+> originating item because the file it lives in was outside that item's authorised paths.
+> Stage 26 was the vehicle for this class and has closed ✅, so these are unowned. Routed
+> here from `insights.md` at triage on 2026-08-25 so the next `/aide-create-queue` sees
+> them; each names the entry it came from.
+
+- **A byte-hash scope fence survives in an unrelated module.**
+  `tests/test_098_stray_components.py::test_ac18_reference_verse_v1_bytes_unchanged` pins
+  `reference_verse_v1.json`'s bytes through `_PRE_098_REFERENCE_VERSE_V1_SHA256` — the last
+  of the three fences item 107's retirement missed, because that item's AC1 grep searched
+  five named `_PRE_NNN_*` prefixes rather than the *shape* of the assertion. The invariant
+  itself is defensible on reflection: `reference_verse_v1.json` is a released production
+  artifact (80 real VerSe19 subjects, the CLI default since item 090) that arguably should
+  not change silently. What is wrong is where it lives — a module about stray-component
+  detection, under a name and docstring reading "item 098's state", so a legitimate future
+  regeneration fires an assertion that looks like an accidental scope violation rather than
+  an integrity check. The fix is to move it to a properly-named artifact-integrity test
+  beside `reference/artifact.py`, not to delete it. *(insights.md 2026-08-12 and 2026-08-15,
+  items 116 and 115)*
+- **A comment header names a fence that is not one.**
+  `tests/test_102_stage18_validation.py` carries `# AC24: the scope fence -- no production
+  code changed by this item` directly above `_SRC_TREE_HASH_AT_COLLECTION`, which hashes the
+  source tree at collection and re-hashes it within the same run — an intra-run determinism
+  assertion, and by item 115's own discriminator the legitimate kind that must stay. The
+  header is the hazard: the next shape-based audit, human or grep, meets text that reads
+  like a fence and either raises a false flag or, worse, retires a good assertion. Renaming
+  the header to say what it actually checks is the whole fix. *(insights.md 2026-08-15,
+  item 115)*
+- **The `scope-check` CI job matches nothing under this repo's git mode.**
+  `.github/workflows/ci.yml`'s job resolves its item number from an `aide/NNN-` head ref,
+  but `[git] mode = "auto-merge"` means an item branch is merged and deleted locally and
+  never becomes a PR, and a queue PR's head is `aide/queue-NNN`, which the anchored `sed`
+  deliberately declines. Every PR this repo actually opens therefore skips while reporting
+  SUCCESS — a gate that decayed as the branching model changed, not one that never worked.
+  Per-item scope is still enforced by `validator.md` step 3 running `aide scope` in-loop, on
+  one machine and one platform, which is the conventions §7 blind spot exactly. Three
+  options are recorded in the insight: retire the job and state that the validator is the
+  gate; give the queue PR a job that enumerates the items merged into the queue branch and
+  runs `aide scope NNN --base <queue base>` for each (what engine 1.8.0's `--base` enables,
+  and the real answer for the queue-PR model); or add `workflow_dispatch` as a manual
+  stopgap. The framework half is answered — engine 1.18.1's `conventions.md` §4 now states
+  per mode what CI gate is possible — leaving this half project-owned and open.
+  *(insights.md 2026-08-20, item 117)*
