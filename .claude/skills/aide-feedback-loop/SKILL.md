@@ -17,7 +17,21 @@ Analyze the current state of the project documents and recent work.
 
 The roles capture out-of-scope insights as one-line inbox entries during
 execution (see `.aide/conventions.md` §1 → `insights.md`); this step routes
-them. For each **unchecked** entry, by type:
+them. It is the boundary for every type that lands in *this* project — a
+`framework` entry may already have been handed over on capture, so expect some
+to be ticked before you arrive.
+
+**Read the backlog with the verb, not by opening the file:**
+
+```
+python .aide/scripts/aide.py insights list --open
+```
+
+The file interleaves closed and open entries, so reading it whole costs the
+entire history to see a working set that is usually a dozen lines. Open the
+file only when you need an entry's full context, and then only that entry.
+
+For each **unchecked** entry, by type:
 
 - **knowledge** → fold the fact into its owning document (`docs/`, `CLAUDE.md`,
   a living document, code comments) — smallest edit that preserves it.
@@ -34,8 +48,32 @@ them. For each **unchecked** entry, by type:
   the observation, and a proposal (this stays `ask`-gated — a human confirms).
   Otherwise leave the entry unchecked with a `(pending handover)` note.
 
-Tick each routed entry **in place**, appending where it landed:
-`- [x] <type> — … → <doc/item/issue>`. The file is append-only otherwise.
+Tick each routed entry with the verb, naming where it landed — never by
+editing the line by hand, which is how a claim gets silently reworded:
+
+```
+python .aide/scripts/aide.py insights tick 7 --pointer "item 042"
+```
+
+That appends `→ item 042` to the entry and flips its checkbox. Never reword,
+reorder or delete a captured claim — including one that turned out to be wrong;
+the correction goes *beneath* it, as a dated line in the entry's status trail,
+which is what the same command writes when the entry is **already** ticked:
+
+```
+- [x] defect — <the original claim, never touched> *(item 117, 2026-08-20)*
+  - **2026-09-02** → superseded: the fence it names was retired by item 121
+```
+
+Use the trail for anything after the first routing — a re-route, a resolution,
+a premise that decayed. Add one when you find a ticked entry whose status you
+now know to be stale; that is triage too, and it is what stops the next reader
+re-deriving it.
+
+When the closed history has grown past the live working set, propose an
+`insights archive --before <date>` to the human — it is a dry run until `--yes`,
+and it renumbers the entries that remain, so it belongs at the *end* of a triage
+pass, never the middle.
 
 ### 1. Document gaps
 

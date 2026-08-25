@@ -18,13 +18,21 @@
     framework  — belongs to AIDE itself, not this project; triage hands it
                  over to the framework repo ([framework] repo in aide.toml)
 
-  Triage happens at the queue boundary (feedback loop): each entry is routed
-  to its destination, then ticked in place with a pointer:
+  Triage routes each entry to its destination, then ticks it in place with a
+  pointer:
     - [x] <type> — <one line> *(item NNN, YYYY-MM-DD)* → <where it landed>
+  Triage happens at the queue boundary (feedback loop) for every type that
+  lands in this project; a `framework` entry leaves for another repo's issue
+  tracker and may be triaged on capture or on demand.
 
-  Append-only, with exactly two exceptions: ticking an entry's checkbox and
-  appending its "→ where it landed" pointer, both at triage. Nothing else about
-  a captured line may be rewritten, and no line is ever reordered or deleted.
+  The captured claim is IMMUTABLE — never reworded, reordered or deleted, not
+  even when it turns out to be wrong (the wrongness is the record). Ticking the
+  checkbox is the one in-place edit. Everything that happens to an entry AFTER
+  triage goes in an appendable status trail: dated lines, indented under the
+  entry, newest last.
+    - [x] framework — <the original claim, never touched> *(2026-08-20)*
+      - **2026-08-20** → aide-loop issue #50
+      - **2026-10-11** → resolved in engine 1.16.0
 -->
 # Insight Inbox
 

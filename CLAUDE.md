@@ -190,15 +190,20 @@ already written down there rather than in `docs/aide/`.
   there or unattended runs stall on permission prompts.
 - **Document templates** — [`.aide/templates/`](.aide/templates/).
 - **CLI** — `python .aide/scripts/aide.py
-  {check,progress,gate,queue,claim,merge,env,sync,gc,status,scope}`. If a verb
-  covers it, the raw git form is wrong: session preflight is `sync`, branch
-  clean-up is `gc`, the state report is `status`, and the item's diff-vs-scope
+  {check,progress,gate,queue,claim,merge,env,sync,gc,status,scope,insights}`. If
+  a verb covers it, the raw git form is wrong: session preflight is `sync`, branch
+  clean-up is `gc`, the state report is `status`, the item's diff-vs-scope
   check is `scope` — the CI job's `scope-check` step (`.github/workflows/ci.yml`)
-  invokes it directly. `check --queue NNN` adds the cross-spec checks; `gate`
-  resolves human gates, and only a person may run it.
+  invokes it directly — and a queue branch is created by `queue start NNN`, never
+  by a hand-typed `git switch -c`. `check --queue NNN` adds the cross-spec checks;
+  `gate` resolves human gates, and only a person may run it.
 - **Insight inbox** — [`docs/aide/insights.md`](docs/aide/insights.md): append a
   one-line `- [ ] <type> — …` when you learn something out of scope, then return
-  to your task. Triaged at the queue boundary by `/aide-feedback-loop`.
+  to your task. Triaged at the queue boundary by `/aide-feedback-loop`, which
+  reads the backlog with `aide insights list --open` and closes an entry with
+  `aide insights tick N --pointer "<where it landed>"` rather than hand-editing
+  the file; `aide insights archive --before YYYY-MM-DD` moves closed entries out
+  to `docs/aide/insights/archive-YYYY-QN.md`.
 - **Skills / commands** — `/aide-*` (create-vision … feedback-loop, spec-queue)
   and the `/aide-run-{item,queue,roadmap}` orchestrators.
 
@@ -240,9 +245,17 @@ paths like `.aide/…` and `python .aide/scripts/aide.py …` appearing inside
 `core/` and `adapters/` are **consumer** paths and are correct — never "fix" them
 to that repo's own layout.
 
-The same applies to any sibling repo in this workspace. A general mechanism for
-this is proposed upstream; until it exists, read the target repo's `CLAUDE.md`
-first.
+The same applies to any sibling repo in this workspace — it is
+[`.aide/conventions.md`](.aide/conventions.md) §8: a repository's own
+instructions bind for work inside it, and where two repos disagree about a file,
+the repo that owns the file wins. Engine 1.18.0 added a reminder, not a
+substitute: `.claude/hooks/sibling_instructions.py` points a session at a
+declared sibling's instruction file the first time it touches a path inside that
+repo. It delivers a *pointer*, once per repo per session, and never gates a tool
+call — reading the file is still on you. The repos it knows about are the ones
+named in the gitignored `.aide/loop/loop.local.toml` (`[framework] local_path`
+and `[hygiene] extra_repos`); a sibling missing from that file gets no reminder
+at all.
 
 Clean workflow to change the framework (no push required — the installer copies
 from the local working tree):
@@ -278,7 +291,12 @@ from the local working tree):
   **must** be pinned in [`.gitattributes`](.gitattributes) with `text eol=lf` (or
   `binary` for compressed blobs like `.nii.gz`), and the generator should write
   bytes with `\n` (`write_bytes`, not `write_text`, since Python 3.9 can't set
-  `newline=` on `Path.write_text`).
+  `newline=` on `Path.write_text`). Engine 1.19.0 gave the rule a lint: `aide
+  check` resolves a fixture path through the test's AST and warns when nothing in
+  `.gitattributes` covers it. It is precise rather than exhaustive by design — a
+  path reached through `tmp_path`, a function argument or an imported constant
+  resolves to nothing and is skipped in silence — so a warning is authoritative
+  and its absence is not a clean bill of health.
 
 ## Durable artifacts must read cold
 
@@ -304,8 +322,9 @@ every identifier must be defined in the document or resolvable in the repo.
 ## Shared vs. personal
 
 - **Shared (committed):** `.aide/` (minus `loop/loop.local.toml`), `aide.toml`,
-  `.claude/{agents,commands,skills,hooks,settings.json}`, `CLAUDE.md`,
-  `docs/aide/` living documents.
+  `CLAUDE.md`, `docs/aide/` living documents, and under `.claude/`: `agents/`,
+  `commands/`, `skills/`, `hooks/`, `scripts/`, `settings.json`,
+  `settings.overlay.json` and `default-context.json`.
 - **Personal (git-ignored):** `.aide/loop/loop.local.toml`,
   `.claude/settings.local.json`, `docs/aide/permissions/*.jsonl`,
   `docs/aide/status/*`, credentials. Never commit credentials.
@@ -337,11 +356,23 @@ checked-out branch.
 **2. Whether a PR is opened per item (`[git] mode` in `aide.toml`).** Currently
 `auto-merge`. Per [`.aide/conventions.md`](.aide/conventions.md) §4:
 
-| mode | on validator PASS | item branch becomes a PR? |
-|---|---|---|
-| `auto-merge` *(current)* | direct-merges to the recorded base, deletes the branch | no |
-| `pr` | pushes and stops for a human to open the PR | **yes** |
-| `local` | local merge, no pushes at all | no |
+| mode | on validator PASS | item status after | item branch becomes a PR? |
+|---|---|---|---|
+| `auto-merge` *(current)* | direct-merges to the recorded base, deletes the branch | ✅ | no |
+| `pr` | pushes and stops for a human to open the PR | 🔍 until the PR lands | **yes** |
+| `local` | local merge, no pushes at all | ✅ | no |
+
+Engine 1.20.0 split those two outcomes apart. The validator now marks every item
+`in-review` (🔍) regardless of mode, and **`aide merge` writes ✅ only when the
+merge actually happens** — so ✅ means *merged* everywhere, and a 🔍 item holds
+its stage at 🚧 and its queue open. That matters most for `aide gc`, whose ✅
+ground deletes a branch locally *and* on the remote; before 1.20.0 a `pr`-mode
+item read ✅ the moment it was pushed, so the exhaustion sweep offered to delete
+the head branch of an open PR. Nothing under `auto-merge` — this repo's current
+mode — changes behaviour. Since nothing inside the loop observes a merge that
+happens on the forge, `aide sync`/`aide status` name any 🔍 item whose work has
+since landed in its base and print the `aide progress set NNN done` that closes
+it.
 
 **The consequence for CI.** The `scope-check` job in
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) fires only on a
@@ -359,3 +390,5 @@ enforced, by `validator.md` step 3 running `aide scope` in-loop. Evidence and
 the three options are recorded in
 [`docs/aide/insights.md`](docs/aide/insights.md) (2026-08-20, item 117);
 switching to `pr` mode is one of the things that would resolve it.
+
+@.aide/AGENT-CONTEXT.md

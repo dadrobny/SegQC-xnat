@@ -26,9 +26,11 @@ lowest-numbered one with open items).
    argument) and list its items that have **no** spec file in `docs/aide/items/`.
    If none, report "queue fully specced" and stop.
 2. **One branch for the whole batch** — not per-item claim branches (those are
-   created later, at execution time, by `aide claim`):
+   created later, at execution time, by `aide claim`). Let the CLI name it; a
+   hand-typed name that `aide claim` does not recognise as a queue branch
+   retargets the merge silently:
    ```
-   git switch -c aide/specs-queue-NNN
+   python .aide/scripts/aide.py queue start NNN --specs
    ```
 3. **Loop over the unspecced items in queue order.** For each, author the spec
    per the `aide-create-item` skill and `.aide/templates/item.md`, with clarify
@@ -82,10 +84,11 @@ lowest-numbered one with open items).
    git add docs/aide/items/NNN-*.md
    git commit -m "docs(NNN): work item spec for <short title>"
    ```
-7. **Land the batch.** Push the branch and open a PR for human review of the
-   whole spec set (`gh pr create` is ask-gated — that pause is intended):
+7. **Land the batch.** Push the specs and open a PR for human review of the
+   whole spec set (`gh pr create` is ask-gated — that pause is intended). Step 2
+   already set the upstream, so this types no branch name either:
    ```
-   git push -u origin aide/specs-queue-NNN
+   git push
    ```
    After the PR merges, run `/aide-run-queue NNN` — execution proceeds
    unattended, claiming per-item branches as usual.

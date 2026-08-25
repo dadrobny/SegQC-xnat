@@ -15,6 +15,7 @@
 | ---- | ----------- |
 | 📋   | Planned     |
 | 🚧   | In Progress |
+| 🔍   | In Review   |
 | ✅   | Complete    |
 | ⏸️ | Deferred    |
 | ❌   | Excluded    |

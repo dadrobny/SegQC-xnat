@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -426,24 +427,77 @@ def test_adv_missing_acceptance_box_raises_assertion():
 # parse return nothing). The sixth new warning names no location; see
 # `_AGGREGATED_WARNING_RES`.
 #
-# Line shift, same date: the `## Human gates` table added to `progress.md`
-# (engine 1.13.0) pushed all three of its baseline lines down by 24. The three
-# warnings are the same three -- the icon-in-prose lines in the Stage 7, 11 and
-# 15 sections -- and this is the standing cost of pinning a line number rather
-# than the text at it.
-_PINNED_BASELINE_WARNING_LOCATIONS = frozenset(
+# **The baseline is keyed by (path, text), not by location** -- changed
+# 2026-08-25 after the line numbers moved three times without a single warning
+# changing meaning:
+#
+#   1. engine 1.13.0's `## Human gates` table pushed `progress.md`'s three down
+#      by 24;
+#   2. engine 1.20.0's `| 🔍 | In Review |` legend row pushed them down by one
+#      more;
+#   3. `aide insights archive --before 2026-08-01` moved 42 closed entries out
+#      of `insights.md`, taking its three from 51/58/60 to 31/32/33.
+#
+# Every one came from a framework verb legitimately rewriting a document it
+# owns, and every one presented as a red test that reads like a regression. The
+# churn was the visible cost; the real one was that a re-pin is a mechanical
+# edit made while reading a failure, and nothing checked that each moved
+# warning was the one the author believed it to be -- so a genuinely new
+# warning arriving in the same run as a shift would have been folded into the
+# baseline unnoticed. AC8's claim ("no new `aide check` warning") is about a
+# warning's *identity*, and a line number is the one part of it the loop
+# perturbs. Dropping the line number from the key makes the assertion immune to
+# all three shifts while still failing on a real new finding.
+#
+# Kept deliberately: **the file path, and the count**. Text alone would collapse
+# the three identical `insights.md` shape warnings into one key, so a fourth
+# malformed entry would pass unnoticed -- the exact silent-green failure this
+# module exists to prevent. Path alone would let a *different* warning about the
+# same file through. The comparison is therefore a multiset: a key may appear no
+# more often than its baseline count, and an unknown key fails.
+#
+# Fewer warnings never fails. The baseline records what is tolerated, not what
+# is required, so fixing one of these documents does not turn this test red for
+# doing the right thing -- and the three `insights.md` entries in particular
+# cannot be fixed in this repo at all (their provenance names a queue or an
+# item range, which `_INSIGHT_RE` rejects and `archive` cannot move, since it
+# selects on a date they do not parse into -- aide-loop issue #76). The `assert
+# warnings` guard below is what keeps "zero warnings" from passing vacuously.
+_PINNED_BASELINE_WARNINGS = Counter(
     {
-        "progress.md:364",
-        "progress.md:483",
-        "progress.md:662",
-        "queue/queue-002.md:80",
-        "insights.md:51",
-        "insights.md:58",
-        "insights.md:60",
+        (
+            "progress.md",
+            "status icon ✅ outside a structural status position (parsers treat it "
+            "as plain text; move or remove it if status was intended)",
+        ): 1,
+        (
+            "progress.md",
+            "status icon ⏸️ outside a structural status position (parsers treat it "
+            "as plain text; move or remove it if status was intended)",
+        ): 1,
+        (
+            "progress.md",
+            "status icon ❌ outside a structural status position (parsers treat it "
+            "as plain text; move or remove it if status was intended)",
+        ): 1,
+        (
+            "queue/queue-002.md",
+            "status icon ✅ outside a structural status position (parsers treat it "
+            "as plain text; move or remove it if status was intended)",
+        ): 1,
+        (
+            "insights.md",
+            "entry does not match '- [ ] <knowledge|defect|gap|automation|framework> "
+            "— <one line> *(item NNN, YYYY-MM-DD)*'",
+        ): 3,
     }
 )
 
-_LOCATION_WARNING_RE = re.compile(r"^([^:]+:\d+):")
+#: Splits `path:lineno: text` into the parts the baseline keys on and the one
+#: it deliberately discards. The path may itself contain no colon (it is a
+#: POSIX relative path rendered by the engine with `.as_posix()`), and the text
+#: may contain any number of them, so only the first two fields are bounded.
+_LOCATION_WARNING_RE = re.compile(r"^([^:]+):(\d+): (.*)$", re.DOTALL)
 
 # Whole-corpus warnings that name no single location, so they cannot be pinned
 # by one. Engine 1.14.0 added the first of them: the mandatory `## Assumptions`
@@ -503,29 +557,88 @@ def _aide_check_warnings() -> list:
     return list(warnings)
 
 
+def _baseline_key(warning: str):
+    """``path:lineno: text`` -> ``(path, text)``, or ``None`` if it is excluded.
+
+    The line number is dropped deliberately (see the note above the baseline).
+    Returning ``None`` for an excluded warning keeps the three exclusion rules
+    in one place instead of repeated at every call site.
+    """
+    if warning.startswith(_BRANCH_STATE_WARNING_PREFIXES):
+        return None
+    if any(pattern.match(warning) for pattern in _AGGREGATED_WARNING_RES):
+        return None
+    if any(pattern.match(warning) for pattern in _GATE_DECISION_WARNING_RES):
+        return None
+    match = _LOCATION_WARNING_RE.match(warning)
+    assert match is not None, (
+        f"unrecognised aide check warning shape (not location-based, "
+        f"not a branch-state warning): {warning!r}"
+    )
+    return (match.group(1), match.group(3))
+
+
 def test_ac8_no_new_aide_check_warning_beyond_pinned_baseline():
     warnings = _aide_check_warnings()
-    # A capture/plumbing failure must fail loudly, not silently skip the
-    # loop below: `aide check` always reports the seven location-stable
-    # baseline warnings on this branch.
+    # A capture/plumbing failure must fail loudly, not silently pass an empty
+    # loop: `aide check` always reports the baseline warnings on this branch.
     assert warnings, "run_checks returned no warnings at all -- expected the pinned baseline"
-    for warning in warnings:
-        if warning.startswith(_BRANCH_STATE_WARNING_PREFIXES):
-            # Branch-state-dependent -- excluded, see the note above.
-            continue
-        if any(pattern.match(warning) for pattern in _AGGREGATED_WARNING_RES):
-            # Whole-corpus, location-free -- excluded, see the note above.
-            continue
-        if any(pattern.match(warning) for pattern in _GATE_DECISION_WARNING_RES):
-            # Reports a pending human decision, not a document defect --
-            # excluded, see the note above.
-            continue
-        match = _LOCATION_WARNING_RE.match(warning)
-        assert match is not None, (
-            f"unrecognised aide check warning shape (not location-based, "
-            f"not a branch-state warning): {warning!r}"
-        )
-        assert match.group(1) in _PINNED_BASELINE_WARNING_LOCATIONS, (
-            f"aide check produced a new warning not in the pre-item-114 "
-            f"baseline: {warning!r}"
-        )
+    observed = Counter(
+        key for key in (_baseline_key(w) for w in warnings) if key is not None
+    )
+    # A multiset comparison, in the tolerating direction only: every observed
+    # (path, text) must be known and must not outnumber its baseline entry.
+    # Fewer is fine -- the baseline says what is tolerated, not what is owed.
+    excess = observed - _PINNED_BASELINE_WARNINGS
+    assert not excess, (
+        "aide check produced warnings beyond the pinned baseline "
+        f"(path, text -> how many more than allowed): {dict(excess)}"
+    )
+
+
+def test_ac8_baseline_key_discards_only_the_line_number():
+    """The property that makes the baseline survive a document rewrite.
+
+    Pinned directly rather than left implicit: the same warning about the same
+    file must key identically no matter what line it lands on, which is what
+    each of the three recorded shifts violated under the old location key.
+    """
+    text = "status icon ✅ outside a structural status position"
+    assert _baseline_key(f"progress.md:365: {text}") == ("progress.md", text)
+    assert _baseline_key(f"progress.md:1: {text}") == ("progress.md", text)
+    assert _baseline_key(f"progress.md:999999: {text}") == ("progress.md", text)
+    # ...but the file and the text still discriminate.
+    assert _baseline_key(f"queue/queue-002.md:80: {text}") != ("progress.md", text)
+    assert _baseline_key("progress.md:365: something else entirely") != (
+        "progress.md",
+        text,
+    )
+
+
+def test_ac8_baseline_counts_catch_one_more_of_an_already_known_warning():
+    """Text alone would collapse the three identical `insights.md` warnings.
+
+    The regression this guards is silent: a fourth malformed inbox entry
+    produces a warning byte-identical to three that are already tolerated, so a
+    set-keyed baseline would accept it forever.
+    """
+    known = (
+        "insights.md",
+        "entry does not match '- [ ] <knowledge|defect|gap|automation|framework> "
+        "— <one line> *(item NNN, YYYY-MM-DD)*'",
+    )
+    assert _PINNED_BASELINE_WARNINGS[known] == 3
+    assert not (Counter({known: 3}) - _PINNED_BASELINE_WARNINGS)
+    assert Counter({known: 4}) - _PINNED_BASELINE_WARNINGS == Counter({known: 1})
+
+
+def test_ac8_baseline_excludes_the_three_documented_categories():
+    """Each exclusion is a decision with a reason; pin that they still apply."""
+    assert _baseline_key("stale claim branch aide/077-x for a finished item") is None
+    assert _baseline_key("unrecognised branch aide/nonsense") is None
+    assert _baseline_key(
+        "32 item spec(s) have no mandatory '## Assumptions' block: 001, 002"
+    ) is None
+    assert _baseline_key(
+        "progress.md:190: human gate 1 (Real segmenter output) is awaiting a decision"
+    ) is None

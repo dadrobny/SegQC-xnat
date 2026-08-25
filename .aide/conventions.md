@@ -23,6 +23,36 @@ left in a generated `docs/aide/**.md` file as an unfilled template slot.
 Dates are always **ISO 8601** (`YYYY-MM-DD`) — the templates' `{{yyyy-mm-dd}}`
 slot spells the format out so no separate lookup is needed.
 
+**Durable artifacts must read cold.** Everything the loop produces outlives
+the session that produced it — item specs, `insights.md` entries, commit
+messages, issue bodies, roadmap and progress prose. The reader who matters is
+someone opening it months later with none of the conversation, so a durable
+artifact is written to be understood with no access to how it was made. Three
+rules follow, and they apply wherever the loop writes, not only to the documents
+whose shape is fixed above:
+
+1. **No chat-local identifiers.** A label coined for the convenience of one
+   conversation — "the second option", "the batch we just scoped", a letter or
+   wave assigned while planning — is scaffolding, not a name. It resolves only
+   for someone who was there, and a reader who was not cannot even tell what the
+   series contained or what happened to the rest of it. Name a thing by what it
+   *is*, and title a change by the change, not by the batch it was scheduled in.
+2. **Cross-reference by resolvable identity.** An issue number, a file path, a
+   commit, a stage number, a dated `insights.md` entry — something a reader can
+   look up. Never "the conventions issue", "the companion PR", or "as discussed
+   above" pointing outside the artifact.
+3. **Record the decision and why it holds, not the route to it.** "My earlier
+   lean was wrong", "agreed direction", "settled while drafting" narrate a
+   process the reader was not part of, and they age badly: the moment the
+   decision is revisited, prose about who once thought what is noise around the
+   reasoning that is actually load-bearing. A superseded decision is recorded by
+   stating the new one and what changed, not by leaving a trail of leans.
+
+The rules bind interactive sessions as much as unattended ones — a human and a
+runtime writing a commit message or an issue body are producing exactly these
+artifacts, with no agent spec in play. `.aide/AGENT-CONTEXT.md` exists so they
+reach that session without anything having to point at this file.
+
 **Header blockquote** — every living document opens with one, carrying its step
 number in the loop, what it derives from, and what derives from it. Those are
 structural facts that hold as long as the document exists, so a reader landing
@@ -31,18 +61,38 @@ line current when a document's relationships change. The transient hand-off
 ("run `/aide-…` next") is spoken by the skill that wrote the file, not stored
 in it.
 
-### Status icons (the only five)
+### Status icons (the only six)
 
 | Icon | Meaning | Rank |
 |------|---------|------|
 | 📋 | Planned | 0 |
 | 🚧 | In Progress | 3 |
-| ✅ | Complete | 4 |
+| 🔍 | In Review | 4 |
+| ✅ | Complete | 5 |
 | ⏸️ | Deferred | 2 |
 | ❌ | Excluded | 1 |
 
 Rank is used when one item is referenced on several lines: the most-advanced
 status wins.
+
+**✅ means merged — in every `git.mode`.** It is written by `aide merge` when
+the merge actually happens, not by an agent ahead of one. 🔍 is the state
+between: the work is pushed and awaiting a human's merge. It exists because ✅
+used to mean two different things depending on the mode — merged under
+`auto-merge`, *pushed and awaiting review* under `pr` — while everything
+downstream read it as "done", including `aide gc`, whose default ground is "the
+item is ✅" and whose action is `git branch -D` plus a remote delete. The
+exhaustion sweep therefore offered to delete the head branch of an open PR, and
+the line a human was asked to approve read like confirmation. A run must be
+stable under either mode, so the mode no longer changes what a status asserts.
+
+A 🔍 item **holds its stage at 🚧** (an open PR has not shipped) and **holds its
+queue open**. `aide check` does not call its claim branch stale, and `aide
+status` reports it as awaiting review rather than recommending `gc`. Because in
+`pr` mode nothing inside the loop ever observes the merge, `aide sync` and `aide
+status` name any 🔍 item whose work has since landed in the base and print the
+`aide progress set NNN done` that closes it — the same content check `gc` uses,
+so it needs no forge call that could silently degrade to "no open PRs found".
 
 **Structural positions only.** The parsers read icons *only* at structural
 positions: a table row's **Status (last) cell**, a stage header's **trailing**
@@ -245,11 +295,19 @@ python .aide/scripts/aide.py scope [NNN] [--base <ref>]
 With no argument it reads the item number from the current claim branch; a
 queue branch resolves to no item and is skipped, since per-item scope is checked
 on each claim branch as it merges and a queue branch legitimately aggregates
-many items' lists. It diffs against the **merge-base** with `origin/<main>` —
-not the local ref, whose merge-base on a checkout sitting behind the work is
-itself, so every file the earlier items touched would be reported against this
-item's spec. Exit `0` in scope · `1` something changed outside it · `2` could
-not check. That third code is the "reported, never silently passed" rule with
+many items' lists. Whether that per-item check is ever reachable from CI — as
+opposed to only from the validator, in-loop — depends on `git.mode`, which
+decides whether a claim branch is pushed and whether it ever carries a PR
+context; see §4. It diffs against the **merge-base with the item's base** — `--base` if
+given, else the branch's recorded base, else `main_branch`, resolved exactly as
+§4 describes. The two *derived* answers prefer the `origin/` counterpart over
+the local ref, whose merge-base on a checkout sitting behind the work is itself,
+so every file the earlier items touched would be reported against this item's
+spec. On stacked work the base is the **queue branch**, not `main`: an item
+claimed from one has diverged from that, and diffing against `main` would report
+every sibling item already merged into the queue.
+
+Exit `0` in scope · `1` something changed outside it · `2` could not check. That third code is the "reported, never silently passed" rule with
 teeth: a spec with no section cannot be read as an unconstrained one.
 
 Three paths are authorised for every item without being listed — `progress.md`
@@ -324,21 +382,66 @@ of scope. Any role, at any time, appends **one line** and returns to its task:
 with `<type>` one of **knowledge** (document it), **defect** (fix it), **gap**
 (plan it), **automation** (a recurring manual/agent action deterministic code
 could replace — script it), **framework** (belongs to AIDE itself). The item
-ref is optional for roles outside an item. The file is **append-only, with
-exactly two exceptions** — ticking an entry's checkbox and appending its
-`→ where it landed` pointer, both performed at triage (below). Nothing else
-about a captured line may be rewritten, and no line is ever reordered or
-deleted. `aide check` shape-checks entries (warning, never error — capture must
-stay cheap). Template: `.aide/templates/insights.md` (copy verbatim).
+ref is optional for roles outside an item. `aide check` shape-checks entries
+(warning, never error — capture must stay cheap). Template:
+`.aide/templates/insights.md` (copy verbatim).
 
-**Triage** happens at the queue boundary (the feedback loop): each unchecked
-entry is routed — `knowledge` → the owning document; `defect`/`gap` →
-candidate items for the queue being authored (so the queue PR reviews them);
-`automation` → a candidate item that adds a CLI verb/script *and* the
-skill/agent edit mandating it; `framework` → a GitHub issue on
-`[framework] repo` from `aide.toml` (via `gh`; if unset/offline the entry
-stays pending). A routed entry is ticked in place:
-`- [x] … → <where it landed>`.
+**Capture is a plain append; everything after it has a verb.** Reading and
+triaging the file by hand is what made triage expensive enough to defer:
+
+```
+python .aide/scripts/aide.py insights list [--open] [--type T] [--trail]
+python .aide/scripts/aide.py insights tick N --pointer "<where it landed>"
+python .aide/scripts/aide.py insights archive --before YYYY-MM-DD [--yes]
+```
+
+`list` numbers entries by position and prints the backlog without the closed
+history around it; `tick` performs the one in-place edit below, or appends a
+dated trail line when the entry is already ticked; `archive` moves **closed**
+entries older than a date into `insights/archive-YYYY-QN.md`, each moved entry
+and its trail carried across line for line, and says so — an archive renumbers
+what remains, so re-run `list` after one.
+Archived entries are frozen and no longer shape-checked, since the immutability
+rule leaves no way to act on a warning about one.
+
+**The claim is immutable; its status is not.** The captured line is never
+reworded, reordered, or deleted — that is what protects provenance, and it is
+load-bearing precisely when an entry turns out to be *wrong*: the wrongness is
+the record, and a correction written beneath it teaches what a silent rewrite
+would erase. Ticking the checkbox is the one in-place edit.
+
+Status *about* a claim is bookkeeping, and freezing bookkeeping buys nothing. An
+entry may carry an **appendable status trail** — dated lines, indented under the
+entry, newest last:
+
+```
+- [x] framework — <the original claim, never touched> *(item 117, 2026-08-20)*
+  - **2026-08-20** → aide-loop issue #50
+  - **2026-09-02** → issue rewritten; the original framing overstated the finding
+  - **2026-10-11** → resolved in engine 1.16.0
+```
+
+A single routing pointer may still be appended to the entry line itself
+(`- [x] … → <where it landed>`); the trail is what a *second* update goes in,
+and what an entry whose premise decayed needs. Without it there is nowhere to
+record that half a claim has since been fixed, so the next reader re-derives all
+of it.
+
+**Triage** routes each unchecked entry by type — `knowledge` → the owning
+document; `defect`/`gap` → candidate items for the queue being authored (so the
+queue PR reviews them); `automation` → a candidate item that adds a CLI
+verb/script *and* the skill/agent edit mandating it; `framework` → a GitHub
+issue on `[framework] repo` from `aide.toml` (via `gh`; if unset/offline the
+entry stays pending).
+
+**When triage happens depends on the destination.** `knowledge`, `defect`,
+`gap` and `automation` all land in this project — a document it owns, or a
+candidate item — so they wait for the queue boundary (the feedback loop), where
+the queue PR reviews the routing. `framework` does not: it leaves for an issue
+on another repo, and nothing about that destination needs a queue, so a
+`framework` entry may be triaged **on capture or on demand**. Routing it through
+the boundary too means the inbox accumulates for exactly as long as a queue
+runs, and a long queue is normal.
 
 ### Human gates (optional, additive)
 
@@ -476,11 +579,37 @@ taken" signal is the **pushed `<branch_prefix>NNN-*` branch** (config
 3. Create and push `aide/NNN-short-name` (push depends on `git.mode`; `local`
    mode does not push and so has no multi-machine claim signal).
 
+**The two branch shapes that are not claims** — `<prefix>queue-NNN` (a queue is
+planned and run on it) and `<prefix>specs-queue-NNN` (its specs are authored on
+it) — are created by `aide queue start NNN [--specs]`, never typed by hand. The
+engine both *constructs* and *recognises* all three shapes from one definition,
+so a name it produces is a name it can parse. A hand-typed name that misses the
+shape is not a cosmetic problem: `aide claim` infers an item's base only from a
+**recognised** queue branch, so an unrecognised one sends every item's merge to
+`main_branch` instead of the queue branch, silently. `queue start` also records
+the branch's own base, which `claim` alone could not do.
+
 One person (or one loop) owns an item at a time. Abandoning an item means
 deleting its remote branch so the item returns to the pool; `aide check` flags a
 claim branch whose item is already ✅ (stale claim), and `aide gc` deletes such
 branches — local and remote — deterministically (dry-run by default, `--yes` to
 act; `--merged` also collects branches already merged into main).
+
+**`gc` asks git, not the document.** A ✅ is a claim made by a document that
+agents and humans both edit, and the action it triggers is `git branch -D` plus
+a remote delete — unrecoverable on a plain git host. So on the ✅ ground `gc`
+deletes a branch only when `git merge-tree --write-tree` says merging it into
+the base would change nothing: the content question, which (unlike `git branch
+--merged`) stays correct across a squash merge, and which also strengthens
+`--merged`. A ✅ item whose branch still carries unlanded content is **skipped**
+with the base named; `--abandon` deletes it anyway, for the genuinely abandoned
+claim. `merge-tree --write-tree` needs git ≥ 2.38 — on older git the ✅ ground
+refuses rather than falling back to a weaker test, so old git is always *more*
+conservative.
+
+**The preview is the set `--yes` acts on.** Every skip — checked out, unlanded,
+git too old — is decided before anything is printed and shown as `skipping <br>:
+<reason>` on both paths. A dry run a human is asked to approve must not overstate.
 
 ---
 
@@ -498,10 +627,11 @@ The rules (runtime-general):
 
 - **If an `aide` verb covers it, the raw git form is wrong.** Session preflight
   (fetch, clean-tree check, landing on the right branch) is `aide sync
-  [--item NNN]`; claiming is `aide claim`; landing is `aide merge`; branch
+  [--item NNN]`; claiming is `aide claim`; starting a queue or specs-queue
+  branch is `aide queue start NNN [--specs]`; landing is `aide merge`; branch
   clean-up is `aide gc`; checking a branch's changed files against its item's
   authorised paths is `aide scope`. Do not improvise the equivalent `git
-  fetch`/`git status`/`git switch`/`git diff --name-only` sequences — the verbs
+  fetch`/`git status`/`git switch -c`/`git diff --name-only` sequences — the verbs
   exist so every run does these steps identically and no step is forgotten.
 - **One command per call.** Never chain with `&&` or `;` — separate calls localise
   failures and keep each invocation legible.
@@ -540,6 +670,43 @@ identical across modes.
   ("open a PR"). The human opens the PR (`gh pr create` stays `ask`-gated).
 - **`local`** — no pushes at all (offline). Claim is a local branch only (no
   multi-machine signal); merge is local into `main`.
+
+**The mode also decides what kind of CI gate can see a claim branch — pick it for
+that too.** Per-item scope is checked as each claim branch merges (§1). Whether a
+CI job can run that check depends on what the mode leaves behind for CI to
+trigger on:
+
+| `git.mode` | Claim branch pushed | PR opened | Per-item scope gate in CI |
+|---|---|---|---|
+| `auto-merge` | yes | no | **push-triggered only** — and see the caveats below |
+| `pr` | yes | yes, by the human | **works**, in PR context |
+| `local` | no | no | **unreachable** — nothing leaves the machine |
+
+The distinction that matters is **PR context**, not visibility. `auto-merge`
+pushes the claim branch like `pr` does, so a push-triggered workflow matching
+`<branch_prefix>**` (§2 — default `aide/**`) can see it — but there is no pull request, so no `github.base_ref` to
+diff against: the job must supply `--base` itself, and it races the in-loop
+merge, which deletes the branch as soon as the item lands. Under `pr` the PR
+carries both refs — head `aide/NNN-…`, base the item's recorded base — which is
+exactly the diff `aide scope` wants, with no branch-name parsing at all.
+
+So the trade is real in both directions. `auto-merge` buys unattended throughput
+and, unless a push workflow is deliberately built for it, leaves the gate
+enforced **only** by the validator running `aide scope` in-loop: same machine,
+same platform, same checkout that built the item — the §7 blind spot exactly.
+`pr` buys the independent, second-platform signal back and costs one human PR
+open per item.
+
+Choose deliberately rather than inheriting the default, because **a scope job
+written for PR context is green forever under `auto-merge` while checking
+nothing**: with no PR it either never triggers, or triggers on a branch whose
+name yields no item number and correctly skips. A gate can decay this way from a
+mode change alone, long after it was correctly built.
+
+The branch *shape* is an independent axis and does not decide this: under the
+stacked queue-branch model below, `pr` still works, since the PR's head is the
+`aide/NNN-` claim branch and its base is the pushed queue branch — the right
+diff base.
 
 **Where "`main`" above actually means "the base".** `main_branch` is the default
 and is never removed as one, but real work stacks: a queue branch carries the
@@ -623,7 +790,16 @@ reviewer outside the loop — never by a gate inside it.
   failures.
 - **A committed byte-exact fixture needs a `.gitattributes` `text eol=lf` pin.**
   Without it `core.autocrlf` rewrites the file on checkout and every byte
-  comparison against it fails on Windows only.
+  comparison against it fails on Windows only. `aide check` warns on the cases
+  it can decide: a path built from literals, compared with `==` or fed to a
+  hash, resolving to a file that exists in the checkout and is covered by no
+  `eol=lf` pattern. It reports **only what it can resolve** — a fixture reached
+  through a `tmp_path`, a function argument, or a constant imported from
+  another package is skipped in silence rather than guessed at, because the
+  majority of `read_bytes()` calls in a real suite compare two freshly
+  generated files to each other and need no pin at all. Treat a warning as
+  authoritative and its silence as partial: the pin is still your
+  responsibility on a path the check cannot see.
 
 **Tests that can actually fail.**
 
@@ -644,6 +820,11 @@ reviewer outside the loop — never by a gate inside it.
 absolute path — the one rule here a script can decide, and the one whose
 recorded instance survived every other gate for weeks.
 
+The lints in this section read `tests_dir`, never `docs_dir`, so they do **not**
+require the roadmap document set: `aide check` in a repo with no `docs_dir` runs
+them, says so in a `notice:`, and exits 0. A repo may adopt these conventions and
+the CLI without adopting the loop.
+
 ---
 
 ## 7. Verify on a platform this loop never runs on
@@ -659,3 +840,43 @@ so the honest response is to look at the one gate that does:
 - When CI is red on a leg that passed locally, treat it as a **portability
   finding first** (§6), not a flake, until the log says otherwise. Every
   recorded instance looked like a content problem and was a platform one.
+
+---
+
+## 8. Reaching into another repository
+
+A project may legitimately span more than one repo — a library and a sibling
+programme repo, or a consumer and the framework clone it updates from. `aide.toml`
+never records where those live; `[framework] local_path` and `[hygiene] extra_repos`
+in the personal, gitignored `.aide/loop/loop.local.toml` do (§3, and the file's own
+comments).
+
+**A repository's own instructions bind for work inside it.** Before editing,
+committing to, or otherwise acting on a repo that is not the working directory's,
+read that repo's instruction file first. Where two repos' rules disagree about a
+file, the repo that owns the file wins.
+
+This is a rule and not merely good manners because the failure is silent and the
+cost is real. A runtime loads instruction files for the **working directory's**
+repo — its root file, and any subdirectory files as it reaches into them. A
+sibling repo gets nothing: *"declared as an additional working directory"* does
+not imply *"instructions loaded"*. So an agent editing a sibling is working
+without rules that were written down, that it would have followed, and whose
+absence nothing announces. What is lost is exactly the material that cannot be
+inferred from the code — a versioning rule enforced by that repo's own suite, a
+merge policy, a path convention that looks like a typo and is not.
+
+The rule holds for a person too, and for an interactive session with no agent
+spec in play. It is the case the framework's own maintenance hits hardest: the
+documented update workflow edits the framework clone from a consumer's checkout,
+which is precisely a session with the framework's instructions unloaded.
+
+**A runtime may automate this.** Where one can inject context on demand, an
+adapter should **point** a session at a declared sibling's instruction file the
+first time it touches a path inside it — lazily, so a session that never reaches
+across pays nothing. A pointer and not the file's contents: the reader then opens
+it as it is *now*, which matters most in the case that motivates the rule, where
+the session is editing that very file. That is a delivery mechanism and therefore adapter-local
+(`ADAPTER-SPEC.md` §8); the rule above is what binds when a runtime has no such
+mechanism, which is the same graceful degradation §3's hygiene guard already
+relies on.

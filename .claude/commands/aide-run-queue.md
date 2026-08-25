@@ -99,10 +99,15 @@ Repeat until `aide claim` reports no remaining unclaimed 📋 item **in this que
 ## On queue exhaustion
 
 When `aide claim` reports no 📋 items remain in this queue, first sweep up any
-leftover claim branches (merged work leaves none in `auto-merge` mode, but `pr`
-merges and abandoned claims do): `python .aide/scripts/aide.py gc` to preview,
-then re-run with `--yes` if the list is right. Then **stop** and report: items
-completed, branches merged/cleaned, and final test status. Point the user at
+leftover claim branches (merged work leaves none in `auto-merge` mode; abandoned
+claims do): `python .aide/scripts/aide.py gc` to preview, then re-run with
+`--yes` if the list is right. The preview is exactly the set `--yes` deletes,
+and `gc` deletes on the ✅ ground only after asking git whether the work
+actually landed — so a branch it lists is one whose content is already in the
+base. **A `pr`-mode item awaiting its merge is 🔍, not ✅, so it is never in
+that list**; report those as awaiting review instead. Then **stop** and report:
+items completed, items awaiting review, branches merged/cleaned, and final test
+status. Point the user at
 the next move (do **not** generate the next queue yourself):
 
 - **Driving the whole roadmap?** Run **`/aide-run-roadmap`** — it generates the

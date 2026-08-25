@@ -51,8 +51,11 @@ or, resuming an existing claim, `python .aide/scripts/aide.py sync --item NNN`
    commits — never hand-edit the rollup):
    ```
    python .aide/scripts/aide.py progress set NNN in-progress   # when starting
-   python .aide/scripts/aide.py progress set NNN done          # when complete
+   python .aide/scripts/aide.py progress set NNN in-review     # when validated
    ```
+   **Never `done`.** ✅ means *merged* and is written by `aide merge` itself when
+   the merge lands, so the status cannot outrun the merge. Under
+   `git.mode = "pr"` the item stays 🔍 until a human merges the PR.
 5. **Scope your updates** — only your item's rows. Do NOT mark other items
    complete, even if their criteria happen to be satisfied as a side effect.
 6. **Capture out-of-scope insights** — anything true but beyond this item (a

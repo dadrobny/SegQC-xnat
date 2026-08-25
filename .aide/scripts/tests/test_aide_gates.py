@@ -408,6 +408,70 @@ def test_a_stage_gate_with_real_items_reports_its_stage_plainly():
     assert "holds NOTHING" not in aide.gate_warnings(_lines(STAGE))[0]
 
 
+def _lines_with_planned_empty_stage(rows: str):
+    """Lines of a document carrying a `📋` Stage 2 whose deliverables name no
+    item — the state every stage is in before anything has been queued for it."""
+    return (_progress(rows) + """
+## Stage 2 — Later — 📋
+
+**Deliverables.**
+- 📋 C. Nothing queued for this yet.
+
+**Acceptance.**
+- [ ] Later works.
+""").splitlines()
+
+
+def test_a_gate_on_a_real_but_unqueued_stage_is_not_called_a_typo():
+    """The primary documented use — raise the gate at planning time, before the
+    stage has items. Reporting that as a mistyped stage number is the check
+    firing on the feature's own happy path, which teaches the reader to ignore
+    it."""
+    rows = "| External data approved | stage 2 | ⏳ Awaiting | — |"
+    w = aide.gate_warnings(_lines_with_planned_empty_stage(rows))[0]
+    assert "holds NOTHING" not in w
+    assert "check the stage number" not in w
+
+
+def test_that_gate_still_says_it_holds_nothing_today():
+    """Neutral, but not silent: the gate blocks no item right now and the
+    reader should not read `stage 2` as work already held."""
+    rows = "| External data approved | stage 2 | ⏳ Awaiting | — |"
+    w = aide.gate_warnings(_lines_with_planned_empty_stage(rows))[0]
+    assert "no items queued yet" in w
+    assert "stage 2" in w
+
+
+def test_a_missing_stage_is_still_reported_as_a_typo_alongside_a_real_one():
+    """Both cases in one document: the check must not have been broadened into
+    treating every empty reach as benign."""
+    rows = ("| Real one | stage 2 | ⏳ Awaiting | — |\n"
+            "| Typo one | stage 99 | ⏳ Awaiting | — |")
+    w = aide.gate_warnings(_lines_with_planned_empty_stage(rows))
+    assert "no items queued yet" in w[0] and "holds NOTHING" not in w[0]
+    assert "holds NOTHING" in w[1] and "check the stage number" in w[1]
+
+
+def test_zero_padding_does_not_turn_a_real_stage_into_a_typo():
+    """`stage_section` matches numerically, so `stage 02` must find `Stage 2` —
+    otherwise the padding alone decides whether the author is told they made a
+    typo."""
+    rows = "| External data approved | stage 02 | ⏳ Awaiting | — |"
+    w = aide.gate_warnings(_lines_with_planned_empty_stage(rows))[0]
+    assert "holds NOTHING" not in w
+    assert "no items queued yet" in w
+
+
+def test_stage_section_separates_absent_from_empty():
+    """The distinction the warning rests on, asserted directly: both stages
+    yield no item numbers, and only one of them exists."""
+    lines = _lines_with_planned_empty_stage("| G | stage 2 | ⏳ Awaiting | — |")
+    assert aide.stage_item_numbers(lines, "2") == []
+    assert aide.stage_item_numbers(lines, "99") == []
+    assert aide.stage_section(lines, "2") is not None
+    assert aide.stage_section(lines, "99") is None
+
+
 def test_a_malformed_row_with_an_empty_first_cell_still_warns():
     """`set("") <= set("-: ")` is true, so an empty first cell used to read as a
     separator row and the malformed-row warning never fired — the vanishing
@@ -427,3 +491,23 @@ def test_an_unnamed_but_well_formed_gate_still_blocks():
 def test_the_real_separator_row_is_still_ignored():
     assert aide.gate_warnings(_lines(AWAITING)) == aide.gate_warnings(_lines(AWAITING))
     assert len(aide.human_gates(_lines(AWAITING))) == 1
+
+
+def test_resolving_a_gate_does_not_prepend_a_bom(tmp_path: Path):
+    """Read tolerantly, write clean — `utf-8-sig` writes the BOM it strips."""
+    repo = _repo(tmp_path, "| Pick a schema | Stage 1 | ⏳ Awaiting | |")
+    ppath = repo / "docs" / "aide" / "progress.md"
+    assert not ppath.read_bytes().startswith(b"\xef\xbb\xbf")
+    assert aide.main(["--repo", str(repo), "gate", "approve", "1",
+                      "--evidence", "chose X", "--no-commit"]) == 0
+    assert not ppath.read_bytes().startswith(b"\xef\xbb\xbf")
+
+
+def test_a_bom_already_in_the_file_is_stripped_not_preserved(tmp_path: Path):
+    """The tolerant read is what removes it; the clean write keeps it removed."""
+    repo = _repo(tmp_path, "| Pick a schema | Stage 1 | ⏳ Awaiting | |")
+    ppath = repo / "docs" / "aide" / "progress.md"
+    ppath.write_bytes(b"\xef\xbb\xbf" + ppath.read_bytes())
+    assert aide.main(["--repo", str(repo), "gate", "approve", "1",
+                      "--no-commit"]) == 0
+    assert not ppath.read_bytes().startswith(b"\xef\xbb\xbf")
