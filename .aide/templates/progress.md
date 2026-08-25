@@ -10,6 +10,9 @@
   Rollup (aide progress + aide check enforce it): a stage is ✅ iff every
   Deliverables bullet is ✅ -> then its Acceptance boxes are [x] and its summary
   row / header / delivered objectives read ✅. Mixed -> 🚧. None started -> 📋.
+  🔍 = pushed, awaiting a human's merge; it holds a stage at 🚧 and its queue
+  open. ✅ means MERGED and is written by `aide merge`, never claimed ahead of
+  one -- under git.mode = "pr" the item stays 🔍 until the PR lands.
   Update INCREMENTALLY; never reset a non-planned status back to 📋.
   Stage ✅ means "the planned work shipped", nothing more; a MEASURED goal the
   work cannot guarantee (an error-rate target, a benchmark) belongs in the
@@ -42,6 +45,7 @@
 |------|---------|
 | 📋 | Planned |
 | 🚧 | In Progress |
+| 🔍 | In Review |
 | ✅ | Complete |
 | ⏸️ | Deferred |
 | ❌ | Excluded |

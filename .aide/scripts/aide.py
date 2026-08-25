@@ -10,8 +10,11 @@ Subcommands::
 
     python .aide/scripts/aide.py check [--queue NNN]   # consistency gate over docs/aide
     python .aide/scripts/aide.py scope [NNN]           # branch diff vs the item's authorised paths
-    python .aide/scripts/aide.py progress set NNN <in-progress|done>
+    python .aide/scripts/aide.py progress set NNN <in-progress|in-review|done>
+    python .aide/scripts/aide.py gate list|approve|decline [N]  # human gates in progress.md
+    python .aide/scripts/aide.py queue start NNN       # create the queue branch (--specs for specs-)
     python .aide/scripts/aide.py queue tidy NNN        # mark a superseded queue as completed
+    python .aide/scripts/aide.py insights list|tick|archive     # the insight inbox
     python .aide/scripts/aide.py claim [--queue NNN]   # pick + claim the next 📋 item
     python .aide/scripts/aide.py merge NNN [--base R]  # merge a validated item per git.mode
     python .aide/scripts/aide.py env                   # venv existence / import check + bootstrap
@@ -41,12 +44,21 @@ from typing import Dict, List, NamedTuple, Optional, Tuple
 STATUS_TO_ICON = {
     "planned": "📋",
     "in-progress": "🚧",
+    "in-review": "🔍",
     "complete": "✅",
     "deferred": "⏸️",
     "excluded": "❌",
 }
 ICON_TO_STATUS = {v: k for k, v in STATUS_TO_ICON.items()}
-RANK = {"planned": 0, "excluded": 1, "deferred": 2, "in-progress": 3, "complete": 4}
+#: `in-review` sits between 🚧 and ✅ because it is strictly more advanced than
+#: in-progress and strictly less than merged. It exists because ✅ used to mean
+#: two different things depending on `git.mode`: under `auto-merge` the item was
+#: merged, under `pr` it was pushed and awaiting a human — and everything
+#: downstream read ✅ as "done", including the destructive sweep, which then
+#: offered to delete the head branch of an open PR. **✅ now means merged, in
+#: every mode**, and is set by `aide merge` when the merge actually happens.
+RANK = {"planned": 0, "excluded": 1, "deferred": 2, "in-progress": 3,
+        "in-review": 4, "complete": 5}
 
 # Icons may be multi-codepoint (⏸️ = U+23F8 U+FE0F), so match by alternation
 # (longest first), never a character class.
@@ -403,7 +415,11 @@ def rollup_status(statuses: List[str]) -> Optional[str]:
         s == "complete" for s in statuses
     ):
         return "complete"
-    if any(s in ("complete", "in-progress") for s in statuses):
+    # 🔍 is deliberately absent from the set above: an item awaiting review has
+    # not landed, so a stage holding one is 🚧, never ✅. That is the whole point
+    # of the state — a `pr`-mode run must not roll a stage up to "shipped" on
+    # work that is still an open PR.
+    if any(s in ("complete", "in-progress", "in-review") for s in statuses):
         return "in-progress"
     return "planned"
 
@@ -462,15 +478,30 @@ class HumanGate(NamedTuple):
                 if self.blocks else "nothing named")
 
 
+def stage_section(lines: List[str], stage: str) -> Optional[Tuple[int, int, str]]:
+    """The stage section numbered *stage*, or None if no such section exists.
+
+    The single place the "which section is stage N" lookup lives. Callers need
+    to tell "no such stage" from "the stage is there and empty" — an absent
+    section is a typo, an empty one is a stage nobody has queued work for yet —
+    and a helper that collapses both into a falsy return makes that
+    indistinguishable at every call site.
+    """
+    return next((sec for sec in stage_sections(lines)
+                 if _same_stage(sec[2], stage)), None)
+
+
 def stage_item_numbers(lines: List[str], stage: str) -> List[int]:
     """Item numbers referenced by *stage*'s deliverable bullets in progress.md.
 
     Reuses the §1 rule that only a deliverable bullet (and its wrapped
     continuation lines) carries an item reference, so a Notes cell or an
     acceptance checkbox naming an item does not widen a stage gate's reach.
+
+    Empty for a stage that does not exist *and* for one whose deliverables name
+    no item yet; ``stage_section`` is what separates the two.
     """
-    section = next((sec for sec in stage_sections(lines)
-                    if _same_stage(sec[2], stage)), None)
+    section = stage_section(lines, stage)
     if section is None:
         return []
     start, end, _ = section
@@ -684,8 +715,7 @@ def accept_criteria(text: str, stage: str, criteria: Optional[List[int]],
     a caller typing the correct number should not have to guess its padding.
     """
     lines = text.splitlines()
-    section = next((s for s in stage_sections(lines)
-                    if _same_stage(s[2], stage)), None)
+    section = stage_section(lines, stage)
     if section is None:
         raise ValueError(f"no Stage {stage} section in progress.md")
     start, end, _ = section
@@ -738,7 +768,7 @@ def _apply_objective_rollup(lines: List[str], stage_status: Dict[str, str]) -> N
             statuses = [stage_status.get(n) for n in nums if stage_status.get(n)]
             if statuses and all(s == "complete" for s in statuses):
                 derived = "complete"
-            elif any(s in ("complete", "in-progress") for s in statuses):
+            elif any(s in ("complete", "in-progress", "in-review") for s in statuses):
                 derived = "in-progress"
             else:
                 derived = current
@@ -751,7 +781,7 @@ def _apply_objective_rollup(lines: List[str], stage_status: Dict[str, str]) -> N
 def _spec_stage_and_title(repo_root: Path, config, number: int) -> Tuple[Optional[str], Optional[str]]:
     """(stage, title) from the item's spec header, best effort."""
     idir = docs_dir(repo_root, config) / "items"
-    specs = sorted(idir.glob(f"{number:03d}-*.md")) if idir.is_dir() else []
+    specs = item_spec_paths(idir, number)
     if not specs:
         return None, None
     text = specs[0].read_text(encoding=_ENCODING)
@@ -786,7 +816,7 @@ def insert_item_reference(text: str, number: int, stage: str, title: str) -> Opt
 def set_item_status(text: str, num: int, status: str) -> str:
     """Flip item NNN's deliverable bullet(s) to ``status`` and roll stages up.
 
-    ``status`` is ``in-progress`` or ``complete``. Updates summary/header/
+    ``status`` is ``in-progress``, ``in-review`` or ``complete``. Updates summary/header/
     objective rows only for stages that fully complete. Never downgrades an
     existing status (additive log), and never touches an acceptance checkbox —
     those are human attestations, ticked only by ``aide progress accept``.
@@ -821,6 +851,85 @@ def set_item_status(text: str, num: int, status: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Item & queue file naming — the filename half of the branch helpers
+# --------------------------------------------------------------------------- #
+#: Item numbers and queue numbers share one namespace with no syntactic marker
+#: between them. `_branch_item_number`/`_is_queue_branch` centralise that hazard
+#: for BRANCH names (and their docstrings record what it cost to learn); these
+#: four do the same for FILE names, which were previously re-derived as raw
+#: globs and f-strings at thirteen call sites. Nothing here fixes a live bug —
+#: every one of those sites was correct. The point is that the convention is now
+#: written down once, so the 1.13.0 class of misread has one place to reappear
+#: and one place to be tested, and a change to the convention is a change here.
+
+
+#: The literal tokens every queue name is built from — the file stem, both
+#: branch shapes, and the regexes that read them back. Written once so that a
+#: change to the convention is a change *here* and everything moves with it;
+#: restating "queue-" in a constructor and again in a recogniser is exactly the
+#: drift 1.15.0 removed for filenames and this block removes for branches.
+_QUEUE_TOKEN = "queue-"
+_SPECS_TOKEN = "specs-"
+
+
+def queue_name(number: int) -> str:
+    """``queue-NNN`` — the stem a queue file and its status prose both use."""
+    return f"{_QUEUE_TOKEN}{number:03d}"
+
+
+def queue_number(path: Path) -> Optional[int]:
+    """Queue number named by *path*, or None when it names no queue.
+
+    Anchored at the start of the stem, for the same reason the branch helpers
+    are: an unanchored digit search reads ``specs-queue-015.md`` or a consumer's
+    ``notes-on-queue-016.md`` as a queue file. Tolerates a trailing slug
+    (``queue-016-stage-27.md``) so the deferred naming harmonisation does not
+    have to touch the parser, and unpadded digits on read.
+    """
+    m = re.match(re.escape(_QUEUE_TOKEN) + r"0*(\d+)(?:-|$)", path.stem)
+    return int(m.group(1)) if m else None
+
+
+def iter_queue_paths(qdir: Path) -> List[Path]:
+    """Every queue file under *qdir*, in queue-number order ([] if no dir).
+
+    Ordered by the parsed number rather than lexicographically, so the order
+    stays the number's even once a name carries a slug after it.
+    """
+    if not qdir.is_dir():
+        return []
+    numbered = [(n, p.name, p) for p, n in
+                ((p, queue_number(p)) for p in qdir.glob(f"{_QUEUE_TOKEN}*.md"))
+                if n is not None]
+    return [p for _, _, p in sorted(numbered)]
+
+
+def queue_path(qdir: Path, number: int) -> Optional[Path]:
+    """The queue file for *number*, or None when it does not exist.
+
+    **Resolves by glob, never by construction.** Constructing
+    ``qdir / f"queue-{n:03d}.md"`` hardcodes the assumption that the number is
+    the whole name; resolving means a slugged queue file is found by the same
+    call, and a caller that wants a name for an error message asks
+    `queue_name` for one instead of half-building a path it may not have.
+    """
+    matches = [p for p in iter_queue_paths(qdir) if queue_number(p) == number]
+    return matches[0] if matches else None
+
+
+def item_spec_paths(idir: Path, number: int) -> List[Path]:
+    """Spec files for item *number* under *idir* — ``items/NNN-*.md``, sorted.
+
+    Returns a list because the convention permits only one and the filesystem
+    does not; every caller takes ``[0]`` and the extras are a consumer's
+    problem, not something to raise over here.
+    """
+    if not idir.is_dir():
+        return []
+    return sorted(idir.glob(f"{number:03d}-*.md"))
+
+
+# --------------------------------------------------------------------------- #
 # queue.md helpers
 # --------------------------------------------------------------------------- #
 _QUEUE_STATUS_RE = re.compile(r"^>\s*\*\*Status:\*\*\s*(.*)$")
@@ -845,14 +954,18 @@ def queue_item_numbers(text: str) -> List[int]:
 
 
 def queue_is_open(text: str, item_status: Dict[int, str]) -> bool:
-    """Derived queue state: open iff any of its items is 📋/🚧 per progress.md.
+    """Derived queue state: open iff any item is 📋/🚧/🔍 per progress.md.
+
+    🔍 counts as open: an item whose PR is still awaiting review is not work the
+    queue is finished with, and marking the queue completed over it would strand
+    the review.
 
     Queue state is DERIVED, never declared — a ``> **Status:**`` line in a
     queue file is decorative (kept for human readers), and the "live" queue is
     simply the lowest-numbered open one. An item progress.md doesn't know yet
     counts as planned, so a freshly wired queue is open.
     """
-    return any(item_status.get(n, "planned") in ("planned", "in-progress")
+    return any(item_status.get(n, "planned") in ("planned", "in-progress", "in-review")
                for n in queue_item_numbers(text))
 
 
@@ -864,13 +977,10 @@ def _progress_item_status(repo_root: Path, config) -> Dict[int, str]:
     return item_status
 
 
-def _queue_paths(qdir: Path) -> List[Path]:
-    return sorted(qdir.glob("queue-*.md"))
-
-
 def tidy_queue_text(text: str, superseded_by: int, date: str) -> str:
     """Rewrite a queue's Status line to 'Completed — superseded by queue-NNN'."""
-    new_status = f"> **Status:** ✅ Completed — superseded by queue-{superseded_by:03d} ({date})."
+    new_status = (f"> **Status:** ✅ Completed — superseded by "
+                  f"{queue_name(superseded_by)} ({date}).")
     lines = text.splitlines()
     for i, line in enumerate(lines):
         if _QUEUE_STATUS_RE.match(line):
@@ -938,6 +1048,14 @@ def insight_warnings(ddir: Path) -> List[str]:
 
     Non-blocking: capture must stay cheap, so a malformed entry is a warning,
     never an error. Every ``- `` bullet in the file is expected to be an entry.
+
+    **The live file only.** ``aide insights archive`` moves closed entries into
+    ``insights/archive-YYYY-QN.md``, and those are deliberately not re-checked
+    here: an archived claim is frozen, so a warning on one names a defect no
+    one may fix — the immutability rule forbids rewording the line. (Unfilled
+    ``{{slot}}`` markers *are* still caught in archives, because
+    ``template_residue_errors`` walks the whole tree; that one is a genuine
+    error wherever it appears.)
     """
     path = ddir / "insights.md"
     if not path.is_file():
@@ -953,6 +1071,215 @@ def insight_warnings(ddir: Path) -> List[str]:
                 f"*(item NNN, YYYY-MM-DD)*'"
             )
     return out
+
+
+#: An entry's full shape, parsed rather than merely validated: the claim, its
+#: provenance, and the optional " → <where it landed>" pointer a tick appends.
+#: ``text`` is non-greedy up to the provenance so a claim may itself contain
+#: parentheses; ``tail`` is whatever follows it, which is the pointer or "".
+_INSIGHT_FULL_RE = re.compile(
+    r"^- \[(?P<mark>[ xX])\] (?P<type>" + "|".join(_INSIGHT_TYPES) + r") [—–-] "
+    r"(?P<text>.+?)\*\((?:[Ii]tem (?P<item>\d+), )?(?P<date>\d{4}-\d{2}-\d{2})\)\*"
+    r"(?P<tail>.*)$"
+)
+#: A status-trail line: indented under its entry, newest last (conventions.md
+#: §1). Indentation is what distinguishes it from the next entry, so this must
+#: require leading whitespace where the entry pattern forbids it.
+_INSIGHT_TRAIL_RE = re.compile(r"^\s+[-*]\s")
+#: The pointer separator, written by `tick` and by hand before it existed.
+_INSIGHT_POINTER = " → "
+#: An ISO date, validated rather than trusted: `archive --before` compares it
+#: lexicographically against every entry's date, which is only equivalent to
+#: comparing dates while both sides are known to be YYYY-MM-DD.
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+class InsightEntry(NamedTuple):
+    """One inbox entry: the parsed claim plus where it sits in the file.
+
+    ``ordinal`` is 1-based position in the live file and is the identity every
+    verb here takes, because an entry has no number of its own. That is sound
+    only because the file is append-only by contract — a claim is "never
+    reworded, reordered or deleted" — so an entry's position is stable for as
+    long as it lives in the file. ``archive`` is the one thing that moves
+    entries out, and it therefore renumbers what remains; it says so when it
+    runs, and ``tick`` refuses to invent a pointer on a number it cannot
+    resolve.
+
+    A malformed entry (one ``aide check`` warns about) still gets an ordinal.
+    Skipping it would make ``insights list`` number entries differently from
+    the file itself, so the one number a reader can act on would be wrong for
+    every entry after the first typo.
+    """
+
+    ordinal: int
+    lineno: int                 # 1-based, of the entry line itself
+    raw: str                    # the entry line, verbatim
+    ticked: bool
+    type: Optional[str]         # None when the line does not parse
+    text: str                   # the claim, without provenance or pointer
+    date: Optional[str]
+    item: Optional[int]
+    pointer: Optional[str]      # what follows " → ", when ticked in place
+    trail: List[str]            # raw status-trail lines, in file order
+    end_lineno: int             # 1-based, of the entry's last trail line
+
+
+def parse_insights(text: str) -> List[InsightEntry]:
+    """Parse ``insights.md`` into entries, malformed ones included.
+
+    Pure: it takes the file's text, never a path, so the shape rules are
+    testable without a filesystem (the module convention — see
+    ``.aide/scripts/tests``).
+    """
+    lines = text.splitlines()
+    entries: List[InsightEntry] = []
+    for lineno, line in enumerate(lines, start=1):
+        if not line.startswith("- "):
+            if entries and _INSIGHT_TRAIL_RE.match(line):
+                # A trail line belongs to the entry above it; NamedTuple is
+                # immutable, so grow the list it holds rather than rebuilding.
+                entries[-1].trail.append(line)
+                entries[-1] = entries[-1]._replace(end_lineno=lineno)
+            continue
+        m = _INSIGHT_FULL_RE.match(line)
+        if m is None:
+            entries.append(InsightEntry(
+                ordinal=len(entries) + 1, lineno=lineno, raw=line,
+                ticked=line.startswith("- [x]") or line.startswith("- [X]"),
+                type=None, text=line[2:].strip(), date=None, item=None,
+                pointer=None, trail=[], end_lineno=lineno))
+            continue
+        tail = m.group("tail")
+        pointer = (tail.split(_INSIGHT_POINTER, 1)[1].strip()
+                   if _INSIGHT_POINTER in tail else None)
+        entries.append(InsightEntry(
+            ordinal=len(entries) + 1, lineno=lineno, raw=line,
+            ticked=m.group("mark") in ("x", "X"),
+            type=m.group("type"), text=m.group("text").strip(),
+            date=m.group("date"),
+            item=int(m.group("item")) if m.group("item") else None,
+            pointer=pointer, trail=[], end_lineno=lineno))
+    return entries
+
+
+def _find_entry(entries: List[InsightEntry], ordinal: int) -> InsightEntry:
+    for e in entries:
+        if e.ordinal == ordinal:
+            return e
+    raise ValueError(
+        f"no entry {ordinal} — the file holds {len(entries)} "
+        f"entr{'y' if len(entries) == 1 else 'ies'}; run `insights list` for "
+        f"current numbers (an archive renumbers what remains)")
+
+
+def tick_insight_text(text: str, ordinal: int, pointer: str,
+                      date: str) -> Tuple[str, str]:
+    """Tick entry *ordinal*, or append a dated trail line if already ticked.
+
+    The two halves of conventions.md §1's lifecycle, chosen by the entry's own
+    state rather than by a flag: the **first** routing flips the checkbox and
+    records where the claim landed on the entry line; **everything after** it —
+    a re-route, a resolution, a premise that decayed — is bookkeeping and goes
+    in the appendable status trail underneath.
+
+    The captured claim is never touched by either path. Returns
+    ``(new_text, message)``; raises ``ValueError`` if the ordinal does not
+    resolve or the entry is too malformed to edit safely.
+    """
+    if "\n" in pointer or "\r" in pointer:
+        raise ValueError(
+            "the pointer may not contain a line break — it is written into a "
+            "single entry line, so a break would split one claim into two and "
+            "renumber everything below it")
+    entries = parse_insights(text)
+    entry = _find_entry(entries, ordinal)
+    lines = text.splitlines()
+    trailing_newline = text.endswith("\n")
+
+    if entry.ticked:
+        # end_lineno is 1-based, so as a 0-based list index it is the slot
+        # just past the entry's last line — where the next trail line goes.
+        insert_at = entry.end_lineno
+        indent = "  "
+        if entry.trail:
+            indent = entry.trail[-1][: len(entry.trail[-1]) - len(entry.trail[-1].lstrip())]
+        lines.insert(insert_at, f"{indent}- **{date}** {_INSIGHT_POINTER.strip()} {pointer}")
+        message = f"entry {ordinal}: already ticked — appended a {date} trail line"
+    else:
+        if entry.type is None:
+            raise ValueError(
+                f"entry {ordinal} does not parse as an inbox entry, so there "
+                f"is no checkbox to tick safely: {entry.raw!r}. Fix the line's "
+                f"shape first (`aide check` names the rule)")
+        line = entry.raw.replace("- [ ]", "- [x]", 1)
+        if entry.pointer is None:
+            line = line + _INSIGHT_POINTER + pointer
+            message = f"entry {ordinal}: ticked → {pointer}"
+        else:
+            # A pointer written by hand before the tick: keep it, and record
+            # this routing where a second one belongs.
+            lines[entry.lineno - 1] = line
+            # 1-based end_lineno as a 0-based index = just past the entry.
+            lines.insert(entry.end_lineno,
+                         f"  - **{date}** {_INSIGHT_POINTER.strip()} {pointer}")
+            return ("\n".join(lines) + ("\n" if trailing_newline else ""),
+                    f"entry {ordinal}: ticked; existing pointer kept, "
+                    f"added a {date} trail line")
+        lines[entry.lineno - 1] = line
+
+    return ("\n".join(lines) + ("\n" if trailing_newline else "")), message
+
+
+def insight_quarter(date: str) -> str:
+    """``"2026-08-24"`` → ``"2026-Q3"`` — the archive file an entry belongs to."""
+    year, month = int(date[:4]), int(date[5:7])
+    return f"{year}-Q{(month - 1) // 3 + 1}"
+
+
+def archive_insight_text(text: str, before: str) -> Tuple[str, Dict[str, List[str]]]:
+    """Split closed entries dated before *before* out of the live file.
+
+    Returns ``(remaining_text, {quarter: [lines]})``. **Only ticked entries
+    move**: an open entry is the live working set whatever its date, and
+    archiving one would hide exactly the backlog this verb exists to surface.
+    An entry travels with its whole status trail, so the archive stays readable
+    on its own.
+
+    Pure, and it never rewrites a claim: each line's *text* is carried across
+    unchanged, which is what keeps the immutability rule true through the move.
+    Line endings are not carried — like every writer in this module, it rebuilds
+    the text with ``\n`` — so the promise is the claim, not the bytes around it.
+    """
+    lines = text.splitlines()
+    entries = parse_insights(text)
+    moving = {e.ordinal for e in entries
+              if e.ticked and e.date is not None and e.date < before}
+    moved: Dict[str, List[str]] = {}
+    drop: set = set()
+    for e in entries:
+        if e.ordinal not in moving:
+            continue
+        block = lines[e.lineno - 1:e.end_lineno]
+        moved.setdefault(insight_quarter(e.date), []).extend(block)
+        drop.update(range(e.lineno - 1, e.end_lineno))
+    kept = [ln for i, ln in enumerate(lines) if i not in drop]
+    return _collapse_blank_runs(kept, text.endswith("\n")), moved
+
+
+def _collapse_blank_runs(lines: List[str], trailing_newline: bool) -> str:
+    """Join *lines*, leaving at most one blank line where entries were removed.
+
+    Lifting entries out of a blank-separated list otherwise leaves the gaps
+    behind, and a file that grows whitespace every time it is tidied is not
+    tidied.
+    """
+    out: List[str] = []
+    for line in lines:
+        if not line.strip() and out and not out[-1].strip():
+            continue
+        out.append(line)
+    return "\n".join(out) + ("\n" if trailing_newline else "")
 
 
 def absolute_path_test_warnings(repo_root: Path,
@@ -1077,11 +1404,23 @@ def gate_warnings(lines: List[str]) -> List[str]:
                 f"work it guards; drop those items or change what the gate asks")
             continue
         if g.stage is not None and not stage_item_numbers(lines, g.stage):
-            # A typo here is invisible otherwise: the gate looks like it guards
-            # a stage while holding nothing at all.
-            reach = (f"stage {g.stage} — which has no deliverable referencing "
-                     f"any item, so this gate holds NOTHING; check the stage "
-                     f"number")
+            # An empty reach has two causes and only one is a mistake.
+            if stage_section(lines, g.stage) is None:
+                # No such section: a typo, invisible otherwise — the gate looks
+                # like it guards a stage while holding nothing at all, ever.
+                reach = (f"stage {g.stage} — which has no deliverable "
+                         f"referencing any item, so this gate holds NOTHING; "
+                         f"check the stage number")
+            else:
+                # The section is there and simply has nothing queued for it
+                # yet. Raising a gate before the work exists is the cheapest
+                # time to raise one, and `stage N` reach re-resolves through
+                # progress.md on every read — so this gate is armed and will
+                # hold that stage's items as they appear. Calling the feature's
+                # own happy path a typo trains the reader to ignore the check.
+                reach = (f"stage {g.stage} — which has no items queued yet, so "
+                         f"it holds nothing today and will block that stage's "
+                         f"items as they are created")
         elif g.blocks or g.stage or g.blocks_all:
             reach = g.reach
         else:
@@ -1224,6 +1563,302 @@ def cli_subprocess_test_warnings(repo_root: Path,
                     f"stdout/encoding surface that has failed on Windows only, "
                     f"and can pass while checking nothing (conventions.md §6)")
                 break
+    return out
+
+
+def _gitattributes_lf_patterns(repo_root: Path) -> Optional[List[str]]:
+    """Every pattern in `.gitattributes` carrying an `eol=lf` pin.
+
+    ``None`` (not ``[]``) when the file is absent, so the caller can tell "no
+    pins" from "no file" and say the more useful of the two.
+    """
+    path = repo_root / ".gitattributes"
+    if not path.is_file():
+        return None
+    out: List[str] = []
+    try:
+        text = path.read_text(encoding=_ENCODING)
+    except (OSError, UnicodeDecodeError):
+        return None
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        # `eol=lf` alone is enough: `text eol=lf` and a bare `eol=lf` both stop
+        # core.autocrlf rewriting the file, which is the whole point here.
+        if len(parts) > 1 and any(a == "eol=lf" for a in parts[1:]):
+            out.append(parts[0])
+    return out
+
+
+def _gitattributes_matches(rel_posix: str, pattern: str) -> bool:
+    """Does a `.gitattributes` pattern cover this repo-relative path?
+
+    Git's pattern rules, not `fnmatch`'s: a `*` stops at a `/` (so
+    `tests/*.json` must not match `tests/a/b.json`, which `fnmatch` would),
+    `**` crosses separators, and a pattern with **no** slash matches at any
+    depth — which is how `*.json` covers the whole tree.
+    """
+    pattern = pattern.strip().rstrip("/")
+    if not pattern:
+        return False
+    if pattern.startswith("/"):
+        pattern = pattern[1:]
+    if "/" not in pattern:
+        # basename match at any depth, per gitattributes(5)
+        return _glob_segment(rel_posix.rsplit("/", 1)[-1], pattern)
+    return _glob_path(rel_posix, pattern)
+
+
+def _glob_segment(name: str, pattern: str) -> bool:
+    """`fnmatch` on a single path component (no separators involved)."""
+    return fnmatch.fnmatchcase(name, pattern)
+
+
+def _glob_path(rel_posix: str, pattern: str) -> bool:
+    """Match a path against a slash-aware glob, honouring `**`."""
+    regex = []
+    i = 0
+    while i < len(pattern):
+        ch = pattern[i]
+        if pattern.startswith("**/", i):
+            regex.append("(?:.*/)?")     # zero or more leading directories
+            i += 3
+            continue
+        if pattern.startswith("**", i):
+            regex.append(".*")
+            i += 2
+            continue
+        if ch == "*":
+            regex.append("[^/]*")        # a single `*` never crosses a `/`
+        elif ch == "?":
+            regex.append("[^/]")
+        elif ch == "/":
+            regex.append("/")
+        else:
+            regex.append(re.escape(ch))
+        i += 1
+    return re.fullmatch("".join(regex), rel_posix) is not None
+
+
+class _LiteralPathResolver(ast.NodeVisitor):
+    """Module-level names whose value is a path built only from literals.
+
+    Deliberately narrow. It follows exactly two roots — ``Path(__file__)``
+    walked up with ``.parent`` / ``.parents[N]``, and a name this same module
+    already resolved — joined with string literals via ``/``. Anything built at
+    run time (a ``tmp_path`` fixture, a function argument, a constant imported
+    from another package) resolves to nothing and is skipped, which is the
+    point: those are not committed files, and guessing at them is how a lint
+    starts crying wolf.
+    """
+
+    def __init__(self, file_path: Path) -> None:
+        self.file_path = file_path
+        self.names: Dict[str, Path] = {}
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        resolved = self._resolve(node.value)
+        if resolved is not None:
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    self.names[target.id] = resolved
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        # `GOLDEN: Path = REPO_ROOT / "x.json"` — annotated, same shape.
+        if node.value is None or not isinstance(node.target, ast.Name):
+            return
+        resolved = self._resolve(node.value)
+        if resolved is not None:
+            self.names[node.target.id] = resolved
+
+    def _resolve(self, node: ast.AST) -> Optional[Path]:
+        if isinstance(node, ast.Name):
+            return self.names.get(node.id)
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            left = self._resolve(node.left)
+            if left is None:
+                return None
+            right = node.right
+            if isinstance(right, ast.Constant) and isinstance(right.value, str):
+                return left / right.value
+            return None
+        if isinstance(node, ast.Attribute) and node.attr == "parent":
+            base = self._resolve(node.value)
+            return None if base is None else base.parent
+        if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute) \
+                and node.value.attr == "parents":
+            base = self._resolve(node.value.value)
+            index = node.slice
+            if base is None or not isinstance(index, ast.Constant) \
+                    or not isinstance(index.value, int):
+                return None
+            try:
+                return base.parents[index.value]
+            except IndexError:
+                return None
+        if isinstance(node, ast.Call):
+            func = node.func
+            # `.resolve()` / `.absolute()` are identity here: the file path this
+            # walks from is already absolute.
+            if isinstance(func, ast.Attribute) and func.attr in ("resolve", "absolute"):
+                return self._resolve(func.value)
+            if isinstance(func, ast.Name) and func.id == "Path" and len(node.args) == 1:
+                arg = node.args[0]
+                if isinstance(arg, ast.Name) and arg.id == "__file__":
+                    return self.file_path
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    candidate = Path(arg.value)
+                    return candidate if candidate.is_absolute() else None
+        return None
+
+
+#: Attribute calls that read a file's exact bytes, or text that a byte-exact
+#: golden comparison is one edit away from. `read_text()` is included because
+#: its universal-newline translation only *hides* an unpinned CRLF checkout —
+#: the consumer instance that prompted this had two such comparisons sitting
+#: latent until someone switched them to `read_bytes()`.
+_BYTE_EXACT_READS = ("read_bytes", "read_text")
+
+
+def _read_call_name(node: ast.AST) -> Optional[Tuple[str, int]]:
+    """`(name, lineno)` if *node* is `NAME.read_bytes()` / `NAME.read_text()`."""
+    if not isinstance(node, ast.Call):
+        return None
+    func = node.func
+    if isinstance(func, ast.Attribute) and func.attr in _BYTE_EXACT_READS \
+            and isinstance(func.value, ast.Name):
+        return func.value.id, func.lineno
+    return None
+
+
+def _byte_exact_reads(tree: ast.AST) -> List[Tuple[str, int]]:
+    """`(name, lineno)` for reads whose bytes are actually *compared*.
+
+    The narrowing that keeps this lint worth reading. An earlier draft flagged
+    every `NAME.read_text()` in the tests tree and, run against a real consumer,
+    produced twenty-odd warnings of which the overwhelming majority were plain
+    helper reads --
+
+        def _read_progress() -> str:
+            return _PROGRESS_PATH.read_text(encoding="utf-8")
+
+    -- whose callers go on to assert a *substring*. Universal-newline
+    translation makes those immune to the CRLF rewrite, so a pin buys them
+    nothing and the warning is pure noise. Requiring the read to sit directly
+    inside an equality comparison, or to be fed to a hash, is what separates
+    `a.read_bytes() == golden.read_bytes()` from reading a file to look inside
+    it. A read stored in a local and compared later is missed on purpose: that
+    indirection is the shape of a determinism check between two generated
+    files, which needs no pin at all.
+    """
+    out: List[Tuple[str, int]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Compare):
+            # Only `==` / `!=`: an ordering or membership test on file contents
+            # is not a byte-exactness claim.
+            if not all(isinstance(op, (ast.Eq, ast.NotEq)) for op in node.ops):
+                continue
+            for side in [node.left, *node.comparators]:
+                found = _read_call_name(side)
+                if found is not None:
+                    out.append(found)
+        elif isinstance(node, ast.Call):
+            func = node.func
+            # `h.update(p.read_bytes())` and `hashlib.sha256(p.read_bytes())` --
+            # a digest is a byte-exact claim by another name, and the recorded
+            # whole-tree-hash failures took exactly this shape.
+            is_hash_sink = (
+                (isinstance(func, ast.Attribute)
+                 and (func.attr == "update"
+                      or func.attr.startswith(("sha", "md5", "blake"))))
+                or (isinstance(func, ast.Name)
+                    and func.id.startswith(("sha", "md5", "blake")))
+            )
+            if not is_hash_sink:
+                continue
+            for arg in node.args:
+                found = _read_call_name(arg)
+                if found is not None:
+                    out.append(found)
+    return out
+
+
+def gitattributes_eol_pin_warnings(repo_root: Path,
+                                   config: Dict[str, Dict[str, object]]) -> List[str]:
+    """Warn on a committed fixture compared byte-for-byte with no `eol=lf` pin.
+
+    conventions.md §6 states the rule — *"a committed byte-exact fixture needs a
+    `.gitattributes` `text eol=lf` pin"* — and until now nothing checked it.
+    Without the pin, `core.autocrlf` rewrites the file on a Windows checkout and
+    every byte comparison against it fails **on Windows only**, which is exactly
+    the platform §7 says no gate in this loop ever sees. The recorded instance
+    cost 13 red tests across three modules, invisible to every local run.
+
+    **Precision over recall, deliberately.** The resolver follows only paths
+    built from literals — `Path(__file__)` walked up, joined with string
+    constants — so a fixture whose path arrives from a `tmp_path` fixture, a
+    function argument or a constant imported from another package resolves to
+    nothing and is skipped in silence. That is not a gap to be closed later by
+    guessing: the overwhelming majority of `read_bytes()` calls in a real suite
+    compare two *freshly generated* files to each other (a determinism check),
+    and those need no pin at all. Flagging them would make the lint noise, and a
+    lint that cries wolf stops being read. What remains — a literal path or an
+    obvious glob beside a `read_bytes()` — is every instance recorded so far.
+
+    A resolved path is only reported if it **exists** in the checkout, which is
+    the cheap proxy for "committed": a path that resolves but is not there is a
+    generated artifact, not a fixture.
+    """
+    files = _test_files(repo_root, config)
+    if not files:
+        return []
+    patterns = _gitattributes_lf_patterns(repo_root)
+    out: List[str] = []
+    seen: set = set()
+    root = repo_root.resolve()
+    for path in files:
+        try:
+            source = path.read_text(encoding=_ENCODING)
+            tree = ast.parse(source)
+        except (OSError, UnicodeDecodeError, SyntaxError):
+            continue
+        resolver = _LiteralPathResolver(path.resolve())
+        resolver.visit(tree)
+        if not resolver.names:
+            continue
+        for name, lineno in _byte_exact_reads(tree):
+            target = resolver.names.get(name)
+            if target is None:
+                continue
+            try:
+                rel = target.resolve().relative_to(root)
+            except ValueError:
+                continue                      # outside the repo: not ours to pin
+            if not target.exists():
+                continue                      # generated, not committed
+            rel_posix = rel.as_posix()
+            key = (_rel_display(path, repo_root), rel_posix)
+            if key in seen:
+                continue
+            seen.add(key)
+            if patterns is None:
+                out.append(
+                    f"{_rel_display(path, repo_root)}:{lineno}: compares "
+                    f"{rel_posix} byte-for-byte, but this repo has no "
+                    f".gitattributes — on a Windows checkout core.autocrlf "
+                    f"rewrites it and the comparison fails there and nowhere "
+                    f"else. Add `{rel_posix} text eol=lf`. See conventions.md §6")
+                continue
+            if any(_gitattributes_matches(rel_posix, p) for p in patterns):
+                continue
+            out.append(
+                f"{_rel_display(path, repo_root)}:{lineno}: compares "
+                f"{rel_posix} byte-for-byte, but no .gitattributes `eol=lf` "
+                f"pin covers it — on a Windows checkout core.autocrlf rewrites "
+                f"it and the comparison fails there and nowhere else. Add "
+                f"`{rel_posix} text eol=lf`. See conventions.md §6")
     return out
 
 
@@ -1412,9 +2047,7 @@ def stray_icon_warnings(ddir: Path) -> List[str]:
     progress = ddir / "progress.md"
     if progress.is_file():
         paths.append(progress)
-    qdir = ddir / "queue"
-    if qdir.is_dir():
-        paths.extend(sorted(qdir.glob("queue-*.md")))
+    paths.extend(iter_queue_paths(ddir / "queue"))
     for path in paths:
         for lineno, line in enumerate(path.read_text(encoding=_ENCODING).splitlines(), start=1):
             for icon in _stray_icons_in_line(line):
@@ -1428,7 +2061,24 @@ def stray_icon_warnings(ddir: Path) -> List[str]:
 
 def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
                branches: Optional[List[str]] = None) -> Tuple[List[str], List[str]]:
-    """Return ``(errors, warnings)``. Empty errors == pass."""
+    """Return ``(errors, warnings)``. Empty errors == pass.
+
+    The first nine checks all run before, and survive, the two early returns
+    below, but for two different reasons. Four of them —
+    `absolute_path_test_warnings`, `separator_dependent_test_warnings`,
+    `cli_subprocess_test_warnings`, `gitattributes_eol_pin_warnings` — read
+    `tests_dir` and never touch `docs_dir`, so they are the ones that make this
+    function worth calling in a repo with no document set. The other five *are* document checks; they
+    simply find nothing to say when `docs_dir` is absent, so keeping them costs
+    nothing and they still report on a `docs_dir` that exists but has no
+    `progress.md`.
+
+    Three cases, kept apart: a repo with **no `docs_dir` at all** gets the
+    test-hygiene lints and passes; a `docs_dir` that **exists but is not a
+    directory** is a misconfigured `aide.toml` and an error; and a `docs_dir`
+    that is a directory but has **lost its `progress.md`** is the error it
+    always was.
+    """
     errors: List[str] = []
     warnings: List[str] = []
     ddir = docs_dir(repo_root, config)
@@ -1440,9 +2090,32 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
     warnings.extend(absolute_path_test_warnings(repo_root, config))
     warnings.extend(separator_dependent_test_warnings(repo_root, config))
     warnings.extend(cli_subprocess_test_warnings(repo_root, config))
+    warnings.extend(gitattributes_eol_pin_warnings(repo_root, config))
     warnings.extend(header_blockquote_warnings(ddir))
     warnings.extend(item_spec_warnings(ddir))
+    if ddir.exists() and not ddir.is_dir():
+        # `docs_dir` pointing at something that is not a directory is a
+        # misconfiguration, and a third case again: it is neither "no document
+        # set" nor "a document set missing its progress.md". Left folded into
+        # the partial-adoption branch below it would report "this repo has no
+        # AIDE document set" and exit 0 — a typo in aide.toml passing as a
+        # deliberate choice not to adopt the loop.
+        errors.append(
+            f"{_rel_display(ddir, repo_root)} is configured as docs_dir but is "
+            f"not a directory — fix [project] docs_dir in aide.toml")
+        return errors, warnings
+    if not ddir.is_dir():
+        # Two different situations used to produce one error. A repo with no
+        # document set at all is not a broken loop repo — it is a repo that
+        # adopted the conventions and the CLI without the roadmap documents,
+        # and the document checks simply do not apply to it. Everything above
+        # has already run and is kept: three of those lints read `tests_dir`,
+        # not `docs_dir`, and conflating the two cases made them unreachable
+        # for any such repo — this framework's own repository included, which
+        # is where they were written (issue #57).
+        return errors, warnings
     if not progress_path.is_file():
+        # `docs_dir` exists but its central document does not: a real error.
         return [f"missing {progress_path}"], warnings
     # One read, reused: two reads can disagree if the file changes between them.
     text = progress_path.read_text(encoding=_ENCODING)
@@ -1528,7 +2201,7 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
     seen: Dict[int, str] = {}
     if qdir.is_dir():
         _, _, istat = _parse_item_status(lines)
-        for qpath in _queue_paths(qdir):
+        for qpath in iter_queue_paths(qdir):
             qtext = qpath.read_text(encoding=_ENCODING)
             derived_open = queue_is_open(qtext, istat)
             declared = queue_status(qtext)
@@ -1580,6 +2253,9 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
                     f"shape, or once it is merged run 'aide gc --merged' to "
                     f"delete it")
             continue
+        # 🔍 is deliberately NOT reported: a claim branch whose item is awaiting
+        # review is a normal, correct state, and warning about it on every run
+        # until the human merges is how a real warning gets tuned out.
         if item_status.get(n) == "complete":
             warnings.append(f"stale claim branch {br}: item {n:03d} is already ✅")
 
@@ -1716,8 +2392,8 @@ def _dependency_cycles(graph: Dict[int, List[int]]) -> List[List[int]]:
 
 
 def queue_spec_findings(repo_root: Path, config: Dict[str, Dict[str, object]],
-                        queue_number: int) -> Tuple[List[SpecFinding], List[int]]:
-    """``(findings, unspecced)`` for every spec on queue *queue_number*.
+                        number: int) -> Tuple[List[SpecFinding], List[int]]:
+    """``(findings, unspecced)`` for every spec on queue *number*.
 
     Runs in the window `/aide-spec-queue` creates and currently leaves
     unguarded: N specs authored on one branch before any is built, where every
@@ -1727,10 +2403,12 @@ def queue_spec_findings(repo_root: Path, config: Dict[str, Dict[str, object]],
     assertion depends on state this item's authorised edit changes.*
     """
     ddir = docs_dir(repo_root, config)
-    qpath = ddir / "queue" / f"queue-{queue_number:03d}.md"
-    if not qpath.is_file():
+    qdir = ddir / "queue"
+    qpath = queue_path(qdir, number)
+    if qpath is None:
         return ([SpecFinding("error", "missing-queue", (),
-                             f"no queue file at {qpath.relative_to(repo_root).as_posix()}")],
+                             f"no {queue_name(number)} file under "
+                             f"{qdir.relative_to(repo_root).as_posix()}")],
                 [])
 
     numbers = queue_item_numbers(qpath.read_text(encoding=_ENCODING))
@@ -1740,7 +2418,7 @@ def queue_spec_findings(repo_root: Path, config: Dict[str, Dict[str, object]],
     declared: Dict[int, AuthorisedPaths] = {}
 
     for num in numbers:
-        specs = sorted(idir.glob(f"{num:03d}-*.md")) if idir.is_dir() else []
+        specs = item_spec_paths(idir, num)
         if not specs:
             # Normal mid-queue state, not a conflict: /aide-spec-queue exists to
             # fill these. Counted and reported, never silently dropped.
@@ -1816,9 +2494,9 @@ def queue_spec_findings(repo_root: Path, config: Dict[str, Dict[str, object]],
         for dep in deps:
             if dep in known:
                 continue
-            has_spec = bool(sorted(idir.glob(f"{dep:03d}-*.md"))) if idir.is_dir() else False
+            has_spec = bool(item_spec_paths(idir, dep))
             in_a_queue = any(dep in queue_item_numbers(p.read_text(encoding=_ENCODING))
-                             for p in _queue_paths(ddir / "queue"))
+                             for p in iter_queue_paths(ddir / "queue"))
             if not has_spec and not in_a_queue:
                 findings.append(SpecFinding(
                     "warning", "unknown-dependency", (num, dep),
@@ -1828,13 +2506,13 @@ def queue_spec_findings(repo_root: Path, config: Dict[str, Dict[str, object]],
     return findings, unspecced
 
 
-def _write_findings_report(path: Path, queue_number: int,
+def _write_findings_report(path: Path, number: int,
                            findings: List[SpecFinding],
                            unspecced: List[int]) -> None:
     """Write the machine-readable report — the seam a reviewer pass consumes as
     its worklist rather than re-deriving what this check already decided."""
     payload = {
-        "queue": queue_number,
+        "queue": number,
         "unspecced_items": unspecced,
         "findings": [
             {"severity": f.severity, "kind": f.kind,
@@ -1853,8 +2531,8 @@ def _write_findings_report(path: Path, queue_number: int,
 
 
 def cmd_check(args: argparse.Namespace) -> int:
-    queue_number = getattr(args, "queue", None)
-    if getattr(args, "report", None) and queue_number is None:
+    queue = getattr(args, "queue", None)
+    if getattr(args, "report", None) and queue is None:
         # Silently ignoring it would be worse than refusing: the caller asked
         # for a file that would never appear, and only the missing file would
         # ever say so.
@@ -1864,19 +2542,32 @@ def cmd_check(args: argparse.Namespace) -> int:
 
     repo_root = find_repo_root(args.repo)
     config = load_config(repo_root)
+    ddir = docs_dir(repo_root, config)
     errors, warnings = run_checks(repo_root, config)
 
-    if queue_number is not None:
-        findings, unspecced = queue_spec_findings(repo_root, config, queue_number)
+    if not ddir.exists() and queue is None:
+        # A notice, not a warning: nothing is wrong, but the reader must not
+        # read "OK" as "the documents were checked and are fine".
+        #
+        # Only on a non-`--queue` run. `--queue` sends `queue_spec_findings`
+        # looking for a queue file under the same absent directory, so it runs
+        # and errors — and "only the repo-agnostic checks ran" would be false
+        # next to that error. The notice exists to stop a *pass* being
+        # over-read; a run that fails needs no such guard.
+        print(f"notice: no {_rel_display(ddir, repo_root)}/ — this repo has no "
+              f"AIDE document set, so only the repo-agnostic checks ran")
+
+    if queue is not None:
+        findings, unspecced = queue_spec_findings(repo_root, config, queue)
         for f in findings:
             (errors if f.severity == "error" else warnings).append(f.message)
         if unspecced:
             listed = ", ".join(f"{n:03d}" for n in unspecced)
-            print(f"aide check: queue {queue_number:03d} — {len(unspecced)} item(s) "
+            print(f"aide check: queue {queue:03d} — {len(unspecced)} item(s) "
                   f"not yet specced, so not compared: {listed}")
         report = getattr(args, "report", None)
         if report:
-            _write_findings_report(Path(report), queue_number, findings, unspecced)
+            _write_findings_report(Path(report), queue, findings, unspecced)
             print(f"aide check: wrote {report}")
 
     for w in warnings:
@@ -1962,7 +2653,12 @@ def cmd_gate(args: argparse.Namespace) -> int:
     except ValueError as exc:
         print(f"aide gate: {exc}", file=sys.stderr)
         return 2
-    ppath.write_text(updated, encoding=_ENCODING)
+    # NOT _ENCODING: "utf-8-sig" *strips* a BOM on read but *writes* one, so
+    # passing it here made every gate decision prepend U+FEFF to progress.md —
+    # manufacturing the exact hazard that constant exists to absorb. Every
+    # other writer in this module already writes plain "utf-8"; this was the
+    # one outlier. Read tolerantly, write clean.
+    ppath.write_text(updated, encoding="utf-8")
     print(f"gate {args.number}: {kind}")
     if not args.no_commit:
         _commit_progress_file(repo_root, config,
@@ -1970,19 +2666,26 @@ def cmd_gate(args: argparse.Namespace) -> int:
     return 0
 
 
+#: What `aide progress set` accepts, and the tracked status each records.
+#: `done` stays the word for ✅ — a consumer's muscle memory and every existing
+#: runbook use it — and `in-review` is additive.
+_SET_STATUS_MAP = {"in-progress": "in-progress", "in-review": "in-review",
+                   "done": "complete"}
+
+
 def cmd_progress(args: argparse.Namespace) -> int:
     if args.action == "accept":
         return _cmd_progress_accept(args)
     if args.action != "set":
-        print("usage: aide progress set NNN <in-progress|done>", file=sys.stderr)
+        print("usage: aide progress set NNN <in-progress|in-review|done>", file=sys.stderr)
         return 2
     if args.status is None:
-        print("usage: aide progress set NNN <in-progress|done>", file=sys.stderr)
+        print("usage: aide progress set NNN <in-progress|in-review|done>", file=sys.stderr)
         return 2
-    status_map = {"in-progress": "in-progress", "done": "complete"}
-    if args.status not in status_map:
-        print("status must be 'in-progress' or 'done'", file=sys.stderr)
+    if args.status not in _SET_STATUS_MAP:
+        print("status must be 'in-progress', 'in-review' or 'done'", file=sys.stderr)
         return 2
+    status_map = _SET_STATUS_MAP
     repo_root = find_repo_root(args.repo)
     config = load_config(repo_root)
     progress_path = docs_dir(repo_root, config) / "progress.md"
@@ -2070,36 +2773,265 @@ def _commit_progress(repo_root: Path, config, number: int, status: str) -> None:
 
 
 def _commit_progress_file(repo_root: Path, config, message: str) -> None:
-    git(["pull", "--rebase"], repo_root, check=False)
     rel = str(config["project"].get("docs_dir", "docs/aide")) + "/progress.md"
-    git(["add", rel], repo_root, check=False)
+    _commit_docs_files(repo_root, config, message, [rel])
+
+
+def _commit_docs_files(repo_root: Path, config, message: str,
+                       rels: List[str]) -> None:
+    """Commit exactly *rels* — repo-relative paths — with *message*.
+
+    Named paths, never ``git add -A``: these verbs run mid-item, alongside a
+    builder's uncommitted work, and a broad add would sweep that into a
+    bookkeeping commit.
+    """
+    git(["pull", "--rebase"], repo_root, check=False)
+    for rel in rels:
+        git(["add", rel], repo_root, check=False)
     res = git(["commit", "-m", message], repo_root, check=False)
     if res.returncode != 0 and "nothing to commit" not in (res.stdout + res.stderr):
         print(res.stderr.strip(), file=sys.stderr)
 
 
+def insights_path(ddir: Path) -> Path:
+    """The live inbox. One name, one place — see ``queue_name``/``item_spec_paths``."""
+    return ddir / "insights.md"
+
+
+def insight_archive_path(ddir: Path, quarter: str) -> Path:
+    """``docs/aide/insights/archive-2026-Q3.md`` — one file per quarter.
+
+    A directory sibling to the live file, not a suffix on it, so the live file
+    keeps the exact name every role appends to and the archive can grow without
+    that name ever changing.
+    """
+    return ddir / "insights" / f"archive-{quarter}.md"
+
+
+_ARCHIVE_HEADER = (
+    "# Insight Archive — {quarter}\n\n"
+    "_Closed entries moved out of `insights.md` by `aide insights archive`._\n"
+    "_Frozen: the claims are immutable and, unlike the live file, this one is_\n"
+    "_not shape-checked — see `insight_warnings`._\n"
+)
+
+
+def cmd_insights(args: argparse.Namespace) -> int:
+    """Read and maintain ``insights.md`` — the one living document with no verb.
+
+    Every other document has the CLI doing its mechanical work; this one made
+    each triage pass an agent reading and hand-parsing the whole file, which is
+    the cost that kept triage getting deferred. ``list`` answers "what is
+    outstanding" without loading the archive with it, ``tick`` performs the one
+    in-place edit the immutability rule permits, and ``archive`` keeps the live
+    file the size of its working set.
+    """
+    import datetime as _dt
+    repo_root = find_repo_root(args.repo)
+    config = load_config(repo_root)
+    ddir = docs_dir(repo_root, config)
+    path = insights_path(ddir)
+    if not path.is_file():
+        print(f"aide insights: no {path} — capture creates it from "
+              ".aide/templates/insights.md (conventions.md §1)", file=sys.stderr)
+        return 2
+    text = path.read_text(encoding=_ENCODING)
+    ddir_rel = ddir.relative_to(repo_root).as_posix()
+
+    if args.action == "list":
+        return _cmd_insights_list(parse_insights(text), args)
+    if args.action == "tick":
+        return _cmd_insights_tick(path, text, ddir_rel, repo_root, config, args,
+                                  _dt.date.today().isoformat())
+    return _cmd_insights_archive(path, text, ddir, ddir_rel, repo_root, config, args)
+
+
+def _cmd_insights_list(entries: List[InsightEntry], args: argparse.Namespace) -> int:
+    if args.type and args.type not in _INSIGHT_TYPES:
+        print(f"aide insights: --type must be one of {', '.join(_INSIGHT_TYPES)}",
+              file=sys.stderr)
+        return 2
+    shown = [e for e in entries
+             if (not args.open_only or not e.ticked)
+             and (not args.type or e.type == args.type)]
+    for e in shown:
+        if e.type is None:
+            # Nothing parsed, so render the line as it stands rather than
+            # dressing it in fields this listing only guessed at.
+            print(f"  {e.ordinal:>3}. ?? {e.raw}")
+            continue
+        # The provenance is reprinted whole, item reference included: "which
+        # item captured this" is half of what triage routes on, and a listing
+        # that drops it sends the reader back to the file it exists to replace.
+        prov = f" *({f'item {e.item:03d}, ' if e.item is not None else ''}{e.date})*" if e.date else ""
+        mark = "x" if e.ticked else " "
+        print(f"  {e.ordinal:>3}. [{mark}] {e.type:<10} — {e.text}{prov}"
+              f"{_INSIGHT_POINTER + e.pointer if e.pointer else ''}")
+        if args.trail:
+            for line in e.trail:
+                print(f"        {line.strip()}")
+    open_entries = [e for e in entries if not e.ticked]
+    by_type = {t: sum(1 for e in open_entries if e.type == t) for t in _INSIGHT_TYPES}
+    breakdown = ", ".join(f"{n} {t}" for t, n in by_type.items() if n)
+    malformed = sum(1 for e in entries if e.type is None)
+    print(f"aide insights: {len(entries)} entr{'y' if len(entries) == 1 else 'ies'}, "
+          f"{len(open_entries)} open"
+          f"{' (' + breakdown + ')' if breakdown else ''}"
+          f"{f'; {malformed} malformed — see `aide check`' if malformed else ''}")
+    if len(shown) != len(entries):
+        print(f"aide insights: {len(shown)} shown by the filters given")
+    return 0
+
+
+def _cmd_insights_tick(path: Path, text: str, ddir_rel: str, repo_root: Path,
+                       config, args: argparse.Namespace, today: str) -> int:
+    if args.number is None:
+        print("usage: aide insights tick N --pointer TEXT", file=sys.stderr)
+        return 2
+    if not (args.pointer or "").strip():
+        print("aide insights tick: --pointer says where the claim landed — a "
+              "doc, an item, an issue. A tick without one records that triage "
+              "happened and loses what it decided.", file=sys.stderr)
+        return 2
+    try:
+        updated, message = tick_insight_text(text, args.number, args.pointer.strip(),
+                                             args.date or today)
+    except ValueError as exc:
+        print(f"aide insights tick: {exc}", file=sys.stderr)
+        return 1
+    path.write_text(updated, encoding="utf-8")
+    print(message)
+    if not args.no_commit and (repo_root / ".git").exists():
+        _commit_docs_files(repo_root, config, f"docs(aide): triage insight {args.number}",
+                           [f"{ddir_rel}/insights.md"])
+    return 0
+
+
+def _cmd_insights_archive(path: Path, text: str, ddir: Path, ddir_rel: str,
+                          repo_root: Path, config, args: argparse.Namespace) -> int:
+    if not _DATE_RE.match(args.before or ""):
+        print("usage: aide insights archive --before YYYY-MM-DD", file=sys.stderr)
+        return 2
+    remaining, moved = archive_insight_text(text, args.before)
+    if not moved:
+        print(f"aide insights: nothing closed before {args.before} to archive")
+        return 0
+    total = 0
+    for quarter in sorted(moved):
+        entries = sum(1 for ln in moved[quarter] if ln.startswith("- "))
+        total += entries
+        print(f"  {insight_archive_path(ddir, quarter).relative_to(repo_root).as_posix()}"
+              f" ← {entries} closed entr{'y' if entries == 1 else 'ies'}")
+    if not args.yes:
+        print(f"aide insights archive: dry run — {total} entr"
+              f"{'y' if total == 1 else 'ies'} would move; re-run with --yes")
+        return 0
+
+    rels = [f"{ddir_rel}/insights.md"]
+    for quarter in sorted(moved):
+        apath = insight_archive_path(ddir, quarter)
+        apath.parent.mkdir(parents=True, exist_ok=True)
+        body = "\n".join(moved[quarter]) + "\n"
+        if apath.is_file():
+            existing = apath.read_text(encoding=_ENCODING)
+            apath.write_text(existing.rstrip("\n") + "\n" + body, encoding="utf-8")
+        else:
+            apath.write_text(_ARCHIVE_HEADER.format(quarter=quarter) + "\n" + body,
+                             encoding="utf-8")
+        rels.append(apath.relative_to(repo_root).as_posix())
+    path.write_text(remaining, encoding="utf-8")
+    print(f"aide insights archive: moved {total} entr{'y' if total == 1 else 'ies'}; "
+          f"{len(parse_insights(remaining))} remain — their list numbers have shifted")
+    if not args.no_commit and (repo_root / ".git").exists():
+        _commit_docs_files(repo_root, config,
+                           f"docs(aide): archive insights closed before {args.before}",
+                           rels)
+    return 0
+
+
 def cmd_queue(args: argparse.Namespace) -> int:
+    if args.action == "start":
+        return _queue_start(args)
     if args.action != "tidy":
-        print("usage: aide queue tidy NNN", file=sys.stderr)
+        print("usage: aide queue {start|tidy} NNN", file=sys.stderr)
         return 2
     import datetime as _dt
     repo_root = find_repo_root(args.repo)
     config = load_config(repo_root)
     qdir = docs_dir(repo_root, config) / "queue"
-    target = qdir / f"queue-{args.number:03d}.md"
-    if not target.is_file():
-        print(f"error: {target} not found", file=sys.stderr)
+    target = queue_path(qdir, args.number)
+    if target is None:
+        print(f"error: no {queue_name(args.number)} file under {qdir}", file=sys.stderr)
         return 1
     # Supersede by the highest-numbered queue after this one.
-    later = sorted(
-        int(p.stem.split("-")[1]) for p in qdir.glob("queue-*.md")
-        if p.stem.split("-")[1].isdigit() and int(p.stem.split("-")[1]) > args.number
-    )
-    superseded_by = later[-1] if later else args.number + 1
+    later = [n for n in (queue_number(p) for p in iter_queue_paths(qdir))
+             if n > args.number]
+    superseded_by = max(later) if later else args.number + 1
     date = args.date or _dt.date.today().isoformat()
     text = target.read_text(encoding=_ENCODING)
     target.write_text(tidy_queue_text(text, superseded_by, date), encoding="utf-8")
-    print(f"queue-{args.number:03d}: marked completed (superseded by queue-{superseded_by:03d})")
+    print(f"{queue_name(args.number)}: marked completed "
+          f"(superseded by {queue_name(superseded_by)})")
+    return 0
+
+
+def _queue_start(args: argparse.Namespace) -> int:
+    """Create (and, off ``local`` mode, push) a queue or specs-queue branch.
+
+    The branch half of what `claim` does for an item. It exists because
+    conventions.md §3 says a raw git form is wrong wherever a verb covers it,
+    and until 1.20.0 two of the three branch shapes the engine recognises were
+    covered by no verb at all: the framework's own prose told an agent to type
+    `git switch -c <prefix>queue-NNN`, and the regex that must later parse that
+    name never saw it until something had already gone wrong. A typo did not
+    fail loudly — it made `claim` infer `main_branch` as the base and merge the
+    item past the queue branch, silently.
+
+    Recording the base is the second half. `_record_branch_base` ran only at
+    claim, so a queue branch had no recorded base of its own; a queue branched
+    off something other than `main_branch` had to be given `--base` at every
+    later call that cared.
+    """
+    repo_root = find_repo_root(args.repo)
+    config = load_config(repo_root)
+    prefix = str(config["git"].get("branch_prefix", "aide/"))
+    mode = str(config["git"].get("mode", "auto-merge"))
+    branch = (specs_queue_branch_name(prefix, args.number) if args.specs
+              else queue_branch_name(prefix, args.number))
+
+    base = args.base or str(config["git"].get("main_branch", "main"))
+    if not _local_branch_exists(repo_root, base):
+        print(f"aide queue start: base '{base}' is not a local branch — a queue "
+              f"branch is branched from its base and merged back into it, so "
+              f"the base must be a branch this checkout can update",
+              file=sys.stderr)
+        return 1
+    if _local_branch_exists(repo_root, branch):
+        print(f"aide queue start: {branch} already exists — switch to it rather "
+              f"than recreating it", file=sys.stderr)
+        return 1
+    # Also on origin: another machine (or another session) already started this
+    # queue. Creating it locally would succeed and the `push -u` would then fail
+    # — an uncaught CalledProcessError, i.e. a raw traceback in what is meant to
+    # be an unattended flow. Fail as a sentence instead.
+    if mode != "local" and _has_origin(repo_root) and branch in _remote_branches(repo_root):
+        print(f"aide queue start: {branch} already exists on origin — someone "
+              f"has started this queue; fetch and switch to it rather than "
+              f"recreating it", file=sys.stderr)
+        return 1
+
+    if args.dry_run:
+        print(f"would start {branch}; base {base}")
+        return 0
+    # Branch FROM the base explicitly, for the reason `claim` does: with no
+    # start point `switch -c` uses HEAD, which lets the branch's actual origin
+    # disagree with the base it records.
+    git(["switch", "-c", branch, base], repo_root)
+    _record_branch_base(repo_root, branch, base)
+    if mode != "local":
+        git(["push", "-u", "origin", branch], repo_root)
+    note = "" if base == str(config["git"].get("main_branch", "main")) else f" (base {base})"
+    print(f"started {branch}{note}")
     return 0
 
 
@@ -2219,9 +3151,7 @@ def _item_dependencies(repo_root: Path, config, number: int) -> List[int]:
     depends on this" aside does not register as a backward blocker.
     """
     idir = docs_dir(repo_root, config) / "items"
-    if not idir.is_dir():
-        return []
-    specs = list(idir.glob(f"{number:03d}-*.md"))
+    specs = item_spec_paths(idir, number)
     if not specs:
         return []
     text = specs[0].read_text(encoding=_ENCODING)
@@ -2269,7 +3199,13 @@ def _pick_item(repo_root: Path, config, queue_text: str,
         if num in gate_blocked:
             continue
         deps = _item_dependencies(repo_root, config, num)
-        if any(item_status.get(d, "planned") in ("planned", "in-progress") for d in deps):
+        # 🔍 blocks like 🚧 does: an item whose PR is still open is work that is
+        # not in the base, so claiming a dependent off that base would branch
+        # from a tree missing the very thing the dependency provides. Under
+        # `auto-merge` this window is milliseconds; under `pr` it is however
+        # long the human takes, which is exactly when it matters.
+        if any(item_status.get(d, "planned") in ("planned", "in-progress", "in-review")
+               for d in deps):
             continue
         return num, titles.get(num, f"item {num}")
     return None
@@ -2282,27 +3218,27 @@ def _open_queue_texts(repo_root: Path, config) -> List[str]:
         return []
     item_status = _progress_item_status(repo_root, config)
     out: List[str] = []
-    for path in _queue_paths(qdir):
+    for path in iter_queue_paths(qdir):
         text = path.read_text(encoding=_ENCODING)
         if queue_is_open(text, item_status):
             out.append(text)
     return out
 
 
-def _live_queue_text(repo_root: Path, config, queue_number: Optional[int]) -> Optional[str]:
+def _live_queue_text(repo_root: Path, config, number: Optional[int]) -> Optional[str]:
     """The queue to work: an explicit number, else the lowest-numbered OPEN
     queue (state derived from progress.md). Falls back to the highest queue
     declaring ``Status: Live`` only when progress.md is missing (legacy)."""
     qdir = docs_dir(repo_root, config) / "queue"
-    if queue_number is not None:
-        path = qdir / f"queue-{queue_number:03d}.md"
-        return path.read_text(encoding=_ENCODING) if path.is_file() else None
+    if number is not None:
+        path = queue_path(qdir, number)
+        return path.read_text(encoding=_ENCODING) if path is not None else None
     if not qdir.is_dir():
         return None
     if (docs_dir(repo_root, config) / "progress.md").is_file():
         open_texts = _open_queue_texts(repo_root, config)
         return open_texts[0] if open_texts else None
-    for path in sorted(_queue_paths(qdir), reverse=True):
+    for path in sorted(iter_queue_paths(qdir), reverse=True):
         text = path.read_text(encoding=_ENCODING)
         if is_live_queue(text):
             return text
@@ -2372,7 +3308,7 @@ def cmd_claim(args: argparse.Namespace) -> int:
         print("none left")
         return 0
     number, title = pick
-    branch = f"{prefix}{number:03d}-{_slug(title)}"
+    branch = claim_branch_name(prefix, number, title)
 
     # What this claim branches off, and what its `merge` will return it to.
     # `switch -c` already branches from whatever is checked out, so claiming
@@ -2414,6 +3350,31 @@ def _find_claim_branch(repo_root: Path, prefix: str, number: int) -> Optional[st
     return None
 
 
+def _promote_item_to_complete(repo_root: Path, config, number: int,
+                              no_commit: bool = False) -> None:
+    """Record item *number* as ✅ in progress.md — best effort, never fatal.
+
+    Deliberately quiet about a no-op: the item may already be ✅ (a re-run, or a
+    consumer still driving the old `progress set NNN done` ordering), and the
+    merge itself is the thing that succeeded. It is *not* quiet about a missing
+    progress.md, which is a real misconfiguration — but even that must not fail
+    a merge that has already landed.
+    """
+    progress_path = docs_dir(repo_root, config) / "progress.md"
+    if not progress_path.is_file():
+        print(f"aide merge: item {number:03d} merged, but {progress_path} was "
+              f"not found, so its status was NOT recorded", file=sys.stderr)
+        return
+    text = progress_path.read_text(encoding=_ENCODING)
+    updated = set_item_status(text, number, "complete")
+    if updated == text:
+        return
+    progress_path.write_text(updated, encoding="utf-8")
+    print(f"item {number:03d}: set to done (merged)")
+    if not no_commit and (repo_root / ".git").exists():
+        _commit_progress(repo_root, config, number, "done")
+
+
 def cmd_merge(args: argparse.Namespace) -> int:
     repo_root = find_repo_root(args.repo)
     config = load_config(repo_root)
@@ -2443,7 +3404,8 @@ def cmd_merge(args: argparse.Namespace) -> int:
         git(["push", "-u", "origin", branch], repo_root)
         print(f"aide merge (pr mode): pushed {branch}. Open a PR against {main} "
               f"to land it (e.g. 'gh pr create'); merge is left to the human "
-              f"review gate.")
+              f"review gate. Item {args.number:03d} stays 🔍 until it merges — "
+              f"then run 'aide progress set {args.number:03d} done'.")
         return 0
 
     git(["switch", main], repo_root)
@@ -2453,6 +3415,17 @@ def cmd_merge(args: argparse.Namespace) -> int:
     if merge_res.returncode != 0:
         print(f"aide merge: merge of {branch} failed:\n{merge_res.stdout}{merge_res.stderr}", file=sys.stderr)
         return 1
+    # ✅ is set HERE, by the process that just did the merge, so it always means
+    # "merged" — not "an agent said so before attempting one". The validator
+    # marks the item 🔍 before this call; whether it becomes ✅ is a fact about
+    # git, and in `pr` mode the return above leaves it 🔍 for the human's merge.
+    #
+    # It must precede the push: the tick is a commit like any other, and the
+    # single `git push` below is the only one that carries `main` to origin.
+    # Recording it afterwards stranded it locally, so origin's progress.md
+    # under-reported — and on a queue's last item nothing would ever push it.
+    _promote_item_to_complete(repo_root, config, args.number,
+                              getattr(args, "no_commit", False))
     if mode != "local":
         git(["push"], repo_root, check=False)
 
@@ -2531,7 +3504,30 @@ def _branch_item_number(branch: str, prefix: str) -> Optional[int]:
 #: `<prefix>queue-NNN`, `/aide-spec-queue` names `<prefix>specs-queue-NNN`.
 #: Recognised positively so they are reported as what they are, rather than
 #: lumped in with a branch nothing can parse.
-_QUEUE_BRANCH_RE = re.compile(r"(?:specs-)?queue-\d+$")
+#:
+#: Built from `_QUEUE_TOKEN`/`_SPECS_TOKEN` — the same literals the constructors
+#: below and `queue_name` use — so the recogniser cannot drift from the names
+#: actually produced. 1.13.0 centralised branch *parsing*; until 1.20.0 two of
+#: the three shapes had no constructor at all and were typed by an agent copying
+#: a string out of a markdown file, which is why the round-trip test that now
+#: pins this could not previously be written.
+_QUEUE_BRANCH_RE = re.compile(
+    "(?:" + re.escape(_SPECS_TOKEN) + ")?" + re.escape(_QUEUE_TOKEN) + r"\d+$")
+
+
+def claim_branch_name(prefix: str, number: int, title: str) -> str:
+    """``<prefix>NNN-short-name`` — the branch `aide claim` creates for an item."""
+    return f"{prefix}{number:03d}-{_slug(title)}"
+
+
+def queue_branch_name(prefix: str, number: int) -> str:
+    """``<prefix>queue-NNN`` — the branch a queue is planned and run on."""
+    return f"{prefix}{queue_name(number)}"
+
+
+def specs_queue_branch_name(prefix: str, number: int) -> str:
+    """``<prefix>specs-queue-NNN`` — the branch a queue's specs are authored on."""
+    return f"{prefix}{_SPECS_TOKEN}{queue_name(number)}"
 
 
 def _is_queue_branch(branch: str, prefix: str) -> bool:
@@ -2649,10 +3645,16 @@ _ASSERTS_LABEL = "asserts against"
 #: - ``insights.md`` — the compound-engineering inbox; conventions.md §1 names
 #:   appending to it as the one write allowed outside an agent's edit scope, so
 #:   flagging it would punish exactly the behaviour the framework requires.
+#: - ``insights/archive-*.md`` — where ``aide insights archive`` moves closed
+#:   entries. The one pattern here, added deliberately rather than by widening
+#:   the rule: it is bounded to a single directory *and* a single filename
+#:   shape, and ``path_matches`` anchors a bare ``*`` per path segment, so it
+#:   cannot reach a subdirectory or a second name. It buys nothing an attacker
+#:   or a careless agent wants — only the file the verb above it writes.
 #:
 #: The item's own spec is authorised separately, by number, in ``cmd_scope`` —
 #: the builder records Decisions & Trade-offs there on every item.
-_ALWAYS_AUTHORISED = ("progress.md", "insights.md")
+_ALWAYS_AUTHORISED = ("progress.md", "insights.md", "insights/archive-*.md")
 
 
 class AuthorisedPaths(NamedTuple):
@@ -2802,7 +3804,7 @@ def scope_findings(changed: List[str], authorised: AuthorisedPaths,
     asserting against state the item moved.
     """
     unauthorised = [p for p in changed
-                    if p not in always
+                    if not any(path_matches(p, a) for a in always)
                     and not any(path_matches(p, g) for g in authorised.may_change)]
     contradictions = [p for p in changed
                       if any(path_matches(p, g) for g in authorised.asserts_against)]
@@ -2864,7 +3866,7 @@ def cmd_scope(args: argparse.Namespace) -> int:
             return 2
 
     idir = docs_dir(repo_root, config) / "items"
-    specs = sorted(idir.glob(f"{number:03d}-*.md")) if idir.is_dir() else []
+    specs = item_spec_paths(idir, number)
     if not specs:
         print(f"aide scope: no spec for item {number:03d} under {idir}",
               file=sys.stderr)
@@ -2913,6 +3915,37 @@ def cmd_scope(args: argparse.Namespace) -> int:
     print(f"aide scope: OK (item {number:03d}, {len(changed)} changed file(s) "
           f"all authorised, vs {base})")
     return 0
+
+
+def _landed_review_items(repo_root: Path, config, prefix: str,
+                         base: str) -> List[str]:
+    """Lines naming every 🔍 item whose branch has since landed in *base*.
+
+    In `pr` mode nothing inside the loop ever observes the merge — the human
+    does it on the forge, hours or days later — so 🔍 needs a way home or it is
+    a state items enter and never leave. This is that way home, and it needs no
+    knowledge of what a PR is: the same content oracle `gc` uses answers "has
+    this work landed?" without a forge call that would silently degrade to
+    "no open PRs found" when `gh` is missing or unauthenticated.
+
+    Reports rather than edits. `sync` is a preflight, and a preflight that
+    rewrites a tracked document as a side effect is not one.
+    """
+    item_status = _progress_item_status(repo_root, config)
+    reviewing = {n for n, st in item_status.items() if st == "in-review"}
+    if not reviewing or not _has_merge_tree(repo_root):
+        return []
+    local = _local_branches(repo_root)
+    lines: List[str] = []
+    for br in sorted(_list_claim_branches(repo_root, prefix)):
+        num = _branch_item_number(br, prefix)
+        if num not in reviewing:
+            continue
+        if _branch_content_landed(repo_root, base, _gc_ref(br, local)) is True:
+            lines.append(f"aide sync: item {num:03d} is 🔍 but its work is now in "
+                         f"{base} — run 'python .aide/scripts/aide.py progress "
+                         f"set {num:03d} done'")
+    return lines
 
 
 def cmd_sync(args: argparse.Namespace) -> int:
@@ -2971,6 +4004,9 @@ def cmd_sync(args: argparse.Namespace) -> int:
         if mode != "local" and _has_origin(repo_root) and claim in _remote_branches(repo_root):
             git(["pull", "--rebase", "origin", claim], repo_root, check=False)
 
+    for line in _landed_review_items(repo_root, config, prefix, main):
+        print(line)
+
     print(f"aide sync: OK — on '{branch}', tree clean"
           + ("" if mode == "local" else ", remotes fetched"))
     return 0
@@ -3008,11 +4044,12 @@ def cmd_status(args: argparse.Namespace) -> int:
     item_status = _progress_item_status(repo_root, config)
     qdir = docs_dir(repo_root, config) / "queue"
     live_seen = False
-    if qdir.is_dir() and _queue_paths(qdir):
-        for path in _queue_paths(qdir):
+    if iter_queue_paths(qdir):
+        for path in iter_queue_paths(qdir):
             nums = queue_item_numbers(path.read_text(encoding=_ENCODING))
             open_nums = [n for n in nums
-                         if item_status.get(n, "planned") in ("planned", "in-progress")]
+                         if item_status.get(n, "planned")
+                         in ("planned", "in-progress", "in-review")]
             if open_nums:
                 tag = " (live)" if not live_seen else ""
                 live_seen = True
@@ -3052,10 +4089,21 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"  branch: {br} ({kind} — not an item claim)")
                 continue
             st = item_status.get(num, "planned")
-            stale = " — STALE (item ✅; run 'aide gc')" if st == "complete" else ""
-            print(f"  claim: {br} (item {num:03d}: {st}){stale}")
+            note = ""
+            if st == "complete":
+                note = " — STALE (item ✅; run 'aide gc')"
+            elif st == "in-review":
+                # Recommending `gc` here would be recommending the deletion of
+                # an open PR's head branch. It is awaiting a human, not stale.
+                note = " — awaiting review (merge the PR, then 'aide progress "
+                note += f"set {num:03d} done')"
+            print(f"  claim: {br} (item {num:03d}: {st}){note}")
     else:
         print("  claims: none")
+
+    for line in _landed_review_items(repo_root, config, prefix,
+                                     str(config["git"].get("main_branch", "main"))):
+        print("  " + line.replace("aide sync: ", ""))
 
     # Open PRs, best effort — informative only, silently skipped without `gh`.
     try:
@@ -3076,10 +4124,121 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def _merged_prefixed_branches(repo_root: Path, main: str, prefix: str) -> List[str]:
-    """Prefixed local branches already merged into *main*, per git itself."""
+    """Prefixed local branches already merged into *main*, per git itself.
+
+    Ancestry-based, so it misses **every** squash merge — which is the shape
+    GitHub's "Squash and merge" produces. `_branch_content_landed` is the
+    stronger oracle and is preferred wherever git is new enough; this remains
+    the fallback on git < 2.38, where being conservative means deleting *less*.
+    """
     out = git(["branch", "--merged", main, "--format=%(refname:short)"],
               repo_root, check=False).stdout
     return [l.strip() for l in out.splitlines() if l.strip().startswith(prefix)]
+
+
+#: `git merge-tree --write-tree` landed in git 2.38 (Oct 2022). As of Aug 2026
+#: the only realistic holdout is Ubuntu 22.04 LTS (git 2.34.1, in standard
+#: support until April 2027); 24.04, Debian 12, Git for Windows, macOS CLT and
+#: this repo's CI are all past it. There is deliberately **no fallback oracle**:
+#: on older git `gc` refuses to delete on the ✅ ground rather than degrading to
+#: a weaker test, so old git is always *more* conservative and there is one
+#: oracle to keep honest rather than two.
+_MERGE_TREE_MIN_GIT = (2, 38)
+
+
+def _git_version(repo_root: Path) -> Optional[Tuple[int, int]]:
+    """(major, minor) of the git on PATH, or None when it cannot be read."""
+    out = git(["--version"], repo_root, check=False).stdout
+    m = re.search(r"(\d+)\.(\d+)", out)
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def _has_merge_tree(repo_root: Path) -> bool:
+    version = _git_version(repo_root)
+    return version is not None and version >= _MERGE_TREE_MIN_GIT
+
+
+def _branch_content_landed(repo_root: Path, base: str,
+                           branch_ref: str) -> Optional[bool]:
+    """True when merging *branch_ref* into *base* would change *base* not at all.
+
+    The question `gc` actually needs answered before force-deleting: is this
+    branch's work already in the base? `git branch --merged` answers a *different*
+    question (is the tip an ancestor) and so misses every squash merge, which is
+    why `gc` reaches for `-D` in the first place. `git cherry` gets a
+    single-commit squash right and a multi-commit squash wrong — a false alarm on
+    the exact shape "Squash and merge" produces. Measured against fixtures of all
+    three shapes:
+
+    ======================  ===============  ============  =================
+    branch                  branch --merged  git cherry    merge-tree
+    ======================  ===============  ============  =================
+    1 commit, squashed      misses           correct       no-op
+    2 commits, squashed     misses           false alarm   no-op
+    genuinely unmerged      correct          correct       would change base
+    ======================  ===============  ============  =================
+
+    Comparing the merged tree to the base's own tree also stays correct after the
+    base advances with unrelated work, since that work is in both sides.
+
+    Returns None when the answer cannot be established (unreadable ref, git too
+    old, unexpected output) — a caller must treat that as "do not delete", never
+    as "landed".
+    """
+    if not _has_merge_tree(repo_root):
+        return None
+    # Resolve first, so an unreadable ref is reported as unmeasurable rather than
+    # as content: `merge-tree` exits 1 for a bad ref exactly as it does for a
+    # conflict, and mapping both to False made `gc` skip for the right reason but
+    # state the wrong one — "has content not in main" about a ref it never read.
+    if not _ref_exists(repo_root, branch_ref):
+        return None
+    res = git(["merge-tree", "--write-tree", base, branch_ref], repo_root, check=False)
+    if res.returncode == 1:
+        return False  # conflicts: the branch certainly carries content the base lacks
+    if res.returncode != 0:
+        return None
+    merged = res.stdout.strip().splitlines()
+    base_tree = git(["rev-parse", f"{base}^{{tree}}"], repo_root, check=False).stdout.strip()
+    if not merged or not base_tree:
+        return None
+    return merged[0].strip() == base_tree
+
+
+def _checked_out_branches(repo_root: Path) -> set:
+    """Branch names `gc` must never delete because a checkout is sitting on them.
+
+    Three ways that happens, and the guard has to cover all three or the preview
+    promises a delete `--yes` cannot perform:
+
+    - **This worktree, on a branch.** The original case.
+    - **This worktree, detached.** `git rev-parse --abbrev-ref HEAD` returns the
+      literal string `HEAD`, and no branch is ever equal to that — so the guard
+      silently protected nothing. Detached, the thing to protect is every branch
+      at the checked-out commit.
+    - **Another worktree.** `git branch -D` refuses these (git's own check), so
+      without asking `git worktree list` the preview lists a branch the delete
+      then bounces off.
+    """
+    protected = set()
+    # `worktree list --porcelain` names the branch of every attached worktree —
+    # including this one when it is not detached — as `branch refs/heads/<name>`.
+    out = git(["worktree", "list", "--porcelain"], repo_root, check=False).stdout
+    for line in out.splitlines():
+        if line.startswith("branch refs/heads/"):
+            protected.add(line[len("branch refs/heads/"):].strip())
+
+    name = _current_branch(repo_root)
+    if name and name != "HEAD":
+        protected.add(name)
+        return protected
+    head = git(["rev-parse", "HEAD"], repo_root, check=False).stdout.strip()
+    if not head:
+        return protected
+    points_at = git(["branch", "--points-at", head, "--format=%(refname:short)"],
+                    repo_root, check=False).stdout
+    protected.update(l.strip() for l in points_at.splitlines() if l.strip())
+    return protected
 
 
 def _plural(n: int, one: str, many: str) -> str:
@@ -3120,6 +4279,11 @@ def _gc_empty_notes(repo_root: Path, prefix: str, main: str,
     return notes
 
 
+def _gc_ref(branch: str, local: List[str]) -> str:
+    """The ref to measure *branch* by: the local branch, else its remote copy."""
+    return branch if branch in local else f"origin/{branch}"
+
+
 def cmd_gc(args: argparse.Namespace) -> int:
     """Delete claim branches whose work has landed (item ✅ in progress.md, or
     ``--merged`` branches already merged into main). Dry-run by default; pass
@@ -3146,11 +4310,17 @@ def cmd_gc(args: argparse.Namespace) -> int:
     local = [b for b in _local_branches(repo_root) if b.startswith(prefix)]
     remote = [b for b in _remote_branches(repo_root) if b.startswith(prefix)]
 
+    # The content oracle is what makes `-D` on the ✅ ground safe; without it
+    # that ground refuses outright (see `_MERGE_TREE_MIN_GIT`).
+    can_measure = _has_merge_tree(repo_root)
+
     merged_local: List[str] = []
     if args.merged:
         merged_local = _merged_prefixed_branches(repo_root, main, prefix)
 
     targets: Dict[str, str] = {}  # branch -> reason
+    skips: Dict[str, str] = {}    # branch -> why it is NOT acted on
+    protected = _checked_out_branches(repo_root)
     for br in sorted(set(local) | set(remote)):
         # Only a positively-identified item claim is deletable on the "item is
         # ✅" ground. A queue branch shares the number namespace but not the
@@ -3160,11 +4330,47 @@ def cmd_gc(args: argparse.Namespace) -> int:
         # is "already merged into main" and is checked against git itself.
         num = _branch_item_number(br, prefix)
         if num is not None and item_status.get(num) == "complete":
-            targets[br] = f"item {num:03d} is ✅"
+            reason = f"item {num:03d} is ✅"
+            # `progress.md` is a document, edited by agents and humans; git is
+            # the authority on whether the commits landed, and until 1.20.0 it
+            # was never asked. A ✅ can outrun the merge easily — a commit added
+            # after the validator marked it done, a hand-edit, the `pr`-mode
+            # window — and the action here is `git branch -D` plus a remote
+            # delete, where the remote half is unrecoverable on a plain git host.
+            if args.abandon:
+                targets[br] = reason + "; --abandon"
+            elif not can_measure:
+                skips[br] = (f"{reason}, but this git cannot verify the work "
+                             f"landed (needs "
+                             f"{_MERGE_TREE_MIN_GIT[0]}.{_MERGE_TREE_MIN_GIT[1]}+ "
+                             f"for 'merge-tree --write-tree'); use --merged or "
+                             f"--abandon")
+            else:
+                landed = _branch_content_landed(repo_root, main, _gc_ref(br, local))
+                if landed is True:
+                    targets[br] = reason
+                elif landed is False:
+                    skips[br] = (f"{reason} but the branch has content not in "
+                                 f"{main}; re-check it, or pass --abandon to "
+                                 f"delete it anyway")
+                else:
+                    # Not the same statement, and this is the one destructive
+                    # verb: say the measurement failed, not that the branch
+                    # carries work it may not carry.
+                    skips[br] = (f"{reason}, but whether its work is in {main} "
+                                 f"could not be determined (ref "
+                                 f"'{_gc_ref(br, local)}' unreadable); not "
+                                 f"deleting — pass --abandon to delete anyway")
         elif br in merged_local:
             targets[br] = f"merged into {main}"
+        elif (args.merged and can_measure
+              and _branch_content_landed(repo_root, main, _gc_ref(br, local)) is True):
+            # `--merged` is built on `git branch --merged`, which is ancestry-
+            # based and so misses every squash merge — the very shape `-D` was
+            # reached for. The same oracle that guards the ✅ ground closes that.
+            targets[br] = f"content already in {main}"
 
-    if not targets:
+    if not targets and not skips:
         # "Nothing to clean" is a claim about the ground and the scope this run
         # actually checked, not about the repository — say which. The default
         # invocation checks only the item ground, and every invocation ignores
@@ -3177,25 +4383,51 @@ def cmd_gc(args: argparse.Namespace) -> int:
             print(f"  {note}")
         return 0
 
-    current = git(["rev-parse", "--abbrev-ref", "HEAD"], repo_root, check=False).stdout.strip()
+    # Every skip is decided BEFORE anything is printed, so the preview is the
+    # set `--yes` acts on rather than a promise it then quietly narrows. A dry
+    # run that overstates trains the reader to skim it, and this is the one
+    # destructive verb — the list a human is asked to approve must be exact.
+    for br in [b for b in targets if b in protected]:
+        del targets[br]
+        skips[br] = ("checked out (here or in another worktree) — git refuses to "
+                     "delete a branch a checkout is sitting on")
+
+    def _where(br: str) -> str:
+        return ("local+remote" if br in local and br in remote
+                else "local" if br in local else "remote")
+
+    for br in sorted(skips):
+        print(f"skipping {br} ({_where(br)}): {skips[br]}")
     for br, reason in targets.items():
-        where = ("local+remote" if br in local and br in remote
-                 else "local" if br in local else "remote")
         if not args.yes:
-            print(f"would delete {br} ({where}; {reason})")
+            print(f"would delete {br} ({_where(br)}; {reason})")
             continue
-        if br == current:
-            print(f"skipping {br}: currently checked out", file=sys.stderr)
-            continue
+        failures: List[str] = []
         if br in local:
             # -D: a ✅/merged item's branch may have landed via squash/PR, so
             # git's ancestry-based -d safety check can refuse a branch whose
-            # work is in fact on main.
-            git(["branch", "-D", br], repo_root, check=False)
+            # work is in fact on main. Safe here only because the content check
+            # above already asked git whether the work landed.
+            res = git(["branch", "-D", br], repo_root, check=False)
+            if res.returncode != 0:
+                failures.append(f"local ({(res.stderr or '').strip()})")
         if br in remote and mode != "local":
-            git(["push", "origin", "--delete", br], repo_root, check=False)
-        print(f"deleted {br} ({where}; {reason})")
-    if not args.yes:
+            res = git(["push", "origin", "--delete", br], repo_root, check=False)
+            if res.returncode != 0:
+                failures.append(f"remote ({(res.stderr or '').strip()})")
+        # Report what git did, not what was asked of it. `-D` still refuses a
+        # branch checked out in ANOTHER worktree, which `_checked_out_branches`
+        # cannot see from here — and printing "deleted" over a refusal makes the
+        # report the very thing this verb was just fixed to stop being: a claim
+        # that does not match what happened.
+        if failures:
+            print(f"could NOT delete {br} ({_where(br)}; {reason}): "
+                  f"{'; '.join(failures)}", file=sys.stderr)
+        else:
+            print(f"deleted {br} ({_where(br)}; {reason})")
+    if not targets:
+        print("aide gc: nothing to delete")
+    if not args.yes and targets:
         print("aide gc: dry run — re-run with --yes to delete")
     return 0
 
@@ -3221,7 +4453,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_prog.add_argument("action", choices=["set", "accept"])
     p_prog.add_argument("number", type=int,
                         help="item number (set) | stage number (accept)")
-    p_prog.add_argument("status", nargs="?", default=None, help="set: in-progress | done")
+    p_prog.add_argument("status", nargs="?", default=None,
+                        help="set: in-progress | in-review | done "
+                             "(in-review = pushed, awaiting a human's merge)")
     p_prog.add_argument("--criterion", type=int, default=None,
                         help="accept: 1-based acceptance-criterion index within the stage")
     p_prog.add_argument("--all", action="store_true", dest="all_criteria",
@@ -3240,11 +4474,38 @@ def build_parser() -> argparse.ArgumentParser:
     p_gate.add_argument("--no-commit", action="store_true", help="edit only, do not git commit")
     p_gate.set_defaults(func=cmd_gate)
 
-    p_queue = sub.add_parser("queue", help="queue maintenance")
-    p_queue.add_argument("action", choices=["tidy"])
+    p_queue = sub.add_parser("queue", help="queue branch creation / maintenance")
+    p_queue.add_argument("action", choices=["start", "tidy"])
     p_queue.add_argument("number", type=int)
-    p_queue.add_argument("--date", default=None, help="override the supersede date (YYYY-MM-DD)")
+    p_queue.add_argument("--specs", action="store_true",
+                         help="start: create the specs-queue branch instead")
+    p_queue.add_argument("--base", default=None,
+                         help="start: branch from this ref (default: main_branch)")
+    p_queue.add_argument("--dry-run", action="store_true",
+                         help="start: print what would be created, create nothing")
+    p_queue.add_argument("--date", default=None, help="tidy: override the supersede date (YYYY-MM-DD)")
     p_queue.set_defaults(func=cmd_queue)
+
+    p_ins = sub.add_parser("insights", help="list / tick / archive the insight inbox")
+    p_ins.add_argument("action", choices=["list", "tick", "archive"])
+    p_ins.add_argument("number", type=int, nargs="?", default=None,
+                       help="tick: the entry number from `insights list`")
+    p_ins.add_argument("--open", action="store_true", dest="open_only",
+                       help="list: only entries still untriaged")
+    p_ins.add_argument("--type", default=None,
+                       help="list: one of " + ", ".join(_INSIGHT_TYPES))
+    p_ins.add_argument("--trail", action="store_true",
+                       help="list: also print each entry's status trail")
+    p_ins.add_argument("--pointer", default=None,
+                       help="tick: where the claim landed (a doc, item, or issue)")
+    p_ins.add_argument("--before", default=None,
+                       help="archive: move entries closed before this date (YYYY-MM-DD)")
+    p_ins.add_argument("--date", default=None,
+                       help="tick: override the trail-line date (default: today)")
+    p_ins.add_argument("--yes", action="store_true",
+                       help="archive: actually move (default: dry run)")
+    p_ins.add_argument("--no-commit", action="store_true", help="edit only, do not git commit")
+    p_ins.set_defaults(func=cmd_insights)
 
     register_git_subcommands(sub)  # claim / merge / env (git layer)
     return parser
@@ -3269,6 +4530,8 @@ def register_git_subcommands(sub) -> None:
                          help="merge into this ref (default: what the claim "
                               "recorded, else main_branch)")
     p_merge.add_argument("--no-test", action="store_true", help="skip the post-merge test run")
+    p_merge.add_argument("--no-commit", action="store_true",
+                         help="do not commit the progress.md status the merge records")
     p_merge.set_defaults(func=cmd_merge)
 
     p_env = sub.add_parser("env", help="venv existence / import check + bootstrap")
@@ -3288,6 +4551,9 @@ def register_git_subcommands(sub) -> None:
     p_gc.add_argument("--base", default=None,
                       help="ref --merged is measured against (default: the "
                            "current branch's recorded base, else main_branch)")
+    p_gc.add_argument("--abandon", action="store_true",
+                      help="delete a ✅ item's branch even though its content "
+                           "is not in the base — for a genuinely abandoned claim")
     p_gc.add_argument("--yes", action="store_true", help="actually delete (default: dry run)")
     p_gc.set_defaults(func=cmd_gc)
 
@@ -3303,8 +4569,9 @@ def register_git_subcommands(sub) -> None:
     p_scope.add_argument("number", type=int, nargs="?", default=None,
                          help="item number (default: read from the current claim branch)")
     p_scope.add_argument("--base", default=None,
-                         help="base ref to diff against (default: origin/<main_branch>, "
-                              "falling back to the local ref)")
+                         help="base ref to diff against (default: the branch's "
+                              "recorded base, else <main_branch>; derived answers "
+                              "prefer origin/<base>, falling back to the local ref)")
     p_scope.set_defaults(func=cmd_scope)
 
 

@@ -820,6 +820,67 @@ def test_insight_entries_well_formed(tmp_path: Path):
     assert not any("insights.md" in w for w in warnings)
 
 
+def test_insight_status_trail_is_accepted(tmp_path: Path):
+    """An entry's claim is immutable; its status trail is appendable.
+
+    conventions.md §1 permits dated, indented lines under an entry recording
+    what happened to it *after* the first routing — a re-route, a resolution, a
+    premise that decayed. The claim itself is never rewritten, so a correction
+    has nowhere else to go. Pinned here because the rule is prose the checker
+    does not enforce: nothing else would notice if the accepted shape drifted.
+    """
+    root = _docs(tmp_path)
+    (root / "docs" / "aide" / "insights.md").write_text(
+        "# Insight Inbox\n\n"
+        "- [x] framework — aide merge misreports branch deletion. *(item 002, 2026-07-18)*\n"
+        "  - **2026-07-18** → aide-loop issue #50\n"
+        "  - **2026-08-02** → issue rewritten; the original framing overstated it\n"
+        "  - **2026-08-20** → resolved in engine 1.16.0\n"
+        "- [ ] defect — two of the three fences named here still stand. *(2026-08-12)*\n"
+        "  - **2026-08-20** → partly stale: the first was retired by item 117\n",
+        encoding="utf-8",
+    )
+    cfg = aide.load_config(root)
+    _, warnings = aide.run_checks(root, cfg, branches=[])
+    assert not any("insights.md" in w for w in warnings)
+
+
+def test_insight_trail_does_not_swallow_a_malformed_entry(tmp_path: Path):
+    """The guard on the guard: trail lines are skipped by indentation, so a
+    malformed entry must still warn when a well-formed trail sits above it."""
+    root = _docs(tmp_path)
+    (root / "docs" / "aide" / "insights.md").write_text(
+        "# Insight Inbox\n\n"
+        "- [x] knowledge — a real entry. *(2026-08-01)*\n"
+        "  - **2026-08-20** → CLAUDE.md\n"
+        "- [ ] misc — unknown type. *(2026-08-21)*\n",
+        encoding="utf-8",
+    )
+    cfg = aide.load_config(root)
+    _, warnings = aide.run_checks(root, cfg, branches=[])
+    assert sum("insights.md" in w for w in warnings) == 1
+
+
+def test_the_documented_trail_example_validates(tmp_path: Path):
+    """The example in `conventions.md` must be one the checker accepts.
+
+    A worked example that would warn if pasted is worse than none — it teaches
+    a shape the tool rejects. Reads the shipped conventions rather than a copy,
+    so the two cannot drift apart silently.
+    """
+    conventions = Path(__file__).resolve().parents[2] / "conventions.md"
+    blocks = [b for b in conventions.read_text(encoding="utf-8").split("```")
+              if "→ aide-loop issue" in b]
+    assert len(blocks) == 1, "expected exactly one status-trail example to check"
+
+    root = _docs(tmp_path)
+    (root / "docs" / "aide" / "insights.md").write_text(
+        "# Insight Inbox\n\n" + blocks[0].strip("\n") + "\n", encoding="utf-8")
+    cfg = aide.load_config(root)
+    _, warnings = aide.run_checks(root, cfg, branches=[])
+    assert not any("insights.md" in w for w in warnings), warnings
+
+
 def test_insight_malformed_entry_warns(tmp_path: Path):
     root = _docs(tmp_path)
     (root / "docs" / "aide" / "insights.md").write_text(

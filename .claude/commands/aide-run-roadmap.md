@@ -96,11 +96,19 @@ prepare the branch and handle push/PR around it.
   entries, run `/aide-feedback-loop` §0 (triage) before planning: `defect`/`gap`/
   `automation` entries become candidate items the queue-planner must see, and the
   queue PR is where the human reviews them.
-- `git switch -c aide/queue-NNN` off an up-to-date `main` (`git pull --rebase`).
+- **Create the queue branch with the CLI**, off an up-to-date `main`
+  (`git pull --rebase`): `python .aide/scripts/aide.py queue start NNN`. It
+  builds the name, records the base, and pushes it. Typing the name by hand
+  risks a shape `aide claim` does not recognise, which silently retargets
+  every item's merge at `main` instead of the queue branch.
 - **Spawn `queue-planner`**: "Generate queue NNN on branch `aide/queue-NNN`;
   tidy the previous queue; commit both; consider the triaged insight candidates;
   do not push or PR." Wait for its summary.
-- `git push -u origin aide/queue-NNN`, then open a **PR**:
+- `git push` the planner's commits — `queue start` pushed the branch when it
+  was empty and set its upstream, so a bare `git push` is enough and no
+  branch name is typed. Do this **before** `gh pr create`: with commits
+  unpushed it prompts for where to push, and a prompt stalls an unattended
+  run rather than failing loudly. Then open a **PR**:
   `gh pr create` titled `docs(aide): work queue NNN`, body summarising the batch.
 - **STOP and tell the user**: review/edit/merge the queue PR, then re-invoke
   `/aide-run-roadmap` (or `/aide-run-queue NNN`) to execute it. A queue PR is

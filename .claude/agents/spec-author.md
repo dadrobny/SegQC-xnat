@@ -107,7 +107,7 @@ in the **Assumptions** block (the builder/validator hand back if reality diverge
 - **Never resolve a human gate.** Raising one is in scope; approving or
   declining one is a person's call and never yours.
 - **Do NOT run `pytest`.** **Do NOT edit `progress.md`** (the builder sets 🚧, the
-  validator reconciles ✅ via the CLI) — with exactly one exception: adding a row
+  validator sets 🔍, and `aide merge` writes the ✅ — all via the CLI) — with exactly one exception: adding a row
   to its `## Human gates` table (step 5). Raising a blocker is safe; resolving
   one is never yours.
 - Edit only `docs/aide/items/NNN-*.md`, plus that one gate row.

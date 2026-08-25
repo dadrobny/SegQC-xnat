@@ -30,7 +30,7 @@ pin the session model, so `/model sonnet` first if you're on Opus.
 | 0 | **Author the item spec** | `spec-author` | **Opus** | writes `docs/aide/items/NNN-*.md` (Description, atomic AC, steps, testing strategy, deps, decisions), commits. **No code, no tests.** Skip only if the spec file already exists and is complete. |
 | 1 | **Write tests** for the item | `test-writer` | Sonnet | reads spec + AC + existing test style, writes tests for every AC + adversarial cases, commits. **No production code, no pytest.** |
 | 2 | **Implement** production code | `builder` | Sonnet (→ Opus on 3rd attempt) | checkout branch, implement `source_dir` per every AC, record decisions, set progress in-progress (`aide progress set NNN in-progress`), commit. **No tests, no pytest.** |
-| 3 | **Validate** + merge | `validator` | Sonnet | a **different** agent: runs pytest, checks AC coverage + scope + vision fit, then on PASS reconciles + merges via the CLI (`aide progress set NNN done`, `aide merge NNN`). **No new tests.** |
+| 3 | **Validate** + merge | `validator` | Sonnet | a **different** agent: runs pytest, checks AC coverage + scope + vision fit, then on PASS reconciles + merges via the CLI (`aide progress set NNN in-review`, `aide merge NNN` — `merge` writes the ✅ itself once the merge lands). **No new tests.** |
 
 **Spec authoring, testing, implementation, and validation are always separate
 agents.** No agent signs off its own work. Spawn a **new** instance of each per
@@ -79,10 +79,13 @@ prefer the right shape first time.
    > `docs/aide/vision.md` and the spec's Assumptions. **Do NOT write or modify
    > tests.**
    > PASS: reconcile + merge via the CLI —
-   > `python .aide/scripts/aide.py progress set NNN done` then
+   > `python .aide/scripts/aide.py progress set NNN in-review` then
    > `python .aide/scripts/aide.py merge NNN` (honours git.mode: direct-merge +
    > re-test + branch cleanup for auto-merge; push-and-stop for pr; local merge for
-   > local). FAIL: report which check failed and whether builder or test-writer
+   > local). **`in-review`, never `done`** — ✅ means merged and is written by
+   > `merge` itself, so under `pr` the item stays 🔍 until a human merges the PR;
+   > marking it done here is what once let the exhaustion sweep target an open
+   > PR's head branch. FAIL: report which check failed and whether builder or test-writer
    > must fix it. Do not merge.
 
 5. **Build/test ↔ validate cycle (orchestrator).** Read the verdict:

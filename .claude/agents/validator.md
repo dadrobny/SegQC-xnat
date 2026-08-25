@@ -116,11 +116,21 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
   test-writer for coverage). Do **not** merge.
 
 - **PASS** only when every check holds. Then, in order:
-  1. **Reconcile `progress.md` via the CLI** — it flips the item's row to done,
-     rolls up the stage/objective status, and commits, all deterministically:
+  1. **Reconcile `progress.md` via the CLI** — it flips the item's row to 🔍
+     (in review), rolls up the stage/objective status, and commits, all
+     deterministically:
      ```
-     python .aide/scripts/aide.py progress set NNN done
+     python .aide/scripts/aide.py progress set NNN in-review
      ```
+     **`in-review`, not `done`, whatever `git.mode` is** — you have validated
+     the work, not landed it, and step 3 is what lands it. ✅ is written by
+     `aide merge` itself when the merge actually happens, so it always means
+     "merged": under `auto-merge` that is moments later; under `pr` the item
+     stays 🔍 until a human merges the PR. Marking it done here would make the
+     status mean different things in different modes, and the queue-exhaustion
+     sweep (`aide gc`, whose ground is "the item is ✅") would then offer to
+     delete the head branch of an open PR.
+
      It deliberately does **not** touch acceptance checkboxes — see step 2.
   2. **Attest any acceptance criterion you actually verified.** An Acceptance
      box is a claim that an observable check holds, so it is ticked only by the
@@ -141,6 +151,12 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
      ```
      python .aide/scripts/aide.py merge NNN
      ```
+     Under `auto-merge`/`local` it records the item as ✅ once the merge lands.
+     Under `pr` it pushes and stops, leaving the item 🔍 and the merge to the
+     human review gate — **report that the item is awaiting review**, and do not
+     mark it done yourself. `aide sync`/`aide status` will point at the
+     `progress set NNN done` once the PR has landed.
+
      Read the base it reports back. It is `main_branch` unless the item was
      claimed from a queue branch; if it is not what the run intends, hand back
      rather than passing `--base` on your own initiative — a wrong merge target

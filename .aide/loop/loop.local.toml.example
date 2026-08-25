@@ -62,7 +62,11 @@ command = ""
 # framework-update workflow (CLAUDE.md > "Updating the framework"). Declaring
 # it here — not in the shared, committed aide.toml — gives the Claude
 # adapter's command-hygiene guard a narrow `git -C <local_path>` carve-out
-# without putting a machine-specific filesystem path in a committed file.
+# without putting a machine-specific filesystem path in a committed file. It
+# also lets a session editing the framework clone pick up that repo's own
+# instructions, which are otherwise never loaded (conventions.md §8) — the
+# case this bites hardest, since the update workflow edits the framework from
+# a consumer's checkout by design.
 # Empty/absent = the workflow's `git -C` step stays blocked (the default,
 # safe posture for anyone not actively developing the framework).
 local_path = ""
@@ -76,12 +80,18 @@ local_path = ""
 # the repo and write into it but never `add`/`commit`, leaving the work
 # uncommitted for a human to finish by hand.
 #
-# Named for its only consumer — this guard. Listing a path here RELAXES ONE
+# Named for its first consumer, the guard. Listing a path here RELAXES ONE
 # LINT AND GRANTS NO PERMISSION: the command still has to match the
 # allow-list to auto-approve, and `git -C …` matches none of the
 # `Bash(git <subcommand>:*)` rules, so it prompts. That is intended — the
 # guard exists to stop shapes that would stall an unattended run, not to be a
 # trust boundary.
+#
+# A declared repo is ALSO where a runtime reads that repo's own instruction
+# file from, the first time a session touches a path inside it (conventions.md
+# §8): a runtime loads instruction files for the working directory's repo
+# only, so a sibling's rules are otherwise never in context. Declaring a repo
+# here is what makes both work.
 #
 # Two different repos in ONE command stay blocked even when both are listed:
 # history read from one repo and applied to another's working tree is a shape

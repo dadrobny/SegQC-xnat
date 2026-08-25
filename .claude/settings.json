@@ -125,6 +125,15 @@
             "command": "sh -c 'for py in python3 python; do command -v \"$py\" >/dev/null 2>&1 || continue; \"$py\" -c \"\" >/dev/null 2>&1 || continue; exec \"$py\" \"$@\"; done; exit 0' _ .claude/hooks/log_permission_event.py"
           }
         ]
+      },
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'for py in python3 python; do command -v \"$py\" >/dev/null 2>&1 || continue; \"$py\" -c \"\" >/dev/null 2>&1 || continue; exec \"$py\" \"$@\"; done; exit 0' _ .claude/hooks/sibling_instructions.py"
+          }
+        ]
       }
     ],
     "PostToolUse": [
