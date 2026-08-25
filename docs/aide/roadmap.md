@@ -1162,8 +1162,25 @@ changes on the corpus except where a retune is explicitly authorised.
   detection, under a name and docstring reading "item 098's state", so a legitimate future
   regeneration fires an assertion that looks like an accidental scope violation rather than
   an integrity check. The fix is to move it to a properly-named artifact-integrity test
-  beside `reference/artifact.py`, not to delete it. *(insights.md 2026-08-12 and 2026-08-15,
-  items 116 and 115)*
+  beside `reference/artifact.py`, not to delete it — which is not this repo's own judgement
+  call but the framework's documented disposition: `.aide/conventions.md` §1 already
+  distinguishes a *diff-time scope claim* ("item N did not touch X"), which belongs under
+  **Asserts against** and should retire with its item, from an *artifact-integrity
+  invariant* ("this released artifact must never change silently"), which is legitimate and
+  durable "but then it belongs in a test named for the artifact, living beside it, not
+  inside an unrelated item's regression module under a `_PRE_NNN_` name."
+
+  **The `.gitattributes` pin must be carried across deliberately.** Engine 1.19.0 added a
+  lint that warns when a byte-exact comparison's fixture is not pinned `eol=lf`, and it
+  reports nothing for this test — but not because it checked it. The lint resolves a fixture
+  path through the AST from `Path(__file__)` joined with string literals, and this test gets
+  its path from `bundled_production_reference_path()`, a function call, which resolves to
+  nothing and is skipped in silence. The file is covered only by an unrelated explicit glob
+  (`src/segfacet/reference/reference_verse_*.json text eol=lf`) that predates the lint. A
+  relocated test written the natural way — through the same helper — will be equally
+  invisible to it, so the remediation must keep the pin by hand and must not read a green
+  `aide check` as evidence of coverage. *(insights.md 2026-08-12 and 2026-08-15, items 116
+  and 115; lint blind spot confirmed 2026-08-25)*
 - **A comment header names a fence that is not one.**
   `tests/test_102_stage18_validation.py` carries `# AC24: the scope fence -- no production
   code changed by this item` directly above `_SRC_TREE_HASH_AT_COLLECTION`, which hashes the
@@ -1187,4 +1204,19 @@ changes on the corpus except where a retune is explicitly authorised.
   and the real answer for the queue-PR model); or add `workflow_dispatch` as a manual
   stopgap. The framework half is answered — engine 1.18.1's `conventions.md` §4 now states
   per mode what CI gate is possible — leaving this half project-owned and open.
-  *(insights.md 2026-08-20, item 117)*
+
+  **Engine 1.20.0 changed the cost comparison between those three options**, in favour of
+  switching `[git] mode` to `pr`. That route previously carried a branch-deleting footgun
+  independent of the CI question, and 1.20.0 removed both halves of it: `✅` used to mean
+  "merged" under `auto-merge` but only "pushed and awaiting review" under `pr`, and `aide
+  gc`'s `✅` ground deleted a branch locally *and* on the remote without asking git whether
+  the work had landed — so under `pr` the queue-exhaustion sweep offered to delete the head
+  branch of an open PR, with the approval line reading like confirmation. `✅` now means
+  merged in every mode, written by `aide merge` when the merge happens, with `🔍 In Review`
+  as the state between; and `gc` now asks `git merge-tree` whether merging the branch would
+  change its base, skipping any `✅` item whose branch still carries unlanded content. So
+  option (a) — switch to `pr`, which makes the existing job work as designed with no
+  workflow changes at all — is now a straight trade of one human PR-open per item against
+  an independent second-platform scope signal, with none of the collateral risk it used to
+  carry. *(insights.md 2026-08-20, item 117; re-assessed against engine 1.20.0 on
+  2026-08-25)*
