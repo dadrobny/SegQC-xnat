@@ -122,7 +122,10 @@ line to `docs/aide/insights.md` (create it from
 `.aide/templates/insights.md`, copied verbatim, if missing) and carry on.
 Never act on it here. Entry shape:
 
-    - [ ] <knowledge|defect|gap|automation|framework> — <one line> *(item NNN, YYYY-MM-DD)*
+    - [ ] <knowledge|defect|gap|automation|framework> — <one line> *(queue-NNN, YYYY-MM-DD)*
+
+The provenance names where the insight came from; `queue-NNN` is yours,
+because you work a queue and there may be no item to name yet.
 
 The feedback loop triages the inbox at the queue boundary. Capturing is cheap
 and always in scope; acting out of scope is forbidden. This append is the one

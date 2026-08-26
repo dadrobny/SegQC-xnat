@@ -381,10 +381,26 @@ of scope. Any role, at any time, appends **one line** and returns to its task:
 
 with `<type>` one of **knowledge** (document it), **defect** (fix it), **gap**
 (plan it), **automation** (a recurring manual/agent action deterministic code
-could replace — script it), **framework** (belongs to AIDE itself). The item
-ref is optional for roles outside an item. `aide check` shape-checks entries
-(warning, never error — capture must stay cheap). Template:
+could replace — script it), **framework** (belongs to AIDE itself). Template:
 `.aide/templates/insights.md` (copy verbatim).
+
+**Name where it came from, in whatever form is honest.** The provenance before
+the date is free-form and optional — write `item NNN` from inside an item,
+`queue-NNN` for planning or spec-authoring done before any item exists,
+`items NNN-NNN` for a finding that genuinely spans several, or omit it entirely
+from a role outside the loop. Those first three are the conventional spellings
+and worth following so a reader can scan them, but they are not a grammar the
+CLI enforces: **the ISO date is the only part that is load-bearing**, since
+`archive` cuts on it. Never bend a provenance to fit a shape — collapsing
+`items 099-101` to `item 099` is a rewording the immutability rule below
+forbids, and it destroys the very thing the marker records.
+
+`aide check` shape-checks entries (warning, never error — capture must stay
+cheap). It is deliberately loose about the provenance and strict about the
+date, for the reason immutability makes sharp: a warning on a captured line can
+never be cleared, so a check that rejects an honest capture produces permanent
+noise, and permanent noise is what teaches a reader to skim the one run where a
+warning was real.
 
 **Capture is a plain append; everything after it has a verb.** Reading and
 triaging the file by hand is what made triage expensive enough to defer:
@@ -400,7 +416,9 @@ history around it; `tick` performs the one in-place edit below, or appends a
 dated trail line when the entry is already ticked; `archive` moves **closed**
 entries older than a date into `insights/archive-YYYY-QN.md`, each moved entry
 and its trail carried across line for line, and says so — an archive renumbers
-what remains, so re-run `list` after one.
+what remains, so re-run `list` after one. A closed entry whose line is too
+malformed to yield a date can be moved by no cut at all; `archive` names each
+one it had to leave behind rather than dropping it silently.
 Archived entries are frozen and no longer shape-checked, since the immutability
 rule leaves no way to act on a warning about one.
 

@@ -1036,10 +1036,44 @@ def template_residue_errors(ddir: Path) -> List[str]:
 
 
 _INSIGHT_TYPES = ("knowledge", "defect", "gap", "automation", "framework")
-# "- [ ] <type> — <one line> *(item NNN, YYYY-MM-DD)*"; the item ref is optional
-# and ticked entries append " → <where it landed>" after the provenance.
+#: What may stand between ``*(`` and the date: anything but a close-paren or a
+#: line break, or nothing at all.
+#:
+#: Deliberately a slug and not a grammar. Only the **date** is load-bearing —
+#: ``archive`` cuts on it and ``list`` prints it; nothing routes on the item
+#: number — while the frame around the provenance already pins the checkbox, a
+#: known type, the dash, a non-empty claim and an ISO date. A provenance that
+#: fails an enumerated shape inside that frame names no defect anyone can act
+#: on.
+#:
+#: Enumerating the accepted forms means predicting what an author will write,
+#: and the cost of predicting wrong is not the usual one: conventions.md §1
+#: makes the captured line immutable, so a rejected provenance is a warning
+#: that can never be cleared, on an entry ``archive`` then declines to move
+#: (see ``archive_insight_text``). Until 1.21.0 the shape was ``item NNN``
+#: alone, which rejected two provenances the loop produces routinely —
+#: ``queue-NNN`` for planning done before any item exists, and
+#: ``items NNN-NNN`` for a finding that genuinely spans several. Both were
+#: unfixable in place, since collapsing a range to one item is a rewording
+#: *and* destroys the provenance the marker exists to record.
+#:
+#: Canonical forms are still documented (conventions.md §1, and the template's
+#: header) so captures converge — guidance, which the reader can follow, rather
+#: than enforcement, which the immutability rule makes permanent.
+#:
+#: It must still end in a non-blank character, so a stray comma — ``*(   ,
+#: 2026-01-01)*`` — is a shape warning rather than a silently accepted
+#: provenance that says nothing. Free-form is not the same as empty.
+_INSIGHT_SOURCE = r"[^)\n]*[^\s)\n]"
+#: A provenance naming exactly one item — the only form that yields an item
+#: *number*. A range, a queue, or anything else leaves ``item`` ``None``, as a
+#: bare date always has.
+_INSIGHT_ONE_ITEM_RE = re.compile(r"^[Ii]tems? (\d+)$")
+# "- [ ] <type> — <one line> *(item NNN, YYYY-MM-DD)*"; the provenance is
+# free-form and optional, and ticked entries append " → <where it landed>".
 _INSIGHT_RE = re.compile(
-    r"^- \[[ xX]\] (?:" + "|".join(_INSIGHT_TYPES) + r") [—–-] .+\*\((?:[Ii]tem \d+, )?\d{4}-\d{2}-\d{2}\)\*"
+    r"^- \[[ xX]\] (?:" + "|".join(_INSIGHT_TYPES) + r") [—–-] .+"
+    r"\*\((?:" + _INSIGHT_SOURCE + r", )?\d{4}-\d{2}-\d{2}\)\*"
 )
 
 
@@ -1068,7 +1102,8 @@ def insight_warnings(ddir: Path) -> List[str]:
             out.append(
                 f"insights.md:{lineno}: entry does not match "
                 f"'- [ ] <{'|'.join(_INSIGHT_TYPES)}> — <one line> "
-                f"*(item NNN, YYYY-MM-DD)*'"
+                f"*(<where it came from>, YYYY-MM-DD)*' — the provenance is "
+                f"free-form and may be omitted; the ISO date may not"
             )
     return out
 
@@ -1077,17 +1112,36 @@ def insight_warnings(ddir: Path) -> List[str]:
 #: provenance, and the optional " → <where it landed>" pointer a tick appends.
 #: ``text`` is non-greedy up to the provenance so a claim may itself contain
 #: parentheses; ``tail`` is whatever follows it, which is the pointer or "".
-_INSIGHT_FULL_RE = re.compile(
+#: The pointer separator, written by `tick` and by hand before it existed.
+_INSIGHT_POINTER = " → "
+#: ``source`` is the provenance verbatim (``None`` for a bare date), because a
+#: listing that re-derives it from an item number can print nothing else back.
+_INSIGHT_ENTRY_HEAD = (
     r"^- \[(?P<mark>[ xX])\] (?P<type>" + "|".join(_INSIGHT_TYPES) + r") [—–-] "
-    r"(?P<text>.+?)\*\((?:[Ii]tem (?P<item>\d+), )?(?P<date>\d{4}-\d{2}-\d{2})\)\*"
-    r"(?P<tail>.*)$"
+    r"(?P<text>.+?)\*\((?:(?P<source>" + _INSIGHT_SOURCE + r"), )?"
+    r"(?P<date>\d{4}-\d{2}-\d{2})\)\*"
 )
+#: Which marker is the provenance, when a line carries more than one.
+#:
+#: ``text`` is non-greedy, so it stops at the *first* ``*(…, date)*`` — and a
+#: free-form provenance means an aside inside the claim can wear that shape:
+#: ``… default is *(prod, 2020-01-01)* not *(item 099, 2026-07-26)*`` would take
+#: the aside's date and file the entry in the wrong archive quarter, silently,
+#: since the line still parses. Greedy is not the answer either — it takes the
+#: *last* marker, which a pointer may equally carry (``→ see *(note, …)*``).
+#:
+#: So neither position decides it: the provenance is the marker that leaves a
+#: **well-formed tail** — nothing, or the ``→`` pointer `tick` writes. That is
+#: the strict pattern, and it resolves both cases above. A tail matching
+#: neither is a hand-written entry predating `tick` (``*(…)* — landed in X``);
+#: the loose pattern accepts it exactly as before, so widening the provenance
+#: costs no entry its parse.
+_INSIGHT_FULL_RE = re.compile(_INSIGHT_ENTRY_HEAD + r"(?P<tail>\s*(?:→.*)?)$")
+_INSIGHT_FULL_LOOSE_RE = re.compile(_INSIGHT_ENTRY_HEAD + r"(?P<tail>.*)$")
 #: A status-trail line: indented under its entry, newest last (conventions.md
 #: §1). Indentation is what distinguishes it from the next entry, so this must
 #: require leading whitespace where the entry pattern forbids it.
 _INSIGHT_TRAIL_RE = re.compile(r"^\s+[-*]\s")
-#: The pointer separator, written by `tick` and by hand before it existed.
-_INSIGHT_POINTER = " → "
 #: An ISO date, validated rather than trusted: `archive --before` compares it
 #: lexicographically against every entry's date, which is only equivalent to
 #: comparing dates while both sides are known to be YYYY-MM-DD.
@@ -1119,7 +1173,8 @@ class InsightEntry(NamedTuple):
     type: Optional[str]         # None when the line does not parse
     text: str                   # the claim, without provenance or pointer
     date: Optional[str]
-    item: Optional[int]
+    source: Optional[str]       # the provenance verbatim; None for a bare date
+    item: Optional[int]         # only when `source` names exactly one item
     pointer: Optional[str]      # what follows " → ", when ticked in place
     trail: List[str]            # raw status-trail lines, in file order
     end_lineno: int             # 1-based, of the entry's last trail line
@@ -1142,23 +1197,25 @@ def parse_insights(text: str) -> List[InsightEntry]:
                 entries[-1].trail.append(line)
                 entries[-1] = entries[-1]._replace(end_lineno=lineno)
             continue
-        m = _INSIGHT_FULL_RE.match(line)
+        m = _INSIGHT_FULL_RE.match(line) or _INSIGHT_FULL_LOOSE_RE.match(line)
         if m is None:
             entries.append(InsightEntry(
                 ordinal=len(entries) + 1, lineno=lineno, raw=line,
                 ticked=line.startswith("- [x]") or line.startswith("- [X]"),
-                type=None, text=line[2:].strip(), date=None, item=None,
-                pointer=None, trail=[], end_lineno=lineno))
+                type=None, text=line[2:].strip(), date=None, source=None,
+                item=None, pointer=None, trail=[], end_lineno=lineno))
             continue
         tail = m.group("tail")
         pointer = (tail.split(_INSIGHT_POINTER, 1)[1].strip()
                    if _INSIGHT_POINTER in tail else None)
+        source = m.group("source")
+        one_item = _INSIGHT_ONE_ITEM_RE.match(source) if source else None
         entries.append(InsightEntry(
             ordinal=len(entries) + 1, lineno=lineno, raw=line,
             ticked=m.group("mark") in ("x", "X"),
             type=m.group("type"), text=m.group("text").strip(),
-            date=m.group("date"),
-            item=int(m.group("item")) if m.group("item") else None,
+            date=m.group("date"), source=source,
+            item=int(one_item.group(1)) if one_item else None,
             pointer=pointer, trail=[], end_lineno=lineno))
     return entries
 
@@ -1237,11 +1294,21 @@ def insight_quarter(date: str) -> str:
     return f"{year}-Q{(month - 1) // 3 + 1}"
 
 
-def archive_insight_text(text: str, before: str) -> Tuple[str, Dict[str, List[str]]]:
+def archive_insight_text(
+    text: str, before: str,
+) -> Tuple[str, Dict[str, List[str]], List[InsightEntry]]:
     """Split closed entries dated before *before* out of the live file.
 
-    Returns ``(remaining_text, {quarter: [lines]})``. **Only ticked entries
-    move**: an open entry is the live working set whatever its date, and
+    Returns ``(remaining_text, {quarter: [lines]}, undatable)``, where
+    ``undatable`` holds the **closed entries this pass could not date** and so
+    could not consider. An entry too malformed to yield a date is excluded from
+    every ``--before`` cut however old and however closed it is, and reporting
+    it here is what keeps that from being silent: the same pass that declines
+    to move it says which lines they were, so the operator can fix a shape
+    instead of wondering why the live file will not shrink. It is returned
+    rather than logged because this helper is pure — the caller prints.
+
+    **Only ticked entries move**: an open entry is the live working set whatever its date, and
     archiving one would hide exactly the backlog this verb exists to surface.
     An entry travels with its whole status trail, so the archive stays readable
     on its own.
@@ -1255,6 +1322,8 @@ def archive_insight_text(text: str, before: str) -> Tuple[str, Dict[str, List[st
     entries = parse_insights(text)
     moving = {e.ordinal for e in entries
               if e.ticked and e.date is not None and e.date < before}
+    # Closed, so it was a candidate; undated, so no cut can ever reach it.
+    undatable = [e for e in entries if e.ticked and e.date is None]
     moved: Dict[str, List[str]] = {}
     drop: set = set()
     for e in entries:
@@ -1264,7 +1333,7 @@ def archive_insight_text(text: str, before: str) -> Tuple[str, Dict[str, List[st
         moved.setdefault(insight_quarter(e.date), []).extend(block)
         drop.update(range(e.lineno - 1, e.end_lineno))
     kept = [ln for i, ln in enumerate(lines) if i not in drop]
-    return _collapse_blank_runs(kept, text.endswith("\n")), moved
+    return _collapse_blank_runs(kept, text.endswith("\n")), moved, undatable
 
 
 def _collapse_blank_runs(lines: List[str], trailing_newline: bool) -> str:
@@ -2860,10 +2929,11 @@ def _cmd_insights_list(entries: List[InsightEntry], args: argparse.Namespace) ->
             # dressing it in fields this listing only guessed at.
             print(f"  {e.ordinal:>3}. ?? {e.raw}")
             continue
-        # The provenance is reprinted whole, item reference included: "which
-        # item captured this" is half of what triage routes on, and a listing
-        # that drops it sends the reader back to the file it exists to replace.
-        prov = f" *({f'item {e.item:03d}, ' if e.item is not None else ''}{e.date})*" if e.date else ""
+        # The provenance is reprinted whole and verbatim: "where did this come
+        # from" is half of what triage routes on, and a listing that drops it —
+        # or re-derives it from the item number, which can only print back the
+        # single-item form — sends the reader to the file it exists to replace.
+        prov = f" *({e.source + ', ' if e.source else ''}{e.date})*" if e.date else ""
         mark = "x" if e.ticked else " "
         print(f"  {e.ordinal:>3}. [{mark}] {e.type:<10} — {e.text}{prov}"
               f"{_INSIGHT_POINTER + e.pointer if e.pointer else ''}")
@@ -2912,7 +2982,18 @@ def _cmd_insights_archive(path: Path, text: str, ddir: Path, ddir_rel: str,
     if not _DATE_RE.match(args.before or ""):
         print("usage: aide insights archive --before YYYY-MM-DD", file=sys.stderr)
         return 2
-    remaining, moved = archive_insight_text(text, args.before)
+    remaining, moved, undatable = archive_insight_text(text, args.before)
+    # Before the early return: an operator whose file will not shrink needs
+    # this most in the run where nothing moved at all.
+    for e in undatable:
+        print(f"aide insights archive: entry {e.ordinal} "
+              f"(insights.md:{e.lineno}) is closed but carries no readable "
+              f"date, so no --before cut can move it: {e.raw!r}", file=sys.stderr)
+    if undatable:
+        print(f"aide insights archive: {len(undatable)} closed entr"
+              f"{'y' if len(undatable) == 1 else 'ies'} could not be dated and "
+              f"stay in the live file; `aide check` names the shape rule",
+              file=sys.stderr)
     if not moved:
         print(f"aide insights: nothing closed before {args.before} to archive")
         return 0
