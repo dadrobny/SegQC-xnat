@@ -362,7 +362,7 @@ recorded in Stage 12's goal. Real VerSe grounding arrived with Stages 12/13.)*
 
 ---
 
-## Stage 7 — Evaluation, Calibration & Metrics (G3, G7) — ✅ *(Phase 1 complete)* — ✅
+## Stage 7 — Evaluation, Calibration & Metrics (G3, G7) *(Phase 1 complete)* — ✅
 
 **Goal.** Quantify performance and calibrate thresholds against VerSe GT,
 TotalSegmentator output, and the synthetic corpus.
@@ -481,7 +481,7 @@ Stage 15.)*
 
 ---
 
-## Stage 11 — Extensibility & Abnormality Classification Arm (G8) — ⏸️ Deferred — 📋
+## Stage 11 — Extensibility & Abnormality Classification Arm (G8) — Deferred — ⏸️
 
 > **Deferred 2026-07-17** (explicit user instruction): prioritise the Phase-3
 > real-data validation arm (Stages 14+) ahead of the deferred G8 extensibility
@@ -660,7 +660,7 @@ held-out FPR/sensitivity are re-measured against the bar.
 
 ---
 
-## Stage 15 — Real-XNAT Deployment Validation (G5) — ❌ Excluded — 📋
+## Stage 15 — Real-XNAT Deployment Validation (G5) — Excluded — ❌
 
 > **❌ Excluded (2026-07-25). Reason:** deployment left this project's scope in the
 > [`vision.md`](vision.md) §0 supersession — FACET is a library and CLI, not a deployed
