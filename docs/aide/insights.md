@@ -8,7 +8,17 @@
   is cheap and always allowed; ACTING on it out of scope is forbidden.
 
   Entry shape (checked by `aide check`, non-blocking):
-    - [ ] <type> — <one line> *(item NNN, YYYY-MM-DD)*     (item ref optional)
+    - [ ] <type> — <one line> *(<where it came from>, YYYY-MM-DD)*
+
+  The date is required; the provenance before it is free-form and may be
+  omitted. Conventional spellings, worth following so a reader can scan them:
+    *(item 099, 2026-07-26)*        captured while working one item
+    *(items 099-101, 2026-07-27)*   a finding that spans several
+    *(queue-014, 2026-07-26)*       queue planning or spec-authoring, before
+                                    any item exists
+    *(2026-07-26)*                  no item or queue to name
+  Write whichever is honest — never bend one to fit, since the line below is
+  immutable and a squeezed provenance can never be corrected.
   Types:
     knowledge  — true fact worth documenting (docs, CLAUDE.md, conventions)
     defect     — something is wrong and needs a fix item
@@ -18,11 +28,21 @@
     framework  — belongs to AIDE itself, not this project; triage hands it
                  over to the framework repo ([framework] repo in aide.toml)
 
-  Triage happens at the queue boundary (feedback loop): each entry is routed
-  to its destination, then ticked in place with a pointer:
+  Triage routes each entry to its destination, then ticks it in place with a
+  pointer:
     - [x] <type> — <one line> *(item NNN, YYYY-MM-DD)* → <where it landed>
+  Triage happens at the queue boundary (feedback loop) for every type that
+  lands in this project; a `framework` entry leaves for another repo's issue
+  tracker and may be triaged on capture or on demand.
 
-  Append-only: never rewrite, reorder, or delete existing lines.
+  The captured claim is IMMUTABLE — never reworded, reordered or deleted, not
+  even when it turns out to be wrong (the wrongness is the record). Ticking the
+  checkbox is the one in-place edit. Everything that happens to an entry AFTER
+  triage goes in an appendable status trail: dated lines, indented under the
+  entry, newest last.
+    - [x] framework — <the original claim, never touched> *(2026-08-20)*
+      - **2026-08-20** → aide-loop issue #50
+      - **2026-10-11** → resolved in engine 1.16.0
 -->
 # Insight Inbox
 
@@ -75,5 +95,5 @@ _Entries below, newest last._
 - [x] defect — `tests/test_114_documentation_corrections.py`'s AC8 baseline pins `aide check` warnings by **location** (`progress.md:365`, `insights.md:31`, …), and a location is the one part of a warning the loop's own verbs keep changing. It has now been re-pinned three times, twice on 2026-08-25 alone: the `## Human gates` table (engine 1.13.0) pushed `progress.md`'s three down by 24, the `| 🔍 | In Review |` legend row (engine 1.20.0) by one more, and `aide insights archive --before 2026-08-01` moved `insights.md`'s three from 51/58/60 to 31/32/33. **Every one was the same warning about the same document line**, and every one presented as a red test that reads like a regression until you diff the numbers. The failure mode is worse than the churn: a re-pin is a mechanical edit under time pressure, and the honest way to make it is to check each moved warning is the one you think it is — which nothing enforces, so a genuinely new warning arriving in the same run as a shift would be re-pinned straight into the baseline. The fix is to pin the warning's **text** and let its location float; the text is what AC8 actually cares about ("no new warning beyond the baseline") and it is stable across all three shifts, while still failing on a real new finding. `aide check` reports as `path:lineno: text`, so the split is a one-line change to `_LOCATION_WARNING_RE`'s use, not a redesign *(2026-08-25)* → routed to `roadmap.md`'s "Carried defects" section 2026-08-25, as a fourth entry: pin the warning text rather than its location. The immediate shift was repaired in place (51/58/60 → 31/32/33) so the suite is green, and the module's audit comment now records all three re-pins and why the design, not the numbers, is the defect
   - **2026-08-25** → **2026-08-25** → fixed, not carried: the roadmap entry this pointed at is removed. AC8 now keys its baseline on `(path, text)` with a count, dropping the line number — proven both ways rather than argued: a +2 line shift inserted into `progress.md` moved all three warnings (365→367 etc.) and AC8 passed, and a fourth malformed `insights.md` entry — byte-identical in text to three already tolerated — failed it, naming the excess. Three new tests pin the properties: the key discards only the line number, the count catches one more of an identical warning, and the three exclusion categories still apply
 
-- [ ] framework — `aide check`'s insight-entry lint accepts only a single `*(item NNN, YYYY-MM-DD)*` reference, so three entries in `docs/aide/insights.md` warn permanently and cannot be cleared from this side. Lines 31–33 are flagged solely for their reference form: `*(queue-014, 2026-07-26)*` names a queue rather than an item, and `*(items 099-101, 2026-07-27)*` (twice) names an item *range*. Both are more accurate than any single item number would be — the first claim was learned while planning a queue, the second spans three items that produced it jointly — and a captured claim is immutable under `conventions.md` §1, so rewording them to satisfy the pattern is forbidden and archiving them would only relocate the warning. Net effect is three permanent warnings in every `aide check` run, which is precisely the "a real stale claim is that much easier to miss among them" failure mode the queue-branch entry above (resolved in engine 1.5.0) described for a different lint. Fix belongs in the framework's entry pattern: accept `queue-NNN` and `items NNN-NNN` alongside `item NNN`, all three still optional *(2026-08-26)*
+- [x] framework — `aide check`'s insight-entry lint accepts only a single `*(item NNN, YYYY-MM-DD)*` reference, so three entries in `docs/aide/insights.md` warn permanently and cannot be cleared from this side. Lines 31–33 are flagged solely for their reference form: `*(queue-014, 2026-07-26)*` names a queue rather than an item, and `*(items 099-101, 2026-07-27)*` (twice) names an item *range*. Both are more accurate than any single item number would be — the first claim was learned while planning a queue, the second spans three items that produced it jointly — and a captured claim is immutable under `conventions.md` §1, so rewording them to satisfy the pattern is forbidden and archiving them would only relocate the warning. Net effect is three permanent warnings in every `aide check` run, which is precisely the "a real stale claim is that much easier to miss among them" failure mode the queue-branch entry above (resolved in engine 1.5.0) described for a different lint. Fix belongs in the framework's entry pattern: accept `queue-NNN` and `items NNN-NNN` alongside `item NNN`, all three still optional *(2026-08-26)* → resolved: aide-loop PR #77, engine 1.21.0 (installed here 2026-08-26) — an insight's provenance is now free-form and only the ISO date is load-bearing, so `queue-NNN` and `items NNN-NNN` parse. Both symptoms are closed: the three warnings are gone from `aide check`, and `archive --before` now dates all three entries (40 of 43 closed entries moved before, 43 after). The engine also reports closed-but-undatable entries rather than skipping them silently
   - **2026-08-26** — the same root cause has a second, worse symptom: these three entries can never be archived either, so they are stuck in the live inbox permanently. `archive_insight_text` (`.aide/scripts/aide.py:1256`) selects on `e.ticked and e.date is not None and e.date < before`, and the unparseable trailer that trips the lint also yields `date = None` — so the archiver skips exactly the entries whose warnings archiving would otherwise clear. Measured today: `aide insights archive --before 2026-08-26` moves 40 of 43 closed entries and leaves precisely these three behind. That rules out archiving as a workaround and makes the parser fix the only route. Note `insight_warnings` (`:1052`) already exempts archived entries by design, reasoning that a warning on a frozen claim names a defect no one may fix — the same reasoning applies to a live claim that is frozen by the immutability rule
