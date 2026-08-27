@@ -74,6 +74,18 @@ from segfacet.synth.golden import GOLDEN_DIR, check_case_golden, load_golden, wr
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
+# Pre-119 sha256 digests (pipeline.py bytes; the catalogue's sorted leaf-path
+# set), captured by the test-writer while those artifacts were still in their
+# pre-119 state. Held in an external fixture rather than as string literals
+# in this file's own source, per test_115's AC8 discriminator: a digest
+# compared against a value pulled from a committed JSON snapshot is an
+# "external" comparison, not a hardcoded-literal "fence" -- see
+# tests/test_094_tptbox_image_layer.py's data_sha256 lookup for the same
+# pattern.
+_PRE_119_DIGESTS = json.loads(
+    (_REPO_ROOT / "tests" / "corpus" / "119_pre_119_digests.json").read_text(encoding="utf-8")
+)
+
 
 # =========================================================================== #
 # Helpers (mirrors tests/test_017_centroid_spline_fit.py's fixture style)
@@ -699,15 +711,10 @@ def test_ac21_no_regenerated_golden_offset_reaches_2mm():
 # =========================================================================== #
 
 
-# sha256 of src/segfacet/pipeline.py as committed before item 119 -- captured
-# by the test-writer while the file was still in its pre-119 state.
-_PRE_119_PIPELINE_SHA256 = "e701164a4a0daea8ccddb78047354c0493ed4611fc049276c8540e876897883d"
-
-
 def test_ac22_pipeline_is_byte_identical_to_pre_119():
     pipeline_path = _REPO_ROOT / "src" / "segfacet" / "pipeline.py"
     digest = hashlib.sha256(pipeline_path.read_bytes()).hexdigest()
-    assert digest == _PRE_119_PIPELINE_SHA256, (
+    assert digest == _PRE_119_DIGESTS["pipeline_sha256"], (
         "src/segfacet/pipeline.py changed -- leave-one-out promotion is item 120's, "
         "not item 119's"
     )
@@ -844,12 +851,11 @@ def test_ac26_orientation_curvature_note_no_longer_names_splev():
 # =========================================================================== #
 
 
-# sha256 of the sorted set of leaf `path` values in the committed
-# docs/aide/feature_catalogue.generated.json as captured pre-119 (this item
-# adds and removes no feature path -- only prose changes).
-_PRE_119_CATALOGUE_LEAF_PATH_SET_SHA256 = (
-    "101f268f409895b8e2830ae68e9f55da81cdb57557f5cd7ce640dc11bf7419ae"
-)
+# The committed docs/aide/feature_catalogue.generated.json's sorted set of
+# leaf `path` values is unchanged pre-119 (this item adds and removes no
+# feature path -- only prose changes); pinned via a sha256 in
+# _PRE_119_DIGESTS, captured while the catalogue was still in its pre-119
+# state.
 
 
 def test_ac27_catalogue_regeneration_matches_committed_artifacts(tmp_path):
@@ -876,7 +882,7 @@ def test_ac27_catalogue_leaf_path_set_unchanged_from_pre_119(tmp_path):
     record = json.loads(json_dest.read_text(encoding="utf-8"))
     paths = sorted(entry["path"] for group in record["groups"] for entry in group["entries"])
     digest = hashlib.sha256("\n".join(paths).encode("utf-8")).hexdigest()
-    assert digest == _PRE_119_CATALOGUE_LEAF_PATH_SET_SHA256, (
+    assert digest == _PRE_119_DIGESTS["catalogue_leaf_path_set_sha256"], (
         "the catalogue's set of leaf feature paths changed -- item 119 must add "
         "and remove no feature path"
     )
