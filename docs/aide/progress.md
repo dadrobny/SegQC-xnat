@@ -1190,7 +1190,7 @@ prior, so it is recorded and gated before any calculation changes.
   the mode-4 signal), how circularity is broken, and the deformity envelope a scoliotic
   spine must express without being flagged. Judged against measurable criteria on real GT.
   **Raises a human gate.** *(Item 118)*
-- 📋 **D2** The formulation implemented, replacing `s=0`, with its smoothing/DoF parameter
+- 🚧 **D2** The formulation implemented, replacing `s=0`, with its smoothing/DoF parameter
   in a scale-free form (`splprep`'s `s` is an absolute mm² residual bound and cannot be a
   literal constant across level counts or spacings). *(Item 119)*
 - 📋 **D3** Per-vertebra offset that separates, including the per-direction components
