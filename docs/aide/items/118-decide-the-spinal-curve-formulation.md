@@ -318,9 +318,6 @@ and left untouched. The work lands in `scripts/` and `docs/`.
 
 **Asserts against:**
 
-- `docs/aide/progress.md` — AC8 reads the `## Human gates` table and pins the
-  spinal-curve-model row's `Blocks` cell (names 119, 120, 121, 123, 125; does not
-  name 118). Read only; this item makes no edit to `progress.md`.
 - `src/segfacet/features/spline.py` — the `interpolating_cubic` candidate is
   today's `fit_centroid_spline` invoked unchanged, so the artifact's baseline
   numbers are a live measurement of the shipped code. Read and pinned by
@@ -503,3 +500,17 @@ against the shipped formulation, and confirms a person resolved the gate before
   `scripts/compare_curve_candidates.py --out out/curve-candidates
   --verse-cohort dataset-verse19training` run — none were invented, and none
   had to be recorded as skipped.
+- **Spec correction: `docs/aide/progress.md` removed from `## Authorised
+  paths` → `Asserts against`.** The original bullet pinned it "read only;
+  this item makes no edit to `progress.md`", but the mandatory
+  `aide progress set NNN in-progress` workflow step (which every item,
+  including this one, must run) always changes `progress.md`'s status
+  column — so the bullet as written made `aide scope` fail on the routine
+  status flip alone, independent of whether AC8's asserted content (the
+  Human gates row's `Blocks` cell) ever changed. `progress.md` is already
+  covered by the framework's own always-authorised path list for exactly
+  that routine flip, so the extra "Asserts against" pin was redundant for
+  the file-level scope check and only added a false-positive failure mode.
+  AC8 itself is unaffected: it is a read-only text assertion against
+  `docs/aide/progress.md`'s content, not a scope-tool declaration, and this
+  item still makes no edit to the Human gates table.
