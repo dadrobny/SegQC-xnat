@@ -1184,7 +1184,7 @@ prior, so it is recorded and gated before any calculation changes.
 
 **Deliverables.**
 
-- 🚧 **D1** The spline formulation decision, recorded before implementation: family,
+- 🔍 **D1** The spline formulation decision, recorded before implementation: family,
   degrees of freedom and how they scale with the number of levels present, arc-length vs
   cranio-caudal parameterisation (the latter is monotonic by construction and would destroy
   the mode-4 signal), how circularity is broken, and the deformity envelope a scoliotic
