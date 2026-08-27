@@ -1159,7 +1159,7 @@ justified in writing.
 
 ---
 
-## Stage 28 — Spinal Curve Model: Formulation, Offset & Orientation (G2, G7) — 📋
+## Stage 28 — Spinal Curve Model: Formulation, Offset & Orientation (G2, G7) — 🚧
 
 **Goal.** `features/spline.py` fits an **interpolating** spline (`splprep(..., s=0)`), so
 the curve passes exactly through every centroid it is meant to judge. Measured 2026-08-27:
@@ -1184,7 +1184,7 @@ prior, so it is recorded and gated before any calculation changes.
 
 **Deliverables.**
 
-- 📋 **D1** The spline formulation decision, recorded before implementation: family,
+- 🚧 **D1** The spline formulation decision, recorded before implementation: family,
   degrees of freedom and how they scale with the number of levels present, arc-length vs
   cranio-caudal parameterisation (the latter is monotonic by construction and would destroy
   the mode-4 signal), how circularity is broken, and the deformity envelope a scoliotic
