@@ -130,10 +130,15 @@ def test_spline_fit_is_frozen_dataclass():
 
 
 def test_spline_fit_has_required_fields():
-    """SplineFit exposes tck, u, degree, and n_points."""
+    """SplineFit exposes spline, smoothing, u, degree, and n_points.
+
+    Item 119 replaced SplineFit.tck (a legacy (t, c, k) FITPACK tuple) with
+    SplineFit.spline (a scipy.interpolate.BSpline) and added
+    SplineFit.smoothing; tck is removed, not shimmed.
+    """
     centroids = _straight_spine(5)
     fit = fit_centroid_spline(centroids)
-    for attr in ("tck", "u", "degree", "n_points"):
+    for attr in ("spline", "smoothing", "u", "degree", "n_points"):
         assert hasattr(fit, attr), f"SplineFit missing field: {attr}"
 
 
