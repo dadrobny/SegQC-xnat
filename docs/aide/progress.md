@@ -1202,7 +1202,7 @@ prior, so it is recorded and gated before any calculation changes.
   every vertebra of the default fixture — a box's widest side, left-right on real anatomy
   too. `closest_u` and `splev(..., der=1)` both exist but are never joined. Retain
   `eigenvalue_ratio` (real-GT CoV 0.155); demote `principal_axis`. *(Item 121)*
-- 🔍 **D5** Signed curvature: `total_curvature_deg` is `max − min` of an *unsigned* angle,
+- ✅ **D5** Signed curvature: `total_curvature_deg` is `max − min` of an *unsigned* angle,
   reporting 5.702° where the true tangent sweep is 11.4° — it halves a C-curve and cancels
   the symmetric S a normal spine has. *(Item 122)*
 - 📋 **D6** Recalibration and regeneration: `max_offset_mm`, the nine goldens,
