@@ -218,3 +218,71 @@ cohort is unreachable, every VerSe-sourced row above (`Source` mentioning
 "VerSe19") is skipped rather than checked — a run without `--verse-cohort`
 records those `verse_scoliotic` blocks as `status: "skipped"` with a reason,
 never a silent pass.
+
+## Revisions to apply when item 119 implements this
+
+Three amendments to the decision above, recorded after the measurements were
+taken. None invalidates a measured number: the comparison script fitted
+`smoothing_spline` through `splprep`, and the amended API carries identical `s`
+semantics, so every value in `## Measurements` still reproduces.
+
+### The fit uses `make_splprep`, not `splprep`
+
+Item 119 constructs the curve with `scipy.interpolate.make_splprep`. SciPy
+documents `splprep` as a legacy FITPACK wrapper and `make_splprep` as its
+supported replacement, so building a new formulation on the legacy interface
+would mean adopting a deprecation on the day it ships.
+
+Three consequences item 119 owns:
+
+- **Dependency floor.** `make_splprep` was added in SciPy 1.15.0.
+  `pyproject.toml` currently declares `scipy>=1.7`, so that bound rises to
+  `>=1.15`. `constraints.txt` already pins `scipy==1.17.1`, so CI is unaffected.
+- **Return shape.** `make_splprep` returns a `(BSpline, u)` pair, not
+  `(tck, u)`. This is not a rename: evaluation moves from `splev(u, tck)` to
+  `spl(u)`, and the derivative from `splev(u, tck, der=1)` to `spl(u, nu=1)`.
+  Every consumer of `SplineFit` is affected — `spline_offset.py`,
+  `consistency.py`, `orientation.py`, `neighbourhood.py`.
+- **The smoothing choice is unchanged.** `s` keeps its meaning as a bound on
+  the weighted sum of squared residuals, so `### Degrees of freedom`'s
+  `s = n_points` carries over verbatim.
+
+### Spline weights — deferred, not rejected
+
+`make_splprep` accepts a per-point weight vector `w`, where `w[i]` is the
+reciprocal of the standard deviation of point `i`'s positional error. The
+decision above fits every centroid with equal weight. Two uses are identified
+and deliberately deferred beyond Stage 28:
+
+- **Down-weight vertebrae touching the image border.** A vertebra clipped by
+  the field of view has a truncated voxel cloud, so its centroid is displaced
+  toward the image interior by an amount reflecting the crop rather than
+  anatomy. Fitting it at full weight drags the curve toward that artefact. The
+  per-label border-contact signal this needs already exists — it is what
+  `heuristics/border.py` reads.
+- **Up-weight the terminal vertebrae when they are clear of the border.** A
+  spline is least constrained at its ends, so the cranial-most and caudal-most
+  levels (C1/C2, L5/S1) carry the most influence over end behaviour and the
+  least support. Weighting them up where they are known-complete stabilises the
+  ends. Doing so where they are clipped would amplify the first problem, which
+  is why the two uses are one scheme rather than two.
+
+Deferred because the weighting scheme would itself need calibrating against
+real GT, whereas Stage 28's remit is to make the offset and orientation
+features carry signal at all. Equal weights are the honest baseline to measure
+that against.
+
+### The deformity envelope is expected to be revised
+
+`### Deformity envelope` proposes one envelope covering all anatomy. A later
+refinement is anticipated: separate envelopes for normal and scoliotic spines,
+so that a curve magnitude which is a finding in one population is expected
+anatomy in the other.
+
+That refinement points at **pathology differentiation** — telling a scoliotic
+spine from a normal one — which is a different objective from the failure-mode
+detection this repository is scoped to, where the question is whether a
+*segmentation* is wrong rather than whether an *anatomy* is atypical. Recorded
+here so the distinction is deliberate when it is taken up. Whether it belongs
+in FACET at all is a `vision.md` question, not one item 119 should answer by
+implementing it.
