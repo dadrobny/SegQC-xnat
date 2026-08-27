@@ -66,6 +66,13 @@
 > 19's G8 criterion and clarified what Stage 20's traceability matrix must prove — see
 > [`roadmap.md`](roadmap.md).
 
+> **Stage 28 scoped 2026-08-27.** Numbered after Stage 27 so numbering stays stable, but
+> **runs before Stage 20** — it changes which rules fire on which cases, and Stage 20 both
+> audits that and pins a specificity baseline against it. It also supersedes part of Stage
+> 20's reachability deliverable: modes 1 and 4 are one defect (the interpolating spline
+> fit), not two, and the FOV-headroom remedy Stage 20 proposed for mode 1 is measurably
+> not the cause. Run order from here: **28 → 20 → 27 → 21 → 16**.
+
 ## Two kinds of "done" — implementation vs. validation
 
 This tracker separates two claims that are easy to conflate:
@@ -189,6 +196,7 @@ may resolve one._
 |------|--------|--------|---------------------|
 | Real segmenter output on real CT handed over to this repo — SPINEPS (primary) and/or TotalSegmentator label maps + manifest, produced in the programme repo, sufficient to build the real candidate-vs-GT cohort | stage 16 | ⏳ Awaiting | Blocks the whole of Stage 16, and transitively Stage 25, whose deliverables are "deliberately unspecified until Stage 16 has characterised real failures". Closes the "Real automatic-segmentation failure corpus" Environment-Gated row and the G2 Outcome target. Not the same prerequisite as the Stage 21 rung-2 corpus, which needs only real VerSe GT — already ✅ Verified and **not** gated. |
 | Access approved for the curated challenging-case source data — real pathology / post-op / atypical anatomy ([`vision.md`](vision.md) §8), `VerSe_fracture_grading.xlsx` a natural seed, plus any clinical cohort requiring an ethics/data-sharing sign-off | stage 16 | ⏳ Awaiting | Independent of the row above: real *segmenter output* does not supply the *challenging cases*, and either arriving alone leaves a Stage 16 deliverable unbuildable. Kept a separate row so approving one does not silently read as approving both. |
+| Spinal curve model — the deformity envelope the fit must represent without flagging it. How much scoliotic / kyphotic curvature is normal anatomy the model must follow, versus deviation it must report; and the accepted false-negative cost of a stiffer fit | stage 28 | ⏳ Awaiting | Blocks Stage 28's D2 (implementing the formulation) but not D1 (recording the decision and its measurements, which is what the gate reads). Not derivable from the corpus: the synthetic fixtures carry one fixed 6 mm curve amplitude and no pathology, so the envelope is a clinical judgement. Real VerSe19 GT is available locally to evidence the proposal. |
 
 ---
 
@@ -921,24 +929,24 @@ rule(s) and any features they need; features may be added alone, modes and rules
 
 - 📋 Traceability matrix, *generated* (not hand-maintained): 8 failure modes × 10 rules ×
   the features each rule consumes, scored in all three directions, every mode row carrying
-  its evidence rung. *(Item 123)*
+  its evidence rung.
 - 📋 The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
   `intensity_reference_delta`) mapped to §6 modes, or recorded as targeting none with a
-  reason — the root close of Stage 19's G8 shortfall. *(Item 119)*
+  reason — the root close of Stage 19's G8 shortfall.
 - 📋 Specificity assertion — no unintended rule may fire — adopted as a ratchet.
-  *(Item 118)*
 - 📋 Reachability hole closed *with its mechanism named per mode*: mode 8 is
   single-channel-unobservable, mode 1's ladder is FOV-capped, mode 4's cause TBD. Made
   detectable where the mechanism allows, recorded where it does not. Not both silent.
-  *(Items 120, 121, 123)*
+  ⚠️ **Superseded in part, 2026-08-27:** modes 1 and 4 are **one** defect, the interpolating
+  spline fit (`splprep(..., s=0)`), and are owned by **Stage 28**. `offset_mm` is zero on
+  every committed golden (max `6.8e-04` mm vs a 15.0 mm threshold) and on real VerSe GT
+  (mean `2.9e-05` mm), so no field of view produces a non-zero offset and the FOV-headroom
+  remedy named here could not have worked. Mode 8 stays this stage's to record.
 - 📋 Per-rule **and per-operator** corpus-exercise reporting (the registered `fuse` operator
-  generates no corpus case at all). *(Item 122)*
+  generates no corpus case at all).
 - 📋 Item 100's mode-1 ladder base widened so mode 1's metric swing is set by the
   perturbation rather than the fixture's FOV walls — the recorded root cause of mode 6's
-  Stage-18 specificity shortfall. *(Item 121)*
-- 📋 Stage 20 end-to-end validation: matrix read for silent rows, ratchet red-then-green
-  replay, exercise-report cross-check, honest end-to-end detection count, fresh-clone suite
-  run, and verification-row closure. *(Item 124)*
+  Stage-18 specificity shortfall.
 
 **Acceptance.**
 
@@ -1148,3 +1156,83 @@ justified in writing.
 - [ ] Every feature is addressable under it; no identity field is stored more than once.
 - [ ] The regenerated catalogue and the drift test agree; no rule's behaviour changes on the
   corpus except where a retune is explicitly authorised.
+
+---
+
+## Stage 28 — Spinal Curve Model: Formulation, Offset & Orientation (G2, G7) — 📋
+
+**Goal.** `features/spline.py` fits an **interpolating** spline (`splprep(..., s=0)`), so
+the curve passes exactly through every centroid it is meant to judge. Measured 2026-08-27:
+`stage3.per_label_offsets[].offset_mm` is zero on all nine committed goldens (max
+`6.8e-04` mm against `mislabel`'s `max_offset_mm = 15.0`) **and** on real VerSe19 GT
+(`reference_verse_v1.json`: mean `2.9e-05` mm, CoV 1.3), and
+`stage3.monotonic_consistency.is_monotonic` is `True` on every case including
+`mode4_relabel_swap`. Eight leaf paths are affected — `offset_mm`, `offset_voxel`,
+`dx/dy/dz_mm`, and all three `per_label_neighbourhood[].stats.offset_mm.*`, so item 110's
+wiring aggregates zeros. `MislabelRule` cannot fire through `run_qc` on any input.
+
+**Modes 1 and 4 are one defect.** Stage 20 records them as separate reachability holes with
+an FOV-headroom remedy for mode 1; no field of view yields a non-zero offset while `s=0`
+holds, and a smoothed fit detects the mode-4 swap directly. That part of Stage 20 is
+superseded here.
+
+**The deliberation is the first deliverable, not a preamble.** The model must be flexible
+enough for real spinal shape (sagittal S; a coronal curve under scoliosis) yet too stiff to
+follow a segmentation error — and a curve fit *from* the centroids then used to judge one is
+circular unless something breaks the circle. That is a modelling decision with a clinical
+prior, so it is recorded and gated before any calculation changes.
+
+**Deliverables.**
+
+- 📋 **D1** The spline formulation decision, recorded before implementation: family,
+  degrees of freedom and how they scale with the number of levels present, arc-length vs
+  cranio-caudal parameterisation (the latter is monotonic by construction and would destroy
+  the mode-4 signal), how circularity is broken, and the deformity envelope a scoliotic
+  spine must express without being flagged. Judged against measurable criteria on real GT.
+  **Raises a human gate.** *(Item 118)*
+- 📋 **D2** The formulation implemented, replacing `s=0`, with its smoothing/DoF parameter
+  in a scale-free form (`splprep`'s `s` is an absolute mm² residual bound and cannot be a
+  literal constant across level counts or spacings). *(Item 119)*
+- 📋 **D3** Per-vertebra offset that separates, including the per-direction components
+  (`dx/dy/dz_mm`) that are computed and catalogued but read by no rule. A leave-one-out fit
+  tracks displacement ~1:1 (measured 5 → 6.2, 10 → 10.4, 15 → 16.0 mm) and already exists as
+  `_recon_leave_one_out_offset` inside the test harness; promoting it retires mode 1's
+  `reconstructed_record` workaround. *(Item 120)*
+- 📋 **D4** Tangent-based vertebra orientation. PCA's `principal_axis` is `(1, 0, 0)` for
+  every vertebra of the default fixture — a box's widest side, left-right on real anatomy
+  too. `closest_u` and `splev(..., der=1)` both exist but are never joined. Retain
+  `eigenvalue_ratio` (real-GT CoV 0.155); demote `principal_axis`. *(Item 121)*
+- 📋 **D5** Signed curvature: `total_curvature_deg` is `max − min` of an *unsigned* angle,
+  reporting 5.702° where the true tangent sweep is 11.4° — it halves a C-curve and cancels
+  the symmetric S a normal spine has. *(Item 122)*
+- 📋 **D6** Recalibration and regeneration: `max_offset_mm`, the nine goldens,
+  `reference_default.json`, `reference_verse_v1.json`. The VerSe19 cohort is available
+  locally (80 CT/GT pairs, gitignored symlink at the documented root), so the real artifact
+  is rebuildable; `dataset-verse19.md`'s documented nested layout needs correcting to match.
+  *(Item 123)*
+- 📋 **D7** An observed-range column in the generated feature catalogue — the check that
+  would have caught this at item 018. The catalogue is current and its `computation` column
+  accurate, but nothing records what a feature *does*: `offset_mm` reads healthy and its
+  `status` is `retune`, shared with 65 of 128 rows. *(Item 124)*
+- 📋 Stage 28 end-to-end validation: gate-before-implementation check, red-then-green replay
+  of modes 1 and 4 through `segfacet run`, a real scoliotic case not flagged, honest
+  before/after detection count, and a fresh-clone byte-reproducibility run. *(Item 125)*
+
+**Scope fence.** Bounded to the spline layer. A sweep of every numeric leaf path found no
+other degenerate feature — the real-GT reference's 21 features all carry genuine spread
+(CoV 0.06–3.6) except `spline_offset_mm`. The 153 paths constant across the goldens are
+constant because all nine fixtures are one box from one base (Stage 21's premise), and the
+corpus alone cannot separate that from a broken feature. Do not widen on that evidence.
+
+**Acceptance.**
+
+- [ ] The formulation decision is recorded with its measurements and signed off at its human
+  gate before D2 lands (**G8**).
+- [ ] A clean GT spine stays within item 017's 0.5 mm pass-through bound across level counts
+  and spacings, while a displaced vertebra separates by a stated margin (**G2**).
+- [ ] `mislabel` fires through plain `run_qc` on the mode-1 case and `is_monotonic` is
+  `False` on the mode-4 case, with the clean control still firing nothing (**G2**).
+- [ ] A real scoliotic curve in the VerSe cohort is not flagged as an offset outlier
+  (**G3**).
+- [ ] Both reference artifacts are rebuilt from real GT and `spline_offset_mm` shows real
+  spread; every regenerated golden is byte-reproducible run-to-run (**G7**).

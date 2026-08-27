@@ -246,5 +246,8 @@ docs/aide/status/*.json
 # Editor workspace files (per-machine, not shared)
 *.code-workspace
 
-# Local datasets (large, not versioned)
-dataset-verse19training/
+# Local datasets (large, not versioned). No trailing slash: the entry must
+# match a symlink to an out-of-tree dataset root as well as a real directory
+# (a trailing slash matches directories only, so a symlink would show as
+# untracked and be committable).
+dataset-verse19training
