@@ -8,7 +8,17 @@
   is cheap and always allowed; ACTING on it out of scope is forbidden.
 
   Entry shape (checked by `aide check`, non-blocking):
-    - [ ] <type> — <one line> *(item NNN, YYYY-MM-DD)*     (item ref optional)
+    - [ ] <type> — <one line> *(<where it came from>, YYYY-MM-DD)*
+
+  The date is required; the provenance before it is free-form and may be
+  omitted. Conventional spellings, worth following so a reader can scan them:
+    *(item 099, 2026-07-26)*        captured while working one item
+    *(items 099-101, 2026-07-27)*   a finding that spans several
+    *(queue-014, 2026-07-26)*       queue planning or spec-authoring, before
+                                    any item exists
+    *(2026-07-26)*                  no item or queue to name
+  Write whichever is honest — never bend one to fit, since the line below is
+  immutable and a squeezed provenance can never be corrected.
   Types:
     knowledge  — true fact worth documenting (docs, CLAUDE.md, conventions)
     defect     — something is wrong and needs a fix item

@@ -185,7 +185,7 @@ def test_tick_refuses_a_malformed_entry_rather_than_guessing():
 # archive_insight_text
 # --------------------------------------------------------------------------- #
 def test_archive_moves_only_closed_entries_older_than_the_date():
-    remaining, moved = aide.archive_insight_text(INBOX, "2026-06-01")
+    remaining, moved, _undatable = aide.archive_insight_text(INBOX, "2026-06-01")
     assert list(moved) == ["2026-Q1"]
     assert len(aide.parse_insights(remaining)) == 3
     assert "insights.md has no verb" not in remaining
@@ -193,7 +193,7 @@ def test_archive_moves_only_closed_entries_older_than_the_date():
 
 def test_archive_never_moves_an_open_entry_however_old():
     """The open backlog is the working set; archiving it hides what list exists for."""
-    remaining, moved = aide.archive_insight_text(INBOX, "2027-01-01")
+    remaining, moved, _undatable = aide.archive_insight_text(INBOX, "2027-01-01")
     kept = aide.parse_insights(remaining)
     assert all(not e.ticked for e in kept)
     assert [e.date for e in kept] == ["2026-05-11", "2026-08-15"]
@@ -201,7 +201,7 @@ def test_archive_never_moves_an_open_entry_however_old():
 
 
 def test_archive_carries_the_status_trail_with_its_entry():
-    _, moved = aide.archive_insight_text(INBOX, "2026-06-01")
+    _, moved, _undatable = aide.archive_insight_text(INBOX, "2026-06-01")
     assert moved["2026-Q1"] == [
         "- [x] framework — insights.md has no verb *(item 117, 2026-03-04)* → aide-loop #52",
         "  - **2026-03-05** → accepted into wave 3",
@@ -210,26 +210,26 @@ def test_archive_carries_the_status_trail_with_its_entry():
 
 def test_archive_moves_lines_byte_for_byte():
     original = INBOX.splitlines()
-    _, moved = aide.archive_insight_text(INBOX, "2026-08-01")
+    _, moved, _undatable = aide.archive_insight_text(INBOX, "2026-08-01")
     for lines in moved.values():
         for line in lines:
             assert line in original
 
 
 def test_archive_groups_by_the_entry_quarter():
-    _, moved = aide.archive_insight_text(INBOX, "2026-08-01")
+    _, moved, _undatable = aide.archive_insight_text(INBOX, "2026-08-01")
     assert sorted(moved) == ["2026-Q1", "2026-Q3"]
 
 
 def test_archive_leaves_no_blank_gap_behind():
     text = "# I\n\n- [x] gap — a *(2026-01-01)*\n\n- [ ] gap — b *(2026-01-02)*\n"
-    remaining, _ = aide.archive_insight_text(text, "2026-01-02")
+    remaining, _, _undatable = aide.archive_insight_text(text, "2026-01-02")
     assert "\n\n\n" not in remaining
     assert remaining == "# I\n\n- [ ] gap — b *(2026-01-02)*\n"
 
 
 def test_archive_of_nothing_is_a_no_op():
-    remaining, moved = aide.archive_insight_text(INBOX, "2026-01-01")
+    remaining, moved, _undatable = aide.archive_insight_text(INBOX, "2026-01-01")
     assert moved == {} and remaining == INBOX
 
 
@@ -460,3 +460,199 @@ def test_an_unfilled_slot_is_still_an_error_inside_an_archive(tmp_path: Path):
         "# Insight Archive\n\n- [x] gap — {{unfilled}} *(2026-01-01)*\n", encoding="utf-8")
     errors = aide.template_residue_errors(d)
     assert any("archive-2026-Q1.md" in e for e in errors)
+
+
+# --------------------------------------------------------------------------- #
+# provenance — what may stand between "*(" and the date (issue #76)
+#
+# The reported failure: the shape accepted `item NNN` alone, so two provenances
+# the loop produces routinely — `queue-NNN` from planning done before any item
+# exists, and `items NNN-NNN` from a finding spanning several — warned forever
+# AND could not be archived, because the same pattern is what yields the date
+# `archive --before` cuts on. Neither was fixable in place: §1 makes the claim
+# immutable, and collapsing a range to one item destroys the provenance the
+# marker records. The date is now the only load-bearing part.
+# --------------------------------------------------------------------------- #
+WIDE = """\
+# Insight Inbox
+
+_Entries below, newest last._
+
+- [x] gap — queue planning found no home for this *(queue-014, 2026-07-26)*
+- [x] defect — the three specs disagree on the same path *(items 099-101, 2026-07-27)*
+- [x] knowledge — provenance can be anything honest *(the 2026 offsite, 2026-07-28)*
+- [ ] framework — a bare date is still fine *(2026-07-29)*
+"""
+
+
+def test_a_queue_or_range_provenance_parses_and_keeps_its_date():
+    """The date is what `archive` cuts on, so every accepted form must yield one."""
+    entries = aide.parse_insights(WIDE)
+    assert [e.date for e in entries] == [
+        "2026-07-26", "2026-07-27", "2026-07-28", "2026-07-29"]
+    assert [e.source for e in entries] == [
+        "queue-014", "items 099-101", "the 2026 offsite", None]
+
+
+def test_only_a_single_item_provenance_yields_an_item_number():
+    """A range and a queue name no one item; inventing one would be a guess."""
+    assert [e.item for e in aide.parse_insights(WIDE)] == [None, None, None, None]
+    assert aide.parse_insights(
+        "- [ ] gap — x *(item 099, 2026-07-26)*\n")[0].item == 99
+
+
+def test_the_claim_survives_a_widened_provenance():
+    """Text is still cut at the provenance, not at the first parenthesis."""
+    entries = aide.parse_insights(WIDE)
+    assert entries[1].text == "the three specs disagree on the same path"
+    assert entries[0].ticked is True and entries[3].ticked is False
+
+
+def test_check_no_longer_warns_on_a_queue_or_multi_item_capture(tmp_path: Path):
+    """The reported entries, verbatim: three permanent warnings, now none."""
+    d = tmp_path / "docs" / "aide"
+    d.mkdir(parents=True)
+    (d / "insights.md").write_text(WIDE, encoding="utf-8")
+    assert aide.insight_warnings(d) == []
+
+
+def test_the_date_stays_strict_where_the_provenance_relaxed(tmp_path: Path):
+    """Relaxing the slug must not relax the one field every verb depends on."""
+    d = tmp_path / "docs" / "aide"
+    d.mkdir(parents=True)
+    (d / "insights.md").write_text(
+        "# I\n\n"
+        "- [ ] gap — no date at all *(queue-014)*\n"
+        "- [ ] gap — not ISO *(item 099, 26-07-26)*\n"
+        "- [ ] gap — a provenance may not span lines *(queue-014,\n"
+        "- [ ] nonsense — not a known type *(2026-07-26)*\n",
+        encoding="utf-8")
+    warnings = aide.insight_warnings(d)
+    assert len(warnings) == 4
+    assert all("YYYY-MM-DD" in w for w in warnings)
+
+
+def test_archive_moves_a_queue_or_multi_item_entry():
+    """The half of #76 that outlived the warning: pinned in the live file forever."""
+    remaining, moved, undatable = aide.archive_insight_text(WIDE, "2026-08-01")
+    assert sum(len(v) for v in moved.values()) == 3
+    assert undatable == []
+    kept = aide.parse_insights(remaining)
+    assert [e.text.strip() for e in kept] == ["a bare date is still fine"]
+
+
+def test_list_reprints_a_range_or_queue_provenance_verbatim(tmp_path: Path, capsys):
+    """Re-deriving the provenance from an item number can print back only one form."""
+    repo = _repo(tmp_path, WIDE)
+    assert aide.main(["--repo", str(repo), "insights", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "*(queue-014, 2026-07-26)*" in out
+    assert "*(items 099-101, 2026-07-27)*" in out
+    assert "*(2026-07-29)*" in out
+
+
+def test_tick_works_on_a_widened_provenance(tmp_path: Path):
+    """`tick` refuses what does not parse, so widening must reach it too."""
+    repo = _repo(tmp_path, WIDE.replace("- [x] gap —", "- [ ] gap —", 1))
+    assert aide.main(["--repo", str(repo), "insights", "tick", "1",
+                      "--pointer", "aide-loop #76"]) == 0
+    assert "*(queue-014, 2026-07-26)* → aide-loop #76" in _inbox(repo)
+
+
+# --------------------------------------------------------------------------- #
+# an entry no cut can reach is reported, not silently skipped (issue #76)
+# --------------------------------------------------------------------------- #
+UNDATABLE = """\
+# Insight Inbox
+
+- [x] gap — dated and closed *(2026-01-01)*
+- [x] this one never parsed at all
+"""
+
+
+def test_archive_returns_the_closed_entries_it_could_not_date():
+    _, _, undatable = aide.archive_insight_text(UNDATABLE, "2026-06-01")
+    assert [e.ordinal for e in undatable] == [2]
+
+
+def test_an_open_undated_entry_is_not_reported_as_unarchivable():
+    """An open entry never moves anyway; naming it would be noise, not a finding."""
+    _, _, undatable = aide.archive_insight_text(
+        UNDATABLE.replace("- [x] this one", "- [ ] this one"), "2026-06-01")
+    assert undatable == []
+
+
+def test_archive_names_the_entry_it_had_to_leave_behind(tmp_path: Path, capsys):
+    repo = _repo(tmp_path, UNDATABLE)
+    assert aide.main(["--repo", str(repo), "insights", "archive",
+                      "--before", "2026-06-01"]) == 0
+    err = capsys.readouterr().err
+    assert "entry 2" in err and "insights.md:4" in err
+    assert "1 closed entry could not be dated" in err
+
+
+def test_the_report_survives_a_run_where_nothing_moved(tmp_path: Path, capsys):
+    """The run that most needs it: the live file will not shrink and says why."""
+    repo = _repo(tmp_path, UNDATABLE)
+    assert aide.main(["--repo", str(repo), "insights", "archive",
+                      "--before", "2020-01-01"]) == 0
+    captured = capsys.readouterr()
+    assert "nothing closed before 2020-01-01" in captured.out
+    assert "could not be dated" in captured.err
+
+
+# --------------------------------------------------------------------------- #
+# which marker is the provenance, when a line carries more than one
+#
+# A free-form provenance means an aside inside the claim can wear the marker's
+# shape. Position alone cannot decide it: the first match takes the claim's
+# aside, the last takes the pointer's. The rule is the marker that leaves a
+# well-formed tail — nothing, or the `→` pointer.
+# --------------------------------------------------------------------------- #
+def test_an_aside_inside_the_claim_does_not_steal_the_provenance():
+    """Taking the aside's date would file the entry in the wrong quarter, silently."""
+    line = ("- [ ] defect — config default is *(prod, 2020-01-01)* not "
+            "*(item 099, 2026-07-26)*\n")
+    e = aide.parse_insights(line)[0]
+    assert (e.source, e.date, e.item) == ("item 099", "2026-07-26", 99)
+    assert e.text == "config default is *(prod, 2020-01-01)* not"
+
+
+def test_an_aside_inside_the_pointer_does_not_steal_it_either():
+    """The symmetric case, which taking the *last* marker would get wrong."""
+    line = "- [x] gap — a *(item 099, 2026-07-26)* → see *(note, 2026-08-01)*\n"
+    e = aide.parse_insights(line)[0]
+    assert (e.source, e.date) == ("item 099", "2026-07-26")
+    assert e.pointer == "see *(note, 2026-08-01)*"
+
+
+def test_an_aside_that_would_be_archived_to_the_wrong_quarter_is_not():
+    """The consequence the parse rule exists to prevent, through the verb itself."""
+    text = ("- [x] defect — was *(prod, 2020-01-01)* now *(item 099, 2026-07-26)*\n")
+    _, moved, _u = aide.archive_insight_text(text, "2026-08-01")
+    assert list(moved) == ["2026-Q3"]          # not 2020-Q1
+
+
+def test_a_hand_written_tail_still_parses_as_it_always_did():
+    """Entries predating `tick` carry tails that are neither empty nor a pointer."""
+    e = aide.parse_insights("- [x] gap — a *(2026-01-01)* — landed in X\n")[0]
+    assert (e.date, e.pointer) == ("2026-01-01", None)
+
+
+def test_a_blank_provenance_is_still_a_shape_warning(tmp_path: Path):
+    """Free-form is not empty: a stray comma says nothing and should be fixed."""
+    d = tmp_path / "docs" / "aide"
+    d.mkdir(parents=True)
+    (d / "insights.md").write_text(
+        "# I\n\n- [ ] gap — a stray comma *(   , 2026-01-01)*\n", encoding="utf-8")
+    assert len(aide.insight_warnings(d)) == 1
+    assert aide.parse_insights("- [ ] gap — a *(   , 2026-01-01)*\n")[0].date is None
+
+
+def test_the_patterns_do_not_backtrack_catastrophically():
+    """Both are run over every bullet in the file, malformed ones included."""
+    import time
+    evil = "- [ ] gap — " + "a(" * 4000 + " *(item 1, 2026-01-01)*"
+    start = time.time()
+    aide.parse_insights(evil)
+    assert time.time() - start < 1.0

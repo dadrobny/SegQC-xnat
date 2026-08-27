@@ -77,7 +77,7 @@ correct ordering, neighbour-spacing values vs hand-computed expectations, and
 that out-of-order / gapped / duplicated label sets are correctly identified;
 deterministic output; missing or single-label maps handled without crashing.
 
-### Item 016: Features-block JSON serialisation & per-case feature table *(completes Stage 2 — ✅ done)*
+### Item 016: Features-block JSON serialisation & per-case feature table *(completes Stage 2 — done)*
 Consolidated all Stage 2 features into the versioned JSON report under a
 `features` block with a per-case human-readable feature table. Extended the
 report schema (009) with validation. *(Already merged to main — do not re-open.)*
