@@ -129,7 +129,24 @@
           0.0,
           0.0
         ],
-        "total_curvature_deg": 0.0
+        "total_curvature_deg": 0.0,
+        "coronal_tangent_angles_deg": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "sagittal_tangent_angles_deg": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "coronal_curvature_deg": 0.0,
+        "sagittal_curvature_deg": 0.0,
+        "curvature_plane": "coronal"
       },
       "spacing_consistency": {
         "mean_spacing_mm": 10.0,

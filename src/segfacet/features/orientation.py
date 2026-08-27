@@ -10,8 +10,17 @@ Two related descriptors contribute to spinal geometry:
 **Part B — Global Curvature Descriptors**
     Given a fitted :class:`~segfacet.features.spline.SplineFit`, compute tangent
     angles along the spline, inter-tangent angles between consecutive centroids,
-    and a Cobb-like total curvature scalar.  Exposed as :class:`SpineCurvature`
-    and :func:`compute_spine_curvature`.
+    and signed, plane-stated curvature sweeps (item 122): a coronal (R-S plane)
+    and a sagittal (A-S plane) unwrapped signed tangent-angle array, each
+    reduced to a per-plane ``max - min`` sweep, with ``total_curvature_deg``
+    the larger of the two and ``curvature_plane`` naming which one.  Both
+    signed arrays are computed against tangents normalised to a consistent
+    cranial-to-caudal traversal direction, so the sweep is invariant to
+    whether the caller supplied centroids cranial-first or caudal-first.  The
+    plane statement holds only when centroids are RAS-ordered mm coordinates
+    (axis 0 = Right, 1 = Anterior, 2 = Superior), which is guaranteed for any
+    volume loaded via :func:`segfacet.io.load_volume`.  Exposed as
+    :class:`SpineCurvature` and :func:`compute_spine_curvature`.
 
 Public API
 ----------
@@ -103,13 +112,45 @@ class SpineCurvature:
         Angle (degrees) between consecutive tangent vectors.  Length is
         ``n_centroids - 1``.  Always non-negative.
     total_curvature_deg : float
-        Cobb-like proxy: the range (max − min) of ``tangent_angles_deg`` along
-        the spine.  ``0.0`` for a perfectly straight spine.
+        The larger of ``coronal_curvature_deg`` and ``sagittal_curvature_deg``
+        — the sweep in the anatomical plane the spine turns in most.  ``0.0``
+        for a perfectly straight spine.  See ``curvature_plane`` for which
+        plane it came from.
+    coronal_tangent_angles_deg : Tuple[float, ...]
+        Signed tangent angle in the coronal (R-S) plane at each centroid:
+        ``degrees(atan2(t_R, t_S))``, unwrapped along the ordered centroid
+        sequence and computed from tangents normalised to a cranial-to-caudal
+        traversal direction (item 122). Positive means the tangent tilts
+        toward the patient's right as the spine advances cranially. Requires
+        RAS-ordered mm centroids (axis 0 = Right, 1 = Anterior, 2 = Superior),
+        guaranteed by :func:`segfacet.io.load_volume`. Length matches the
+        number of centroids.
+    sagittal_tangent_angles_deg : Tuple[float, ...]
+        Signed tangent angle in the sagittal (A-S) plane at each centroid:
+        ``degrees(atan2(t_A, t_S))``, unwrapped and direction-normalised the
+        same way as ``coronal_tangent_angles_deg``. Positive means the
+        tangent tilts anterior. Same RAS precondition. Length matches the
+        number of centroids.
+    coronal_curvature_deg : float
+        ``max - min`` of ``coronal_tangent_angles_deg`` — the coronal-plane
+        sweep. ``0.0`` for a curve confined to the sagittal plane.
+    sagittal_curvature_deg : float
+        ``max - min`` of ``sagittal_tangent_angles_deg`` — the sagittal-plane
+        sweep. ``0.0`` for a curve confined to the coronal plane.
+    curvature_plane : str
+        ``"coronal"`` when ``coronal_curvature_deg >= sagittal_curvature_deg``,
+        else ``"sagittal"``. An exact tie (including a straight spine's
+        ``0.0``/``0.0``) resolves to ``"coronal"``.
     """
 
     tangent_angles_deg: Tuple[float, ...]
     inter_tangent_angles_deg: Tuple[float, ...]
     total_curvature_deg: float
+    coronal_tangent_angles_deg: Tuple[float, ...]
+    sagittal_tangent_angles_deg: Tuple[float, ...]
+    coronal_curvature_deg: float
+    sagittal_curvature_deg: float
+    curvature_plane: str
 
 
 # --------------------------------------------------------------------------- #
@@ -203,6 +244,26 @@ def _angle_between_unit_vectors_deg(a: np.ndarray, b: np.ndarray) -> float:
         return 0.0
     cos_theta = float(np.clip(np.dot(a / na, b / nb), -1.0, 1.0))
     return math.degrees(math.acos(cos_theta))
+
+
+def _signed_plane_angles_deg(unit_tangents: np.ndarray, axis: int) -> np.ndarray:
+    """Unwrapped signed in-plane tangent angle (degrees), one per row.
+
+    ``axis`` selects the in-plane component (0 = R for coronal, 1 = A for
+    sagittal); axis 2 (S) is always the reference. Returns
+    ``degrees(atan2(t[:, axis], t[:, 2]))``, unwrapped along the row order so
+    a tangent crossing the −S direction does not produce a ±360° discontinuity
+    (item 122).
+    """
+    raw = np.arctan2(unit_tangents[:, axis], unit_tangents[:, 2])
+    return np.degrees(np.unwrap(raw))
+
+
+def _sweep(angles: np.ndarray) -> float:
+    """``max - min`` of *angles*; ``0.0`` for a single-element (or empty) array."""
+    if len(angles) < 2:
+        return 0.0
+    return float(np.max(angles) - np.min(angles))
 
 
 # --------------------------------------------------------------------------- #
@@ -385,12 +446,43 @@ def compute_spine_curvature(
         for i in range(n - 1)
     )
 
-    # Total curvature: range of tangent angles (Cobb-like proxy).
-    angles_array = np.asarray(tangent_angles_deg, dtype=np.float64)
-    total_curvature_deg = float(np.max(angles_array) - np.min(angles_array))
+    # Direction normalisation (item 122): the signed angles below are measured
+    # against +S, so a cranial-first (caudally-advancing) sequence would read
+    # every tangent near +/-180 degrees. Negate tangents when the net advance
+    # (last centroid's S minus first's) is caudal, so the descriptor measures
+    # tilt relative to the cranio-caudal axis regardless of traversal order.
+    # This normalised copy feeds only the new signed arrays below;
+    # tangent_angles_deg and inter_tangent_angles_deg above are unaffected
+    # (both are already invariant to a global tangent sign flip).
+    net_advance_s = float(centroids[-1].centroid_mm[2]) - float(centroids[0].centroid_mm[2])
+    if net_advance_s < 0:
+        normalised_tangents = -unit_tangents
+    else:
+        normalised_tangents = unit_tangents
+
+    coronal_tangent_angles = _signed_plane_angles_deg(normalised_tangents, axis=0)
+    sagittal_tangent_angles = _signed_plane_angles_deg(normalised_tangents, axis=1)
+
+    coronal_tangent_angles_deg: Tuple[float, ...] = tuple(
+        float(v) for v in coronal_tangent_angles
+    )
+    sagittal_tangent_angles_deg: Tuple[float, ...] = tuple(
+        float(v) for v in sagittal_tangent_angles
+    )
+
+    coronal_curvature_deg = _sweep(coronal_tangent_angles)
+    sagittal_curvature_deg = _sweep(sagittal_tangent_angles)
+
+    total_curvature_deg = max(coronal_curvature_deg, sagittal_curvature_deg)
+    curvature_plane = "coronal" if coronal_curvature_deg >= sagittal_curvature_deg else "sagittal"
 
     return SpineCurvature(
         tangent_angles_deg=tangent_angles_deg,
         inter_tangent_angles_deg=inter_tangent_angles_deg,
         total_curvature_deg=total_curvature_deg,
+        coronal_tangent_angles_deg=coronal_tangent_angles_deg,
+        sagittal_tangent_angles_deg=sagittal_tangent_angles_deg,
+        coronal_curvature_deg=coronal_curvature_deg,
+        sagittal_curvature_deg=sagittal_curvature_deg,
+        curvature_plane=curvature_plane,
     )

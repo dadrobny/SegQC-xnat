@@ -1413,6 +1413,51 @@
     {
       "entries": [
         {
+          "computation": "max - min of coronal_tangent_angles_deg. 0.0 for a curve confined to the sagittal plane. Requires RAS-ordered mm centroids, guaranteed by io.load_volume.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Coronal-plane (R-S) curvature sweep.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.curvature.coronal_curvature_deg",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": "degrees"
+        },
+        {
+          "computation": "degrees(atan2(t_R, t_S)) per centroid, unwrapped along the ordered sequence, computed from tangents normalised to a cranial-to-caudal traversal direction. Requires RAS-ordered mm centroids (axis 0 = Right, 1 = Anterior, 2 = Superior), guaranteed by io.load_volume.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Signed tangent angle in the coronal (R-S) plane at each centroid; positive tilts toward the patient's right as the spine advances cranially.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.curvature.coronal_tangent_angles_deg[]",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": "degrees"
+        },
+        {
+          "computation": "\"coronal\" when coronal_curvature_deg >= sagittal_curvature_deg, else \"sagittal\". An exact tie, including a straight spine's 0.0/0.0, resolves to \"coronal\".",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Which anatomical plane (coronal or sagittal) total_curvature_deg came from.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.curvature.curvature_plane",
+          "rule_evidence": [],
+          "scale_sensitivity": "categorical",
+          "status": "unwired",
+          "units": ""
+        },
+        {
           "computation": "Angle between each pair of adjacent unit tangent vectors along the spine.",
           "consumers": [],
           "consuming_rules": [],
@@ -1425,6 +1470,36 @@
           "rule_evidence": [],
           "scale_sensitivity": "dimensionless",
           "status": "retune",
+          "units": "degrees"
+        },
+        {
+          "computation": "max - min of sagittal_tangent_angles_deg. 0.0 for a curve confined to the coronal plane. Requires RAS-ordered mm centroids, guaranteed by io.load_volume.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Sagittal-plane (A-S) curvature sweep.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.curvature.sagittal_curvature_deg",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
+          "units": "degrees"
+        },
+        {
+          "computation": "degrees(atan2(t_A, t_S)) per centroid, unwrapped along the ordered sequence, computed from tangents normalised to a cranial-to-caudal traversal direction. Requires RAS-ordered mm centroids (axis 0 = Right, 1 = Anterior, 2 = Superior), guaranteed by io.load_volume.",
+          "consumers": [],
+          "consuming_rules": [],
+          "documented": true,
+          "failure_modes": [],
+          "measures": "Signed tangent angle in the sagittal (A-S) plane at each centroid; positive tilts anterior.",
+          "mode_evidence": [],
+          "origin": "record",
+          "path": "stage3.curvature.sagittal_tangent_angles_deg[]",
+          "rule_evidence": [],
+          "scale_sensitivity": "dimensionless",
+          "status": "unwired",
           "units": "degrees"
         },
         {
@@ -1443,12 +1518,12 @@
           "units": "degrees"
         },
         {
-          "computation": "max(tangent_angles_deg) - min(tangent_angles_deg) across the whole spine; 0 for a perfectly straight column.",
+          "computation": "max(coronal_curvature_deg, sagittal_curvature_deg); 0 for a perfectly straight column. curvature_plane names which plane it came from.",
           "consumers": [],
           "consuming_rules": [],
           "documented": true,
           "failure_modes": [],
-          "measures": "Cobb-angle-like global curvature proxy.",
+          "measures": "Global curvature magnitude: the larger of the coronal and sagittal per-plane sweeps.",
           "mode_evidence": [],
           "origin": "record",
           "path": "stage3.curvature.total_curvature_deg",

@@ -1440,10 +1440,40 @@ FEATURE_DOCS: Mapping[str, FeatureDoc] = MappingProxyType(
             scale_sensitivity='dimensionless',
         ),
         'stage3.curvature.total_curvature_deg': FeatureDoc(
-            measures='Cobb-angle-like global curvature proxy.',
-            computation='max(tangent_angles_deg) - min(tangent_angles_deg) across the whole spine; 0 for a perfectly straight column.',
+            measures='Global curvature magnitude: the larger of the coronal and sagittal per-plane sweeps.',
+            computation='max(coronal_curvature_deg, sagittal_curvature_deg); 0 for a perfectly straight column. curvature_plane names which plane it came from.',
             units='degrees',
             scale_sensitivity='dimensionless',
+        ),
+        'stage3.curvature.coronal_tangent_angles_deg[]': FeatureDoc(
+            measures="Signed tangent angle in the coronal (R-S) plane at each centroid; positive tilts toward the patient's right as the spine advances cranially.",
+            computation='degrees(atan2(t_R, t_S)) per centroid, unwrapped along the ordered sequence, computed from tangents normalised to a cranial-to-caudal traversal direction. Requires RAS-ordered mm centroids (axis 0 = Right, 1 = Anterior, 2 = Superior), guaranteed by io.load_volume.',
+            units='degrees',
+            scale_sensitivity='dimensionless',
+        ),
+        'stage3.curvature.sagittal_tangent_angles_deg[]': FeatureDoc(
+            measures='Signed tangent angle in the sagittal (A-S) plane at each centroid; positive tilts anterior.',
+            computation='degrees(atan2(t_A, t_S)) per centroid, unwrapped along the ordered sequence, computed from tangents normalised to a cranial-to-caudal traversal direction. Requires RAS-ordered mm centroids (axis 0 = Right, 1 = Anterior, 2 = Superior), guaranteed by io.load_volume.',
+            units='degrees',
+            scale_sensitivity='dimensionless',
+        ),
+        'stage3.curvature.coronal_curvature_deg': FeatureDoc(
+            measures='Coronal-plane (R-S) curvature sweep.',
+            computation='max - min of coronal_tangent_angles_deg. 0.0 for a curve confined to the sagittal plane. Requires RAS-ordered mm centroids, guaranteed by io.load_volume.',
+            units='degrees',
+            scale_sensitivity='dimensionless',
+        ),
+        'stage3.curvature.sagittal_curvature_deg': FeatureDoc(
+            measures='Sagittal-plane (A-S) curvature sweep.',
+            computation='max - min of sagittal_tangent_angles_deg. 0.0 for a curve confined to the coronal plane. Requires RAS-ordered mm centroids, guaranteed by io.load_volume.',
+            units='degrees',
+            scale_sensitivity='dimensionless',
+        ),
+        'stage3.curvature.curvature_plane': FeatureDoc(
+            measures='Which anatomical plane (coronal or sagittal) total_curvature_deg came from.',
+            computation='"coronal" when coronal_curvature_deg >= sagittal_curvature_deg, else "sagittal". An exact tie, including a straight spine\'s 0.0/0.0, resolves to "coronal".',
+            units='',
+            scale_sensitivity='categorical',
         ),
         'stage3.monotonic_consistency.is_monotonic': FeatureDoc(
             measures="Whether every vertebra's closest-spline-parameter u increases along the anatomical order.",

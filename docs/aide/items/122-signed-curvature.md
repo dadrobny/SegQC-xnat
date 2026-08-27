@@ -587,3 +587,27 @@ while the new coronal array reads near `5°`. Reconciling the two arrays means
 redefining `tangent_angles_deg`, which is item 121's and Stage 20's territory —
 this item's scope fence is `SpineCurvature`'s scalar reduction. Captured in
 `insights.md` rather than acted on.
+
+### Implementation notes (builder)
+
+- Direction normalisation compares `centroids[-1].centroid_mm[2]` against
+  `centroids[0].centroid_mm[2]` (the raw input sequence's first/last S, not
+  `fit.u`-reordered values), matching the spec's step 2. The normalised
+  tangent array feeds only `_signed_plane_angles_deg`; `tangent_angles_deg`
+  and `inter_tangent_angles_deg` are computed from the original
+  `unit_tangents` exactly as before, unaffected by the sign flip.
+- `_signed_plane_angles_deg(unit_tangents, axis)` takes `axis=0` (R) for
+  coronal and `axis=1` (A) for sagittal, always against `t[:, 2]` (S); it
+  wraps `np.unwrap` around `np.arctan2`. `_sweep` returns `0.0` for arrays of
+  length < 2 (the two-centroid minimum still produces a finite, if trivial,
+  sweep).
+- Artifact regeneration matched the spec's measured values exactly:
+  `clean_control` coronal `11.4034°` (vs retired `5.7017°`),
+  `mode6_crop_at_border` sagittal `70.7815°` / coronal `11.7501°` /
+  `curvature_plane == "sagittal"` (vs retired `35.6720°`, unattributed), and
+  `mode4_relabel_swap`'s coronal sweep `355.3172°` unwrapped. The regenerated
+  `tests/corpus/golden/*.json` and `tests/golden/022_stage3_report.json` diffs
+  against `aide/queue-017` are confined entirely to the `stage3.curvature`
+  object in every file (AC22), confirmed via `git diff aide/queue-017 --
+  tests/corpus/golden tests/golden`; `aide scope` reports all 19 changed
+  files authorised.

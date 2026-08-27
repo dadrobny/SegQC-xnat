@@ -258,13 +258,21 @@ def orientation_to_dict(o: "VertebralOrientation") -> dict:
 def curvature_to_dict(c: "SpineCurvature") -> dict:
     """Convert a :class:`~segfacet.features.orientation.SpineCurvature` to a dict.
 
-    Tuple fields ``tangent_angles_deg`` and ``inter_tangent_angles_deg`` become
-    lists. ``total_curvature_deg`` is emitted as a float.
+    Tuple fields ``tangent_angles_deg``, ``inter_tangent_angles_deg``,
+    ``coronal_tangent_angles_deg`` and ``sagittal_tangent_angles_deg`` become
+    lists of ``float``. ``total_curvature_deg``, ``coronal_curvature_deg`` and
+    ``sagittal_curvature_deg`` are emitted as ``float``; ``curvature_plane`` as
+    ``str`` (item 122).
     """
     return {
         "tangent_angles_deg": list(c.tangent_angles_deg),
         "inter_tangent_angles_deg": list(c.inter_tangent_angles_deg),
         "total_curvature_deg": float(c.total_curvature_deg),
+        "coronal_tangent_angles_deg": [float(v) for v in c.coronal_tangent_angles_deg],
+        "sagittal_tangent_angles_deg": [float(v) for v in c.sagittal_tangent_angles_deg],
+        "coronal_curvature_deg": float(c.coronal_curvature_deg),
+        "sagittal_curvature_deg": float(c.sagittal_curvature_deg),
+        "curvature_plane": str(c.curvature_plane),
     }
 
 

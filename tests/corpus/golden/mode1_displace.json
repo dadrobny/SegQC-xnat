@@ -331,11 +331,28 @@
     },
     "stage3": {
       "curvature": {
+        "coronal_curvature_deg": 49.5019634447012,
+        "coronal_tangent_angles_deg": [
+          -21.697687638262195,
+          24.75098172235061,
+          -5.4659549743637335e-15,
+          -24.750981722350588,
+          21.697687638262273
+        ],
+        "curvature_plane": "sagittal",
         "inter_tangent_angles_deg": [
           62.89604367486368,
           30.693583185546583,
           30.693583185546544,
           62.89604367486374
+        ],
+        "sagittal_curvature_deg": 53.25708398237761,
+        "sagittal_tangent_angles_deg": [
+          -26.62854199118878,
+          20.502101404320683,
+          -5.4659549743637335e-15,
+          -20.502101404320673,
+          26.628541991188833
         ],
         "tangent_angles_deg": [
           32.62284735218241,
@@ -344,7 +361,7 @@
           30.693583185546558,
           32.6228473521825
         ],
-        "total_curvature_deg": 32.6228473521825
+        "total_curvature_deg": 53.25708398237761
       },
       "monotonic_consistency": {
         "is_monotonic": true,
