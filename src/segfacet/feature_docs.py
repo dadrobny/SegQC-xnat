@@ -269,9 +269,9 @@ GROUP_INTROS: Mapping[str, str] = MappingProxyType(
         ),
         "Spline Offset": (
             "A cubic (degree clamped to n_points-1 when the sequence is short) "
-            "B-spline is fit through the ordered centroids' mm-coordinates "
-            "(scipy.interpolate.splprep, s=0 -> passes exactly through every "
-            "centroid); this spline underlies the per-vertebra offset measured "
+            "smoothing B-spline is fit through the ordered centroids' "
+            "mm-coordinates (scipy.interpolate.make_splprep, s = n_points by "
+            "default); this spline underlies the per-vertebra offset measured "
             "here and the orientation/curvature/consistency families below."
         ),
         "Orientation & Curvature": (
@@ -1435,7 +1435,7 @@ FEATURE_DOCS: Mapping[str, FeatureDoc] = MappingProxyType(
         ),
         'stage3.curvature.tangent_angles_deg[]': FeatureDoc(
             measures="Angle between the spline's local tangent and the superior-inferior axis, per vertebra.",
-            computation="Evaluated at each vertebra's stored u via the spline's first derivative (splev, der=1).",
+            computation="Evaluated at each vertebra's stored u via the spline's first derivative (evaluate_spline_derivative, nu=1).",
             units='degrees',
             scale_sensitivity='dimensionless',
         ),

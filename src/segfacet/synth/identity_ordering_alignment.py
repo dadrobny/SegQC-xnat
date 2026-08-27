@@ -14,10 +14,10 @@ naming the induced §6 failure mode and the offending label(s):
   affine -- item 116) while keeping its label. Targets the misalignment
   detector of
   :class:`~segfacet.heuristics.mislabel.MislabelRule` (item 033, Detector A,
-  §6 mode 1). Because the real pipeline refits an *interpolating* spline
+  §6 mode 1). Because the real pipeline refits a *single smoothing* spline
   through **all** present centroids in ascending-label order every time
-  (item 017, ``splprep(..., s=0)``), the displaced centroid is absorbed back
-  onto the refit and plain ``run_qc`` cannot surface this -- it is asserted
+  (item 119, ``make_splprep(..., s=n_points)``), the displaced centroid is
+  absorbed back onto the refit and plain ``run_qc`` cannot surface this -- it is asserted
   via a **reconstructed** ``per_label_offsets`` record (the target's
   leave-one-out offset) fed to ``MislabelRule`` directly, the same pattern
   item 038's ``force_overlap`` used for ``OverlapRule``.

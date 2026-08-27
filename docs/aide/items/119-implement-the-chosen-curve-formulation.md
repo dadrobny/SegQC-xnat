@@ -435,12 +435,16 @@ The code path in `src/segfacet` (see `aide.toml` `project.source_dir`):
 - `tests/test_119_curve_formulation.py` — the new test module.
 - `tests/test_017_centroid_spline_fit.py` — `test_ac4_determinism_curved_spine`
   reads `fit1.tck[0]`, which no longer exists; re-express it against
-  `fit.spline.t`. That one assertion only — item 017's AC1 tolerance and
-  fixtures must not move (AC7).
-- `tests/test_074_benchmark.py`, `tests/test_094_tptbox_image_layer.py`,
-  `tests/test_095_env_migration.py` — each hardcodes `"scipy>=1.7"` in an
-  "existing core dependencies unchanged" set; update that one literal to
-  `"scipy>=1.15"` in each. No other assertion in these modules changes.
+  `fit.spline.t`. Also `test_spline_fit_has_required_fields`'s `hasattr(fit,
+  "tck")` assertion, for the same reason — `tck` is removed, not shimmed
+  (AC1's Assumptions), so the field it checks for no longer exists either.
+  These two assertions only — item 017's AC1 tolerance and fixtures must not
+  move (AC7).
+- `tests/test_074_benchmark.py` — hardcodes `"scipy>=1.7"` in an "existing core
+  dependencies unchanged" set; update that one literal to `"scipy>=1.15"`. No
+  other assertion in this module changes.
+- `tests/test_094_tptbox_image_layer.py` — same literal, same fix.
+- `tests/test_095_env_migration.py` — same literal, same fix.
 - `tests/test_072_backend_feature_port.py` — the fake-CuPy module installs
   forbidden `splprep`/`splev` attributes; add `make_splprep` alongside them so
   the guard still covers the call the fit actually makes. Names only.
@@ -603,4 +607,48 @@ reference artifacts; item 125 validates Stage 28 end to end.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Spec correction: `tests/test_017_centroid_spline_fit.py`'s authorised-path
+  entry widened to name `test_spline_fit_has_required_fields`.** The
+  test-writer correctly declined to touch that assertion under the spec as
+  originally scoped (it asserts `hasattr(fit, "tck")`, which this item removes)
+  and logged the gap in `insights.md` (2026-08-27) rather than widen its own
+  authority. Corrected here, before the test-writer's follow-up edit, so that
+  edit lands inside an authorised path rather than needing its own hand-back.
+
+- **`fit.spline(u)` returns `(3, N)`, not `(N, 3)`.** The spec's Implementation
+  Steps assumed `make_splprep`'s returned `BSpline` evaluates to `(N, 3)`
+  directly (a vector-valued spline evaluated at N points, dimension-last).
+  Measured on this branch: it is dimension-first, `(3, N)` — confirmed with
+  disambiguating N != 3 test inputs, since the assumption and reality are
+  indistinguishable whenever N happens to equal 3. Both `evaluate_spline` and
+  `evaluate_spline_derivative` transpose the result before returning, so the
+  module's `(N, 3)` contract (AC1, AC14, and every existing consumer via
+  `evaluate_spline`) is preserved exactly; this is an internal correction, not
+  a scope or behaviour change — no AC or consumer needed adjustment once the
+  transpose was added.
+
+- **Coincident-centroid guard checks all pairs, not just consecutive ones.**
+  Implementation Steps' step 3 says "detect exactly-equal consecutive
+  mm-coordinate triples"; the shipped `_find_coincident_pair` instead scans
+  every centroid against every previously-seen one (an O(n) dict-based check).
+  A non-consecutive exact duplicate (e.g. levels 1 and 3 coincident, level 2
+  different) would still confuse chord-length parameterisation and is exactly
+  the class of input AC16 exists to give a readable message for, so narrowing
+  the check to adjacent pairs only would leave a gap the broader check closes
+  for free at the same cost. AC16's own fixture happens to use adjacent
+  centroids, so this does not change what that test observes.
+
+- **Spec correction: split the three-file `scipy>=1.7` bullet into one bullet
+  per path.** `aide scope`'s parser reads only the first backtick span per
+  bullet line (`.aide/scripts/aide.py`'s documented rule), so the original
+  single bullet naming `test_074_benchmark.py`, `test_094_tptbox_image_layer.py`
+  and `test_095_env_migration.py` together authorised only the first of the
+  three — `aide scope` failed on the other two even though the spec's prose
+  named them. Split into three one-path bullets; no path added or removed
+  from the authorised set, only made machine-readable.
+
+- **Verified, not asserted by a committed test:** AC20's narrowness (no
+  verdict/finding moved, every changed leaf under `features.stage3`) and
+  AC22's pipeline byte-identity were both confirmed directly against the
+  regenerated goldens and `pipeline.py`'s sha256 before committing, matching
+  the values `test_119_curve_formulation.py` pins.

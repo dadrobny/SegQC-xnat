@@ -19,7 +19,9 @@ Two related descriptors contribute to spinal geometry:
     whether the caller supplied centroids cranial-first or caudal-first.  The
     plane statement holds only when centroids are RAS-ordered mm coordinates
     (axis 0 = Right, 1 = Anterior, 2 = Superior), which is guaranteed for any
-    volume loaded via :func:`segfacet.io.load_volume`.  Exposed as
+    volume loaded via :func:`segfacet.io.load_volume`.  Tangents come from
+    :func:`~segfacet.features.spline.evaluate_spline_derivative` (item 119) —
+    this module never imports SciPy directly.  Exposed as
     :class:`SpineCurvature` and :func:`compute_spine_curvature`.
 
 Public API
@@ -42,10 +44,9 @@ from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 import nibabel as nib
-from scipy.interpolate import splev
 
 from segfacet.features.centroids import LabelCentroid
-from segfacet.features.spline import SplineFit
+from segfacet.features.spline import SplineFit, evaluate_spline_derivative
 from segfacet.labels import LabelConvention
 
 __all__ = [
@@ -366,8 +367,9 @@ def compute_spine_curvature(
 ) -> SpineCurvature:
     """Compute global curvature descriptors along the fitted spline.
 
-    The spline is evaluated at each centroid's stored parameter value (*u*) using
-    ``scipy.interpolate.splev`` with ``der=1`` to obtain tangent vectors.
+    The spline is evaluated at each centroid's stored parameter value (*u*)
+    using :func:`~segfacet.features.spline.evaluate_spline_derivative` with
+    ``nu=1`` to obtain tangent vectors.
 
     Parameters
     ----------
@@ -422,12 +424,7 @@ def compute_spine_curvature(
             u_vals = list(cumulative / total)
 
     # Evaluate first derivative (tangent) at each u value.
-    u_array = np.asarray(u_vals, dtype=np.float64)
-    derivs = splev(u_array, fit.tck, der=1)
-    # derivs is [dx/du_array, dy/du_array, dz/du_array], each of length n.
-    tangents = np.column_stack(
-        [np.asarray(derivs[0]), np.asarray(derivs[1]), np.asarray(derivs[2])]
-    ).astype(np.float64)  # shape (n, 3)
+    tangents = evaluate_spline_derivative(fit, u_vals, nu=1)  # shape (n, 3)
 
     # Normalise each tangent vector.
     norms = np.linalg.norm(tangents, axis=1, keepdims=True)  # (n, 1)

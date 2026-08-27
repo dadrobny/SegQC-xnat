@@ -1405,7 +1405,7 @@
           "units": "voxels"
         }
       ],
-      "intro": "A cubic (degree clamped to n_points-1 when the sequence is short) B-spline is fit through the ordered centroids' mm-coordinates (scipy.interpolate.splprep, s=0 -> passes exactly through every centroid); this spline underlies the per-vertebra offset measured here and the orientation/curvature/consistency families below.",
+      "intro": "A cubic (degree clamped to n_points-1 when the sequence is short) smoothing B-spline is fit through the ordered centroids' mm-coordinates (scipy.interpolate.make_splprep, s = n_points by default); this spline underlies the per-vertebra offset measured here and the orientation/curvature/consistency families below.",
       "module": "segfacet.features.spline_offset",
       "stage": "Stage 3 · item 018",
       "title": "Spline Offset"
@@ -1503,7 +1503,7 @@
           "units": "degrees"
         },
         {
-          "computation": "Evaluated at each vertebra's stored u via the spline's first derivative (splev, der=1).",
+          "computation": "Evaluated at each vertebra's stored u via the spline's first derivative (evaluate_spline_derivative, nu=1).",
           "consumers": [],
           "consuming_rules": [],
           "documented": true,

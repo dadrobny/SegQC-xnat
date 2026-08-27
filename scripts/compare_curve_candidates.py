@@ -163,8 +163,8 @@ _N_SCAN = 500
 
 
 class _ParametricCurve:
-    """Wraps a ``segfacet.features.spline.SplineFit``-shaped ``(t, c, k)``
-    tck through :func:`segfacet.features.spline.evaluate_spline`."""
+    """Wraps a ``segfacet.features.spline.SplineFit`` through
+    :func:`segfacet.features.spline.evaluate_spline`."""
 
     def __init__(self, fit) -> None:
         self._fit = fit
@@ -242,23 +242,13 @@ def _closest_point_distance(evaluate_fn: Callable, point_mm: np.ndarray, n_scan:
 def _fit_interpolating_cubic(centroids: Sequence) -> _ParametricCurve:
     from segfacet.features.spline import fit_centroid_spline
 
-    return _ParametricCurve(fit_centroid_spline(centroids))
+    return _ParametricCurve(fit_centroid_spline(centroids, smoothing=0.0))
 
 
 def _fit_smoothing_spline(centroids: Sequence) -> _ParametricCurve:
-    from scipy.interpolate import splprep
+    from segfacet.features.spline import fit_centroid_spline
 
-    from segfacet.features.spline import SplineFit
-
-    n = len(centroids)
-    k = min(3, n - 1)
-    x = np.array([float(c.centroid_mm[0]) for c in centroids], dtype=np.float64)
-    y = np.array([float(c.centroid_mm[1]) for c in centroids], dtype=np.float64)
-    z = np.array([float(c.centroid_mm[2]) for c in centroids], dtype=np.float64)
-    s = float(n)  # SciPy's suggested starting point: s in (m - sqrt(2m), m + sqrt(2m))
-    tck, u = splprep([x, y, z], k=k, s=s)
-    fit = SplineFit(tck=tck, u=tuple(float(v) for v in u), degree=k, n_points=n)
-    return _ParametricCurve(fit)
+    return _ParametricCurve(fit_centroid_spline(centroids))
 
 
 def _fit_lsq_bspline_fixed_knots(centroids: Sequence) -> _AxisCurve:
