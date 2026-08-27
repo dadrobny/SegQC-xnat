@@ -326,6 +326,13 @@ Given the ordered unit tangents `t` already computed by
 - `tests/golden/022_stage3_report.json` — regenerated from the test's
   `produced` text, never hand-edited.
 - `tests/test_122_signed_curvature.py` — the new test module.
+- `tests/test_103_feature_catalogue.py` — the hardcoded `clean_control`
+  leaf-path count, a direct mechanical consequence of adding five new leaves
+  under `stage3.curvature` (84 → 89).
+- `docs/aide/golden-decision-table.md` — the nine Group-A rows' measured
+  `N/M leaf paths unwired` evidence cells and the narrative sentence quoting
+  them, a direct mechanical consequence of the same leaf-count change; no
+  judgement column (disposition, rationale, replacement guarantee) may change.
 - `docs/aide/items/122-signed-curvature.md` — this spec.
 - `docs/aide/insights.md` — one-line out-of-scope captures only.
 
@@ -587,6 +594,23 @@ while the new coronal array reads near `5°`. Reconciling the two arrays means
 redefining `tangent_angles_deg`, which is item 121's and Stage 20's territory —
 this item's scope fence is `SpineCurvature`'s scalar reduction. Captured in
 `insights.md` rather than acted on.
+
+### Authorised paths under-scoped the leaf-count blast radius
+
+The original **Authorised paths** list omitted `tests/test_103_feature_catalogue.py`
+and `docs/aide/golden-decision-table.md`. Both hardcode the `clean_control`
+leaf-path count (84, and the derived `17/84` unwired fraction across the nine
+Group-A golden rows), and adding five new leaves under `stage3.curvature`
+moves both numbers (84 → 89, 17/84 → 22/89) whether or not this item's scope
+fence says so — the count is measured off `segfacet.catalogue.build_catalogue()`
+and the regenerated goldens, not chosen by the builder. A follow-up item could
+not land the fix first: the true count only exists once this item's leaves
+exist, so pairing the refresh with a later item would leave both documents
+red for the entire gap. Both are added to **May change** here, restricted to
+exactly the mechanical consequence (a count in one, and measured evidence
+cells plus their narrative sentence in the other) — no judgement column in
+the golden-decision-table (disposition, rationale, replacement guarantee) is
+authorised to change from inside this item.
 
 ### Implementation notes (builder)
 
