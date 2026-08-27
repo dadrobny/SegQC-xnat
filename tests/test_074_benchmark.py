@@ -321,7 +321,7 @@ def _load_pyproject():
 def test_ac13_core_dependencies_unchanged_no_cupy():
     expected_deps = {
         "numpy>=1.26,<3",
-        "scipy>=1.7",
+        "scipy>=1.15",
         "scikit-image>=0.19",
         "nibabel>=4.0",
         "PyYAML>=5.4",

@@ -121,7 +121,7 @@ def test_ac2_other_core_dependency_bounds_unchanged():
     # dependencies' lower bounds are untouched.
     dependencies = _load_pyproject()["project"]["dependencies"]
     unchanged = {
-        "scipy>=1.7",
+        "scipy>=1.15",
         "scikit-image>=0.19",
         "nibabel>=4.0",
         "PyYAML>=5.4",

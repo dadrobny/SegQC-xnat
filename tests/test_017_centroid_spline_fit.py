@@ -405,11 +405,16 @@ def test_ac4_determinism_straight_spine():
 
 
 def test_ac4_determinism_curved_spine():
-    """AC4: Two fits on the same curved spine return identical tck knot vectors."""
+    """AC4: Two fits on the same curved spine return identical knot vectors.
+
+    Item 119 replaced SplineFit.tck (a legacy (t, c, k) FITPACK tuple) with
+    SplineFit.spline (a scipy.interpolate.BSpline); its knot vector is now
+    reachable as fit.spline.t.
+    """
     centroids = _curved_spine()
     fit1 = fit_centroid_spline(centroids)
     fit2 = fit_centroid_spline(centroids)
-    np.testing.assert_array_equal(fit1.tck[0], fit2.tck[0])
+    np.testing.assert_array_equal(fit1.spline.t, fit2.spline.t)
 
 
 def test_ac4_determinism_evaluate_spline():
