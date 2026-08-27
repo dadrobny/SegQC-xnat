@@ -293,20 +293,23 @@ its third); any feature outside the spline layer (queue-017's scope fence);
   regeneration stays auditable and item 123's remaining work — the threshold
   and both reference artifacts — is untouched.
 
-- **Both `reference_*.json` artifacts are left stale on purpose.**
-  `reference_default.json`'s `spline_offset_mm` distribution is noise about zero
-  (L1 mean `7.4e-05` mm, std `2.1e-05` mm), so after this item a clean case's
-  `~0.35` mm offset scores thousands of sigma out and
-  `run_qc_with_reference` produces extra `reference_delta` findings (measured:
-  `clean_control` goes from 6 to 21 reference-delta findings against the
-  bundled default). The existing reference tests survive this — item 049's
-  clean-control control builds its bracketing reference *from current code* in
-  a temp cohort, and item 049's AC11 asserts `out_of_range_features != []`,
-  which extra entries do not break — but the builder must confirm it rather
-  than assume it (see [Testing Strategy](#testing-strategy)). Rebuilding either
-  artifact is item 123's; `reference_verse_v1.json` additionally cannot be
-  rebuilt without the real cohort and is byte-pinned by
-  `test_098_stray_components.py`.
+- **~~Both `reference_*.json` artifacts are left stale on purpose.~~
+  Superseded in the second validation round: `reference_default.json` is
+  rebuilt here.** The original reasoning held that
+  `reference_default.json`'s `spline_offset_mm` distribution is noise about
+  zero (L1 mean `7.4e-05` mm, std `2.1e-05` mm), so after this item a clean
+  case's `~0.35` mm offset scores thousands of sigma out and
+  `run_qc_with_reference` produces extra `reference_delta` findings, and that
+  the existing reference tests survive it. The survey behind that was
+  incomplete: it named `test_049`, `test_090`, `test_092`, `test_097` and
+  `test_098` — which do survive — but missed
+  `test_045_reference_artifact.py`, `test_063_reference_intensity.py` and
+  `test_081_reference_morphology.py`, five of whose tests compare a **freshly
+  built** distribution against the **committed** artifact and therefore cannot
+  survive a stale one. See the Decisions log entry "The bundled default
+  reference artifact is rebuilt here". `reference_verse_v1.json` is still left
+  to item 123: it cannot be rebuilt without the real cohort and is byte-pinned
+  by `test_098_stray_components.py`.
 
 - **`aide check --queue 017` reports four pre-existing cross-spec errors that
   this item cannot clear.** They are all overlaps with items **118** and
@@ -448,6 +451,31 @@ The code path in `src/segfacet` (see `aide.toml` `project.source_dir`):
 - `tests/test_072_backend_feature_port.py` — the fake-CuPy module installs
   forbidden `splprep`/`splev` attributes; add `make_splprep` alongside them so
   the guard still covers the call the fit actually makes. Names only.
+- `src/segfacet/reference/reference_default.json` — regenerated via
+  `python -m segfacet.reference.artifact`, never hand-edited. **Amended after
+  the second validation round** (see the Decisions log entry "The bundled
+  default reference artifact is rebuilt here"): the artifact's
+  `spline_offset_mm` distribution is measured *by the fit this item replaces*,
+  so leaving it stale makes five committed tests compare a fresh build against
+  a distribution that no longer exists —
+  `test_045_reference_artifact.py::test_ac10_regenerating_reproduces_committed_bytes`,
+  `test_063_reference_intensity.py::{test_ac13_default_cohort_geometric_stats_identical_on_off_intensity,
+  test_ac15_bundled_artifact_regenerates_byte_identically}` and
+  `test_081_reference_morphology.py::{test_ac12_bundled_default_geometric_and_intensity_stats_identical_on_off_morphology,
+  test_ac17_regenerated_artifact_deterministic_and_matches_committed_within_tolerance}`.
+  Under this repo's `auto-merge` mode a red suite cannot merge, so item 123
+  cannot clear them later: the rebuilt distribution only exists once this
+  item's fit exists. `reference_verse_v1.json` stays item 123's and is
+  untouched (it needs the real VerSe cohort).
+- `tests/test_122_signed_curvature.py` — **amended after the second validation
+  round** (see the Decisions log entry "Item 122's pinned tangent-angle
+  constants were measured under the interpolating fit"): four of its
+  absolute-value assertions were measured against the `s = 0` fit this item
+  retires and are stale, not wrong-by-regression. The constant update is
+  confined to those four numbers on the `_coronal_c_curve` / `_sagittal_c_curve`
+  fixtures; AC15's contract (tuple lengths, `curvature_plane` string domain,
+  `total_curvature_deg == max − min`) and AC17's near-coincident adversarial
+  fixture are unchanged and stay green untouched.
 - `docs/aide/insights.md` — append-only, per the out-of-scope-insight rule.
 
 **Asserts against:**
@@ -456,10 +484,11 @@ The code path in `src/segfacet` (see `aide.toml` `project.source_dir`):
   leave-one-out promotion is item 120's.
 - `src/segfacet/heuristics/mislabel.py` — read and pinned by AC21:
   `max_offset_mm` stays `15.0`; item 123 raises it.
-- `src/segfacet/reference/reference_default.json` and
-  `src/segfacet/reference/reference_verse_v1.json` — read, not changed. Both
-  are stale after this item by design (item 123 rebuilds them); the second is
-  additionally byte-pinned by `test_098_stray_components.py`.
+- `src/segfacet/reference/reference_verse_v1.json` — read, not changed. It
+  cannot be rebuilt without the real VerSe cohort, is byte-pinned by
+  `test_098_stray_components.py`, and its rebuild is item 123's. (Its sibling
+  `reference_default.json` moved to **May change** in the second validation
+  round — see that entry above.)
 - `src/segfacet/synth/regression.py` — read, not changed.
   `_recon_leave_one_out_offset` is the technique AC9 mirrors and the workaround
   item 120 retires.
@@ -472,8 +501,6 @@ The code path in `src/segfacet` (see `aide.toml` `project.source_dir`):
   non-VerSe numbers still reproduce.
 - `tests/test_118_curve_formulation_decision.py` — read, not changed. AC25 is
   satisfied by this module staying green as committed.
-- `tests/test_122_signed_curvature.py` — read, not changed. AC17 pins its
-  near-coincident adversarial fixture; AC15 pins its signed-curvature contract.
 - `tests/corpus/manifest.json` — read, not changed. The nine cases and their
   committed fixtures are the population AC18/AC20 regenerate against.
 - `.gitattributes` — read, not changed: every file this item regenerates is
@@ -652,3 +679,140 @@ reference artifacts; item 125 validates Stage 28 end to end.
   AC22's pipeline byte-identity were both confirmed directly against the
   regenerated goldens and `pipeline.py`'s sha256 before committing, matching
   the values `test_119_curve_formulation.py` pins.
+
+- **Item 122's pinned tangent-angle constants were measured under the
+  interpolating fit, and are stale rather than wrong.** The second validation
+  round failed four tests in `tests/test_122_signed_curvature.py`: on the
+  identical `_coronal_c_curve(7)` fixture, `coronal_tangent_angles_deg[0]`
+  reads `58.28039547838166` here against `43.85365592755774` on
+  `aide/queue-017`. Two readings were possible — a genuine consequence of the
+  approved `s = 0` → `s = n_points` change, or a defect in this item's
+  `(3, N)` → `(N, 3)` transpose in `evaluate_spline_derivative`. Four
+  independent measurements settle it as the former:
+
+  1. **`make_splprep`'s evaluation really is dimension-first.** At `N = 11`
+     parameter values (so `N != 3` and the two layouts are distinguishable),
+     both `spl(u)` and `spl(u, nu=1)` return shape `(3, 11)`. The transpose is
+     correct, and this is now confirmed at a disambiguating `N` — the check
+     the previous round did not perform.
+  2. **Analytic ground truth.** On a straight 6-centroid spine along
+     `(3, 4, 12)/13`, `evaluate_spline_derivative` returns that unit direction
+     at every one of `u = 0, 0.25, 0.5, 0.75, 1` to `2.2e-16`. A transposed or
+     axis-swapped derivative cannot reproduce a known direction to machine
+     precision.
+  3. **An independent SciPy path agrees.** `fit.spline.derivative()(u)`,
+     which reaches the same quantity without `nu=`, matches
+     `evaluate_spline_derivative` to `2.8e-14` over 11 parameter values; and
+     central finite differences of `evaluate_spline` (`h = 1e-6`) match it to
+     `9.2e-09` against a derivative scale of `102.2`.
+  4. **The decisive one: the old numbers reproduce through the new code
+     path.** `fit_centroid_spline(_coronal_c_curve(7), smoothing=0.0)` fed
+     through the *current* `evaluate_spline_derivative` and the *current*
+     `compute_spine_curvature` yields `coronal_tangent_angles_deg[0] =
+     43.8536559275577`, matching item 122's committed `43.85365592755774` to
+     `1.4e-14` relative. Every one of item 122's four stale constants
+     reproduces exactly this way. The tangent-derivation path is therefore
+     bit-for-bit the pre-119 behaviour; the entire shift is the fit.
+
+  The shift's direction is also physically expected: a smoothing spline is no
+  longer pinned to its endpoints (this fixture's worst pass-through deviation
+  is `1.396` mm at a 30 mm curve amplitude, against `7.1e-15` mm interpolating),
+  and an unclamped end is where a smoothing fit's tangent moves most — so a
+  large end-point angle shift on a fixture measured *at* `u = 0` is the
+  signature of the approved change, not of a defect.
+
+  The stale constants and their re-measured values, for the test-writer (the
+  fixtures and every relational assertion are unchanged; only these absolute
+  numbers move):
+
+  | Test | Assertion | Old | New |
+  |---|---|---|---|
+  | `test_ac1_coronal_c_curve_first_positive_last_negative` | `coronal_tangent_angles_deg[0]` | `43.8537` | `58.2804` |
+  | `test_ac1_coronal_c_curve_first_positive_last_negative` | `coronal_tangent_angles_deg[-1]` | `-43.8537` | `-58.2804` |
+  | `test_ac5_coronal_c_curve_equals_inter_tangent_sum` | `coronal_curvature_deg` | `87.7073` | `116.5608` |
+  | `test_ac5_retired_formula_is_half_on_same_fixture` | retired `max − min` | `43.8537` | `58.2804` |
+  | `test_ac7_sagittal_curve_zero_coronal` | `sagittal_curvature_deg` | `87.7073` | `116.5608` |
+
+  Full-precision measurements: `58.28039547838166`, `-58.280395478381614`,
+  `116.56079095676327`. `_balanced_s_curve`'s pins (`total_curvature_deg
+  53.7979`, retired `0.0900`) are **unchanged** and must not be touched — that
+  fixture has 4 centroids at `k = 3`, so the B-spline has exactly as many
+  coefficients as points and the smoothing term has no freedom to act. The
+  `_coronal_c_curve` / `_sagittal_c_curve` docstrings ("coronal 87.7073",
+  "sagittal 87.7073") carry the same stale figure and should move with the
+  assertions; `_mode4_relabel_swap_shape`'s docstring cites the corpus golden's
+  `355.3172` deg, which this item's golden regeneration moves to `355.2389`.
+
+- **The bundled default reference artifact is rebuilt here.**
+  `src/segfacet/reference/reference_default.json` moves from **Asserts
+  against** to **May change**, rebuilt with the project's own tooling
+  (`python -m segfacet.reference.artifact`), never hand-edited. Five committed
+  tests compare a *freshly built* distribution against the *committed* one —
+  `test_045_reference_artifact.py::test_ac10_regenerating_reproduces_committed_bytes`,
+  `test_063_reference_intensity.py::{test_ac13_default_cohort_geometric_stats_identical_on_off_intensity,
+  test_ac15_bundled_artifact_regenerates_byte_identically}`,
+  `test_081_reference_morphology.py::{test_ac12_bundled_default_geometric_and_intensity_stats_identical_on_off_morphology,
+  test_ac17_regenerated_artifact_deterministic_and_matches_committed_within_tolerance}`
+  — so a stale artifact fails them by construction. Item 123 cannot clear them
+  later: the rebuilt distribution only exists once this item's fit exists, and
+  under `auto-merge` (`aide.toml` `[git] mode`) a red suite cannot merge at
+  all. This is the same resolution item 122 took with its goldens, and the
+  same one this item's Assumptions already took for the corpus goldens. Item
+  123 keeps `mislabel`'s `max_offset_mm` recalibration (still `15.0` here) and
+  the `reference_verse_v1.json` rebuild, which needs the real VerSe cohort.
+
+  **The rebuild's footprint, measured leaf by leaf against
+  `aide/queue-017`:** 48 changed leaves, *all 48* under
+  `levels.<L1..L5>.all.feature_stats.spline_offset_mm` (mean/std/min/max and
+  the p1–p99 percentiles). `schema_version`, `provenance` (including
+  `config_hash`), `features`, `percentiles`, `subject_count`, `strata` and the
+  level key set are byte-unchanged, and no other feature's stats moved. Two
+  successive rebuilds are byte-identical, so
+  `test_ac10_two_regenerations_stay_byte_identical` holds; the
+  `.gitattributes` `text eol=lf` pin on the path is already present and
+  untouched. Example magnitude: L1 `spline_offset_mm.mean` `7.44e-05` mm →
+  `0.0214` mm.
+
+- **Detection behaviour: no verdict and no `(rule_id, labels)` pair moves on
+  any corpus case.** Verified by replaying all nine committed corpus fixtures
+  through both `run_qc` and `run_qc_with_reference` on a worktree of
+  `aide/queue-017` (pre-119 code *and* pre-119 artifact) and on this branch
+  (post-119 code *and* rebuilt artifact):
+
+  - Under plain `run_qc` — the path `synth/golden.py` uses, and therefore the
+    only one the committed goldens see — all nine cases are **identical to
+    pre-119**: same overall `Severity`, same findings, same reason count.
+  - Under `run_qc_with_reference` against the bundled default, every case
+    keeps its pre-119 overall `Severity`, and the *set* of `(rule_id, labels)`
+    pairs is unchanged on all nine — no rule starts or stops firing, and no
+    label starts or stops being flagged. What changes is the **multiplicity**
+    of `reference_delta` findings on labels that were already firing
+    `reference_delta` (e.g. `clean_control` label 20: 2 → 3), because that
+    rule emits one finding per out-of-range feature and `spline_offset_mm` is
+    now a real measurement with real spread rather than `~1e-4` mm of
+    numerical noise. No other `rule_id` changed on any case.
+
+  The rebuild strictly *reduces* that residue rather than causing it: with the
+  stale artifact `clean_control` carries 27 reference-delta findings against a
+  pre-119 baseline of 12, and the rebuild brings it to 17. Closing the
+  remaining gap is item 123's recalibration, which the leave-one-out
+  distributions from item 120 exist to justify.
+
+- **One descriptive `curvature_plane` value flips, inside AC20's fence.**
+  `mode1_displace`'s `features.stage3.curvature.curvature_plane` moves
+  `sagittal` → `coronal`. Its two plane sweeps are near-tied and both moved
+  under the new fit (`coronal 49.502` / `sagittal 53.257` before; `coronal
+  44.926` / `sagittal 42.295` after), so the `max` of the two changes hands. It
+  is a descriptive feature value under `features.stage3`, which AC20 permits;
+  AC15 pins the `curvature_plane` *string domain*, not which member a given
+  fixture selects, and the domain is unchanged.
+
+- **Boundary re-confirmation after the second round.** `git diff
+  aide/queue-017` lists no change to `src/segfacet/pipeline.py` (AC22),
+  `src/segfacet/heuristics/mislabel.py` (`_DEFAULT_MAX_OFFSET_MM` still
+  `15.0`, AC21) or `src/segfacet/reference/reference_verse_v1.json`. AC20
+  re-verified leaf by leaf over all nine regenerated goldens: no `verdict`
+  moved, the ordered `(rule_id, labels)` list is unchanged on every case, and
+  every changed leaf lies under `features.stage3` (`per_label_offsets`,
+  `per_label_neighbourhood`, `monotonic_consistency.u_values` and the
+  `curvature` block).
