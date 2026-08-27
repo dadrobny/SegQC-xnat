@@ -440,4 +440,66 @@ against the shipped formulation, and confirms a person resolved the gate before
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Family: `smoothing_spline`** (SciPy `splprep` with `s = n_points` instead
+  of `0`, same `k = min(3, n_points - 1)` degree clamp as today). Rejected
+  `lsq_bspline_fixed_knots` and `polynomial_per_plane` despite both showing a
+  *larger* synthetic in-sample separation margin, because both fail badly on
+  real VerSe19 anatomy (in-sample max pass-through on the cohort's most
+  coronally-deviated cases: `17.68` mm and `27.86` mm respectively, against
+  `smoothing_spline`'s `2.10` mm) — they would falsely flag real scoliotic
+  curvature. `robust_downweighted` was excluded outright: an
+  iteratively-reweighted robust regression needs functionality SciPy/NumPy do
+  not ship, and adding it means a new runtime dependency, which this item's
+  Assumptions forbid.
+- **Degrees of freedom: `s = n_points`**, SciPy's own documented starting
+  point (`s` in `(m - sqrt(2m), m + sqrt(2m))`), so smoothing capacity scales
+  with cohort size automatically rather than via a fixed, separately-tuned
+  knot count. Measured trade-off: at small level counts (the sweep's
+  smallest multi-level grid point) there is no spare freedom to smooth with,
+  so `smoothing_spline` provably degenerates to the same fit as the
+  fixed-knot alternative there (both `0.552139` mm) — the real
+  differentiation only shows up at the larger vertebra counts VerSe19
+  provides.
+- **Parameterisation: chord-length**, unchanged from today's `u` (the value
+  `splprep` already computes), shared by `interpolating_cubic`,
+  `smoothing_spline` and `lsq_bspline_fixed_knots`. `polynomial_per_plane`'s
+  own-domain (cranio-caudal-coordinate) reparameterisation is one further,
+  independent reason it was not chosen: adopting it would mean redefining
+  what "the spline parameter" means for every Stage 3 consumer
+  (`closest_u`, `_find_closest_u`, the monotonic-`u` check).
+- **Breaking circularity: leave-one-out**, matching the technique
+  `synth/regression.py`'s `_recon_leave_one_out_offset` already uses for the
+  mislabel reconstruction path. Measured to matter *more* than the family
+  choice: every evaluated family separates a 5 mm synthetic displacement
+  almost identically well once the excluded point never gets to bend the
+  fit toward itself (smallest leave-one-out margin `4.999144`–`4.999936` mm
+  across families, vs. `-0.244683`–`0.140882` mm in-sample). Item 119 should
+  make leave-one-out the actual `stage3.per_label_offsets` computation, not
+  only a synthetic-test technique.
+- **Deformity envelope: PROPOSED, not decided here.** A proposed
+  `max_offset_mm` of `25.0` mm (up from today's `15.0`, tuned against an
+  always-zero interpolating offset) is recorded as evidence for the human
+  gate in `docs/spinal-curve-model.md`'s `### Deformity envelope` section —
+  set above the highest leave-one-out offset observed on any real VerSe19 GT
+  case (`21.073357` mm) so a genuinely scoliotic but undisplaced spine is not
+  falsely flagged, at the accepted cost of missing a smaller genuine
+  displacement. This item does not resolve the gate (AC3/AC8); a person must
+  decide via `aide gate approve` before item 119 lands.
+- **Script structure**: `scripts/compare_curve_candidates.py` builds every
+  candidate's centroid-mm coordinates via a shared `evaluate(u) -> (N, 3)`
+  interface (`u` in `[0, 1]`) so one coarse-scan-then-refine closest-point
+  search (mirroring `features/spline_offset._find_closest_u`) works
+  unmodified across all four evaluated families, including
+  `polynomial_per_plane` (whose own domain is linearly remapped onto `u`).
+  Leave-one-out in the clean-GT sweep excludes only *interior* centroid
+  indices, not endpoints — excluding an endpoint turns the measurement into a
+  pure extrapolation-beyond-the-fit-domain question dominated by
+  inter-vertebra spacing for every family alike, not a genuine
+  family-differentiating signal.
+- **Real-cohort run**: the VerSe19 cohort was reachable on the implementation
+  machine (`dataset-verse19training`, 80 masks via recursive glob). Every
+  number quoted in `docs/spinal-curve-model.md`, including every
+  VerSe-sourced row, came from an actual
+  `scripts/compare_curve_candidates.py --out out/curve-candidates
+  --verse-cohort dataset-verse19training` run — none were invented, and none
+  had to be recorded as skipped.
