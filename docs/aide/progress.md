@@ -921,19 +921,24 @@ rule(s) and any features they need; features may be added alone, modes and rules
 
 - 📋 Traceability matrix, *generated* (not hand-maintained): 8 failure modes × 10 rules ×
   the features each rule consumes, scored in all three directions, every mode row carrying
-  its evidence rung.
+  its evidence rung. *(Item 123)*
 - 📋 The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
   `intensity_reference_delta`) mapped to §6 modes, or recorded as targeting none with a
-  reason — the root close of Stage 19's G8 shortfall.
+  reason — the root close of Stage 19's G8 shortfall. *(Item 119)*
 - 📋 Specificity assertion — no unintended rule may fire — adopted as a ratchet.
+  *(Item 118)*
 - 📋 Reachability hole closed *with its mechanism named per mode*: mode 8 is
   single-channel-unobservable, mode 1's ladder is FOV-capped, mode 4's cause TBD. Made
   detectable where the mechanism allows, recorded where it does not. Not both silent.
+  *(Items 120, 121, 123)*
 - 📋 Per-rule **and per-operator** corpus-exercise reporting (the registered `fuse` operator
-  generates no corpus case at all).
+  generates no corpus case at all). *(Item 122)*
 - 📋 Item 100's mode-1 ladder base widened so mode 1's metric swing is set by the
   perturbation rather than the fixture's FOV walls — the recorded root cause of mode 6's
-  Stage-18 specificity shortfall.
+  Stage-18 specificity shortfall. *(Item 121)*
+- 📋 Stage 20 end-to-end validation: matrix read for silent rows, ratchet red-then-green
+  replay, exercise-report cross-check, honest end-to-end detection count, fresh-clone suite
+  run, and verification-row closure. *(Item 124)*
 
 **Acceptance.**
 
