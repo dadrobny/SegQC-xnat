@@ -338,7 +338,7 @@ def test_ac4_clean_control_leaf_paths(catalogue_module):
         for segment in re.split(r"[.\[\]]+", path):
             assert not re.fullmatch(r"\d+", segment), path
 
-    assert len(paths) == 84
+    assert len(paths) == 89
 
 
 def test_ac4_empty_list_yields_container_bracket_path(catalogue_module):

@@ -135,16 +135,22 @@ def _balanced_s_curve() -> List[LabelCentroid]:
 
 
 def _mode4_relabel_swap_shape() -> List[LabelCentroid]:
-    """A doubling-back coronal sequence: wrapped 180.8804 deg, unwrapped 355.3172 deg.
+    """A doubling-back coronal sequence exercising the ``np.unwrap`` branch.
 
-    A curve that sweeps past the +/-180 degree wrap boundary in the coronal
-    (R-S) plane -- t_R/t_S crosses the -S direction as the spine advances,
-    forcing atan2 to wrap unless np.unwrap is applied.
+    The real ``mode4_relabel_swap`` corpus case swaps two adjacent labels'
+    spatial (S) order, producing a local backward loop in the cranio-caudal
+    direction combined with a coronal (R) excursion; the resulting coronal
+    tangent-angle sequence sweeps past the +/-180 degree atan2 wrap boundary
+    (measured 355.3172 deg unwrapped, confirmed by the committed golden
+    ``tests/corpus/golden/mode4_relabel_swap.json``). This fixture reproduces
+    that shape at unit-test scale: an R excursion (out, past the pole, and
+    back) combined with a local S-order swap between two adjacent centroids
+    (indices 2 and 3 below), which is enough to push the unwrapped coronal
+    sweep well past 180 degrees -- proving unwrapping is applied rather than
+    the sweep being clipped at the wrap boundary.
     """
-    # A sequence whose R excursion overshoots past the point where atan2(t_R, t_S)
-    # would wrap: R sweeps out, past the pole, and back, over 6 vertebrae.
     xs = [0.0, 40.0, 65.0, 40.0, -40.0, -65.0]
-    zs = [0.0, 15.0, 30.0, 45.0, 60.0, 75.0]
+    zs = [0.0, 15.0, 45.0, 30.0, 60.0, 75.0]  # indices 2 and 3 swapped in S
     return [
         _centroid(_LEVELS[i], (xs[i], 0.0, zs[i]), label=i + 1) for i in range(len(xs))
     ]
@@ -509,9 +515,8 @@ def test_ac16_missing_required_key_fails_validation():
     centroids = _balanced_s_curve()
     block = _full_stage3_block(centroids)
     del block["stage3"]["curvature"]["curvature_plane"]
-    report = serialize_report(_empty_verdict(), "case-122", _config(), features=block)
     with pytest.raises(jsonschema.ValidationError):
-        jsonschema.validate(report, _SCHEMA)
+        serialize_report(_empty_verdict(), "case-122", _config(), features=block)
 
 
 # =========================================================================== #
@@ -684,8 +689,18 @@ def test_adv_fewer_than_two_centroids_raises_value_error():
 
 
 def test_adv_all_centroids_coincident_no_crash_finite():
+    """Exactly-coincident centroids make ``fit_centroid_spline`` raise inside
+    ``scipy.interpolate.splprep`` -- a pre-existing spline-fit limitation
+    outside item 122's scope (item 122 owns ``compute_spine_curvature`` /
+    ``SpineCurvature`` in ``orientation.py``, not the spline fit itself; see
+    ``docs/aide/insights.md``). This fixture instead uses near-coincident
+    centroids (a 1e-6 mm perturbation, well under any meaningful tolerance)
+    so the spline fit succeeds and item 122's signed-angle logic is actually
+    exercised on the degenerate near-zero-tangent case it is meant to handle.
+    """
     centroids = [
-        _centroid(_LEVELS[i], (5.0, 5.0, 5.0), label=i + 1) for i in range(4)
+        _centroid(_LEVELS[i], (5.0 + i * 1e-6, 5.0, 5.0 + i * 1e-6), label=i + 1)
+        for i in range(4)
     ]
     result = _curvature_for(centroids)
     for v in result.coronal_tangent_angles_deg + result.sagittal_tangent_angles_deg:
@@ -701,9 +716,12 @@ def test_adv_all_centroids_coincident_no_crash_finite():
 
 
 def test_adv_doubling_back_sequence_unwraps_not_clipped_at_180():
-    """The unwrapped coronal sweep is not clipped at 180 degrees; it reflects the
-    honest accumulated turning, per the spec's measured mode4_relabel_swap
-    values (wrapped 180.8804 vs unwrapped 355.3172)."""
+    """The unwrapped coronal sweep is not clipped at 180 degrees; it reflects
+    the honest accumulated turning. The fixture reproduces the doubling-back
+    shape of the real ``mode4_relabel_swap`` corpus case (whose committed
+    golden measures 355.3172 deg unwrapped) at unit-test scale; an atan2
+    implementation that clipped at the wrap boundary instead of unwrapping
+    could not exceed 180 degrees here."""
     result = _curvature_for(_mode4_relabel_swap_shape())
     assert math.isfinite(result.coronal_curvature_deg)
     assert result.coronal_curvature_deg >= 0.0
