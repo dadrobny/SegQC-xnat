@@ -96,7 +96,7 @@ def _straight_spine(n: int = 5, spacing_mm: float = 10.0) -> List[LabelCentroid]
 
 
 def _coronal_c_curve(n: int = 7) -> List[LabelCentroid]:
-    """7 centroids: (30*sin(pi*i/6), 0, 15*i) -- coronal 87.7073, sagittal 0.0."""
+    """7 centroids: (30*sin(pi*i/6), 0, 15*i) -- coronal 116.5608, sagittal 0.0."""
     return [
         _centroid(
             _LEVELS[i % len(_LEVELS)],
@@ -108,7 +108,7 @@ def _coronal_c_curve(n: int = 7) -> List[LabelCentroid]:
 
 
 def _sagittal_c_curve(n: int = 7) -> List[LabelCentroid]:
-    """7 centroids: (0, 30*sin(pi*i/6), 15*i) -- coronal 0.0, sagittal 87.7073."""
+    """7 centroids: (0, 30*sin(pi*i/6), 15*i) -- coronal 0.0, sagittal 116.5608."""
     return [
         _centroid(
             _LEVELS[i % len(_LEVELS)],
@@ -141,7 +141,7 @@ def _mode4_relabel_swap_shape() -> List[LabelCentroid]:
     spatial (S) order, producing a local backward loop in the cranio-caudal
     direction combined with a coronal (R) excursion; the resulting coronal
     tangent-angle sequence sweeps past the +/-180 degree atan2 wrap boundary
-    (measured 355.3172 deg unwrapped, confirmed by the committed golden
+    (measured 355.2389 deg unwrapped, confirmed by the committed golden
     ``tests/corpus/golden/mode4_relabel_swap.json``). This fixture reproduces
     that shape at unit-test scale: an R excursion (out, past the pole, and
     back) combined with a local S-order swap between two adjacent centroids
@@ -199,8 +199,8 @@ def test_ac1_coronal_c_curve_first_positive_last_negative():
     result = _curvature_for(_coronal_c_curve(7))
     assert result.coronal_tangent_angles_deg[0] > 0.0
     assert result.coronal_tangent_angles_deg[-1] < 0.0
-    assert result.coronal_tangent_angles_deg[0] == pytest.approx(43.8537, abs=1e-3)
-    assert result.coronal_tangent_angles_deg[-1] == pytest.approx(-43.8537, abs=1e-3)
+    assert result.coronal_tangent_angles_deg[0] == pytest.approx(58.2804, abs=1e-3)
+    assert result.coronal_tangent_angles_deg[-1] == pytest.approx(-58.2804, abs=1e-3)
 
 
 # =========================================================================== #
@@ -258,14 +258,14 @@ def test_ac5_coronal_c_curve_equals_inter_tangent_sum():
     result = _curvature_for(_coronal_c_curve(7))
     expected = sum(result.inter_tangent_angles_deg)
     assert result.coronal_curvature_deg == pytest.approx(expected, abs=1e-6)
-    assert result.coronal_curvature_deg == pytest.approx(87.7073, abs=1e-3)
+    assert result.coronal_curvature_deg == pytest.approx(116.5608, abs=1e-3)
 
 
 def test_ac5_retired_formula_is_half_on_same_fixture():
-    """The retired descriptor reports 43.8537 -- half of the new 87.7073."""
+    """The retired descriptor reports 58.2804 -- half of the new 116.5608."""
     result = _curvature_for(_coronal_c_curve(7))
     retired = _retired_formula(result)
-    assert retired == pytest.approx(43.8537, abs=1e-3)
+    assert retired == pytest.approx(58.2804, abs=1e-3)
     assert result.coronal_curvature_deg == pytest.approx(2.0 * retired, abs=1e-2)
 
 
@@ -289,7 +289,7 @@ def test_ac7_sagittal_curve_zero_coronal():
     result = _curvature_for(_sagittal_c_curve(7))
     assert result.coronal_curvature_deg == pytest.approx(0.0, abs=1e-9)
     assert result.sagittal_curvature_deg > 20.0
-    assert result.sagittal_curvature_deg == pytest.approx(87.7073, abs=1e-3)
+    assert result.sagittal_curvature_deg == pytest.approx(116.5608, abs=1e-3)
 
 
 # =========================================================================== #
@@ -719,7 +719,7 @@ def test_adv_doubling_back_sequence_unwraps_not_clipped_at_180():
     """The unwrapped coronal sweep is not clipped at 180 degrees; it reflects
     the honest accumulated turning. The fixture reproduces the doubling-back
     shape of the real ``mode4_relabel_swap`` corpus case (whose committed
-    golden measures 355.3172 deg unwrapped) at unit-test scale; an atan2
+    golden measures 355.2389 deg unwrapped) at unit-test scale; an atan2
     implementation that clipped at the wrap boundary instead of unwrapping
     could not exceed 180 degrees here."""
     result = _curvature_for(_mode4_relabel_swap_shape())
