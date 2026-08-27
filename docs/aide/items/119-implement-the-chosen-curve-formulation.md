@@ -816,3 +816,57 @@ reference artifacts; item 125 validates Stage 28 end to end.
   every changed leaf lies under `features.stage3` (`per_label_offsets`,
   `per_label_neighbourhood`, `monotonic_consistency.u_values` and the
   `curvature` block).
+
+## Blocker — open, awaiting a human decision (2026-08-27)
+
+The item reached the loop's three-validation-round cap and stopped unmerged.
+Everything substantive validated; one narrow, fully-diagnosed defect remains.
+
+**State at the cap.** Round 3 ran `5775 passed, 55 skipped, 3 failed`. All three
+failures are in `tests/test_105_golden_decision_table.py`
+(`test_ac3_current_tree_has_29_non_py_fixtures`,
+`test_ac3_section1_fixture_set_equals_filesystem_walk_both_directions`,
+`test_adv_ac3_empty_header_only_table_fails_with_full_missing_list`) and share
+one cause.
+
+**The cause.** Round 2 cleared a fence-count regression against
+`tests/test_115_stage26_validation.py::test_ac8_no_hardcoded_literal_fence_remains`
+by moving two pre-119 sha256 digests out of in-file string literals into a new
+committed fixture, `tests/corpus/119_pre_119_digests.json` (commit `b27e22d`).
+That fix is sound on its own terms — AC22's byte-identical `pipeline.py` check
+and AC27's catalogue leaf-path-set check still assert exactly what they did —
+but the new file is a non-`.py` fixture under `tests/`, and item 105's
+`docs/aide/golden-decision-table.md` enumerates the complete fixture set by
+filesystem walk and asserts the match in both directions. The inventory moved
+from 29 to 30 without the document moving with it. `aide scope 119` independently
+reports the same file as the one path of 30 outside this item's Authorised paths.
+
+**Why it needs a person.** Two remedies are available and they differ in what
+they touch, not in difficulty:
+
+1. Add the fixture to this item's Authorised paths *and* to
+   `docs/aide/golden-decision-table.md` Section 1, updating its count to 30.
+   That document carries a human sign-off dated 2026-07-28 and is listed in
+   this item's **Asserts against**; item 122 already refreshed its measured
+   evidence cells once, under an explicit constraint that no judgement column
+   move. Taking this route widens a signed-off inventory for a digest-storage
+   convenience.
+2. Store the two digests without creating a new tracked fixture, so item 105's
+   inventory never moves. This keeps both invariants intact and touches no
+   signed-off artifact, at the cost of finding a storage form that
+   `test_115`'s scanner does not classify as a literal fence.
+
+Route 2 is the narrower change and the one recorded here as preferred, but the
+choice is a person's: route 1 edits a signed-off document, and an agent electing
+to widen it to make its own test pass is the thing the sign-off exists to
+prevent.
+
+**Everything else validated.** The curvature shift was proved to be the approved
+fit change rather than a migration defect (`smoothing=0.0` reproduces item 122's
+`43.85365592755774` through the current code path to `1.4e-14`;
+`evaluate_spline_derivative` matches an analytic direction to `2.2e-16` and
+`BSpline.derivative()` to `2.8e-14`). `_balanced_s_curve`'s pins are untouched.
+The `reference_default.json` rebuild's 48 changed leaves all sit under
+`spline_offset_mm`. Boundary checks 1–3 (`pipeline.py` byte-identical,
+`max_offset_mm` still `15.0`, `reference_verse_v1.json` unmodified) held at
+every round.
