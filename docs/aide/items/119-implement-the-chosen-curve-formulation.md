@@ -476,6 +476,26 @@ The code path in `src/segfacet` (see `aide.toml` `project.source_dir`):
   fixtures; AC15's contract (tuple lengths, `curvature_plane` string domain,
   `total_curvature_deg == max − min`) and AC17's near-coincident adversarial
   fixture are unchanged and stay green untouched.
+- `tests/corpus/119_pre_119_digests.json` — **amended after the third
+  validation round, on a human decision dated 2026-08-28** (see the Decisions
+  log entry "The pre-119 digests live in a committed fixture"). Holds the two
+  pre-119 sha256 digests AC22 and AC27 compare against. It exists only because
+  `test_115_stage26_validation.py::test_ac8_no_hardcoded_literal_fence_remains`
+  permits exactly one hardcoded-literal digest fence repo-wide and that slot is
+  already taken, so the digests cannot be string literals in the test module.
+- `docs/aide/golden-decision-table.md` — **amended on the same 2026-08-28
+  decision.** Section 1 enumerates every non-`.py` fixture under `tests/` and
+  asserts the match against a filesystem walk in both directions, so a new
+  fixture that is not documented there fails item 105's tests. One row is added
+  for `119_pre_119_digests.json`, plus a dated paragraph recording that this
+  amendment — unlike every earlier one, which only recomputed evidence numbers
+  — assigns a disposition and so is a human judgement. No existing row's
+  judgement columns move.
+- `tests/test_105_golden_decision_table.py` — the non-`.py` fixture count moves
+  29 → 30 in the two assertions that pin it and in one test's name. No other
+  assertion in the module changes.
+- `.gitattributes` — one `text eol=lf` pin for the new fixture, per CLAUDE.md's
+  committed-text-fixture gotcha.
 - `docs/aide/insights.md` — append-only, per the out-of-scope-insight rule.
 
 **Asserts against:**
@@ -817,7 +837,48 @@ reference artifacts; item 125 validates Stage 28 end to end.
   `per_label_neighbourhood`, `monotonic_consistency.u_values` and the
   `curvature` block).
 
-## Blocker — open, awaiting a human decision (2026-08-27)
+- **The pre-119 digests live in a committed fixture, and that fixture is
+  documented rather than avoided (human decision, 2026-08-28).** AC22 and AC27
+  each compare a recomputed sha256 against a value captured while this branch
+  still held the pre-119 tree. Written as string literals in
+  `tests/test_119_curve_formulation.py` they are, by
+  `test_115_stage26_validation.py`'s shape-based classifier, *fences* — and
+  that test permits exactly one repo-wide, already spent on
+  `test_098_stray_components.py`'s `reference_verse_v1.json` pin. Moving them
+  into `tests/corpus/119_pre_119_digests.json` makes the comparison
+  "external" instead, the same pattern
+  `tests/test_094_tptbox_image_layer.py`'s `data_sha256` lookup already uses.
+  The cost is that item 105's `golden-decision-table.md` enumerates every
+  non-`.py` fixture under `tests/` and checks the match both ways, so a new
+  fixture is a documentation obligation, not a free choice. That table carries
+  a human sign-off, which is why this was escalated rather than decided
+  in-loop. Resolved by adding the row with a fresh dated sign-off — see the
+  Blocker section below.
+
+## Blocker — resolved by human decision (2026-08-28)
+
+**Decision: route 1.** The human maintainer chose to document the fixture in
+`docs/aide/golden-decision-table.md` rather than to find a storage form that
+avoids creating one, and supplied the sign-off the amendment needs at the same
+time. The stated grounds: the sign-off that route 1 was held back for is a
+*process* protection, not a prohibition — what it forbids is an agent widening
+the inventory unilaterally, not the inventory ever growing. With a person
+making the call there is nothing left to protect against, and route 1 leaves
+the fixture visible in the one document that is supposed to enumerate every
+committed fixture, where route 2 would have hidden it from that inventory by
+construction.
+
+The amendment is recorded in the table itself as a dated paragraph immediately
+before Section 1, distinguishing it from every earlier amendment: the previous
+four only recomputed evidence numbers, while this one adds a row and assigns a
+disposition. No existing row's judgement columns moved. The new row is marked
+as expected to be **deleted** rather than retired, because both digests are
+fences scoped to this item and item 120's leave-one-out promotion edits
+`pipeline.py` by design.
+
+The original blocker record follows unchanged.
+
+## Blocker as recorded at the cap (2026-08-27)
 
 The item reached the loop's three-validation-round cap and stopped unmerged.
 Everything substantive validated; one narrow, fully-diagnosed defect remains.
