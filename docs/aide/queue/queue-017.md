@@ -108,7 +108,7 @@ What must be weighed and written down, each with its consequence stated:
   follow versus deviation it must report. This is the gated question.
 
 Judged against criteria measurable now, not argued in the abstract: clean GT
-stays inside item 017's 0.5 mm pass-through bound across level counts and
+stays inside a 1.0 mm pass-through bound across level counts and
 spacings; a displaced vertebra separates from the clean distribution by a stated
 margin; a real scoliotic curve in the VerSe cohort is not flagged; 2-level and
 truncated-FOV inputs neither crash nor degenerate; the fit is deterministic
@@ -130,7 +130,8 @@ fields but its existing consumers — `spline_offset.py`, `consistency.py`,
 committed goldens to change; regenerating them is item 123's job, so this item
 should leave the corpus tests red in a way item 123 clears rather than adjusting
 fixtures to hide the change. *Testable:* a clean spine's maximum offset stays
-under 0.5 mm across level counts and spacings; a displaced vertebra's offset
+under 1.0 mm across level counts and spacings (raised from 0.5 mm on
+2026-08-28 — see `roadmap.md`'s Stage 28 acceptance note); a displaced vertebra's offset
 exceeds the clean maximum by the margin item 118 stated; two fits of the same
 input are identical; a 2-level input and a truncated-FOV input both fit without
 error.

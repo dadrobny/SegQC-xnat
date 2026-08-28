@@ -98,11 +98,13 @@ its third); any feature outside the spline layer (queue-017's scope fence);
   and 5 × spacings `(1,1,1)`, `(1,1,2)`, `(0.8,0.8,1)` with a 6 mm curve
   amplitude, the maximum closest-approach distance from any centroid to the
   fitted curve is `> 0.5` mm and `≤ 0.56` mm — matching
-  `docs/spinal-curve-model.md`'s recorded `0.552139` mm. *(Both halves are
-  asserted: the bound is a ceiling, and the `> 0.5` half pins that this grid
-  is genuinely the one place the sweep exceeds item 017's fixture bound, so the
-  discrepancy recorded in [Assumptions](#assumptions) cannot be silently
-  "fixed" by a later tweak without this test noticing.)*
+  `docs/spinal-curve-model.md`'s recorded `0.552139` mm — and inside stage 28's
+  `1.0` mm acceptance bound. *(Both halves are asserted: the ceiling pins the
+  value, and the `> 0.5` half pins that the sweep still reaches past item 017's
+  fixture tolerance, which is what distinguishes the approved smoothing fit
+  from a drift back toward interpolation. The `> 0.5` half is **not** an
+  acceptance bound — see the 2026-08-28 resolution in
+  [Assumptions](#assumptions).)*
 
 - [ ] **AC9: A displaced vertebra separates under leave-one-out evaluation.**
   On the decision document's separation fixture (8 thoracic levels, 1 mm
@@ -250,6 +252,17 @@ its third); any feature outside the spline layer (queue-017's scope fence);
   discrepancy in both directions (AC7 and AC8) so item 125 ticks that
   acceptance line against measured fact rather than against the aspiration.
   Captured for the queue boundary in [`insights.md`](../insights.md).
+
+  **Resolved 2026-08-28, after this item merged.** The acceptance line was the
+  wrong half of the pair: it had stretched item 017's *unit* tolerance over a
+  much wider sweep, and the approved formulation was never going to satisfy it.
+  The maintainer raised the stage bound to **1.0 mm** — sub-voxel at every
+  spacing on the grid, ~1.8× the measured `0.552139` mm peak — in
+  `roadmap.md`, `progress.md` and `queue-017.md`. Item 017's AC1 keeps its own
+  0.5 mm tolerance on its own fixtures. AC7 and AC8 are unchanged numerically,
+  since what they measure did not move. AC8 gained an explicit assertion
+  against the 1.0 mm bound, and its prose no longer describes the gap as an
+  unresolved discrepancy. Item 125 now ticks that acceptance line as met.
 
 - **`SplineFit.tck` is removed rather than shimmed.** Retaining a derived
   `(t, c, k)` tuple would keep the legacy interface the decision document's
