@@ -10,10 +10,12 @@ predicates that dispatch on the case's ``detection`` discriminator (item 040):
 * ``detection == "pipeline"`` -- the failure mode is directly observable by
   the plain pipeline; assert straight against ``run_qc``'s output.
 * ``detection == "reconstructed_record"`` -- the failure mode is structurally
-  invisible to plain ``run_qc`` (item 040's documented limitation for modes
-  1/4/8); assert instead via the same reconstruction technique items 038/039
-  used in their own tests, feeding a reconstructed feature record directly to
-  the designated rule (:class:`~segfacet.heuristics.mislabel.MislabelRule` /
+  invisible to plain ``run_qc`` (item 040's documented limitation, now
+  modes 4/8 only -- item 120 promoted mode 1's held-out spline offset into
+  the pipeline itself, retiring its reconstruction technique); assert
+  instead via the same reconstruction technique items 038/039 used in their
+  own tests, feeding a reconstructed feature record directly to the
+  designated rule (:class:`~segfacet.heuristics.mislabel.MislabelRule` /
   :class:`~segfacet.heuristics.overlap.OverlapRule`).
 
 This module is a small, importable verification library -- **not** a pytest
@@ -42,7 +44,6 @@ from segfacet.features.centroids import compute_centroid
 from segfacet.features.consistency import compute_monotonic_consistency
 from segfacet.features.overlap import detect_overlaps
 from segfacet.features.spline import fit_centroid_spline
-from segfacet.features.spline_offset import compute_spline_offsets
 from segfacet.feature_report import overlap_to_dict
 from segfacet.heuristics.mislabel import MislabelRule
 from segfacet.heuristics.overlap import OverlapRule
@@ -113,32 +114,6 @@ def pipeline_verdict_label(case: dict, config=None) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def _recon_leave_one_out_offset(case: dict, config) -> List:
-    """Mode 1 (``displace``): fit the spline through every OTHER present
-    label's centroid, measure the target's spacing-aware offset to that fit,
-    overwrite that label's entry in the record's ``per_label_offsets``, and
-    feed the record to :class:`MislabelRule`."""
-    seg_img = loaded_seg_image(case)
-    target = case["perturbation_params"]["target_label"]
-
-    data = np.asanyarray(seg_img.dataobj)
-    present = sorted(int(v) for v in np.unique(data) if v != 0)
-    others = [label for label in present if label != target]
-    other_centroids = [compute_centroid(seg_img, label) for label in others]
-    fit = fit_centroid_spline(other_centroids)
-    target_centroid = compute_centroid(seg_img, target)
-    spacing = tuple(float(z) for z in seg_img.header.get_zooms()[:3])
-    offsets = compute_spline_offsets([target_centroid], fit, spacing_mm=spacing)
-    loo_offset = offsets[0].offset_mm
-
-    record = extract_feature_record(seg_img, config)
-    for entry in record["stage3"]["per_label_offsets"]:
-        if entry["label"] == target:
-            entry["offset_mm"] = loo_offset
-
-    return MislabelRule().evaluate(record, config)
-
-
 def _recon_monotonic_true_spatial_order(case: dict, config) -> List:
     """Mode 4 (``relabel_swap``): fit the spline through the perturbed
     centroids ordered by TRUE spatial (stacking-axis voxel) position, assess
@@ -189,7 +164,6 @@ def _recon_overlap_mask_stack(case: dict, config) -> List:
 
 
 RECONSTRUCTIONS: Dict[str, Callable] = {
-    "leave_one_out_offset": _recon_leave_one_out_offset,
     "monotonic_true_spatial_order": _recon_monotonic_true_spatial_order,
     "overlap_mask_stack": _recon_overlap_mask_stack,
 }

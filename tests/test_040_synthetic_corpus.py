@@ -77,12 +77,11 @@ from segfacet.verdict import Severity
 _VALID_DETECTIONS = {"pipeline", "reconstructed_record"}
 _VALID_VERDICTS = {"pass", "flagged-for-review", "fail"}
 _VALID_RECONSTRUCTIONS = {
-    "leave_one_out_offset",
     "monotonic_true_spatial_order",
     "overlap_mask_stack",
 }
-_RECONSTRUCTED_MODES = {1, 4, 8}
-_PIPELINE_ONLY_MODES = {0, 2, 3, 5, 6, 7}
+_RECONSTRUCTED_MODES = {4, 8}
+_PIPELINE_ONLY_MODES = {0, 1, 2, 3, 5, 6, 7}
 
 _CASE_ID_RE = re.compile(r"^[a-z0-9_]+$")
 
@@ -220,11 +219,12 @@ def test_ac7_detection_is_one_of_the_two_kinds():
         assert case["detection"] in _VALID_DETECTIONS
 
 
-def test_ac8_modes_1_4_8_reconstructed_record_rest_pipeline():
-    """AC8: every case with failure_mode in {1, 4, 8} is
-    reconstructed_record with a valid reconstruction technique; every case
-    with failure_mode in {0, 2, 3, 5, 6, 7} is pipeline with no
-    reconstruction."""
+def test_ac8_modes_4_8_reconstructed_record_rest_pipeline():
+    """AC8: every case with failure_mode in {4, 8} is reconstructed_record
+    with a valid reconstruction technique; every case with failure_mode in
+    {0, 1, 2, 3, 5, 6, 7} is pipeline with no reconstruction. Mode 1 moved
+    into the pipeline set in item 120, which promoted a held-out per-label
+    spline offset into the pipeline itself."""
     for case in _cases():
         mode = case["failure_mode"]
         if mode in _RECONSTRUCTED_MODES:

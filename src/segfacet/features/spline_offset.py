@@ -19,17 +19,68 @@ Public API
 ``VertebralSplineOffset``
     Frozen dataclass with per-centroid offset data.
 ``compute_spline_offsets(centroids, fit, spacing_mm=None) -> List[VertebralSplineOffset]``
-    Compute one offset record per centroid.
+    Compute one offset record per centroid, **in-sample**: the level under
+    test shaped the curve it is measured against.
+``compute_leave_one_out_spline_offsets(centroids, spacing_mm=None, *, backend=None) -> List[VertebralSplineOffset]``
+    Compute one offset record per centroid, **held out** (item 120): the
+    level under test does not shape the curve it is judged against.
 
 Deliberate CPU fallback (item 072)
 -----------------------------------
-``compute_spline_offsets`` accepts a ``backend`` keyword for signature
-uniformity with the other Stage-2/3 feature functions, but its numeric work
-always runs on CPU: the coarse ``u`` scan and ``scipy.optimize.minimize_scalar``
-refinement operate on tiny centroid arrays with no reliable CuPy equivalent, so
+``compute_spline_offsets`` and ``compute_leave_one_out_spline_offsets`` both
+accept a ``backend`` keyword for signature uniformity with the other Stage-2/3
+feature functions, but their numeric work always runs on CPU: the coarse ``u``
+scan, ``scipy.optimize.minimize_scalar`` refinement, and the leave-one-out
+refits operate on tiny centroid arrays with no reliable CuPy equivalent, so
 this is a documented, known partial-GPU-coverage limitation -- even under an
 explicit GPU backend, the optimisation runs on SciPy/CPU with host arrays and
 returns host results.
+
+Held-out evaluation (item 120)
+--------------------------------
+``compute_spline_offsets`` is *in-sample*: the fit it is evaluated against was
+shaped by every centroid it measures, including the one under test, so a
+displaced vertebra pulls the smoothing spline (item 119) toward itself and its
+own offset reads far below the applied displacement -- the circularity item
+118 diagnosed. ``compute_leave_one_out_spline_offsets`` corrects this by
+measuring each level against a curve it did not shape:
+
+1. Fit once through all present centroids at equal weight (the "reference
+   fit"), and identify the single most-deviant level under that fit -- the
+   **dominant outlier**, chosen as the largest in-sample ``offset_mm``, ties
+   broken by **ascending label**.
+2. For each level in turn, refit through **the same chord-length
+   parameterisation** (``u``) as the reference fit, but with that level's own
+   weight and the dominant outlier's weight both driven to a negligible
+   constant. Withholding by **down-weighting instead of dropping** keeps
+   every level in the curve's parameter domain -- terminal levels are still
+   measured against curve interior, not against a truncated endpoint -- while
+   a negligible weight keeps the withheld level from pulling the fit toward
+   itself. Withholding the case's dominant outlier too prevents one broken
+   vertebra from bending its neighbours' held-out curves (outlier
+   cross-talk).
+3. Below four levels the held-out path falls back to the in-sample
+   measurement: withholding two of four-or-fewer points leaves too few
+   effective points for a refit to mean anything.
+
+**Documented limitation.** A displaced *terminal* level on a short spine is
+not reliably separable: withholding a terminal level and the dominant outlier
+leaves only three points to constrain a cubic at five levels (the committed
+corpus's level count), so the held-out offset under-reports the true
+displacement there. Real fields of view carry far more than five levels, and
+this is measurably resolved by level count alone -- not worked around here.
+
+RAS axis contract for the direction components (item 120)
+-------------------------------------------------------------
+``dx_mm``, ``dy_mm`` and ``dz_mm`` are anatomically readable -- array axis 0
+is left-right, axis 1 is anterior-posterior, axis 2 is cranio-caudal -- **only
+because** two facts hold elsewhere in this codebase: ``segfacet.io.
+load_volume`` reorients every volume to axis codes ``("R", "A", "S")``
+(``io.py``'s ``_TARGET_AXCODES``) before any feature is computed, and
+:func:`segfacet.features.centroids.compute_centroid` derives ``centroid_mm``
+as ``centroid_voxel * spacing`` with no affine of its own. If either fact
+changed, the direction components would still be well-defined numbers but
+would no longer mean "left-right" / "anterior-posterior" / "cranio-caudal".
 """
 
 from __future__ import annotations
@@ -44,16 +95,28 @@ from scipy.optimize import minimize_scalar
 import segfacet.backend as _backend_mod
 from segfacet.backend import Backend
 from segfacet.features.centroids import LabelCentroid
-from segfacet.features.spline import SplineFit, evaluate_spline
+from segfacet.features.spline import SplineFit, evaluate_spline, fit_centroid_spline
 
 __all__ = [
     "VertebralSplineOffset",
     "compute_spline_offsets",
+    "compute_leave_one_out_spline_offsets",
 ]
 
 # Number of u samples in the coarse scan.  500 gives sub-mm resolution for
 # typical whole-spine extents (~400 mm total arc length).
 _N_SCAN: int = 500
+
+# Weight assigned to a withheld level's own point (and the case's dominant
+# outlier) in a leave-one-out refit (item 120). Small enough to be
+# negligible relative to the uniform 1.0 weight on every other point, but
+# strictly positive -- make_splprep rejects a zero weight.
+_WITHHELD_WEIGHT: float = 1e-6
+
+# Below this many levels, withholding two of them (the level under test plus
+# the dominant outlier) leaves too few effective points for a refit to mean
+# anything -- fall back to the in-sample measurement (item 120, AC7).
+_MIN_LEVELS_FOR_HELD_OUT: int = 4
 
 
 # --------------------------------------------------------------------------- #
@@ -243,3 +306,91 @@ def compute_spline_offsets(
         )
 
     return records
+
+
+# --------------------------------------------------------------------------- #
+# Held-out (leave-one-out) evaluation (item 120)
+# --------------------------------------------------------------------------- #
+
+
+def compute_leave_one_out_spline_offsets(
+    centroids: Sequence[LabelCentroid],
+    spacing_mm: Optional[Tuple[float, float, float]] = None,
+    *,
+    backend: Optional[Backend] = None,
+) -> List[VertebralSplineOffset]:
+    """Compute each centroid's offset from a spline it did not shape.
+
+    See the module docstring's "Held-out evaluation (item 120)" section for
+    the full definition. In short: a reference fit through all centroids at
+    equal weight identifies the case's dominant outlier (the largest
+    in-sample ``offset_mm``, ties broken by **ascending label**); then, for
+    each level, a refit through the reference fit's own chord-length ``u``
+    down-weights that level and the dominant outlier to a negligible
+    constant (never zero -- ``make_splprep`` rejects that), so the level
+    under test cannot pull the curve toward itself while the curve's
+    parameter domain never shrinks.
+
+    Parameters
+    ----------
+    centroids:
+        Ordered sequence of LabelCentroid objects.
+    spacing_mm:
+        Voxel spacings (sx, sy, sz) in mm, forwarded to
+        :func:`compute_spline_offsets` for the ``offset_voxel`` conversion.
+    backend:
+        Optional :class:`~segfacet.backend.Backend` handle, forwarded to the
+        fit/evaluate calls this function makes. The refits themselves always
+        run on host NumPy/SciPy regardless -- see the module docstring's
+        "Deliberate CPU fallback" section.
+
+    Returns
+    -------
+    List[VertebralSplineOffset]
+        One record per input centroid, in input order, with the same field
+        set :func:`compute_spline_offsets` returns.
+
+    Raises
+    ------
+    ValueError
+        Propagated from :func:`~segfacet.features.spline.fit_centroid_spline`
+        or :func:`compute_spline_offsets` (e.g. fewer than 2 centroids, or
+        two centroids sharing an exactly-coincident mm-coordinate).
+    """
+    backend = backend or _backend_mod.get_backend()
+
+    n_points = len(centroids)
+
+    reference_fit = fit_centroid_spline(centroids, backend=backend)
+
+    if n_points < _MIN_LEVELS_FOR_HELD_OUT:
+        return compute_spline_offsets(
+            centroids, reference_fit, spacing_mm=spacing_mm, backend=backend
+        )
+
+    in_sample = compute_spline_offsets(
+        centroids, reference_fit, spacing_mm=spacing_mm, backend=backend
+    )
+
+    # Dominant outlier: largest in-sample offset_mm, ties broken by
+    # ascending label.
+    worst_idx = min(
+        range(n_points),
+        key=lambda i: (-in_sample[i].offset_mm, centroids[i].label),
+    )
+
+    records: List[Optional[VertebralSplineOffset]] = [None] * n_points
+    for i in range(n_points):
+        weights = [1.0] * n_points
+        weights[i] = _WITHHELD_WEIGHT
+        weights[worst_idx] = _WITHHELD_WEIGHT
+
+        refit = fit_centroid_spline(
+            centroids, u=reference_fit.u, weights=weights, backend=backend
+        )
+        record = compute_spline_offsets(
+            [centroids[i]], refit, spacing_mm=spacing_mm, backend=backend
+        )[0]
+        records[i] = record
+
+    return records  # type: ignore[return-value]

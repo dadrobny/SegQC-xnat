@@ -142,13 +142,20 @@ def extract_feature_record(seg_img: "nib.Nifti1Image", config: "HeuristicConfig"
             compute_vertebra_orientations,
         )
         from segfacet.features.spline import fit_centroid_spline
-        from segfacet.features.spline_offset import compute_spline_offsets
+        from segfacet.features.spline_offset import (
+            compute_leave_one_out_spline_offsets,
+        )
 
         spacing_mm = tuple(float(z) for z in seg_img.header.get_zooms()[:3])
+        # fit is still needed below for curvature/monotonic_consistency; the
+        # per-label offsets themselves are evaluated held-out (item 120) --
+        # a level's offset_mm is its closest-approach distance to a curve
+        # that level did not shape, so a displacement separates at roughly
+        # its true magnitude instead of being absorbed by the in-sample fit.
         fit = fit_centroid_spline(ordered_centroids)
 
-        spline_offsets = compute_spline_offsets(
-            ordered_centroids, fit, spacing_mm=spacing_mm
+        spline_offsets = compute_leave_one_out_spline_offsets(
+            ordered_centroids, spacing_mm=spacing_mm
         )
 
         stage3_kwargs = {

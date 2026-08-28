@@ -23,6 +23,17 @@ Design decisions (recorded per item 033 spec):
   produce findings from either or both.
 - Detector A fires on ``offset_mm >= max_offset_mm`` (default ``15.0``,
   inclusive) and is label-attributed (single offending label).
+- Detector A reads ``dx_mm``/``dy_mm``/``dz_mm`` when all three are present
+  and finite (item 120), naming the dominant displacement direction as one
+  of ``"left-right"``, ``"anterior-posterior"`` or ``"cranio-caudal"`` --
+  the largest of ``|dx_mm|``, ``|dy_mm|``, ``|dz_mm|``, ties broken
+  x -> y -> z. This reading rests on the RAS axis contract stated in
+  ``features/spline_offset.py``'s module docstring: array axis 0 is
+  left-right, axis 1 anterior-posterior, axis 2 cranio-caudal, because
+  ``io.load_volume`` reorients every volume to ``("R", "A", "S")`` and
+  ``centroid_mm`` carries no affine of its own. An entry missing any
+  component, or carrying a non-finite one, omits the direction clause
+  entirely rather than guessing or raising.
 - Detector B fires on each ``non_monotonic_pairs`` entry, resolving both
   level names to integer labels via ``per_label``; an unresolvable name is
   omitted from ``labels`` but still named in the ``reason``.
@@ -36,6 +47,7 @@ Design decisions (recorded per item 033 spec):
 
 from __future__ import annotations
 
+import math
 from typing import Dict, List, Optional
 
 from segfacet.heuristics.finding import Finding
@@ -177,6 +189,38 @@ class MislabelRule(Rule):
         return offset_findings + order_findings
 
     @staticmethod
+    def _dominant_direction(entry: dict) -> Optional[str]:
+        """Return the dominant displacement direction name for *entry*, or
+        ``None`` when any of ``dx_mm``/``dy_mm``/``dz_mm`` is missing or
+        non-finite (item 120, AC14/AC15).
+
+        Selected as the largest of ``|dx_mm|``, ``|dy_mm|``, ``|dz_mm|``,
+        ties broken x -> y -> z (left-right -> anterior-posterior ->
+        cranio-caudal), per the RAS axis contract in
+        ``features/spline_offset.py``.
+        """
+        components = []
+        for key, name in (
+            ("dx_mm", "left-right"),
+            ("dy_mm", "anterior-posterior"),
+            ("dz_mm", "cranio-caudal"),
+        ):
+            if key not in entry:
+                return None
+            try:
+                value = float(entry[key])
+            except (TypeError, ValueError):
+                return None
+            if not math.isfinite(value):
+                return None
+            components.append((abs(value), name))
+
+        # Stable sort by descending magnitude keeps x -> y -> z tie order
+        # (the insertion order above) for equal magnitudes.
+        best = max(components, key=lambda c: c[0])
+        return best[1]
+
+    @staticmethod
     def _detect_offset_outliers(
         stage3: dict, severity: Severity, max_offset: float
     ) -> List[Finding]:
@@ -195,20 +239,23 @@ class MislabelRule(Rule):
                 continue
             offset = float(entry.get("offset_mm", 0.0) or 0.0)
             name = entry.get("level_name")
-            normalised.append((label, name, offset))
+            direction = MislabelRule._dominant_direction(entry)
+            normalised.append((label, name, offset, direction))
 
         normalised.sort(key=lambda t: t[0])
 
         findings: List[Finding] = []
-        for label, name, offset in normalised:
+        for label, name, offset, direction in normalised:
             if offset >= max_offset:
+                direction_clause = f", predominantly {direction}" if direction else ""
                 findings.append(
                     Finding(
                         rule_id="mislabel",
                         severity=severity,
                         reason=(
                             f"{_MISALIGN_TAG} label {label} ({name}) centroid "
-                            f"lies {offset:.1f} mm off the fitted spinal curve "
+                            f"lies {offset:.1f} mm off the fitted spinal curve"
+                            f"{direction_clause} "
                             f"(threshold {max_offset:.1f} mm)."
                         ),
                         labels=frozenset({label}),

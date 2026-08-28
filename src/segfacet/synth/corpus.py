@@ -18,14 +18,18 @@ Two public surfaces:
   (:func:`main`), regenerating the committed corpus under
   ``tests/corpus/`` by default.
 
-Three of the nine cases (modes 1, 4, 8 -- ``displace``, ``relabel_swap``,
-``force_overlap``) are documented by items 038/039 as **structurally
-invisible** to the plain ``run_qc`` pipeline (a single-integer label map
-cannot encode an overlap; the interpolating/ascending-label spline refit
-absorbs the displacement/swap). This module faithfully represents that fact:
-each such case's manifest entry carries ``detection == "reconstructed_record"``
-and a ``reconstruction`` technique key, rather than pretending ``run_qc``
-would catch it. See the item 040 spec's Assumptions for the full rationale.
+Two of the nine cases (modes 4, 8 -- ``relabel_swap``, ``force_overlap``) are
+documented by items 038/039 as **structurally invisible** to the plain
+``run_qc`` pipeline (a single-integer label map cannot encode an overlap; the
+pipeline reorders by ascending label before refitting, so a swapped-identity
+pair's monotonic-progression signal is always empty). This module faithfully
+represents that fact: each such case's manifest entry carries
+``detection == "reconstructed_record"`` and a ``reconstruction`` technique
+key, rather than pretending ``run_qc`` would catch it. Mode 1 (``displace``)
+was reconstructed_record before item 120 promoted a held-out per-label
+spline offset into the pipeline itself; it is now ``detection == "pipeline"``
+like the remaining five modes. See the item 040 spec's Assumptions for the
+full rationale.
 """
 
 from __future__ import annotations
@@ -122,8 +126,7 @@ CASE_RECIPE: List[_RecipeEntry] = [
         case_id="mode1_displace",
         perturbation="displace",
         perturbation_params={"target_label": 22},
-        detection="reconstructed_record",
-        reconstruction="leave_one_out_offset",
+        detection="pipeline",
     ),
     _RecipeEntry(
         case_id="mode2_fragment",

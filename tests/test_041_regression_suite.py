@@ -114,7 +114,6 @@ def test_ac2_every_case_routes_to_exactly_one_handled_path(case):
     if case["detection"] == "reconstructed_record":
         assert case["reconstruction"] in RECONSTRUCTIONS
         assert case["reconstruction"] in {
-            "leave_one_out_offset",
             "monotonic_true_spatial_order",
             "overlap_mask_stack",
         }

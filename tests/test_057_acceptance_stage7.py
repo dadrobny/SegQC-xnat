@@ -33,17 +33,19 @@ The three acceptance criteria this suite asserts on directly:
   ``load_config``, and the achieved metrics surface in the evaluation
   report's ``calibration`` block.
 
-**Reconstructed-record modes 1/4/8 are deliberately NOT asserted at
+**Reconstructed-record modes 4/8 are deliberately NOT asserted at
 sensitivity 1.0** (mirrors item 049's own acceptance-suite decision): items
-040/049 document ``mode1_displace``, ``mode4_relabel_swap``, and
-``mode8_force_overlap`` as structurally invisible to the plain ``run_qc``
-pipeline (a single-integer label map cannot encode an overlap; the
-interpolating/ascending-label spline refit absorbs the displacement/swap).
-The corpus cohort here runs the plain pipeline on each candidate, so those
-three cases classify ``FALSE_NEGATIVE`` -- overall cohort sensitivity is
-consequently ``5/8``, not ``1.0``. This is intentional, not a bug: over-
-claiming detection on the reconstructed modes would misrepresent the
-system's real, honest capability.
+040/049 document ``mode4_relabel_swap`` and ``mode8_force_overlap`` as
+structurally invisible to the plain ``run_qc`` pipeline (a single-integer
+label map cannot encode an overlap; the pipeline reorders by ascending label
+before refitting, so a swapped-identity pair's monotonic-progression signal
+is always empty). ``mode1_displace`` moved into the pipeline-detectable set
+in item 120, which promoted a held-out per-label spline offset into the
+pipeline itself. The corpus cohort here runs the plain pipeline on each
+candidate, so those two cases classify ``FALSE_NEGATIVE`` -- overall cohort
+sensitivity is consequently ``6/8``, not ``1.0``. This is intentional, not a
+bug: over-claiming detection on the reconstructed modes would misrepresent
+the system's real, honest capability.
 
 All tests are deterministic, CPU-only, and portable (no network, no
 absolute paths, no wall clock).
@@ -73,10 +75,12 @@ from segfacet.synth.coverage_border_overlap import CropAtBorderPerturbation
 from segfacet.synth.perturbation import FAILURE_MODE_NAMES
 from segfacet.synth.regression import loaded_seg_image
 
-#: Sec.6 modes the plain pipeline is documented to catch (Assumptions).
-_PIPELINE_DETECTABLE_MODES = (2, 3, 5, 6, 7)
+#: Sec.6 modes the plain pipeline is documented to catch (Assumptions). Mode 1
+#: moved here in item 120, which promoted a held-out per-label spline offset
+#: into the pipeline itself.
+_PIPELINE_DETECTABLE_MODES = (1, 2, 3, 5, 6, 7)
 #: Sec.6 modes documented as structurally invisible to the plain pipeline.
-_RECONSTRUCTED_RECORD_MODES = (1, 4, 8)
+_RECONSTRUCTED_RECORD_MODES = (4, 8)
 
 
 # =========================================================================== #
@@ -168,12 +172,13 @@ def test_reconstructed_record_modes_are_not_over_claimed_as_caught(mode):
     assert entry.sensitivity == 0.0
 
 
-def test_overall_corpus_sensitivity_is_five_of_eight_not_over_claimed():
-    """Overall cohort sensitivity (TP / (TP + FN)) is 5/8 -- the five
-    pipeline-detectable failures caught, the three reconstructed-record
+def test_overall_corpus_sensitivity_is_six_of_eight_not_over_claimed():
+    """Overall cohort sensitivity (TP / (TP + FN)) is 6/8 -- the six
+    pipeline-detectable failures caught (item 120 promoted mode 1's held-out
+    per-label spline offset into the pipeline), the two reconstructed-record
     modes missed -- not 1.0 (Assumptions)."""
     metrics = _corpus_cohort_metrics()
-    assert metrics.sensitivity == pytest.approx(5.0 / 8.0)
+    assert metrics.sensitivity == pytest.approx(6.0 / 8.0)
 
 
 # =========================================================================== #

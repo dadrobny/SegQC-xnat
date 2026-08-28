@@ -272,7 +272,16 @@ GROUP_INTROS: Mapping[str, str] = MappingProxyType(
             "smoothing B-spline is fit through the ordered centroids' "
             "mm-coordinates (scipy.interpolate.make_splprep, s = n_points by "
             "default); this spline underlies the per-vertebra offset measured "
-            "here and the orientation/curvature/consistency families below."
+            "here and the orientation/curvature/consistency families below. "
+            "offset_mm is a held-out (leave-one-out, down-weighted) measurement "
+            "(item 120): a level's offset is its closest-approach distance to a "
+            "curve refit with that level and the case's dominant outlier "
+            "down-weighted to a negligible constant, so the level under test "
+            "cannot pull the curve toward itself. dx_mm/dy_mm/dz_mm are "
+            "anatomically readable -- array axis 0 left-right, axis 1 "
+            "anterior-posterior, axis 2 cranio-caudal -- only because "
+            "io.load_volume reorients every volume to axis codes (R, A, S) and "
+            "centroid_mm carries no affine of its own."
         ),
         "Orientation & Curvature": (
             "Per-vertebra orientation (PCA of the mean-centred, spacing-scaled "

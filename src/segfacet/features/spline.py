@@ -45,10 +45,25 @@ pair rather than the legacy FITPACK ``(tck, u)``, so ``SplineFit`` carries a
 ``scipy.interpolate.BSpline`` instance (``spline``) instead of a ``tck``
 tuple; the underlying ``t``/``c``/``k`` are reachable as ``spline.t`` /
 ``spline.c`` / ``spline.k``.
+
+Held-out evaluation support (item 120)
+----------------------------------------
+``fit_centroid_spline`` accepts two keyword-only parameters used by
+:func:`segfacet.features.spline_offset.compute_leave_one_out_spline_offsets`
+to withhold a level from the curve it is judged against, without shrinking
+the curve's parameter domain: ``u`` supplies an explicit parameterisation
+(instead of letting ``make_splprep`` compute chord-length ``u`` from the
+supplied points), so a refit can reuse the parameterisation of a reference
+fit through *all* present centroids even when some of those centroids are
+down-weighted; ``weights`` supplies a strictly-positive per-point weight
+(forwarded to ``make_splprep``'s ``w=``), so a withheld level stays in the
+knot placement but cannot pull the fit toward itself. Both default to
+today's behaviour (chord-length ``u``, uniform weights) when omitted.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Optional, Sequence
 
@@ -119,11 +134,44 @@ def _find_coincident_pair(centroids: Sequence[LabelCentroid]):
     return None
 
 
+def _validate_weights(weights: Sequence[float], n_points: int) -> np.ndarray:
+    """Validate *weights* for :func:`fit_centroid_spline` (item 120, AC2).
+
+    Requires exactly ``n_points`` values, every one finite and strictly
+    positive (``make_splprep`` rejects a zero weight, and a negative or NaN
+    weight has no meaning here). Raises ``ValueError`` naming the offending
+    length or value in a readable, single-line message -- never SciPy's raw
+    FITPACK failure text.
+    """
+    w = np.asarray(weights, dtype=np.float64)
+    if w.ndim != 1 or w.shape[0] != n_points:
+        raise ValueError(
+            f"fit_centroid_spline: weights must have length {n_points} "
+            f"(one per centroid), but received length {w.shape[0] if w.ndim == 1 else w.shape}."
+        )
+    for idx, value in enumerate(w):
+        if not math.isfinite(value):
+            raise ValueError(
+                f"fit_centroid_spline: weights[{idx}] = {value!r} is not "
+                f"finite; every weight must be a finite, strictly positive "
+                f"number."
+            )
+        if value <= 0.0:
+            raise ValueError(
+                f"fit_centroid_spline: weights[{idx}] = {value!r} is not "
+                f"strictly positive; every weight must be > 0 "
+                f"(make_splprep rejects zero weights)."
+            )
+    return w
+
+
 def fit_centroid_spline(
     centroids: Sequence[LabelCentroid],
     degree: int = 3,
     *,
     smoothing: Optional[float] = None,
+    u: Optional[Sequence[float]] = None,
+    weights: Optional[Sequence[float]] = None,
     backend: Optional[Backend] = None,
 ) -> SplineFit:
     """Fit a parametric smoothing B-spline through ordered centroid mm-coordinates.
@@ -149,6 +197,18 @@ def fit_centroid_spline(
         by ``scripts/compare_curve_candidates.py`` to keep an honest
         interpolating baseline.  The value actually used is recorded in
         :attr:`SplineFit.smoothing`.
+    u:
+        Optional explicit parameter values (one per centroid) forwarded to
+        ``make_splprep(..., u=...)`` instead of letting it compute
+        chord-length parameterisation from *centroids* itself. ``None`` (the
+        default) reproduces today's chord-length behaviour (item 120,
+        AC1). Stored verbatim on the returned :class:`SplineFit`.
+    weights:
+        Optional per-point weights, forwarded to ``make_splprep(..., w=...)``.
+        Must have length ``n_points`` with every value finite and strictly
+        positive; validated up front with a readable ``ValueError`` rather
+        than SciPy's raw FITPACK message (item 120, AC2). ``None`` (the
+        default) reproduces today's uniform-weight behaviour.
     backend:
         Optional :class:`~segfacet.backend.Backend` handle. Accepted for
         signature uniformity and to resolve the auto-detect default (see
@@ -168,7 +228,9 @@ def fit_centroid_spline(
         an exactly-coincident mm-coordinate, naming the duplicated
         coordinate and the offending ``level_name``s — ``make_splprep``'s
         own failure on such input is an unreadable multi-line FITPACK
-        message (item 119, AC16).
+        message (item 119, AC16). Also raised when *weights* has the wrong
+        length or contains a non-finite or non-positive value (item 120,
+        AC2).
     """
     backend = backend or _backend_mod.get_backend()
 
@@ -191,6 +253,8 @@ def fit_centroid_spline(
             f"input segmentation for duplicated/collapsed labels."
         )
 
+    w = None if weights is None else _validate_weights(weights, n_points)
+
     # Clamp degree so that k < n_points, as required by make_splprep.
     effective_degree = min(degree, n_points - 1)
 
@@ -201,11 +265,17 @@ def fit_centroid_spline(
     y = np.array([float(c.centroid_mm[1]) for c in centroids], dtype=np.float64)
     z = np.array([float(c.centroid_mm[2]) for c in centroids], dtype=np.float64)
 
+    make_splprep_kwargs: dict = {"k": effective_degree, "s": s}
+    if u is not None:
+        make_splprep_kwargs["u"] = np.asarray([float(v) for v in u], dtype=np.float64)
+    if w is not None:
+        make_splprep_kwargs["w"] = w
+
     # Fit the parametric smoothing B-spline. s=0 forces the spline through
     # every input point (interpolating fit); the default s=n_points allows
     # it to smooth over noise/outliers, per docs/spinal-curve-model.md.
     try:
-        spl, u = make_splprep([x, y, z], k=effective_degree, s=s)
+        spl, u_out = make_splprep([x, y, z], **make_splprep_kwargs)
     except ValueError:
         # A defensive fallback for any residual FITPACK failure the pre-check
         # above did not catch (e.g. near-degenerate configurations this
@@ -220,7 +290,7 @@ def fit_centroid_spline(
     return SplineFit(
         spline=spl,
         smoothing=s,
-        u=tuple(float(v) for v in u),
+        u=tuple(float(v) for v in u_out),
         degree=effective_degree,
         n_points=n_points,
     )

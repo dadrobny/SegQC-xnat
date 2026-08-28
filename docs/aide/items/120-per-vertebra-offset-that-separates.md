@@ -737,4 +737,80 @@ the 5-of-8 to 6-of-8 detection count in `progress.md`.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Weight construction.** `compute_leave_one_out_spline_offsets` builds a
+  fresh `[1.0] * n_points` list per level, sets `weights[i]` and
+  `weights[worst_idx]` to the module-level `_WITHHELD_WEIGHT = 1e-6`, and
+  refits with `u=reference_fit.u`. When `i == worst_idx` (the level under
+  test is itself the dominant outlier) the same index is set twice with no
+  special-casing needed — the result is the same single withheld point,
+  which is the correct behaviour: the dominant outlier's own held-out
+  reading only withholds itself, since there is no *second* level left to
+  additionally withhold.
+
+- **Dominant-outlier tie-break implementation.** `min(range(n), key=lambda i:
+  (-in_sample[i].offset_mm, centroids[i].label))` selects the largest
+  in-sample `offset_mm`, ties broken by ascending `label` — matches AC6's
+  wording directly (negating the offset turns "largest offset" into "min
+  key", and the label is the natural ascending tiebreaker for `min`).
+
+- **`mislabel`'s direction tie-break uses `max()`'s first-occurrence
+  semantics.** `_dominant_direction` builds `[(|dx|, "left-right"), (|dy|,
+  "anterior-posterior"), (|dz|, "cranio-caudal")]` in that fixed order and
+  calls `max(components, key=lambda c: c[0])`; Python's `max` returns the
+  *first* maximal element on a tie, which reproduces the required x -> y ->
+  z tie order without an explicit tie-break branch. Verified against AC14's
+  two tie tests (dx==dy -> left-right; dy==dz -> anterior-posterior).
+
+- **`identity_ordering_alignment.py`'s `detail=` string, not just its
+  docstrings, needed correcting.** The Authorised paths note for this file
+  says "docstring only", but `corpus.py`'s `write_corpus` takes the
+  manifest's `"detail"` field verbatim from `DisplacePerturbation.apply()`'s
+  `Expectation.detail` — there is no separate corpus-level override. AC20
+  requires the *manifest's* detail prose to stop claiming the mode is hidden
+  from `run_qc`, which is only reachable by editing that f-string. This
+  changes no voxel data and no generator behaviour (the string is descriptive
+  metadata folded into the committed manifest at regeneration, same as any
+  other text this item's step 9 regenerates) — kept inside the spirit of the
+  "docstring only, no generator behaviour changes" constraint.
+
+- **AC26 implemented per the coherent reading, not the literal text.** As
+  already logged in `insights.md` (2026-08-28), AC26's prose ("verdict is
+  unchanged from its pre-120 committed value" for "all nine") contradicts
+  AC18/AC20, which require `mode1_displace` to fire `mislabel` through plain
+  `run_qc` and lose its `reconstructed_record` status — and severity-dominance
+  verdict aggregation (`aggregate.py`) makes a verdict move from `pass` to
+  `flagged-for-review` an unavoidable consequence of a genuine new finding on
+  a case with zero prior findings. Implemented and tested per the committed
+  `test_120_leave_one_out_offset.py::test_ac26_regeneration_moves_no_verdict_outside_mode1s_own_deliverable`:
+  every other case's verdict is byte-for-byte unchanged; `mode1_displace`
+  alone moves to `flagged-for-review`, and every other changed JSON leaf
+  (across all nine goldens) lies under `features.stage3` or `findings`.
+
+- **Threshold margins measured on the regenerated corpus (Validation step 5).**
+  Over the nine regenerated goldens, the largest `per_label_offsets[].offset_mm`
+  on every case that must not raise a `mislabel` offset finding is
+  **5.143859 mm** (`mode4_relabel_swap`'s largest reading; the clean control
+  alone peaks at **0.673278 mm**) — a margin of **9.86 mm** below the 15.0 mm
+  threshold on the tightest non-firing case. `mode1_displace`'s displaced
+  label 22 reads **18.718604 mm**, a margin of **3.72 mm** above the
+  threshold. `mode6_crop_at_border`'s deliberate new finding (AC23) reads
+  **17.507445 mm** on label 22, a margin of **2.51 mm** above the threshold.
+  These are the numbers item 123 needs to re-measure the real-GT ceiling
+  under this item's estimator before moving `max_offset_mm`.
+
+- **Collateral test breakage outside this item's Authorised paths, not
+  fixed here.** `tests/test_110_neighbourhood_wiring.py::
+  test_ac11_corpus_findings_rule_ids_unchanged` asserts, for every
+  `detection == "pipeline"` corpus case, that the *full* set of fired
+  `rule_id`s equals `set(case["expected_rule_ids"])`. AC23 deliberately adds
+  a `mislabel` finding to `mode6_crop_at_border` while its
+  `expected_rule_ids` stays `["border"]` (the designated rule only), so this
+  one assertion now fails for that case. `tests/test_110_neighbourhood_wiring.py`
+  is item 110's (✅ merged) and is not in this item's Authorised paths — its
+  Testing Strategy table named only that file's `offset_mm` aggregation
+  stats as something to verify, not this assertion, so this is a genuine gap
+  in the reconciliation table rather than something this item was authorised
+  to touch. Left unedited per the table's own escape hatch ("if it pins
+  values, hand back rather than editing blind"); logged in `insights.md`
+  (2026-08-28) for a human/validator to decide the follow-up (widen this
+  item's scope, or a small authorised fix in a later item).

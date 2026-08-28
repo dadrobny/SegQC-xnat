@@ -1259,14 +1259,26 @@
         {
           "computation": "centroid_mm - closest spline point, x component.",
           "consumers": [],
-          "consuming_rules": [],
+          "consuming_rules": [
+            "mislabel"
+          ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            1,
+            4
+          ],
           "measures": "Signed x-axis displacement from the fitted spline.",
-          "mode_evidence": [],
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
           "origin": "record",
           "path": "stage3.per_label_offsets[].dx_mm",
-          "rule_evidence": [],
+          "rule_evidence": [
+            [
+              "mislabel",
+              "observed"
+            ]
+          ],
           "scale_sensitivity": "scales with spacing",
           "status": "retune",
           "units": "mm"
@@ -1274,14 +1286,26 @@
         {
           "computation": "centroid_mm - closest spline point, y component.",
           "consumers": [],
-          "consuming_rules": [],
+          "consuming_rules": [
+            "mislabel"
+          ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            1,
+            4
+          ],
           "measures": "Signed y-axis displacement from the fitted spline.",
-          "mode_evidence": [],
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
           "origin": "record",
           "path": "stage3.per_label_offsets[].dy_mm",
-          "rule_evidence": [],
+          "rule_evidence": [
+            [
+              "mislabel",
+              "observed"
+            ]
+          ],
           "scale_sensitivity": "scales with spacing",
           "status": "retune",
           "units": "mm"
@@ -1289,14 +1313,26 @@
         {
           "computation": "centroid_mm - closest spline point, z component.",
           "consumers": [],
-          "consuming_rules": [],
+          "consuming_rules": [
+            "mislabel"
+          ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            1,
+            4
+          ],
           "measures": "Signed z-axis displacement from the fitted spline.",
-          "mode_evidence": [],
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
           "origin": "record",
           "path": "stage3.per_label_offsets[].dz_mm",
-          "rule_evidence": [],
+          "rule_evidence": [
+            [
+              "mislabel",
+              "observed"
+            ]
+          ],
           "scale_sensitivity": "scales with spacing",
           "status": "retune",
           "units": "mm"
@@ -1405,7 +1441,7 @@
           "units": "voxels"
         }
       ],
-      "intro": "A cubic (degree clamped to n_points-1 when the sequence is short) smoothing B-spline is fit through the ordered centroids' mm-coordinates (scipy.interpolate.make_splprep, s = n_points by default); this spline underlies the per-vertebra offset measured here and the orientation/curvature/consistency families below.",
+      "intro": "A cubic (degree clamped to n_points-1 when the sequence is short) smoothing B-spline is fit through the ordered centroids' mm-coordinates (scipy.interpolate.make_splprep, s = n_points by default); this spline underlies the per-vertebra offset measured here and the orientation/curvature/consistency families below. offset_mm is a held-out (leave-one-out, down-weighted) measurement (item 120): a level's offset is its closest-approach distance to a curve refit with that level and the case's dominant outlier down-weighted to a negligible constant, so the level under test cannot pull the curve toward itself. dx_mm/dy_mm/dz_mm are anatomically readable -- array axis 0 left-right, axis 1 anterior-posterior, axis 2 cranio-caudal -- only because io.load_volume reorients every volume to axis codes (R, A, S) and centroid_mm carries no affine of its own.",
       "module": "segfacet.features.spline_offset",
       "stage": "Stage 3 · item 018",
       "title": "Spline Offset"

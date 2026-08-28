@@ -376,16 +376,16 @@
       },
       "per_label_neighbourhood": [
         {
-          "deviation_score": 661366.859346482,
+          "deviation_score": 5317058.147241467,
           "is_outlier": true,
           "label": 20,
           "level_name": "L1",
           "stats": {
             "offset_mm": {
-              "mean": 0.6312767739409861,
-              "median": 0.6312767739409861,
-              "std": 0.330683429673241,
-              "z_score": 661366.859346482
+              "mean": 6.042650131399335,
+              "median": 6.042650131399335,
+              "std": 2.658529073620733,
+              "z_score": 5317058.147241467
             },
             "spacing_mm": {
               "mean": 42.42686480400789,
@@ -406,16 +406,16 @@
           ]
         },
         {
-          "deviation_score": 0.042507131137089156,
+          "deviation_score": 0.30652268083355977,
           "is_outlier": false,
           "label": 21,
           "level_name": "L2",
           "stats": {
             "offset_mm": {
-              "mean": 0.9439825118362007,
-              "median": 0.9619602036142272,
-              "std": 0.5181416577206335,
-              "z_score": 0.042507131137089156
+              "mean": 10.267968170711015,
+              "median": 8.701179205020068,
+              "std": 6.35755269661132,
+              "z_score": 0.30652268083355977
             },
             "spacing_mm": {
               "mean": 43.169318910516004,
@@ -437,16 +437,16 @@
           ]
         },
         {
-          "deviation_score": 607433.784012398,
+          "deviation_score": 10017425.04431432,
           "is_outlier": true,
           "label": 22,
           "level_name": "L3",
           "stats": {
             "offset_mm": {
-              "mean": 1.1644381316183645,
-              "median": 0.9619602036142366,
-              "std": 0.2863470318646475,
-              "z_score": 607433.784012398
+              "mean": 12.040320886458161,
+              "median": 8.701179205020068,
+              "std": 4.72225945257507,
+              "z_score": 10017425.04431432
             },
             "spacing_mm": {
               "mean": 43.169318910516004,
@@ -468,16 +468,16 @@
           ]
         },
         {
-          "deviation_score": 0.04250721710184365,
+          "deviation_score": 0.3065226808351281,
           "is_outlier": false,
           "label": 23,
           "level_name": "L4",
           "stats": {
             "offset_mm": {
-              "mean": 0.9439824738647719,
-              "median": 0.9619602036142366,
-              "std": 0.5181417048706902,
-              "z_score": 0.04250721710184365
+              "mean": 10.267968170717127,
+              "median": 8.701179205020042,
+              "std": 6.357552696604693,
+              "z_score": 0.3065226808351281
             },
             "spacing_mm": {
               "mean": 41.68441069749978,
@@ -499,16 +499,16 @@
           ]
         },
         {
-          "deviation_score": 661366.973260788,
+          "deviation_score": 5317058.147223075,
           "is_outlier": true,
           "label": 24,
           "level_name": "L5",
           "stats": {
             "offset_mm": {
-              "mean": 0.6312767169838427,
-              "median": 0.6312767169838427,
-              "std": 0.330683486630394,
-              "z_score": 661366.973260788
+              "mean": 6.042650131408504,
+              "median": 6.042650131408504,
+              "std": 2.6585290736115375,
+              "z_score": 5317058.147223075
             },
             "spacing_mm": {
               "mean": 40.19950248448356,
@@ -531,54 +531,54 @@
       ],
       "per_label_offsets": [
         {
-          "closest_u": 5.611895432316293e-07,
-          "dx_mm": 0.21626981084886054,
-          "dy_mm": 0.2087671360463439,
-          "dz_mm": -0.00010217863082573331,
+          "closest_u": 0.00379552920273045,
+          "dx_mm": 2.3429734330455325,
+          "dy_mm": 2.342324806324701,
+          "dz_mm": -0.690119792079134,
           "label": 20,
           "level_name": "L1",
-          "offset_mm": 0.3005933442677452,
-          "offset_voxel": 0.3005933442677452
+          "offset_mm": 3.3841210577786014,
+          "offset_voxel": 3.3841210577786014
         },
         {
-          "closest_u": 0.23407470852229495,
-          "dx_mm": -0.5982836709067385,
-          "dy_mm": -0.6091420989046128,
-          "dz_mm": 0.44313653178897994,
+          "closest_u": 0.23046143932309318,
+          "dx_mm": -6.181090558756701,
+          "dy_mm": -6.039290238661856,
+          "dz_mm": 1.0156832555113198,
           "label": 21,
           "level_name": "L2",
-          "offset_mm": 0.9619602036142272,
-          "offset_voxel": 0.9619602036142272
+          "offset_mm": 8.701179205020068,
+          "offset_voxel": 8.701179205020068
         },
         {
-          "closest_u": 0.5000000249651061,
-          "dx_mm": 1.1291732402876136,
-          "dy_mm": 1.0899382009101046,
-          "dz_mm": -3.718863183621579e-06,
+          "closest_u": 0.5000000004028241,
+          "dx_mm": 13.46796736866952,
+          "dy_mm": 12.999999999986613,
+          "dz_mm": -6.00056466737442e-08,
           "label": 22,
           "level_name": "L3",
-          "offset_mm": 1.5693939876266298,
-          "offset_voxel": 1.5693939876266298
+          "offset_mm": 18.718604249334373,
+          "offset_voxel": 18.718604249334373
         },
         {
-          "closest_u": 0.7659252914777046,
-          "dx_mm": -0.5982836709067669,
-          "dy_mm": -0.6091420989046412,
-          "dz_mm": -0.4431365317889231,
+          "closest_u": 0.7695385606769095,
+          "dx_mm": -6.181090558756615,
+          "dy_mm": -6.03929023866182,
+          "dz_mm": -1.0156832555118172,
           "label": 23,
           "level_name": "L4",
-          "offset_mm": 0.9619602036142366,
-          "offset_voxel": 0.9619602036142366
+          "offset_mm": 8.701179205020042,
+          "offset_voxel": 8.701179205020042
         },
         {
-          "closest_u": 0.9999994401419617,
-          "dx_mm": 0.21626974315865155,
-          "dy_mm": 0.20876704226822795,
-          "dz_mm": 0.00010193619698384282,
+          "closest_u": 0.9962044855170623,
+          "dx_mm": 2.3429739924422357,
+          "dy_mm": 2.342325034267077,
+          "dz_mm": 0.690117119342716,
           "label": 24,
           "level_name": "L5",
-          "offset_mm": 0.30059323035344865,
-          "offset_voxel": 0.30059323035344865
+          "offset_mm": 3.3841210577969667,
+          "offset_voxel": 3.3841210577969667
         }
       ],
       "per_label_orientations": [
@@ -652,9 +652,28 @@
       }
     }
   },
-  "findings": [],
-  "per_label": {},
+  "findings": [
+    {
+      "labels": [
+        22
+      ],
+      "reason": "Vertebra misaligned from spinal curve: label 22 (L3) centroid lies 18.7 mm off the fitted spinal curve, predominantly left-right (threshold 15.0 mm).",
+      "rule_id": "mislabel",
+      "severity": "flagged-for-review"
+    }
+  ],
+  "per_label": {
+    "22": [
+      {
+        "labels": [
+          22
+        ],
+        "message": "Vertebra misaligned from spinal curve: label 22 (L3) centroid lies 18.7 mm off the fitted spinal curve, predominantly left-right (threshold 15.0 mm).",
+        "severity": "flagged-for-review"
+      }
+    ]
+  },
   "reasons": [],
   "schema_version": "0.1",
-  "verdict": "pass"
+  "verdict": "flagged-for-review"
 }
