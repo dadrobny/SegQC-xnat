@@ -259,6 +259,16 @@ with the reason it earns its keep rather than following Group A:
   is invariant under every retune this stage or Stage 20 authorises, and it
   remains a live ratchet on any future `io.load_volume` change rather than a
   discharged one-shot migration fence.
+- `tests/corpus/119_pre_119_digests.json` — a blast-radius fence, not a
+  computed-feature snapshot: it pins that item 119 changed neither
+  `src/segfacet/pipeline.py` nor the feature catalogue's set of leaf paths, so
+  no feature retune can invalidate it. It diverges from Group A in the
+  opposite direction to `094_pre_migration_snapshot.json` — that one earns
+  `keep` for being a live ratchet, whereas this one is a discharged one-shot
+  fence and earns `keep` only for as long as its item's boundary is still
+  worth holding. Expected to be **deleted** rather than retired when item 120
+  edits `pipeline.py`, which is the event that ends the first of its two
+  assertions.
 - `src/segfacet/reference/reference_default.json` — shipped default data with
   a live regenerated-vs-committed guarantee, not a corpus-case snapshot.
 - `src/segfacet/reference/reference_verse_v1.json` — unregenerable in CI (built
