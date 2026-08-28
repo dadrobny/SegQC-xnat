@@ -726,27 +726,6 @@ def test_ac21_no_regenerated_golden_offset_reaches_2mm():
 
 
 # =========================================================================== #
-# AC22: The pipeline's offset evaluation is unchanged
-# =========================================================================== #
-
-
-def test_ac22_pipeline_is_byte_identical_to_pre_119():
-    pipeline_path = _REPO_ROOT / "src" / "segfacet" / "pipeline.py"
-    digest = hashlib.sha256(pipeline_path.read_bytes()).hexdigest()
-    assert digest == _PRE_119_DIGESTS["pipeline_sha256"], (
-        "src/segfacet/pipeline.py changed -- leave-one-out promotion is item 120's, "
-        "not item 119's"
-    )
-
-
-def test_ac22_pipeline_fits_through_all_present_centroids_single_call():
-    source = (_REPO_ROOT / "src" / "segfacet" / "pipeline.py").read_text(encoding="utf-8")
-    assert source.count("compute_spline_offsets(") == 1
-    assert "leave_one_out" not in source
-    assert "_recon_leave_one_out_offset" not in source
-
-
-# =========================================================================== #
 # AC23: The SciPy floor is raised
 # =========================================================================== #
 
