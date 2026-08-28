@@ -1193,7 +1193,7 @@ prior, so it is recorded and gated before any calculation changes.
 - ✅ **D2** The formulation implemented, replacing `s=0`, with its smoothing/DoF parameter
   in a scale-free form (`splprep`'s `s` is an absolute mm² residual bound and cannot be a
   literal constant across level counts or spacings). *(Item 119)*
-- 📋 **D3** Per-vertebra offset that separates, including the per-direction components
+- 🚧 **D3** Per-vertebra offset that separates, including the per-direction components
   (`dx/dy/dz_mm`) that are computed and catalogued but read by no rule. A leave-one-out fit
   tracks displacement ~1:1 (measured 5 → 6.2, 10 → 10.4, 15 → 16.0 mm) and already exists as
   `_recon_leave_one_out_offset` inside the test harness; promoting it retires mode 1's
