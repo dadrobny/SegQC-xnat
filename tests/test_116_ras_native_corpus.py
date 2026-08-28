@@ -375,15 +375,37 @@ _MANIFEST_CASES = load_manifest()["cases"]
 _MERGE_BASE_SHA = _merge_base_sha()
 
 
+#: Item 120 makes the per-vertebra spline offset a held-out measurement,
+#: which deliberately adds a ``mislabel`` finding on label 22 to these two
+#: cases (AC18/AC23) that the merge-base (pre-120) committed golden does not
+#: carry. Widened by human decision, 2026-08-28 -- see
+#: docs/aide/items/120-per-vertebra-offset-that-separates.md's Authorised
+#: paths entry for this test.
+_ITEM_120_ADDED_MISLABEL_PAIR = ("mislabel", (22,))
+_ITEM_120_NEW_MISLABEL_CASES = frozenset({"mode1_displace", "mode6_crop_at_border"})
+
+
 @pytest.mark.skipif(_MERGE_BASE_SHA is None, reason="git merge-base unavailable in this environment")
 @pytest.mark.parametrize("case", _MANIFEST_CASES, ids=lambda c: c["case_id"])
 def test_ac7_case_identity_preserved_vs_merge_base(case):
     """AC7: the freshly-built report's (rule_id, sorted labels) pairs match
     the merge-base (pre-migration) committed golden's exactly -- numeric
-    feature values may move, but which rule fires on which labels must not."""
+    feature values may move, but which rule fires on which labels must not.
+
+    Except for ``mode1_displace`` and ``mode6_crop_at_border``, where item
+    120 deliberately adds a ``mislabel`` finding on label 22 (AC18/AC23):
+    that one added pair is stripped from the fresh side before comparing so
+    the rest of each case's rule/label identity is still pinned exactly."""
     fresh = build_report_for_case(case)
     committed = _merge_base_golden(case["case_id"], _MERGE_BASE_SHA)
-    assert _rule_label_pairs(fresh["findings"]) == _rule_label_pairs(committed["findings"]), (
+    fresh_pairs = _rule_label_pairs(fresh["findings"])
+    if case["case_id"] in _ITEM_120_NEW_MISLABEL_CASES:
+        assert _ITEM_120_ADDED_MISLABEL_PAIR in fresh_pairs, (
+            f"case {case['case_id']!r}: expected item 120's deliberate "
+            "mislabel finding on label 22, but it did not fire"
+        )
+        fresh_pairs = [p for p in fresh_pairs if p != _ITEM_120_ADDED_MISLABEL_PAIR]
+    assert fresh_pairs == _rule_label_pairs(committed["findings"]), (
         f"case {case['case_id']!r}: designated rule/labels changed relative "
         "to the pre-migration (merge-base) golden"
     )

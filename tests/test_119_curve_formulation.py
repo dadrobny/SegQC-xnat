@@ -634,19 +634,18 @@ def test_ac19_stage3_report_golden_matches_test_022_output():
 # =========================================================================== #
 
 
-# Pre-119 committed (verdict, [(rule_id, labels), ...]) per case, captured as
-# a fixture constant -- not by re-reading a file this item rewrites.
-_PRE_119_VERDICTS_AND_FINDINGS = {
-    "clean_control": ("pass", []),
-    "mode1_displace": ("pass", []),
-    "mode2_fragment": ("flagged-for-review", [("fragmentation", [22])]),
-    "mode3_inject_islands": ("flagged-for-review", [("fragmentation", [22])]),
-    "mode4_relabel_swap": ("pass", []),
-    "mode5_remove_level": ("flagged-for-review", [("coverage", [])]),
-    "mode6_crop_at_border": ("flagged-for-review", [("border", [22])]),
-    "mode7_sequence_break": ("flagged-for-review", [("sequence", [28])]),
-    "mode8_force_overlap": ("pass", []),
-}
+#: ``test_ac20_regeneration_moves_no_verdict_or_finding`` pinned a pre-119
+#: (== pre-120) verdict/findings snapshot here and is retired: item 120
+#: deliberately moves ``mode1_displace``'s verdict from ``pass`` to
+#: ``flagged-for-review`` (AC18/AC20) and adds a ``mislabel`` finding to
+#: ``mode6_crop_at_border`` (AC23) -- the exact thing this test existed to
+#: forbid. Item 120's own goldens/verdict-movement claim is pinned by
+#: ``test_120_leave_one_out_offset.py::
+#: test_ac26_regeneration_moves_no_verdict_outside_mode1s_own_deliverable``,
+#: which supersedes this test the same way the deleted
+#: ``test_ac22_pipeline_is_byte_identical_to_pre_119`` pair was superseded.
+#: Retired per docs/aide/items/120-per-vertebra-offset-that-separates.md's
+#: Authorised paths (widened by human decision, 2026-08-28).
 
 
 def _leaf_paths(node, prefix=()):
@@ -656,22 +655,6 @@ def _leaf_paths(node, prefix=()):
             yield from _leaf_paths(value, prefix + (key,))
     else:
         yield prefix
-
-
-def test_ac20_regeneration_moves_no_verdict_or_finding():
-    manifest = load_manifest()
-    assert set(c["case_id"] for c in manifest["cases"]) == set(_PRE_119_VERDICTS_AND_FINDINGS)
-
-    for case in manifest["cases"]:
-        case_id = case["case_id"]
-        golden = load_golden(case_id)
-        expected_verdict, expected_findings = _PRE_119_VERDICTS_AND_FINDINGS[case_id]
-
-        assert golden["verdict"] == expected_verdict, f"{case_id}: verdict moved"
-        actual_findings = [
-            (f["rule_id"], list(f.get("labels", []))) for f in golden.get("findings", [])
-        ]
-        assert actual_findings == expected_findings, f"{case_id}: findings moved"
 
 
 def test_ac20_diff_against_committed_goldens_stays_under_stage3(tmp_path):
@@ -713,16 +696,16 @@ def test_ac21_mislabel_default_threshold_unchanged():
     assert _DEFAULT_MAX_OFFSET_MM == 15.0
 
 
-def test_ac21_no_regenerated_golden_offset_reaches_2mm():
-    manifest = load_manifest()
-    for case in manifest["cases"]:
-        golden = load_golden(case["case_id"])
-        offsets = golden.get("features", {}).get("stage3", {}).get("per_label_offsets", [])
-        for offset in offsets:
-            assert offset["offset_mm"] < 2.0, (
-                f"{case['case_id']}: offset_mm {offset['offset_mm']} reaches the "
-                f"15.0/25.0 threshold-adjacency region item 123 owns"
-            )
+#: ``test_ac21_no_regenerated_golden_offset_reaches_2mm`` pinned the pre-120
+#: in-sample offset ceiling here and is retired: item 120 makes
+#: ``stage3.per_label_offsets[].offset_mm`` a held-out measurement, and
+#: ``mode1_displace``'s label 22 now deliberately reads 18.719 mm (AC6/AC17)
+#: -- item 120's whole point is to reach that region, not stay clear of it.
+#: The post-120 margins (clean-control ceiling 0.674 mm, displaced reading
+#: 18.719 mm) are pinned by
+#: ``test_120_leave_one_out_offset.py::test_ac17_threshold_margins_hold_on_corpus``
+#: instead. Retired per docs/aide/items/120-per-vertebra-offset-that-
+#: separates.md's Authorised paths (widened by human decision, 2026-08-28).
 
 
 # =========================================================================== #

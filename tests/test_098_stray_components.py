@@ -827,9 +827,30 @@ def test_ac14_every_golden_still_validates_against_schema():
 # (frozen pre-098 snapshot)
 # =========================================================================== #
 
+#: Item 120 makes the per-vertebra spline offset a held-out measurement,
+#: which deliberately moves two cases' verdict/findings: ``mode1_displace``
+#: now fires a ``mislabel`` offset finding on label 22 (18.7 mm, AC18) and
+#: ``mode6_crop_at_border`` gains the same finding alongside its pre-existing
+#: ``border`` finding (17.5 mm, AC23). Both moves are the pipeline-detection
+#: promotion documented in docs/aide/items/120-per-vertebra-offset-that-
+#: separates.md; every other case's snapshot is still the frozen pre-098 one.
 _PRE_098_GOLDEN_VERDICT_AND_FINDINGS = {
     "clean_control": {"verdict": "pass", "findings": []},
-    "mode1_displace": {"verdict": "pass", "findings": []},
+    "mode1_displace": {
+        "verdict": "flagged-for-review",
+        "findings": [
+            {
+                "rule_id": "mislabel",
+                "severity": "flagged-for-review",
+                "labels": [22],
+                "reason": (
+                    "Vertebra misaligned from spinal curve: label 22 (L3) "
+                    "centroid lies 18.7 mm off the fitted spinal curve, "
+                    "predominantly left-right (threshold 15.0 mm)."
+                ),
+            }
+        ],
+    },
     "mode2_fragment": {
         "verdict": "flagged-for-review",
         "findings": [
@@ -887,7 +908,17 @@ _PRE_098_GOLDEN_VERDICT_AND_FINDINGS = {
                     "Partial vertebra clipped by FOV: label 22 (L3) touches "
                     "image face(s): anterior."
                 ),
-            }
+            },
+            {
+                "rule_id": "mislabel",
+                "severity": "flagged-for-review",
+                "labels": [22],
+                "reason": (
+                    "Vertebra misaligned from spinal curve: label 22 (L3) "
+                    "centroid lies 17.5 mm off the fitted spinal curve, "
+                    "predominantly anterior-posterior (threshold 15.0 mm)."
+                ),
+            },
         ],
     },
     "mode7_sequence_break": {
@@ -936,7 +967,12 @@ def test_ac15_golden_verdict_and_findings_unchanged(case_id):
     """AC15: the regenerated golden's top-level verdict and findings array
     (length, order, rule_id/severity/labels, and -- except for the one
     face-name-sensitive case, item 116 -- reason) are identical to the
-    pre-098 committed golden's -- only the features block grew."""
+    pre-098 committed golden's, for every case except ``mode1_displace`` and
+    ``mode6_crop_at_border`` -- item 120 deliberately fires a ``mislabel``
+    finding through plain ``run_qc`` for both (AC18/AC23), so their entries
+    in ``_PRE_098_GOLDEN_VERDICT_AND_FINDINGS`` above are the post-120
+    values, not the frozen pre-098 ones. For every other case only the
+    features block grew."""
     golden = load_golden(case_id)
     expected = _PRE_098_GOLDEN_VERDICT_AND_FINDINGS[case_id]
     assert golden["verdict"] == expected["verdict"]

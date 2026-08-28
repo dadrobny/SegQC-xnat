@@ -79,13 +79,6 @@ _PRE_119_DIGESTS = json.loads(
     (_REPO_ROOT / "tests" / "corpus" / "119_pre_119_digests.json").read_text(encoding="utf-8")
 )
 
-# Pre-120 sha256 of the untouched real-GT reference artifact (AC29). Captured
-# by the test-writer while this file was still in its pre-120 state -- this
-# item never rebuilds it (real VerSe cohort, item 123's).
-_PRE_120_REFERENCE_VERSE_V1_SHA256 = (
-    "978c63d0367d9dd018f472aaa034740d42a04c47b95ccf0501cc128ad0638826"
-)
-
 
 # =========================================================================== #
 # Helpers (mirror tests/test_017_centroid_spline_fit.py / test_119's style)
@@ -906,9 +899,17 @@ def test_ac28_spline_offset_mm_distribution_has_nonzero_mean():
 
 
 def test_ac29_reference_verse_v1_unchanged():
+    """AC29: reference_verse_v1.json is byte-identical to its pinned
+    pre-098 digest. Reuses ``test_098_stray_components``'s existing fence
+    rather than adding a second hardcoded literal for the same file --
+    ``tests/test_115_stage26_validation.py::
+    test_ac8_no_hardcoded_literal_fence_remains`` caps the corpus at exactly
+    one such fence."""
+    from test_098_stray_components import _PRE_098_REFERENCE_VERSE_V1_SHA256
+
     path = _REPO_ROOT / "src" / "segfacet" / "reference" / "reference_verse_v1.json"
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    assert digest == _PRE_120_REFERENCE_VERSE_V1_SHA256, (
+    assert digest == _PRE_098_REFERENCE_VERSE_V1_SHA256, (
         "reference_verse_v1.json changed -- its rebuild needs the real VerSe "
         "cohort and is item 123's, not item 120's"
     )
@@ -975,6 +976,20 @@ def test_adv_straight_spine_all_held_out_offsets_near_zero():
 
 
 def test_adv_two_opposite_displacements_both_separate():
+    """Both displaced levels exceed a working threshold and are named --
+    the spec's literal claim (item 120's Description/Testing Strategy).
+
+    This does *not* assert either displaced level is the maximum reading:
+    only a single dominant outlier is withheld per refit (Decisions log,
+    "Weight construction"), so with two genuinely displaced levels the
+    un-withheld one still pulls every other level's held-out curve toward
+    itself. Shipped as a known, documented limitation (human decision,
+    2026-08-28; ``spline_offset.py``'s module docstring, "Documented
+    limitation: only the single dominant outlier is withheld") -- not fixed
+    here. That limitation is pinned below, not just narrated around: on this
+    exact scenario a genuinely clean level (T8) reads ~31.96 mm, strictly
+    above one of the two displaced levels' ~19.31 mm reading, so a clean
+    vertebra can be named an offender ahead of an actual one."""
     centroids = _eight_level_thoracic_spine()
     idx_a, idx_b = 2, 5
     scenario = list(centroids)
@@ -982,13 +997,23 @@ def test_adv_two_opposite_displacements_both_separate():
     scenario[idx_b] = _displace_index(centroids, idx_b, -15.0, axis=0)
 
     records = compute_leave_one_out_spline_offsets(scenario)
-    others_max = max(
-        r.offset_mm for i, r in enumerate(records) if i not in (idx_a, idx_b)
-    )
-    assert records[idx_a].offset_mm > others_max
+
+    # Both displaced levels exceed a working threshold and are correctly
+    # identified as the displaced labels (AC-level claim: they "separate").
     assert records[idx_a].offset_mm > 5.0
-    assert records[idx_b].offset_mm > others_max
     assert records[idx_b].offset_mm > 5.0
+
+    # The multi-outlier limitation itself, pinned: a clean level (the
+    # terminal T8, index 7, never displaced) reads higher than one of the
+    # two genuinely displaced levels -- a clean vertebra can outrank an
+    # actual offender under the single-dominant-outlier withholding scheme.
+    clean_idx = 7
+    assert clean_idx not in (idx_a, idx_b)
+    clean_offset = records[clean_idx].offset_mm
+    assert clean_offset > records[idx_b].offset_mm, (
+        "expected the documented multi-outlier limitation: a clean level "
+        "reading higher than one of the two genuinely displaced levels"
+    )
 
 
 def test_adv_terminal_displacement_five_levels_not_separable():
