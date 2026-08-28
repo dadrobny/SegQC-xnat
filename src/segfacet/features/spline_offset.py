@@ -70,6 +70,19 @@ corpus's level count), so the held-out offset under-reports the true
 displacement there. Real fields of view carry far more than five levels, and
 this is measurably resolved by level count alone -- not worked around here.
 
+**Documented limitation: only the single dominant outlier is withheld.**
+Step 1 identifies and withholds one outlier per refit. With **two or more**
+genuinely displaced levels, every un-withheld displaced level still pulls
+every *other* level's held-out curve toward itself, which can both under-report
+a real displacement and over-report a clean level as displaced. Measured on
+the adversarial two-opposite-displacements case (two levels displaced in
+opposite directions): a genuinely **clean** level reads **31.96 mm** while one
+of the **displaced** levels reads only **19.31 mm** -- the clean level can be
+named an offender ahead of an actual one. This is accepted as a known, shipped
+limitation (not fixed by this item); the natural follow-up is withholding
+every level above some outlier cutoff, not just the single dominant one, and
+is left to future work.
+
 RAS axis contract for the direction components (item 120)
 -------------------------------------------------------------
 ``dx_mm``, ``dy_mm`` and ``dz_mm`` are anatomically readable -- array axis 0

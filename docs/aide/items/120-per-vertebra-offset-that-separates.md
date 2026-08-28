@@ -553,6 +553,40 @@ The code path in `src/segfacet` (see `aide.toml` `project.source_dir`):
   six of eight and is renamed, along with the module docstring's `5/8`
   sentence (AC24).
 - `docs/aide/insights.md` — append-only, per the out-of-scope-insight rule.
+- `tests/test_098_stray_components.py` —
+  `test_ac15_golden_verdict_and_findings_unchanged` for `mode1_displace` and
+  `mode6_crop_at_border`: both cases' verdict/findings shape is a direct
+  consequence of AC18/AC20/AC23's deliberate behaviour change (widened by
+  human decision, 2026-08-28).
+- `tests/test_102_stage18_validation.py` —
+  `test_ac5_report_verdict_and_findings_match_pre_098_snapshot`, same two
+  cases, same reason (widened by human decision, 2026-08-28).
+- `tests/test_116_ras_native_corpus.py` —
+  `test_ac7_case_identity_preserved_vs_merge_base`, same two cases, same
+  reason (widened by human decision, 2026-08-28).
+- `tests/test_110_neighbourhood_wiring.py` —
+  `test_ac11_corpus_findings_rule_ids_unchanged`, whose exact-equality
+  assertion AC23 deliberately breaks for `mode6_crop_at_border` (widened by
+  human decision, 2026-08-28; see the "Collateral test breakage" entry in
+  Decisions & Trade-offs, now resolved by this widening).
+- `tests/test_119_curve_formulation.py` — additionally
+  `test_ac20_regeneration_moves_no_verdict_or_finding` and
+  `test_ac21_no_regenerated_golden_offset_reaches_2mm`, both of which pin
+  pre-120 behaviour this item deliberately supersedes (widened by human
+  decision, 2026-08-28).
+- `tests/test_115_stage26_validation.py` and the redundant second digest
+  fence in `tests/test_120_leave_one_out_offset.py` — both assert against
+  `tests/corpus/119_pre_119_digests.json`, whose `pipeline_sha256` key this
+  item's step 9 drops (widened by human decision, 2026-08-28).
+- `docs/aide/golden-decision-table.md` and
+  `tests/test_105_golden_decision_table.py` — the "asserted by" cell naming
+  the deleted `test_ac22_pipeline_is_byte_identical_to_pre_119` (widened by
+  human decision, 2026-08-28). This reverses this spec's own earlier decision
+  not to pin them (see the "Asserts against" note below this list, now
+  superseded for these two paths only): the table's own row text for
+  `tests/corpus/119_pre_119_digests.json` already predicted that item 120
+  ends the `pipeline_sha256` fence's life, so updating the row is this
+  item's job, not a later one's.
 
 **Asserts against:**
 
@@ -578,12 +612,21 @@ The code path in `src/segfacet` (see `aide.toml` `project.source_dir`):
 - `tests/corpus/fixtures/*.nii.gz` — read, not changed. No generator behaviour
   changes, so the committed volumes must be byte-stable across step 9.
 
-`docs/aide/golden-decision-table.md`, `tests/test_105_golden_decision_table.py`
-and `.gitattributes` are deliberately **not** pinned here even though this item
-leaves all three alone: it adds and removes no non-`.py` fixture under `tests/`,
-so the documented fixture count and the existing `text eol=lf` pins already
-cover everything regenerated in step 9. Pinning them would only collide with
-items 119 and 122, which legitimately edited them and are merged.
+`.gitattributes` is deliberately **not** pinned here: this item adds and
+removes no non-`.py` fixture under `tests/`, so the existing `text eol=lf`
+pins already cover everything regenerated in step 9. Pinning it would only
+collide with items 119 and 122, which legitimately edited it and are merged.
+
+`docs/aide/golden-decision-table.md` and `tests/test_105_golden_decision_table.py`
+were originally scoped out on the same reasoning (this item adds/removes no
+fixture, so the documented fixture count doesn't move) — but that reasoning
+missed that this item *retires an assertion on an existing, already-pinned*
+fixture (`tests/corpus/119_pre_119_digests.json`'s `pipeline_sha256` key and
+`test_ac22_pipeline_is_byte_identical_to_pre_119`), which the table's own row
+names by test id. Human decision, 2026-08-28: widen the May-change list (see
+above) to cover the table row's "asserted by" cell and the deleted-test
+reference `tests/test_105_golden_decision_table.py` checks against, rather
+than leaving that reconciliation to a later item.
 
 ## Testing Strategy
 
@@ -814,3 +857,42 @@ the 5-of-8 to 6-of-8 detection count in `progress.md`.
   values, hand back rather than editing blind"); logged in `insights.md`
   (2026-08-28) for a human/validator to decide the follow-up (widen this
   item's scope, or a small authorised fix in a later item).
+
+- **Multi-outlier limitation shipped as a known, documented limitation
+  (human decision, 2026-08-28).** `compute_leave_one_out_spline_offsets`
+  withholds only the single dominant outlier per refit (Decisions entry
+  above, "Weight construction"). With two or more genuinely displaced
+  levels, every un-withheld displaced level still pulls every *other*
+  level's held-out curve toward itself. Measured on the adversarial
+  two-opposite-displacements case: a genuinely **clean** level reads
+  **31.96 mm** while one of the **displaced** levels reads only **19.31 mm**
+  — a clean vertebra can be named an offender ahead of an actual one. The
+  project owner accepted this as a known limitation to ship now rather than
+  a defect to fix in this item: it is measured, reproducible, and does not
+  regress anything this item's AC pin (the single-outlier corpus cases all
+  measure correctly). The limitation is now stated plainly, with these
+  numbers, in `src/segfacet/features/spline_offset.py`'s module docstring so
+  a reader of the code learns it without opening this spec. The accepted
+  follow-up — withhold every level above some outlier cutoff, not just the
+  single dominant one — is logged in `insights.md` (2026-08-28) for a later
+  item; not implemented here per "do not redesign the estimator."
+
+- **Authorised paths widened after initial commit (human decision,
+  2026-08-28).** The reconciliation table under-scoped this item's blast
+  radius: several already-merged tests assert exact shapes (verdict/findings
+  snapshots, rule-id sets, pre-120 offset ceilings, a deleted-test reference
+  in the golden-decision-table) that this item's deliberate behaviour change
+  — `mode1_displace` and `mode6_crop_at_border` now firing `mislabel` through
+  plain `run_qc` — necessarily breaks. Rather than leave those breakages as
+  "collateral, fixed later" (the disposition originally recorded for
+  `test_110_neighbourhood_wiring.py` above), the owner widened this item's
+  May-change list to cover all of them in one pass: `test_098_stray_
+  components.py`, `test_102_stage18_validation.py`, `test_116_ras_native_
+  corpus.py`, `test_110_neighbourhood_wiring.py`, the two `test_119_curve_
+  formulation.py` pre-120-pinning tests, `test_115_stage26_validation.py`,
+  the redundant digest fence in `test_120_leave_one_out_offset.py`, and
+  `docs/aide/golden-decision-table.md` / `test_105_golden_decision_table.py`
+  (see the Authorised paths section for the full list and per-file reasons).
+  This does not change any measured value or redesign the estimator — it
+  only aligns the spec's authorised scope with the behaviour this item
+  already, deliberately, produces.
