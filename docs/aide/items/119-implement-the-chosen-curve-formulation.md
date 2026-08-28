@@ -523,13 +523,12 @@ The code path in `src/segfacet` (see `aide.toml` `project.source_dir`):
   satisfied by this module staying green as committed.
 - `tests/corpus/manifest.json` — read, not changed. The nine cases and their
   committed fixtures are the population AC18/AC20 regenerate against.
-- `.gitattributes` — read, not changed: every file this item regenerates is
-  already pinned (`tests/corpus/golden/*.json`, `tests/golden/*.json`,
-  `docs/aide/feature_catalogue.generated.{json,md}`, `src/segfacet/**/*.py`).
-
-`docs/aide/golden-decision-table.md` needs no entry on either list: this item
-adds and removes no leaf path, so its measured `N/M leaf paths unwired` cells
-hold untouched.
+**Amended 2026-08-28.** Two entries were removed from this list and moved onto
+**May change** above, on the human decision recorded in the Decisions log and
+the Blocker section. Both were scoped on the assumption that this item only
+*regenerates* committed files, and both missed the case that materialised — it
+also creates one. See the Decisions log entry "The pre-119 digests live in a
+committed fixture".
 
 ## Testing Strategy
 
@@ -854,6 +853,19 @@ reference artifacts; item 125 validates Stage 28 end to end.
   a human sign-off, which is why this was escalated rather than decided
   in-loop. Resolved by adding the row with a fresh dated sign-off — see the
   Blocker section below.
+
+  Two **Asserts against** entries were removed by the same decision, both
+  mis-scoped for the same reason — each was reasoned about regeneration and
+  neither anticipated a *newly created* file. `.gitattributes` was pinned as
+  read-not-changed because every file this item regenerates is already covered
+  by an existing glob (`tests/corpus/golden/*.json`, `tests/golden/*.json`,
+  `docs/aide/feature_catalogue.generated.{json,md}`, `src/segfacet/**/*.py`);
+  none of those globs covers `tests/corpus/119_pre_119_digests.json`.
+  `docs/aide/golden-decision-table.md` was recorded as needing no entry on
+  either list because this item adds and removes no leaf path, leaving the
+  measured `N/M leaf paths unwired` cells untouched — still true of those
+  cells, but Section 1 also enumerates the fixture *set*, which the new file
+  changes.
 
 ## Blocker — resolved by human decision (2026-08-28)
 
