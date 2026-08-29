@@ -1205,7 +1205,7 @@ prior, so it is recorded and gated before any calculation changes.
 - ✅ **D5** Signed curvature: `total_curvature_deg` is `max − min` of an *unsigned* angle,
   reporting 5.702° where the true tangent sweep is 11.4° — it halves a C-curve and cancels
   the symmetric S a normal spine has. *(Item 122)*
-- 🔍 **D6** Recalibration and regeneration: `max_offset_mm`, the nine goldens,
+- ✅ **D6** Recalibration and regeneration: `max_offset_mm`, the nine goldens,
   `reference_default.json`, `reference_verse_v1.json`. The VerSe19 cohort is available
   locally (80 CT/GT pairs, gitignored symlink at the documented root), so the real artifact
   is rebuildable; `dataset-verse19.md`'s documented nested layout needs correcting to match.
