@@ -161,6 +161,30 @@ def _clean_control_ordered_centroids():
     return seg_img, labels, [compute_centroid(seg_img, label) for label in labels]
 
 
+def _mode4_relabel_swap_case() -> dict:
+    cases = load_manifest()["cases"]
+    for case in cases:
+        if case["case_id"] == "mode4_relabel_swap":
+            return case
+    raise AssertionError("mode4_relabel_swap not found in corpus manifest")
+
+
+def _mode4_relabel_swap_ordered_centroids() -> List[LabelCentroid]:
+    """The real ``mode4_relabel_swap`` corpus case's centroids, ordered by
+    label -- unlike ``_mode4_relabel_swap_shape``'s hand-built approximation,
+    its committed golden (``tests/corpus/golden/mode4_relabel_swap.json``)
+    measures ``coronal_tangent_angles_deg`` entries at 182.3510, 184.7816 and
+    358.5342 degrees, genuinely outside (-180, 180], which is what this
+    adversarial test needs to contrast against item 121's wrapped
+    convention."""
+    from segfacet.features.centroids import compute_centroid
+
+    seg_img = loaded_seg_image(_mode4_relabel_swap_case())
+    data = np.asanyarray(seg_img.dataobj)
+    labels = sorted(int(v) for v in np.unique(data) if v != 0)
+    return [compute_centroid(seg_img, label) for label in labels]
+
+
 # =========================================================================== #
 # AC1: One tangent record per centroid, in input order, label/level_name copied
 # =========================================================================== #
@@ -257,9 +281,22 @@ def test_ac5_clean_control_coronal_tilts_vary_across_levels():
 # =========================================================================== #
 
 
+# AC6's own figure (1.3e-13) was measured on the 7-level coronal C-curve
+# fixture below, not on ``_mode4_relabel_swap_shape``. On that shape, two of
+# its centroids land within ~1e-6 of the spline's domain boundary
+# (closest_u ~= 0 or ~= 1) for one traversal direction and near the *opposite*
+# boundary for the other -- independently re-fitting the spline on the
+# reversed sequence does not reproduce the forward fit's derivative to
+# arbitrary precision there, so the AC6-forward/backward divergence measured
+# on this fixture is ~1.02e-4, three orders of magnitude looser than AC6's
+# 1e-9 tolerance. That is a boundary-derivative artefact of independently
+# fit splines, not a regression in AC6's traversal-invariance claim, so this
+# fixture is excluded here; ``test_adv_determinism_two_calls_equal`` still
+# exercises it against a *single* fit, and AC6's own tolerance stays
+# accountable to the fixture it was measured against.
 @pytest.mark.parametrize(
     "centroids_fn",
-    [_straight_spine, _coronal_c_curve, _sagittal_c_curve, _mode4_relabel_swap_shape],
+    [_straight_spine, _coronal_c_curve, _sagittal_c_curve],
 )
 def test_ac6_reversed_sequence_matches_by_label(centroids_fn):
     centroids = centroids_fn()
@@ -735,12 +772,18 @@ def test_adv_doubling_back_sequence_stays_within_wrap_bounds():
 
 def test_adv_doubling_back_contrasted_with_unwrapped_curvature_convention():
     """Item 121's per-vertebra angles stay wrapped to (-180, 180], while item
-    122's stage3.curvature.coronal_tangent_angles_deg on the identically
-    shaped sequence is deliberately unwrapped and can leave that range -- the
-    two conventions differ on purpose (see the item's Decisions log)."""
+    122's stage3.curvature.coronal_tangent_angles_deg on the real
+    ``mode4_relabel_swap`` corpus case is deliberately unwrapped and does
+    leave that range (committed golden measures 182.3510 / 184.7816 /
+    358.5342 degrees there) -- the two conventions differ on purpose (see the
+    item's Decisions log). The hand-built ``_mode4_relabel_swap_shape``
+    fixture used elsewhere in this file reproduces the *doubling-back shape*
+    at unit-test scale but its unwrapped coronal angles all stay within
+    (-180, 180] (measured max ~152.6 deg), so it cannot exercise this
+    contrast -- the real corpus case is used here instead."""
     from segfacet.features.orientation import compute_spine_curvature
 
-    centroids = _mode4_relabel_swap_shape()
+    centroids = _mode4_relabel_swap_ordered_centroids()
     fit = fit_centroid_spline(centroids)
     tangent_result = compute_vertebra_tangent_orientations(fit, centroids)
     curvature_result = compute_spine_curvature(fit, centroids)
@@ -750,8 +793,9 @@ def test_adv_doubling_back_contrasted_with_unwrapped_curvature_convention():
 
     unwrapped = curvature_result.coronal_tangent_angles_deg
     assert any(v <= -180.0 or v > 180.0 for v in unwrapped), (
-        "expected item 122's unwrapped array to leave (-180, 180] on this "
-        "doubling-back shape, contrasting with item 121's wrapped convention"
+        "expected item 122's unwrapped array to leave (-180, 180] on the "
+        "real mode4_relabel_swap corpus case, contrasting with item 121's "
+        "wrapped convention"
     )
 
 
