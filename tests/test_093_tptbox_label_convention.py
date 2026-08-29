@@ -412,30 +412,71 @@ def test_ac5_l6_level_name_is_l6():
 
 
 #: Item 123 (docs/aide/items/123-recalibrate-and-regenerate-downstream-
-#: artifacts.md) excludes a level's ``spline_offset_mm`` statistic entirely
-#: when that level has zero **interior** occurrences across the cohort
-#: (AC41/AC43) -- not a drifted *value* skipped from an otherwise-present
-#: key, an outright **absence** of the key itself. ``L6`` is the caudal-most
-#: (last) level of every subject sequence it appears in across this
-#: 80-subject cohort, so it is never interior and its rebuilt
-#: ``feature_stats`` carries no ``spline_offset_mm`` entry at all (verified
-#: directly against the committed, rebuilt ``reference_verse_v1.json``,
-#: AC56). Every other statistic in ``_PRE_RENAME_S_FEATURE_STATS`` is
-#: geometry/intensity/morphology, which item 123 does not touch, so it stays
-#: pinned exactly.
-_AC5_FEATURES_MOVED_BY_ITEM_123_REFIT = frozenset({"spline_offset_mm"})
+#: artifacts.md, AC19/AC56, "Third-round correction, 2026-08-29" in the
+#: Decisions log) moves 14 of L6's feature_stats values away from the
+#: pre-rename pinned snapshot, driven by two distinct, unrelated causes:
+#:
+#: - ``spline_offset_mm`` -- an interior-only feature definition (AC41/AC43).
+#:   ``L6`` is the caudal-most (last) level of every subject sequence it
+#:   appears in across this 80-subject cohort, so it has zero interior
+#:   occurrences and carries **no** ``spline_offset_mm`` key at all -- a
+#:   genuinely absent key, verified directly against the committed rebuilt
+#:   ``reference_verse_v1.json``.
+#: - The 13 ``intensity_*`` names (``segfacet.reference.ingest.
+#:   INGESTED_INTENSITY_FEATURES``) -- improved CT discovery, not an
+#:   interior/terminal effect. This item's rebuild tool finds a CT sibling
+#:   for all 3 of L6's subjects (a recursive, split-infix-aware glob), where
+#:   the pre-123 (2026-07-17) build found only 1 of 3 -- so each intensity
+#:   statistic's ``count`` moved ``1 -> 3`` and its mean/std/percentiles were
+#:   recomputed over a materially different population. Verified directly
+#:   against the committed artifact: every ``intensity_*`` key is **still
+#:   present** in L6's ``feature_stats`` (``count`` now equals
+#:   ``record_count``, ``3``) -- only its *value* moved, not its presence.
+#:
+#: The two causes have different observable shapes -- one an absent key
+#: (``spline_offset_mm``), the other 13 present keys with moved values --
+#: so the tests below check each the way it actually presents in the
+#: committed artifact, rather than treating all 14 names as uniformly
+#: absent (a claim the artifact itself does not support for the 13
+#: ``intensity_*`` names: their keys ARE present, verified with
+#: ``"intensity_mean" in dist.levels["L6"]["all"].feature_stats`` returning
+#: ``True``).
+_AC5_FEATURES_MOVED_BY_ITEM_123_REFIT = frozenset({
+    "spline_offset_mm",
+    "intensity_mean", "intensity_median", "intensity_std", "intensity_min",
+    "intensity_max", "intensity_p05", "intensity_p25", "intensity_p50",
+    "intensity_p75", "intensity_p95", "intensity_range", "intensity_iqr",
+    "intensity_entropy",
+})
+
+#: Of the 14 moved features, only ``spline_offset_mm`` is a genuinely absent
+#: key (AC43); the other 13 (``intensity_*``) are present keys whose value
+#: moved instead -- see ``_AC5_FEATURES_MOVED_BY_ITEM_123_REFIT``'s
+#: docstring above.
+_AC5_FEATURES_ABSENT_ENTIRELY = frozenset({"spline_offset_mm"})
 
 
 def test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s():
-    """``spline_offset_mm`` is not merely skipped while remaining a key --
-    it is absent from ``l6_stats`` entirely (AC56), so the key-set equality
-    itself is asserted against the pre-rename set with that one key
-    subtracted, rather than an unconditional equality plus a per-feature
-    skip that would silently pass even if the key had stayed present."""
+    """14 features moved, for two distinct reasons (AC19/AC56 third-round
+    correction): ``spline_offset_mm`` is a genuinely absent key (AC43); the
+    13 ``intensity_*`` names are present keys whose value moved (improved
+    CT discovery) and are excluded from the value comparison, not from the
+    key set -- so the key-set equality only subtracts the one key that is
+    actually missing, and a separate check confirms the other 13 are still
+    present (not silently missing themselves)."""
     dist = bundled_production_reference()
     l6_stats = dist.levels["L6"][ALL_STRATUM].feature_stats
-    assert set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS) - _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT
+
+    assert set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS) - _AC5_FEATURES_ABSENT_ENTIRELY
     assert "spline_offset_mm" not in l6_stats
+
+    value_skipped_but_present = _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT - _AC5_FEATURES_ABSENT_ENTIRELY
+    assert len(value_skipped_but_present) == 13
+    for feature_name in value_skipped_but_present:
+        assert feature_name in l6_stats, (
+            f"{feature_name!r} moved by value, not by absence -- it must still be a key"
+        )
+
     for feature_name, expected in _PRE_RENAME_S_FEATURE_STATS.items():
         if feature_name in _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT:
             continue
@@ -443,21 +484,30 @@ def test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s():
         assert actual == expected, f"feature_stats mismatch for {feature_name!r}"
 
 
-def test_ac5_spline_offset_mm_excluded_from_byte_for_byte_is_the_only_exclusion():
-    """The item-123 narrowing removes exactly one feature -- as an absent
-    key, not a value skipped from an otherwise-present one (AC56) -- from
-    the byte-for-byte set; every other pre-rename statistic is still
-    checked."""
-    assert _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT == {"spline_offset_mm"}
+def test_ac5_fourteen_features_are_the_only_byte_for_byte_exclusions():
+    """The item-123 widening (third-round correction) excludes exactly 14
+    features from the byte-for-byte value comparison -- not 1 -- and only
+    one of the 14 (``spline_offset_mm``) is an absent key; the other 13
+    (``intensity_*``) are present keys whose value moved instead. Every
+    other pre-rename statistic is still checked byte-for-byte."""
+    assert len(_AC5_FEATURES_MOVED_BY_ITEM_123_REFIT) == 14
+    assert _AC5_FEATURES_ABSENT_ENTIRELY == {"spline_offset_mm"}
+    assert _AC5_FEATURES_ABSENT_ENTIRELY < _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT
+
     still_checked = set(_PRE_RENAME_S_FEATURE_STATS) - _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT
-    assert len(still_checked) == len(_PRE_RENAME_S_FEATURE_STATS) - 1
+    assert len(still_checked) == len(_PRE_RENAME_S_FEATURE_STATS) - 14
 
     dist = bundled_production_reference()
     l6_stats = dist.levels["L6"][ALL_STRATUM].feature_stats
     assert "spline_offset_mm" not in l6_stats, (
-        "the excluded feature must be an ABSENT key, not a present key whose "
-        "value comparison is merely skipped"
+        "the interior-only feature must be an ABSENT key, not a present key "
+        "whose value comparison is merely skipped"
     )
+    for feature_name in _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT - _AC5_FEATURES_ABSENT_ENTIRELY:
+        assert feature_name in l6_stats, (
+            f"{feature_name!r} moved by value (improved CT discovery), not by "
+            "absence -- its key must still be present"
+        )
 
 
 def test_ac5_no_other_level_or_top_level_field_changed():
