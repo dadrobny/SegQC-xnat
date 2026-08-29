@@ -84,6 +84,15 @@ from segfacet.reference import (
     load_artifact,
 )
 from segfacet.reference.artifact import build_and_write_default, default_artifact_path
+from segfacet.features.centroids import compute_centroid
+from segfacet.features.spline_offset import (
+    compute_leave_one_out_spline_offsets,
+    compute_spline_offsets,
+)
+from segfacet.features.spline import fit_centroid_spline
+import segfacet.heuristics.mislabel  # noqa: F401 -- triggers MislabelRule registration
+from segfacet.heuristics import run_rules
+from segfacet.pipeline import extract_feature_record
 from segfacet.synth.clean_gt import build_clean_spine
 from segfacet.synth.corpus import load_manifest
 from segfacet.synth.golden import GOLDEN_DIR, check_case_golden, load_golden, write_goldens
@@ -736,15 +745,27 @@ def test_ac15_mode4_relabel_swap_fires_no_mislabel_finding():
 # =========================================================================== #
 
 
-def test_ac16_docstring_records_the_four_margins_and_the_artifact_name():
+def test_ac16_docstring_records_the_margins_and_the_artifact_name():
+    """Amended 2026-08-29: the docstring records the INTERIOR-only ceiling
+    (2.510990 mm, mode4_relabel_swap) rather than the pre-amendment
+    5.143859 mm (that reading is on mode4's cranial-terminal label 20, which
+    AC39 removes from the detector's consideration entirely)."""
     import segfacet.heuristics.mislabel as mislabel_mod
     from segfacet.heuristics.mislabel import _DEFAULT_MAX_OFFSET_MM
 
     doc = mislabel_mod.__doc__ or ""
     assert "reference_verse_v1.json" in doc
-    for literal in ("5.143859", "17.507445", "18.718604"):
+    for literal in ("2.510990", "17.507445", "18.718604"):
         assert literal in doc, f"expected margin {literal!r} recorded in the module docstring"
     assert f"{_DEFAULT_MAX_OFFSET_MM}" in doc or f"{_DEFAULT_MAX_OFFSET_MM:.1f}" in doc
+
+
+def test_ac16_docstring_states_the_terminal_exclusion_and_why():
+    import segfacet.heuristics.mislabel as mislabel_mod
+
+    doc = (mislabel_mod.__doc__ or "").lower()
+    assert "terminal" in doc
+    assert "extrapolat" in doc, "expected the held-out-refit-extrapolation rationale recorded"
 
 
 # =========================================================================== #
@@ -774,6 +795,28 @@ def test_ac17_calibration_block_shape_against_standin_cohort(tmp_path):
     top_ids = calibration["top_subject_ids"]
     assert isinstance(top_ids, list)
     assert len(top_ids) <= 10
+
+
+def test_ac17_calibration_block_reports_terminal_interior_split(tmp_path):
+    """Amended 2026-08-29: the calibration block additionally reports
+    terminal_count / interior_count (and per-population stats), so the
+    evidence for excluding terminals is regenerable from the tool."""
+    rr = _load_tool()
+    cohort = _build_standin_cohort(tmp_path / "cohort", n=3)
+    out = tmp_path / "out"
+    rc = rr.main(["--out", str(out), "--verse-cohort", str(cohort)])
+    assert rc == 0
+
+    calibration = _read_summary(out)["calibration"]
+    assert "terminal_count" in calibration
+    assert "interior_count" in calibration
+    assert isinstance(calibration["terminal_count"], int)
+    assert isinstance(calibration["interior_count"], int)
+    assert calibration["terminal_count"] >= 0
+    assert calibration["interior_count"] >= 0
+    # Every stand-in subject contributes exactly two terminal levels (its
+    # cranial-most and caudal-most present level).
+    assert calibration["terminal_count"] > 0
 
 
 # =========================================================================== #
@@ -893,13 +936,19 @@ def test_ac24_write_goldens_into_two_dirs_is_byte_identical(tmp_path):
 
 
 # =========================================================================== #
-# AC25-AC26: exactly two goldens changed, in exactly the threshold clause
+# AC25-AC26: every golden gains is_terminal; the two firing goldens also move
+# the threshold clause (amended 2026-08-29 -- all nine goldens now change,
+# replacing the pre-amendment "seven are byte-unchanged").
 # =========================================================================== #
 
 _THRESHOLD_CARRYING_CASES = frozenset({"mode1_displace", "mode6_crop_at_border"})
 
 
-def test_ac25_seven_non_mislabel_goldens_byte_unchanged_from_pre_123():
+def _all_offset_entries(golden: dict) -> list:
+    return golden.get("features", {}).get("stage3", {}).get("per_label_offsets", [])
+
+
+def test_ac25_seven_non_mislabel_goldens_gain_only_is_terminal():
     base_rev = _pre_123_base_rev()
     manifest = load_manifest()
     unaffected = [c for c in manifest["cases"] if c["case_id"] not in _THRESHOLD_CARRYING_CASES]
@@ -914,18 +963,35 @@ def test_ac25_seven_non_mislabel_goldens_byte_unchanged_from_pre_123():
                 continue
             checked_any = True
             committed = load_golden(case_id)
-            assert committed == pre, f"{case_id}: golden changed but is not threshold-carrying"
+            diffs = _diff_leaves(pre, committed)
+            assert diffs, f"{case_id}: expected the added is_terminal booleans to be visible as diffs"
+            for path, _old, new in diffs:
+                assert path.endswith(".is_terminal"), (
+                    f"{case_id}: unexpected changed leaf {path!r} outside is_terminal"
+                )
+                assert isinstance(new, bool)
         if checked_any:
             return
 
-    # Fallback (git unavailable to the test runner): no non-threshold case's
-    # golden text carries the threshold clause substring.
+    # Fallback (git unavailable to the test runner): every offset entry
+    # carries a boolean is_terminal, exactly the first/last are True, and no
+    # non-threshold-carrying case's text carries the threshold clause.
     for case in unaffected:
+        golden = load_golden(case["case_id"])
+        entries = _all_offset_entries(golden)
+        if not entries:
+            continue
+        for entry in entries:
+            assert isinstance(entry.get("is_terminal"), bool)
+        assert entries[0]["is_terminal"] is True
+        assert entries[-1]["is_terminal"] is True
+        for entry in entries[1:-1]:
+            assert entry["is_terminal"] is False
         text = (GOLDEN_DIR / f"{case['case_id']}.json").read_text(encoding="utf-8")
         assert "(threshold" not in text
 
 
-def test_ac26_two_changed_goldens_move_only_the_threshold_clause():
+def test_ac26_two_changed_goldens_move_only_is_terminal_and_the_threshold_clause():
     from segfacet.heuristics.mislabel import _DEFAULT_MAX_OFFSET_MM
 
     base_rev = _pre_123_base_rev()
@@ -938,24 +1004,37 @@ def test_ac26_two_changed_goldens_move_only_the_threshold_clause():
             checked_any = True
             committed = load_golden(case_id)
             diffs = _diff_leaves(pre, committed)
-            assert diffs, f"{case_id}: expected the recalibrated threshold to move at least one leaf"
-            for path, old_text, new_text in diffs:
+            assert diffs, f"{case_id}: expected is_terminal + the recalibrated threshold to move"
+            old_threshold_clause = "(threshold 15.0 mm)"
+            new_threshold_clause = f"(threshold {_DEFAULT_MAX_OFFSET_MM:.1f} mm)"
+            saw_threshold_diff = False
+            for path, old_value, new_value in diffs:
+                if path.endswith(".is_terminal"):
+                    assert isinstance(new_value, bool)
+                    continue
                 assert path.endswith(".reason") or path.endswith(".message"), (
-                    f"{case_id}: unexpected changed leaf {path!r} outside the threshold clause"
+                    f"{case_id}: unexpected changed leaf {path!r} outside is_terminal/threshold"
                 )
-                old_threshold_clause = "(threshold 15.0 mm)"
-                assert old_threshold_clause in old_text
-                assert old_text.replace(
-                    old_threshold_clause, f"(threshold {_DEFAULT_MAX_OFFSET_MM:.1f} mm)"
-                ) == new_text
+                assert old_threshold_clause in old_value
+                assert old_value.replace(old_threshold_clause, new_threshold_clause) == new_value
+                saw_threshold_diff = True
+            assert saw_threshold_diff, f"{case_id}: expected the threshold clause to have moved"
         if checked_any:
             return
 
-    # Fallback: only the two named cases carry the "(threshold" substring,
-    # and every occurrence names the current default.
+    # Fallback: every offset entry carries is_terminal (first/last True); only
+    # the two named cases carry "(threshold", naming the current default.
     manifest = load_manifest()
     for case in manifest["cases"]:
         case_id = case["case_id"]
+        golden = load_golden(case_id)
+        entries = _all_offset_entries(golden)
+        for entry in entries:
+            assert isinstance(entry.get("is_terminal"), bool)
+        if entries:
+            assert entries[0]["is_terminal"] is True
+            assert entries[-1]["is_terminal"] is True
+
         text = (GOLDEN_DIR / f"{case_id}.json").read_text(encoding="utf-8")
         if case_id in _THRESHOLD_CARRYING_CASES:
             assert "(threshold" in text
@@ -965,7 +1044,8 @@ def test_ac26_two_changed_goldens_move_only_the_threshold_clause():
 
 
 # =========================================================================== #
-# AC27: the Stage-3 report golden is byte-unchanged
+# AC27: the Stage-3 report golden is regenerated (amended 2026-08-29 --
+# replaces the pre-amendment "byte-unchanged": AC37's key reaches it too)
 # =========================================================================== #
 
 
@@ -979,6 +1059,16 @@ def test_ac27_stage3_report_golden_matches_test_022_output():
     )
     committed = t022.GOLDEN_PATH.read_text(encoding="utf-8")
     assert produced == committed
+
+
+def test_ac27_stage3_report_golden_offset_entries_carry_is_terminal():
+    import test_022_stage3_serialisation as t022
+
+    committed = json.loads(t022.GOLDEN_PATH.read_text(encoding="utf-8"))
+    entries = committed.get("features", {}).get("stage3", {}).get("per_label_offsets", [])
+    assert entries, "expected at least one per_label_offsets entry in the Stage-3 golden"
+    for entry in entries:
+        assert isinstance(entry.get("is_terminal"), bool)
 
 
 # =========================================================================== #
@@ -1077,9 +1167,466 @@ def test_ac34_retired_test_names_absent_from_test_120_source():
     assert "test_ac16_default_max_offset_mm_still_15" not in source
 
 
+def test_ac50_test120_field_set_includes_is_terminal():
+    """AC50's actual assertion lives in test_120 (the module that owns the
+    field-set test); this pins that the reconciliation landed there."""
+    source = (_REPO_ROOT / "tests" / "test_120_leave_one_out_offset.py").read_text(encoding="utf-8")
+    assert "is_terminal" in source
+
+
+# =========================================================================== #
+# Terminal-vertebra exclusion (added 2026-08-29 by human decision): AC35-AC51
+# =========================================================================== #
+
+
+def _straight_spine_centroids(n: int, spacing_mm: float = 10.0):
+    from segfacet.features.centroids import LabelCentroid
+
+    levels = ["T8", "T9", "T10", "T11", "T12", "L1", "L2", "L3", "L4", "L5"]
+    return [
+        LabelCentroid(
+            label=i + 1,
+            level_name=levels[i % len(levels)],
+            centroid_voxel=(0.0, 0.0, 0.0),
+            centroid_mm=(0.0, 0.0, float(i) * spacing_mm),
+        )
+        for i in range(n)
+    ]
+
+
+def _write_mislabel_config(tmp_path, max_offset_mm: float):
+    from segfacet.config import SUPPORTED_SCHEMA_VERSION, load_config
+
+    content = (
+        f"schema_version: '{SUPPORTED_SCHEMA_VERSION}'\n"
+        "rules:\n  mislabel:\n    params:\n"
+        f"      max_offset_mm: {max_offset_mm}\n"
+    )
+    path = tmp_path / "mislabel_config.yaml"
+    path.write_text(content, encoding="utf-8")
+    return load_config(path)
+
+
+def _offset_entry(label, level_name, offset_mm, is_terminal=None):
+    entry = {
+        "label": label, "level_name": level_name, "closest_u": 0.5,
+        "offset_mm": offset_mm, "offset_voxel": offset_mm,
+        "dx_mm": offset_mm, "dy_mm": 0.0, "dz_mm": 0.0,
+    }
+    if is_terminal is not None:
+        entry["is_terminal"] = is_terminal
+    return entry
+
+
+def _mislabel_record(entries):
+    return {
+        "stage3": {
+            "per_label_offsets": list(entries),
+            "monotonic_consistency": {"is_monotonic": True, "non_monotonic_pairs": [], "u_values": []},
+        },
+    }
+
+
+def _mislabel_findings(findings):
+    return [f for f in findings if f.rule_id == "mislabel"]
+
+
+# --- AC35: the field exists, defaults False, dataclass stays frozen ------- #
+
+
+def test_ac35_is_terminal_field_exists_and_defaults_false():
+    import dataclasses
+
+    from segfacet.features.spline_offset import VertebralSplineOffset
+
+    fields = {f.name: f for f in dataclasses.fields(VertebralSplineOffset)}
+    assert "is_terminal" in fields
+    assert fields["is_terminal"].default is False
+
+
+def test_ac35_vertebralsplineoffset_still_frozen():
+    import dataclasses
+
+    from segfacet.features.spline_offset import VertebralSplineOffset
+
+    centroids = _straight_spine_centroids(5)
+    fit = fit_centroid_spline(centroids)
+    record = compute_spline_offsets(centroids, fit)[0]
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        record.is_terminal = True  # type: ignore[misc]
+
+
+# --- AC36: first/last True, interior False, both compute functions ------- #
+
+
+@pytest.mark.parametrize("compute", ["in_sample", "held_out"])
+def test_ac36_first_and_last_are_terminal_interior_is_not(compute):
+    centroids = _straight_spine_centroids(5)
+    if compute == "in_sample":
+        fit = fit_centroid_spline(centroids)
+        records = compute_spline_offsets(centroids, fit)
+    else:
+        records = compute_leave_one_out_spline_offsets(centroids)
+
+    assert records[0].is_terminal is True
+    assert records[-1].is_terminal is True
+    for r in records[1:-1]:
+        assert r.is_terminal is False
+
+
+# --- AC37: a sequence of one or two centroids is entirely terminal ------- #
+
+
+@pytest.mark.parametrize("n", [1, 2])
+def test_ac37_short_sequence_is_entirely_terminal(n):
+    centroids = _straight_spine_centroids(n)
+    fit = fit_centroid_spline(centroids) if n >= 2 else None
+    records = (
+        compute_spline_offsets(centroids, fit) if fit is not None
+        else compute_leave_one_out_spline_offsets(centroids)
+    )
+    assert len(records) == n
+    for r in records:
+        assert r.is_terminal is True
+
+
+# --- AC38: terminality is sequence-relative, matched by label ------------ #
+
+
+def test_ac38_reversal_invariance_matches_by_label_not_index():
+    centroids = _straight_spine_centroids(6)
+    forward = compute_leave_one_out_spline_offsets(centroids)
+    forward_terminal_labels = {r.label for r in forward if r.is_terminal}
+
+    reversed_centroids = list(reversed(centroids))
+    backward = compute_leave_one_out_spline_offsets(reversed_centroids)
+    backward_terminal_labels = {r.label for r in backward if r.is_terminal}
+
+    assert forward_terminal_labels == {centroids[0].label, centroids[-1].label}
+    assert backward_terminal_labels == forward_terminal_labels
+
+
+# --- AC39/AC40: MislabelRule excludes terminal entries, interior fires --- #
+
+
+def test_ac39_terminal_entry_never_fires_even_at_forty_mm_over_a_thirteen_mm_threshold(tmp_path):
+    cfg = _write_mislabel_config(tmp_path, max_offset_mm=13.0)
+    entry = _offset_entry(20, "L1", offset_mm=40.0, is_terminal=True)
+    findings = _mislabel_findings(run_rules(_mislabel_record([entry]), cfg))
+    assert findings == []
+
+
+def test_ac39_interior_entry_over_threshold_still_fires_alongside_a_terminal_one(tmp_path):
+    cfg = _write_mislabel_config(tmp_path, max_offset_mm=13.0)
+    terminal_entry = _offset_entry(20, "L1", offset_mm=40.0, is_terminal=True)
+    interior_entry = _offset_entry(21, "L2", offset_mm=20.0, is_terminal=False)
+    findings = _mislabel_findings(run_rules(_mislabel_record([terminal_entry, interior_entry]), cfg))
+    assert len(findings) == 1
+    assert findings[0].labels == frozenset({21})
+
+
+def test_ac40_none_is_terminal_value_still_fires(tmp_path):
+    cfg = _write_mislabel_config(tmp_path, max_offset_mm=13.0)
+    entry = _offset_entry(20, "L1", offset_mm=41.3, is_terminal=None)
+    findings = _mislabel_findings(run_rules(_mislabel_record([entry]), cfg))
+    assert len(findings) == 1
+    assert findings[0].labels == frozenset({20})
+
+
+def test_ac40_absent_is_terminal_key_still_fires(tmp_path):
+    cfg = _write_mislabel_config(tmp_path, max_offset_mm=13.0)
+    entry = _offset_entry(20, "L1", offset_mm=41.3)  # key omitted entirely
+    assert "is_terminal" not in entry
+    findings = _mislabel_findings(run_rules(_mislabel_record([entry]), cfg))
+    assert len(findings) == 1
+    assert findings[0].labels == frozenset({20})
+
+
+def test_ac40_test033_positional_terminal_fixtures_still_fire_unmodified():
+    """AC40 exists precisely so test_033_mislabel.py needs no edit. Rather
+    than re-declaring its ~20 cases here, drive its own boundary fixture
+    directly through the shipped rule and confirm it still fires -- this
+    fixture's offending entry sits at list index 0, which is exactly the
+    positional shape AC40 must not treat as terminal."""
+    import test_033_mislabel as t033
+
+    offsets = [t033._make_offset_entry(t033._LABEL_L1, 41.3, "L1")]
+    record = t033._make_record(offsets, [])
+    findings = _mislabel_findings(run_rules(record, t033.default_config()))
+    assert len(findings) == 1
+    assert findings[0].labels == frozenset({t033._LABEL_L1})
+
+
+# --- AC41/AC42: symmetric ingest/delta exclusion -------------------------- #
+
+
+def _tiny_standin_ingest_cohort(tmp_path, n=2):
+    """A tiny cohort in ingest_cohort's own convention (item 044's
+    '_seg.nii.gz' suffix) -- never the real-VerSe naming this module's
+    rebuild-tool tests use elsewhere."""
+    cohort_dir = tmp_path / "ingest_cohort"
+    cohort_dir.mkdir()
+    for i in range(n):
+        spine = build_clean_spine(
+            levels=("L1", "L2", "L3", "L4", "L5"), spacing=(1.0, 1.0, 1.0 + 0.1 * i),
+            curve_amplitude_mm=4.0 + i,
+        )
+        nib.save(spine.seg_img, str(cohort_dir / f"subject{i}_seg.nii.gz"))
+    return cohort_dir
+
+
+def test_ac41_ingest_excludes_terminal_offsets_from_count(tmp_path):
+    from segfacet.reference.ingest import ingest_cohort
+
+    cohort_dir = _tiny_standin_ingest_cohort(tmp_path, n=2)
+    ingested = ingest_cohort(cohort_dir, with_size_proxy=False)
+
+    interior_occurrences = 0
+    total_occurrences = 0
+    for record in ingested.records:
+        total_occurrences += 1
+        if "spline_offset_mm" in record.features:
+            interior_occurrences += 1
+    assert total_occurrences > 0
+    # Every subject here has 5 levels (L1-L5): 2 terminal + 3 interior each,
+    # so strictly fewer occurrences carry spline_offset_mm than total.
+    assert 0 < interior_occurrences < total_occurrences
+
+
+def test_ac42_delta_excludes_terminal_labels_symmetrically():
+    from segfacet.reference.delta import compute_reference_delta
+
+    spine = build_clean_spine(levels=("L1", "L2", "L3", "L4", "L5"))
+    config = bundled_default_config()
+    block = extract_feature_record(spine.seg_img, config)
+
+    # Identify the terminal labels from the block's own per_label_offsets.
+    offsets = block["stage3"]["per_label_offsets"]
+    terminal_labels = {o["label"] for o in offsets if o.get("is_terminal")}
+    interior_labels = {o["label"] for o in offsets if not o.get("is_terminal")}
+    assert terminal_labels, "expected at least one terminal label"
+    assert interior_labels, "expected at least one interior label"
+
+    delta = compute_reference_delta(block, bundled_production_reference())
+    for label in terminal_labels:
+        label_delta = delta.per_label.get(label)
+        if label_delta is None:
+            continue
+        assert not any(fd.feature == "spline_offset_mm" for fd in label_delta.features)
+
+
+# --- AC43: the committed artifact is interior-only, anomaly gone --------- #
+
+
+def test_ac43_l5_below_qualifying_count_or_absent():
+    dist = bundled_production_reference()
+    l5 = dist.levels.get("L5", {}).get(ALL_STRATUM)
+    if l5 is None:
+        return
+    offset = l5.feature_stats.get("spline_offset_mm")
+    if offset is None:
+        return
+    assert offset.count < 10
+
+
+def test_ac43_no_qualifying_level_p99_exceeds_thirteen():
+    dist = bundled_production_reference()
+    for strata in dist.levels.values():
+        stats = strata.get(ALL_STRATUM)
+        if stats is None:
+            continue
+        offset = stats.feature_stats.get("spline_offset_mm")
+        if offset is None or offset.count < 10:
+            continue
+        p99 = offset.percentiles.get("p99")
+        assert p99 is not None
+        assert p99 <= 13.0, f"qualifying level p99 {p99} exceeds 13.0 mm"
+
+
+def test_ac43_level_with_no_interior_occurrence_still_loads():
+    # A structural round-trip: the artifact loads regardless of which levels
+    # carry spline_offset_mm.
+    dist = load_artifact(bundled_production_reference_path())
+    assert dist.schema_version == "1.2"
+
+
+# --- AC44/AC45: the human-agreed threshold and the interior ceiling ------ #
+
+
+def test_ac44_default_max_offset_mm_is_thirteen():
+    from segfacet.heuristics.mislabel import _DEFAULT_MAX_OFFSET_MM
+
+    assert _DEFAULT_MAX_OFFSET_MM == 13.0
+
+
+def _interior_offset_ceiling_over_corpus(exclude_case_ids=frozenset()):
+    manifest = load_manifest()
+    ceiling = 0.0
+    for case in manifest["cases"]:
+        if case["case_id"] in exclude_case_ids:
+            continue
+        golden = load_golden(case["case_id"])
+        entries = _all_offset_entries(golden)
+        for entry in entries[1:-1] if len(entries) > 2 else []:
+            ceiling = max(ceiling, entry["offset_mm"])
+    return ceiling
+
+
+def test_ac45_interior_corpus_ceiling_is_2_510990():
+    ceiling = _interior_offset_ceiling_over_corpus(exclude_case_ids=_THRESHOLD_CARRYING_CASES)
+    assert ceiling == pytest.approx(2.510990, abs=1e-6)
+
+
+def test_ac45_threshold_exceeds_the_interior_ceiling():
+    from segfacet.heuristics.mislabel import _DEFAULT_MAX_OFFSET_MM
+
+    ceiling = _interior_offset_ceiling_over_corpus(exclude_case_ids=_THRESHOLD_CARRYING_CASES)
+    assert _DEFAULT_MAX_OFFSET_MM > ceiling
+
+
+# --- AC46: FEATURE_DOCS documents the new leaf and its rationale --------- #
+
+
+def test_ac46_feature_docs_entry_exists_with_rationale():
+    from segfacet.feature_docs import FEATURE_DOCS
+
+    key = "stage3.per_label_offsets[].is_terminal"
+    assert key in FEATURE_DOCS
+    doc = FEATURE_DOCS[key]
+    text = " ".join(str(v) for v in vars(doc).values()).lower()
+    assert "first" in text and "last" in text
+    assert "mislabel" in text
+    assert "extrapolat" in text or "refit" in text
+
+
+# --- AC47: the generated catalogue regenerates drift-clean --------------- #
+
+
+def test_ac47_catalogue_regenerates_byte_identical_and_contains_new_path(tmp_path):
+    import segfacet.catalogue as catalogue
+
+    json_dest = tmp_path / "feature_catalogue.generated.json"
+    md_dest = tmp_path / "feature_catalogue.generated.md"
+    catalogue.main(["--json", str(json_dest), "--md", str(md_dest)])
+
+    committed_json = _REPO_ROOT / "docs" / "aide" / "feature_catalogue.generated.json"
+    committed_md = _REPO_ROOT / "docs" / "aide" / "feature_catalogue.generated.md"
+    assert json_dest.read_bytes() == committed_json.read_bytes()
+    assert md_dest.read_bytes() == committed_md.read_bytes()
+
+    record = json.loads(json_dest.read_text(encoding="utf-8"))
+    paths = {entry["path"] for group in record["groups"] for entry in group["entries"]}
+    assert "stage3.per_label_offsets[].is_terminal" in paths
+
+
+# --- AC48: the leaf-count constants match the regenerated catalogue ------ #
+
+
+def test_ac48_test103_leaf_count_constant_is_94():
+    source = (_REPO_ROOT / "tests" / "test_103_feature_catalogue.py").read_text(encoding="utf-8")
+    assert "94" in source
+
+
+# --- AC49: the pre-119 leaf-path digest is bumped alongside the catalogue #
+
+
+def test_ac49_pre_119_digest_matches_the_live_catalogue_leaf_path_set(tmp_path):
+    """Reads (never recomputes/hardcodes) the committed digest fixture and
+    compares it to a fresh catalogue run's own leaf-path-set digest -- this
+    is expected to fail until the builder regenerates the catalogue AND
+    bumps the fixture together (step 9), mirroring how AC33's sha256 fence
+    is left to the builder rather than pre-guessed here."""
+    import segfacet.catalogue as catalogue
+
+    json_dest = tmp_path / "feature_catalogue.generated.json"
+    md_dest = tmp_path / "feature_catalogue.generated.md"
+    catalogue.main(["--json", str(json_dest), "--md", str(md_dest)])
+    record = json.loads(json_dest.read_text(encoding="utf-8"))
+    paths = sorted(entry["path"] for group in record["groups"] for entry in group["entries"])
+    live_digest = hashlib.sha256("\n".join(paths).encode("utf-8")).hexdigest()
+
+    fixture = json.loads(
+        (_REPO_ROOT / "tests" / "corpus" / "119_pre_119_digests.json").read_text(encoding="utf-8")
+    )
+    assert fixture["catalogue_leaf_path_set_sha256"] == live_digest
+
+
+# --- AC51: the schema admits is_terminal as optional --------------------- #
+
+
+def _stage3_offset_entry_schema():
+    import importlib.resources
+    import segfacet as _segfacet_pkg
+
+    ref = importlib.resources.files(_segfacet_pkg).joinpath("report_schema_v0.json")
+    schema = json.loads(ref.read_text(encoding="utf-8"))
+    return schema["definitions"]["stage3OffsetEntry"]
+
+
+def _well_formed_offset_entry_instance() -> dict:
+    return {
+        "label": 20, "level_name": "L1", "closest_u": 0.5,
+        "offset_mm": 1.0, "offset_voxel": 1.0, "dx_mm": 1.0, "dy_mm": 0.0, "dz_mm": 0.0,
+    }
+
+
+def test_ac51_is_terminal_is_a_boolean_property_not_required():
+    schema = _stage3_offset_entry_schema()
+    assert schema["properties"]["is_terminal"]["type"] == "boolean"
+    assert "is_terminal" not in schema.get("required", [])
+
+
+def test_ac51_entry_with_is_terminal_validates():
+    import jsonschema
+
+    instance = _well_formed_offset_entry_instance()
+    instance["is_terminal"] = True
+    jsonschema.validate(instance, _stage3_offset_entry_schema())
+
+
+def test_ac51_entry_without_is_terminal_still_validates():
+    import jsonschema
+
+    jsonschema.validate(_well_formed_offset_entry_instance(), _stage3_offset_entry_schema())
+
+
+def test_ac51_misspelt_variant_key_fails_validation():
+    import jsonschema
+
+    instance = _well_formed_offset_entry_instance()
+    instance["is_termnial"] = True  # deliberate misspelling
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance, _stage3_offset_entry_schema())
+
+
 # =========================================================================== #
 # Adversarial / edge cases
 # =========================================================================== #
+
+
+def test_adv_terminal_entry_with_astronomically_large_offset_never_fires(tmp_path):
+    """Magnitude is never the discriminator: a 1e6 mm terminal reading fires
+    nothing, while a modest interior entry over threshold in the same record
+    still fires."""
+    cfg = _write_mislabel_config(tmp_path, max_offset_mm=13.0)
+    huge_terminal = _offset_entry(20, "L1", offset_mm=1.0e6, is_terminal=True)
+    modest_interior = _offset_entry(21, "L2", offset_mm=13.5, is_terminal=False)
+    findings = _mislabel_findings(run_rules(_mislabel_record([huge_terminal, modest_interior]), cfg))
+    assert len(findings) == 1
+    assert findings[0].labels == frozenset({21})
+
+
+def test_adv_all_terminal_two_centroid_sequence_has_no_interior_at_all():
+    """n<=2: every returned record is terminal -- there is no interior
+    population for either compute path to disagree about."""
+    centroids = _straight_spine_centroids(2)
+    fit = fit_centroid_spline(centroids)
+    in_sample = compute_spline_offsets(centroids, fit)
+    held_out = compute_leave_one_out_spline_offsets(centroids)
+    for records in (in_sample, held_out):
+        assert len(records) == 2
+        assert all(r.is_terminal for r in records)
+        assert not any(not r.is_terminal for r in records)
 
 
 def test_adv_symlinked_cohort_root_is_discovered(tmp_path):

@@ -338,7 +338,10 @@ def test_ac4_clean_control_leaf_paths(catalogue_module):
         for segment in re.split(r"[.\[\]]+", path):
             assert not re.fullmatch(r"\d+", segment), path
 
-    assert len(paths) == 93
+    # 93 -> 94: item 123 (docs/aide/items/123-recalibrate-and-regenerate-
+    # downstream-artifacts.md, AC48) adds one leaf path,
+    # stage3.per_label_offsets[].is_terminal.
+    assert len(paths) == 94
 
 
 def test_ac4_empty_list_yields_container_bracket_path(catalogue_module):

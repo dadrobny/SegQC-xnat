@@ -446,6 +446,9 @@ def test_ac12_catalogue_leaf_path_set_unchanged_from_pre_119(tmp_path):
 
 
 def test_ac12_per_label_offsets_entry_field_set_exact():
+    """Nine keys, not eight: item 123 (docs/aide/items/123-recalibrate-and-
+    regenerate-downstream-artifacts.md, AC50) adds ``is_terminal`` as the
+    ninth field."""
     clean = build_clean_spine()
     record = extract_feature_record(clean.seg_img, bundled_default_config())
     entries = record["stage3"]["per_label_offsets"]
@@ -459,6 +462,7 @@ def test_ac12_per_label_offsets_entry_field_set_exact():
         "dx_mm",
         "dy_mm",
         "dz_mm",
+        "is_terminal",
     }
     for entry in entries:
         assert set(entry.keys()) == expected_fields
