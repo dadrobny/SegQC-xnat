@@ -241,51 +241,48 @@ def _distribution(levels: dict) -> ReferenceDistribution:
     )
 
 
-#: The item's own recorded/suggested base -- its Validation section diffs
-#: against exactly this ref (``git diff aide/queue-017 -- tests/corpus/golden``,
-#: ``git diff aide/queue-017 --stat``). ``main`` is stale relative to it: this
-#: item's queue (queue-017) stacks its items on a queue branch that is not yet
-#: merged to ``main`` (this repo's stacked-queue shape, .aide/README.md), so
-#: ``git merge-base HEAD main`` resolves to a commit from *before* items
-#: 119-122 landed -- diffing against it would surface those items' legitimate
-#: golden changes (item 121's spline_tangent keys, item 122's curvature
-#: values) as if item 123 had caused them. ``aide/queue-017``'s tip already
-#: carries 119-122 and nothing of 123, which is the actual pre-123 state.
-_RECORDED_BASE_BRANCH = "aide/queue-017"
-_BASE_BRANCH_FALLBACK = "main"
+#: The fixed pre-123 commit: the last commit on ``aide/queue-017`` before
+#: item 123's first commit (``4a2ae50``, "docs(123): work item spec ..."),
+#: i.e. ``51d8e41``'s "progress(aide): item 121 -> done" -- the state
+#: carrying items 119-122 and nothing of 123. Verified to lack
+#: ``is_terminal`` anywhere in ``tests/corpus/golden/clean_control.json``.
+#:
+#: Pinned as a literal SHA, deliberately NOT a live
+#: ``git merge-base HEAD aide/queue-017``: that live form self-invalidates
+#: the moment item 123 actually merges into its recorded base, because a
+#: fast-forward merge makes HEAD and ``aide/queue-017`` the *same* commit --
+#: the merge-base of a branch with itself is itself, so ``git show`` would
+#: then serve the POST-123 goldens as the "pre-123" baseline,
+#: ``_diff_leaves`` would return ``[]``, and ``assert diffs`` would fail on
+#: perfectly correct, already-merged goldens (observed post-merge on
+#: ``aide/queue-017``, 2026-08-30). A fixed SHA names one immutable commit
+#: regardless of what any branch pointer does afterwards, so it has no such
+#: failure mode.
+_PRE_123_BASE_SHA = "51d8e411b2ccc14ff10c4c244005ba007b4217d9"
 
 
 def _pre_123_base_rev():
-    """``git merge-base HEAD <base>`` against the item's recorded base
-    (``aide/queue-017``), falling back to ``main`` only if that ref cannot be
-    resolved at all (e.g. a shallow clone / CI checkout that never fetched
-    the queue branch) -- never silently against the wrong ancestor. Returns
-    ``None`` (never raises) if git is unavailable to the test runner
-    entirely -- AC25/AC26 fall back to the weaker text-only assertion in that
-    case (Testing Strategy)."""
-    for base in (_RECORDED_BASE_BRANCH, _BASE_BRANCH_FALLBACK):
-        try:
-            verify = subprocess.run(
-                ["git", "rev-parse", "--verify", "--quiet", base],
-                cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=10,
-            )
-        except Exception:
-            continue
-        if verify.returncode != 0:
-            continue
-        try:
-            result = subprocess.run(
-                ["git", "merge-base", "HEAD", base],
-                cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=10,
-            )
-        except Exception:
-            continue
-        if result.returncode != 0:
-            continue
-        rev = result.stdout.strip()
-        if rev:
-            return rev
-    return None
+    """Verify the pinned pre-123 SHA (``_PRE_123_BASE_SHA``) is reachable in
+    this checkout and return it. ``pytest.skip`` -- never a silent
+    ``None``-and-guess -- if it is not: e.g. a shallow clone that never
+    fetched history back that far. This realises the Testing Strategy's "if
+    reading the pre-123 revision from git is not available to the test
+    runner" fallback: with a pinned SHA the only way it becomes unavailable
+    is missing history, which no weaker text-only substitute can compensate
+    for meaningfully either, so skipping is the honest outcome."""
+    try:
+        result = subprocess.run(
+            ["git", "cat-file", "-e", f"{_PRE_123_BASE_SHA}^{{commit}}"],
+            cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=10,
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        pytest.skip(f"git unavailable to resolve the pinned pre-123 commit: {exc}")
+    if result.returncode != 0:
+        pytest.skip(
+            f"pinned pre-123 commit {_PRE_123_BASE_SHA} is not reachable in this "
+            "checkout (likely a shallow clone) -- cannot diff against it"
+        )
+    return _PRE_123_BASE_SHA
 
 
 def _git_show_json(rev: str, relpath: str):

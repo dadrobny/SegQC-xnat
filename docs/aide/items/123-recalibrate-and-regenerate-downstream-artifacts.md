@@ -1912,3 +1912,20 @@ and no geometric or mask-pairing defect was found, `reference_verse_v1.json`
 is **not** rebuilt again by this correction — only the spec's prose (AC19,
 AC56, the reconciliation table, and this entry) is corrected to describe it
 accurately.
+
+### Post-merge fix, 2026-08-30 — AC25/AC26's baseline self-invalidated on merge
+
+Item 123 fast-forward-merged into `aide/queue-017`; the full suite then failed
+`test_ac25_seven_non_mislabel_goldens_gain_only_is_terminal` and
+`test_ac26_two_changed_goldens_move_only_is_terminal_and_the_threshold_clause`
+because `_pre_123_base_rev()` resolved the pre-123 baseline as a *live*
+`git merge-base HEAD aide/queue-017` — once the fast-forward made `HEAD` and
+`aide/queue-017` the same commit, that merge-base is HEAD itself, so `git show`
+served the already-merged (post-123) goldens as the "pre-123" baseline,
+`_diff_leaves` returned `[]`, and `assert diffs` failed against perfectly
+correct, already-shipped goldens. `tests/test_123_recalibrate_and_regenerate.py`
+now pins the pre-123 commit as the fixed SHA `51d8e41` (the last commit on
+`aide/queue-017` before item 123's first commit) instead of a live merge-base,
+with a `pytest.skip` (not a silent substitute) if that SHA is ever unreachable
+(e.g. a shallow clone) — a fixed commit has no merge to self-invalidate
+against.
