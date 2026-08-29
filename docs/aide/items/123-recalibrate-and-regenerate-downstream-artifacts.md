@@ -165,7 +165,11 @@ mechanically checkable instead of a claim in prose.
   `spline_offset_mm.count >= 10` of that level's
   `feature_stats["spline_offset_mm"].percentiles["p99"]`. Levels with fewer than
   10 subjects are excluded. On a synthetic distribution with a known `P` the
-  returned value is exactly the rule's value.
+  returned value is exactly the rule's value. *(Amended 2026-08-29: the
+  function's form is unchanged; what changed is its input. The distribution it
+  reads is now **interior-only**, because AC41 has `reference/ingest.py` exclude
+  sequence-terminal offsets — so "derives from interior-only occurrences" is a
+  property of the artifact, not a second code path here. AC43 pins it.)*
 
 - [ ] **AC11: A distribution carrying no qualifying level yields the floor.**
   Given a distribution whose every level has `count < 10`, or which carries no
@@ -182,10 +186,15 @@ mechanically checkable instead of a claim in prose.
   `_DEFAULT_MAX_OFFSET_MM`, and `_DEFAULT_MAX_OFFSET_MM` is no longer `15.0`.
 
 - [ ] **AC14: The threshold sits strictly inside the corpus window.**
-  `_DEFAULT_MAX_OFFSET_MM > 5.143859` (the largest `offset_mm` on any committed
-  corpus case that must **not** raise a `mislabel` offset finding —
-  `mode4_relabel_swap`) and `<= 17.507445` (the smallest `offset_mm` on any case
-  that **must** fire — `mode6_crop_at_border`, item 120's AC23).
+  `_DEFAULT_MAX_OFFSET_MM > 5.143859` and `<= 17.507445`. *(Bounds unchanged by
+  the 2026-08-29 amendment, deliberately: `17.507445` is still the smallest
+  `offset_mm` on a case that **must** fire — `mode6_crop_at_border`, item 120's
+  AC23 — and `5.143859` is retained as the **conservative** lower bound because
+  it is the number the human decision was reasoned against, so the
+  deformity-envelope gate stays closed on the same argument. It is no longer the
+  binding lower bound: `5.143859` is `mode4_relabel_swap`'s **terminal** label 20,
+  which AC39 removes from the rule's consideration entirely. The measured
+  terminal-aware bound is AC45's `2.510990` mm.)*
 
 - [ ] **AC15: The corpus's firing behaviour is unchanged by the recalibration.**
   Through plain `run_qc` over the committed corpus: `mode1_displace` fires
@@ -193,13 +202,14 @@ mechanically checkable instead of a claim in prose.
   `mislabel` on `{22}` and `border` on `{22}`; `clean_control` fires nothing with
   verdict `pass`; `mode4_relabel_swap` fires no `mislabel` finding.
 
-- [ ] **AC16: The four calibration margins are recorded where the threshold
-  lives.** `heuristics/mislabel.py`'s module docstring states, as numbers: the
-  real-GT `P` the rule was derived from and the level attaining it, the chosen
-  threshold, `mode4_relabel_swap`'s `5.143859` mm non-firing ceiling,
-  `mode6_crop_at_border`'s `17.507445` mm and `mode1_displace`'s `18.718604` mm
-  firing readings — and names `reference_verse_v1.json` as the distribution it
-  was calibrated against.
+- [ ] **AC16: The calibration margins are recorded where the threshold lives.**
+  `heuristics/mislabel.py`'s module docstring states, as numbers: the real-GT
+  interior-only `P` the rule was derived from and the level attaining it, the
+  chosen threshold, `mode4_relabel_swap`'s `2.510990` mm interior non-firing
+  ceiling, `mode6_crop_at_border`'s `17.507445` mm and `mode1_displace`'s
+  `18.718604` mm firing readings — and names `reference_verse_v1.json` as the
+  distribution it was calibrated against. It also states that terminal vertebrae
+  are excluded from the detector and why (AC39).
 
 - [ ] **AC17: The real-GT false-positive count at the chosen threshold is
   recorded.** The summary's `calibration` block records `p99_by_level`, the
@@ -207,7 +217,11 @@ mechanically checkable instead of a claim in prose.
   fraction of ingested subject-level `spline_offset_mm` values that meet or
   exceed it — together with the top-ranked subject ids by held-out offset, so
   item 125 can replay them for the "a real scoliotic curve is not flagged"
-  criterion.
+  criterion. *(Amended 2026-08-29: the same block additionally reports the
+  terminal / interior split it was derived from — `terminal_count`,
+  `interior_count` and the same statistics computed over each — so the evidence
+  for excluding terminals is regenerable rather than resting on a scratch
+  analysis. See AC43.)*
 
 ### The reference artifacts
 
@@ -215,13 +229,20 @@ mechanically checkable instead of a claim in prose.
   spread.** In the committed artifact, every level with `count >= 10` has
   `spline_offset_mm.mean > 0.1` mm, and the maximum over levels of
   `spline_offset_mm.mean` exceeds `0.5` mm — against the pre-123 committed
-  values, whose largest level mean is `1.39e-05` mm.
+  values, whose largest level mean is `1.39e-05` mm. *(The `count >= 10` guard
+  carries the 2026-08-29 amendment for free: after AC41 a level's `count` is its
+  number of **interior** occurrences, so a level that is almost always terminal —
+  `L5`, `C1` — drops below the guard rather than being judged on three subjects.)*
 
 - [ ] **AC19: The rebuilt artifact keeps its identity.** It loads via
   `load_artifact`; `schema_version` is `"1.2"`; `provenance.source` is
   `"verse-v1"`; `subject_count` is `80`; the level key set is unchanged from the
   pre-123 artifact, containing `"L6"` and not `"S"`; and the `features` list is
-  unchanged (21 features, `spline_offset_mm` among them).
+  unchanged (21 features, `spline_offset_mm` among them). *(Amended 2026-08-29:
+  the `features` list is a cohort-level vocabulary and stays complete, but a
+  **level** with no interior occurrence at all carries no `spline_offset_mm`
+  entry in its own `feature_stats` — AC43. That is a per-level absence, not a
+  vocabulary change, and every other feature's per-level coverage is unchanged.)*
 
 - [ ] **AC20: The artifact's config hash is the current config's.**
   `provenance.config_hash` equals
@@ -249,23 +270,30 @@ mechanically checkable instead of a claim in prose.
   runs into two different directories produce byte-identical files for all nine
   cases.
 
-- [ ] **AC25: Seven goldens are byte-unchanged.** The seven cases other than
-  `mode1_displace` and `mode6_crop_at_border` are byte-identical to their pre-123
-  committed state — none of them fires `mislabel`, so nothing in them can carry
-  the threshold.
+- [ ] **AC25: Every golden gains `is_terminal`, and nothing else moves in seven
+  of them.** *(Replaces the pre-amendment "seven goldens are byte-unchanged" —
+  AC37 adds a key to every `per_label_offsets` entry, so all nine files change.)*
+  For the seven cases other than `mode1_displace` and `mode6_crop_at_border`, the
+  only differing JSON leaves against the pre-123 committed files are the added
+  `features.stage3.per_label_offsets[].is_terminal` booleans — no `verdict`, no
+  finding, and no other value under `features` moves.
 
-- [ ] **AC26: The two changed goldens changed only in the threshold clause.** For
-  `mode1_displace` and `mode6_crop_at_border`, the only differing JSON leaves
-  against the pre-123 committed files are the `mislabel` finding's `reason` and
-  the corresponding report `message`, and each differs from its pre-123 value
-  only by the substring `"(threshold 15.0 mm)"` becoming
-  `"(threshold <new> mm)"`. Every other leaf — `verdict`, every `rule_id`, every
-  `labels` list, every value under `features` — is unchanged.
+- [ ] **AC26: The two firing goldens change only in `is_terminal` and the
+  threshold clause.** For `mode1_displace` and `mode6_crop_at_border`, the
+  differing leaves against the pre-123 committed files are the added
+  `is_terminal` booleans plus the `mislabel` finding's `reason` and the
+  corresponding report `message`, each of which differs from its pre-123 value
+  only by `"(threshold 15.0 mm)"` becoming `"(threshold 13.0 mm)"`. Every other
+  leaf — `verdict`, every `rule_id`, every `labels` list, every other value under
+  `features` — is unchanged.
 
-- [ ] **AC27: The Stage-3 report golden is byte-unchanged.**
-  `tests/golden/022_stage3_report.json` is byte-identical to its pre-123 state; it
-  serialises features only and carries no finding, so the threshold cannot reach
-  it.
+- [ ] **AC27: The Stage-3 report golden is regenerated.** *(Replaces the
+  pre-amendment "byte-unchanged": `tests/golden/022_stage3_report.json` carries a
+  `per_label_offsets` block, so AC37's key reaches it.)*
+  `tests/golden/022_stage3_report.json` matches
+  `test_022_stage3_serialisation.py::test_ac8_golden_snapshot`'s produced text
+  exactly with that test unmodified, and differs from its pre-123 state only by
+  the added `is_terminal` booleans.
 
 - [ ] **AC28: The pinned finding snapshot tracks the new threshold.**
   `tests/test_098_stray_components.py`'s `_PRE_098_GOLDEN_VERDICT_AND_FINDINGS`
@@ -312,11 +340,172 @@ mechanically checkable instead of a claim in prose.
   `test_ac16_default_max_offset_mm_still_15`; both exist solely to assert that
   item 120 did not do this item's work.
 
+### Terminal-vertebra exclusion (added 2026-08-29 by human decision)
+
+_Added after the first hand-back. The rebuild measured `P = 21.209` mm at `L5`
+(count 62), deriving `21.5` mm — outside AC14's window — and the follow-up
+per-vertebra analysis showed the anomaly is entirely a **terminal-extrapolation**
+effect of item 120's held-out refit, not real deformity. The user's decision
+(2026-08-29) is to exclude sequence-terminal vertebrae from this rule as the
+simple fix for now and defer a smarter treatment; see
+[Decisions & Trade-offs](#decisions--trade-offs) for the measured evidence.
+AC1–AC11, AC17 and AC29–AC31 already landed and are unaffected._
+
+- [ ] **AC35: The offset record carries terminality.**
+  `segfacet.features.spline_offset.VertebralSplineOffset` has a boolean field
+  `is_terminal` defaulting to `False`, and the dataclass stays frozen.
+
+- [ ] **AC36: Terminality is the first and last of the ordered sequence.** Both
+  `compute_spline_offsets` and `compute_leave_one_out_spline_offsets` return
+  records whose `is_terminal` is `True` for exactly the first and last entries of
+  the centroid sequence they were given, and `False` for every entry between
+  them.
+
+- [ ] **AC37: A short sequence is entirely terminal.** For a sequence of one or
+  two centroids, every returned record has `is_terminal` `True` — there is no
+  interior.
+
+- [ ] **AC38: Terminality is sequence-relative, not label-relative.** Reversing
+  the input centroid order leaves the same two **labels** marked terminal (the
+  cranial-most and caudal-most present), matched by label rather than by index.
+
+- [ ] **AC39: `mislabel` never fires an offset finding on a terminal vertebra.**
+  Given a record whose largest `offset_mm` sits on an entry with
+  `is_terminal: true`, `MislabelRule` emits no misalignment finding for that
+  label at any threshold — including a `40.0` mm terminal reading against a
+  `13.0` mm threshold — while an interior entry over the threshold in the same
+  record still fires.
+
+- [ ] **AC40: A record with no terminality is treated as interior.** An offset
+  entry carrying no `is_terminal` key, or carrying `None`, is treated as
+  non-terminal and still fires, so `tests/test_033_mislabel.py` stays green
+  **unmodified**.
+
+- [ ] **AC41: The reference ingest excludes terminal offsets.**
+  `segfacet.reference.ingest` contributes a label's `spline_offset_mm` only when
+  that label's `per_label_offsets` entry is not terminal, so the built
+  distribution describes interior vertebrae alone.
+
+- [ ] **AC42: The delta computation excludes them symmetrically.**
+  `segfacet.reference.delta` scores a case's `spline_offset_mm` only for
+  non-terminal labels, so a case is never compared against a distribution built
+  from a different population. *(Without this half, an interior-only reference
+  band would flag every terminal vertebra in every case.)*
+
+- [ ] **AC43: The committed artifact's `spline_offset_mm` is interior-only, and
+  the anomaly is gone.** In the rebuilt `reference_verse_v1.json`, `L5`'s
+  `spline_offset_mm.count` is below the `count >= 10` qualifying floor (it is
+  interior in only 3 of 62 subjects), no qualifying level's `p99` exceeds
+  `13.0` mm, and a level with no interior occurrence carries no
+  `spline_offset_mm` entry in its `feature_stats` while still loading via
+  `load_artifact`.
+
+- [ ] **AC44: The shipped threshold is `13.0` mm.** `_DEFAULT_MAX_OFFSET_MM ==
+  13.0`. *(Derived from the recorded interior-only ceiling `P = 12.91` mm at
+  `T10`: the smallest `0.5` multiple strictly above it. Stable for any `P` in
+  `(12.5, 13.0]`. AC12 remains the binding mechanical assertion — this AC pins
+  the number a person agreed to.)*
+
+- [ ] **AC45: The threshold clears the interior corpus ceiling.** The largest
+  **interior** `offset_mm` on any committed corpus case that must not raise a
+  `mislabel` offset finding is `2.510990` mm (`mode4_relabel_swap`, label 23 /
+  L4), and `_DEFAULT_MAX_OFFSET_MM` exceeds it. *(`mode4`'s larger `5.143859` mm
+  reading is on label 20, its cranial-terminal vertebra, which AC39 removes from
+  the detector.)*
+
+- [ ] **AC46: The new leaf path is documented with its rationale.**
+  `feature_docs.FEATURE_DOCS` carries an entry for
+  `stage3.per_label_offsets[].is_terminal` stating that the flag marks the first
+  and last vertebra of the ordered sequence, that `mislabel` and the reference
+  distribution both exclude those vertebrae, and why (held-out refit
+  extrapolation at a sequence end).
+
+- [ ] **AC47: The generated catalogue is regenerated and drift-clean.**
+  `docs/aide/feature_catalogue.generated.json` and `.md` are byte-identical to a
+  fresh `python -m segfacet.catalogue` run and contain the new leaf path, and
+  item 104's drift test is clean in both directions.
+
+- [ ] **AC48: The leaf-count constants match the regenerated catalogue.**
+  `tests/test_103_feature_catalogue.py`'s hardcoded `clean_control` leaf count is
+  `94` (93 → 94, one added path), and every `N/M leaf paths unwired` cell in
+  `docs/aide/golden-decision-table.md`'s nine Group-A rows equals the value
+  `tests/test_105_golden_decision_table.py`'s AC7 recomputes live, with `M` equal
+  to `94`.
+
+- [ ] **AC49: The pre-119 leaf-path digest is bumped.**
+  `tests/corpus/119_pre_119_digests.json`'s `catalogue_leaf_path_set_sha256` is
+  the sha256 of the post-123 sorted leaf-path set, so
+  `test_119_curve_formulation.py::test_ac27_…` and
+  `test_120_leave_one_out_offset.py::test_ac12_catalogue_leaf_path_set_unchanged_from_pre_119`
+  both pass. *(The same obligation item 121 recorded: any item that adds a leaf
+  path must recompute this digest alongside the catalogue.)*
+
+- [ ] **AC50: The exact-field-set assertion admits the new key.**
+  `tests/test_120_leave_one_out_offset.py::test_ac12_per_label_offsets_entry_field_set_exact`
+  asserts a nine-key set including `is_terminal`. *(Item 120's AC12 pinned
+  exactly eight keys; this item adds the ninth by design.)*
+
+- [ ] **AC51: The schema admits the new key without requiring it.**
+  `report_schema_v0.json`'s `stage3OffsetEntry` lists `is_terminal` as a
+  `boolean` in `properties` and **not** in `required`; a Stage-3 report carrying
+  it validates, one carrying a misspelt variant fails — so
+  `additionalProperties: false` stays load-bearing and every existing test that
+  builds an offset entry without the key still validates.
+
 ## Assumptions  <!-- MANDATORY -->
 
 Clarify mode is `assume` (`aide.toml`), so each ambiguity below was resolved with
 the most defensible default and recorded here for audit at the queue boundary.
 
+- **Terminality is a stored flag on the offset record, not inferred from list
+  position — because `test_033_mislabel.py` proves the positional reading
+  unsafe.** The cheap alternative was a helper reading the first and last entries
+  of `stage3.per_label_offsets`, touching no schema and adding no leaf path.
+  It was rejected on evidence: `tests/test_033_mislabel.py` builds ~20 records
+  from one- and two-entry offset lists whose *offending* entry is at index 0 or
+  −1, so under a positional rule every one of those tests would stop firing and a
+  merged, item-033-owned module would need rewriting — and semantically a
+  hand-built two-entry record is not "a spine whose ends are field-of-view edges".
+  A stored `is_terminal` defaulting to `False` (AC35, AC40) keeps that module
+  green **unmodified**, which is the same backward-compatibility shape item 120's
+  AC15 used for the direction components. The flag is computed once, in
+  `features/spline_offset.py`, where the ordered centroid sequence is actually in
+  hand; the three consumers (`mislabel`, `reference/ingest`, `reference/delta`)
+  read it rather than each re-deriving it.
+- **The reference distribution *excludes* terminal offsets rather than recording
+  their terminality, and `delta` excludes them symmetrically.** The alternative —
+  keep them in and let consumers filter — leaves `spline_offset_mm` describing
+  two different populations at once, which is what produced the anomaly: `L5`'s
+  band has `p99` `21.49` mm with terminals against an interior maximum of
+  `1.00` mm, so an interior `L5` displacement of 15 mm would score as unremarkable
+  while a genuinely-terminal 26 mm reads as in-range. Excluding on both sides
+  (AC41, AC42) makes `spline_offset_mm` mean one thing end to end: *the offset of
+  a vertebra with neighbours on both sides*. A third option — ship a second
+  feature (`spline_offset_interior_mm`) — was rejected because it changes the
+  artifact's `features` vocabulary, which AC19 pins.
+- **The consequence is that a level with no interior occurrence carries no
+  `spline_offset_mm` statistic** (AC43). In the synthetic default cohort every
+  case is `L1`–`L5`, so `L1` and `L5` are always terminal and lose the feature; in
+  VerSe, `L5` keeps only 3 interior subjects and `C1`/`T1` similarly thin out. The
+  reference machinery already tolerates a missing per-level feature — `delta.py`
+  skips a feature absent from either side, and `derive_max_offset_mm` skips a
+  level with no `spline_offset_mm` stats (AC11) — but this is the assumption most
+  likely to be wrong in a way the suite catches, so the builder must confirm it
+  against `test_090`, `test_045`, `test_063` and `test_081` rather than assume it.
+- **Excluding terminals is a stop-gap the user chose knowingly, not a model.** A
+  terminal vertebra's offset is not meaningless — it is un-judgeable *by this
+  estimator*, because the held-out refit must extrapolate past the end of its own
+  parameter domain. The real treatments (a separately calibrated terminal
+  threshold, an extrapolation-aware estimator, or a curvature model that does not
+  need the neighbours) are deferred; the cost accepted today is that a genuinely
+  displaced cranial-most or caudal-most vertebra is not detected at all. Recorded
+  in [`insights.md`](../insights.md) (2026-08-29) so the deferral is visible to
+  the queue boundary rather than buried here.
+- **The hand-back clause stands, unchanged.** If the interior-only derivation
+  still lands outside AC14's window, the item hands back again rather than
+  clamping. The 2026-08-29 decision changed *which population the rule is
+  calibrated on*; it did not authorise a threshold outside the approved corpus
+  window, and doing so would still re-open the deformity-envelope gate.
 - **The threshold-selection rule is this item's design decision, and it is
   mechanical.** Queue-017 asks only that "the recalibrated threshold is justified
   by the recorded clean and displaced distributions". A number chosen by
@@ -476,6 +665,48 @@ the most defensible default and recorded here for audit at the queue boundary.
 
 ## Implementation Steps
 
+**Steps 1–5 are already implemented and committed** (`daf8312`) and are unchanged
+by the 2026-08-29 amendment, except step 5's calibration block, which gains the
+terminal/interior split (AC17). **Steps 0a–0e below are new** and must land before
+the rebuild is re-run, because they change what the rebuild measures.
+
+0a. **`features/spline_offset.py` — the terminality flag (AC35–AC38).** Add
+    `is_terminal: bool = False` to the frozen `VertebralSplineOffset`. In both
+    `compute_spline_offsets` and `compute_leave_one_out_spline_offsets`, set it
+    `True` for index `0` and index `n - 1` of the ordered centroid sequence, and
+    for **every** entry when `n <= 2`. Extend the module docstring: what the flag
+    means, that it is sequence-relative (the cranial-most and caudal-most present
+    vertebrae, i.e. a field-of-view edge or an anatomical end), and why the
+    consumers exclude it — the held-out refit must extrapolate past the end of
+    its own parameter domain there, which is the measured cause of the `L5`
+    anomaly recorded in [Decisions](#decisions--trade-offs).
+
+0b. **`feature_report.py` + `report_schema_v0.json` (AC37, AC51).** Emit
+    `is_terminal` as a JSON `bool` from `offset_to_dict`, and add it to
+    `stage3OffsetEntry.properties` as `{"type": "boolean"}` with a description,
+    leaving `required` alone. `additionalProperties: false` means skipping the
+    schema half fails every schema-validating module in the suite.
+
+0c. **`heuristics/mislabel.py` — the exclusion (AC39, AC40).** In
+    `_detect_offset_outliers`, skip an entry whose `is_terminal` is truthy before
+    the threshold comparison. A missing key or `None` is falsy and therefore
+    interior, which is what keeps `tests/test_033_mislabel.py` green unmodified.
+    Detector B (the ordering detector) is **not** touched. Record the exclusion,
+    its cause and its accepted cost in the module docstring's design-decisions
+    list, alongside AC16's margins.
+
+0d. **`reference/ingest.py` and `reference/delta.py` — symmetric exclusion
+    (AC41, AC42).** Both build `offsets_by_label` with the same loop over
+    `stage3["per_label_offsets"]`; add the same `is_terminal` guard to each so
+    `spline_offset_mm` is an interior-only feature on both the reference side and
+    the case side. Change nothing else in either module.
+
+0e. **`feature_docs.py` (AC46).** Add a `FeatureDoc` for
+    `stage3.per_label_offsets[].is_terminal` carrying the rationale, and extend
+    the "Spline Offset" group note to say the feature is interior-only.
+    `STATUS_OVERRIDES`, `MODE_ANCHOR_PATHS`, `BLOCK_OWNERS` and `PATH_ALIASES`
+    are not touched.
+
 1. **`scripts/rebuild_verse_reference.py` — the skeleton.** Follow
    `scripts/refresh_reference.py`'s shape: module docstring naming item 123,
    `REPO_ROOT`, an `argparse` parser (`--out`, `--verse-cohort`, `--staging-dir`,
@@ -511,49 +742,74 @@ the most defensible default and recorded here for audit at the queue boundary.
    each level's `count`), the qualifying-level filter, `P`, the level attaining
    it, the derived threshold, `subject_levels_above_threshold` (count and
    fraction, computed from the ingested per-subject values), and the ten
-   subject ids with the largest held-out `spline_offset_mm`.
+   subject ids with the largest held-out `spline_offset_mm`. **Amended
+   2026-08-29:** the block also reports `terminal_count`, `interior_count` and
+   the same statistics over each population, so the evidence for the exclusion is
+   regenerable from the tool rather than from a scratch analysis (AC17).
 
-6. **Run it on this machine** against the mounted cohort and read the numbers.
-   Install the rebuilt artifact by copying `<out>/reference_verse_v1.json` over
+6. **Re-run it on this machine** against the mounted cohort — after steps 0a–0e,
+   so the build measures interior-only offsets — and read the numbers. Install
+   the rebuilt artifact by copying `<out>/reference_verse_v1.json` over
    `src/segfacet/reference/reference_verse_v1.json` — an explicit operator step,
    never something the tool does.
 
-7. **Recalibrate the threshold (AC12, AC13, AC16).** Set
+7. **Recalibrate the threshold (AC12, AC13, AC16, AC44, AC45).** Set
    `heuristics/mislabel.py`'s `_DEFAULT_MAX_OFFSET_MM` and
    `src/segfacet/default_config.yaml`'s `rules.mislabel.max_offset_mm` to the
-   derived value; update `mislabel.py`'s module docstring (which currently says
-   "default ``15.0``") with the value, the distribution it came from and the four
-   margins. If the derived value falls outside AC14's window, stop and hand back
-   per [Assumptions](#assumptions).
+   derived value — expected `13.0` from the recorded interior-only ceiling
+   `P = 12.91` mm at `T10`, and stable for any `P` in `(12.5, 13.0]`. Update
+   `mislabel.py`'s module docstring (which currently says "default ``15.0``") with
+   the value, the distribution it came from, the margins and the terminal
+   exclusion. If the derived value falls outside AC14's window, stop and hand back
+   per [Assumptions](#assumptions) — the 2026-08-29 decision did not lift that
+   clause.
 
 8. **Rebuild `reference_default.json` (AC21, AC22):**
-   `.venv/bin/python -m segfacet.reference.artifact`.
+   `.venv/bin/python -m segfacet.reference.artifact`. Expect its
+   `spline_offset_mm` stats to move for a second reason beyond `config_hash`: the
+   synthetic cohort's `L1` and `L5` are always terminal, so those levels lose the
+   feature (AC43).
 
-9. **Regenerate the goldens (AC23–AC27):**
-   `.venv/bin/python -m segfacet.synth.golden` — the one-command path; it writes
-   canonical JSON bytes with `write_bytes`, so the `.gitattributes` LF pin on
-   `tests/corpus/golden/*.json` holds. Expect exactly two files to change, in
-   exactly four strings; `tests/golden/022_stage3_report.json` must not move and
-   is not rewritten.
+9. **Regenerate the catalogue and its counts (AC47–AC49):**
+   `.venv/bin/python -m segfacet.catalogue`; then update
+   `tests/test_103_feature_catalogue.py`'s `clean_control` leaf count (93 → 94)
+   and the nine `N/M leaf paths unwired` cells in
+   `docs/aide/golden-decision-table.md`, appending a dated re-measurement
+   paragraph there rather than overwriting item 121's; then recompute
+   `tests/corpus/119_pre_119_digests.json`'s `catalogue_leaf_path_set_sha256`
+   (rerun `segfacet.catalogue.main`, take the sorted leaf `path` values, sha256
+   the newline-joined list).
 
-10. **Update the pinned finding snapshot (AC28).** In
-    `tests/test_098_stray_components.py`,
+10. **Regenerate the goldens (AC23–AC27):**
+    `.venv/bin/python -m segfacet.synth.golden` — the one-command path; it writes
+    canonical JSON bytes with `write_bytes`, so the `.gitattributes` LF pin on
+    `tests/corpus/golden/*.json` holds. All nine change (the added `is_terminal`
+    booleans); two additionally change in the threshold clause. Then rewrite
+    `tests/golden/022_stage3_report.json` from
+    `test_022_stage3_serialisation.py::test_ac8_golden_snapshot`'s `produced`
+    text, writing bytes with `\n` (`write_bytes`, never `write_text` — see
+    CLAUDE.md's committed-fixture gotcha).
+
+11. **Update the pinned finding snapshot and the exact field set (AC28, AC50).**
+    In `tests/test_098_stray_components.py`,
     `_PRE_098_GOLDEN_VERDICT_AND_FINDINGS`'s two `mislabel` reasons carry
-    `"(threshold 15.0 mm)"`; update both to the new value.
+    `"(threshold 15.0 mm)"`; update both to `13.0`.
     `tests/test_102_stage18_validation.py` imports the constant, so it needs no
-    edit of its own.
+    edit of its own. In `tests/test_120_leave_one_out_offset.py`, add
+    `is_terminal` to `test_ac12_per_label_offsets_entry_field_set_exact`'s
+    expected set.
 
-11. **Measure the rebuilt artifact's footprint** leaf by leaf against the pre-123
+12. **Measure the rebuilt artifact's footprint** leaf by leaf against the pre-123
     committed artifact (`git show` the pre-123 blob into a scratch file and diff
     the parsed JSON), and record the result in the Decisions log. This is what
     decides how the reconciliation of `test_093` and `test_090` is scoped.
 
-12. **Documentation (AC29–AC32).** Correct `docs/aide/dataset-verse19.md`'s
-    "Git / versioning policy" and "Directory structure" sections and
-    `docs/reference-build.md`'s "Acquisition" / "Staging the cohort" /
-    "Reproducibility" sections; add the dated rebuild record.
+13. **Documentation (AC29–AC32).** Already landed in `daf8312` for AC29–AC31;
+    extend `docs/reference-build.md`'s dated rebuild record (AC32) with the
+    second, interior-only run and the threshold it produced, and state that
+    `spline_offset_mm` is now an interior-only feature.
 
-13. **Reconcile the tests listed in [Testing Strategy](#testing-strategy)**, then
+14. **Reconcile the tests listed in [Testing Strategy](#testing-strategy)**, then
     run the [Validation](#validation) section before committing.
 
 ## Authorised paths
@@ -567,15 +823,49 @@ the most defensible default and recorded here for audit at the queue boundary.
 - `src/segfacet/reference/reference_default.json` — rebuilt via
   `python -m segfacet.reference.artifact`, never hand-edited; its
   `provenance.config_hash` moves with the threshold (AC21, AC22).
-- `src/segfacet/heuristics/mislabel.py` — `_DEFAULT_MAX_OFFSET_MM` and the module
-  docstring's threshold statement and recorded margins (AC12, AC16). No detector
-  logic, no tag constant and no finding text changes.
+- `src/segfacet/heuristics/mislabel.py` — `_DEFAULT_MAX_OFFSET_MM`, the terminal
+  skip in `_detect_offset_outliers`, and the module docstring's threshold
+  statement, recorded margins and exclusion rationale (AC12, AC16, AC39, AC40,
+  AC44). No tag constant and no finding **text** changes beyond the threshold
+  number the f-string already interpolates; Detector B is untouched.
 - `src/segfacet/default_config.yaml` — the single `rules.mislabel.max_offset_mm`
   value (AC13). No other key.
-- `tests/corpus/golden/mode1_displace.json` — regenerated via
-  `python -m segfacet.synth.golden`, never hand-edited; its two `mislabel`
-  strings carry the threshold (AC23, AC24, AC26).
-- `tests/corpus/golden/mode6_crop_at_border.json` — likewise (AC23, AC24, AC26).
+- `src/segfacet/features/spline_offset.py` — the `is_terminal` field, its
+  assignment in both compute functions, and the module docstring (AC35–AC38).
+  *Added by the 2026-08-29 amendment; item 120's estimator, its withholding
+  mechanism and `compute_spline_offsets`' in-sample semantics are unchanged, and
+  `tests/test_018_per_vertebra_spline_offset.py` must stay green unmodified.*
+- `src/segfacet/feature_report.py` — `offset_to_dict` emits `is_terminal`
+  (AC37). No other serialiser changes.
+- `src/segfacet/report_schema_v0.json` — the `stage3OffsetEntry` definition only:
+  `is_terminal` added to `properties`, `required` untouched (AC51).
+- `src/segfacet/reference/ingest.py` — the terminal guard on the
+  `offsets_by_label` loop (AC41). Nothing else.
+- `src/segfacet/reference/delta.py` — the same guard on its own
+  `offsets_by_label` loop (AC42). Nothing else.
+- `src/segfacet/feature_docs.py` — a `FeatureDoc` for the new leaf path and the
+  "Spline Offset" group note (AC46). `STATUS_OVERRIDES`, `MODE_ANCHOR_PATHS`,
+  `BLOCK_OWNERS` and `PATH_ALIASES` must not change.
+- `docs/aide/feature_catalogue.generated.json` — regenerated via
+  `python -m segfacet.catalogue`, never hand-edited (AC47).
+- `docs/aide/feature_catalogue.generated.md` — likewise (AC47).
+- `tests/test_103_feature_catalogue.py` — the hardcoded `clean_control`
+  leaf-path count only, 93 → 94 (AC48).
+- `docs/aide/golden-decision-table.md` — the nine Group-A rows'
+  `N/M leaf paths unwired` evidence cells and a new dated re-measurement
+  paragraph (AC48). No judgement column and no earlier dated paragraph may
+  change. *(Item 121 made the same edit for the same mechanical reason.)*
+- `tests/corpus/119_pre_119_digests.json` — the
+  `catalogue_leaf_path_set_sha256` value only, bumped to the post-123 leaf-path
+  set (AC49).
+- `tests/corpus/golden/*.json` — all nine, regenerated via
+  `python -m segfacet.synth.golden`, never hand-edited (AC23–AC26). *Widened
+  from the two firing cases by the 2026-08-29 amendment: `is_terminal` reaches
+  every case's `per_label_offsets` entries.*
+- `tests/golden/022_stage3_report.json` — regenerated from
+  `test_022_stage3_serialisation.py::test_ac8_golden_snapshot`'s `produced`
+  text, never hand-edited (AC27). *Moved here from **Asserts against** by the
+  2026-08-29 amendment, for the same reason.*
 - `docs/aide/dataset-verse19.md` — the nested-layout claim and the `.gitignore`
   sentence (AC30).
 - `docs/reference-build.md` — the staging recipe, the cohort-root configuration,
@@ -589,8 +879,9 @@ the most defensible default and recorded here for audit at the queue boundary.
   the item-123 state.
 - `tests/test_120_leave_one_out_offset.py` — delete two tests that exist only to
   fence item 120 out of this item's work: `test_ac29_reference_verse_v1_unchanged`
-  and `test_ac16_default_max_offset_mm_still_15` (AC34). No other test in the
-  module changes.
+  and `test_ac16_default_max_offset_mm_still_15` (AC34); and add `is_terminal` to
+  `test_ac12_per_label_offsets_entry_field_set_exact`'s expected nine-key set
+  (AC50). No other test in the module changes.
 - `tests/test_093_tptbox_label_convention.py` —
   `test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s` only,
   narrowed to exclude the statistics the re-fit legitimately moves, with the
@@ -611,27 +902,28 @@ the most defensible default and recorded here for audit at the queue boundary.
   `dataset-verse19training` entry (the trailing slash was removed on 2026-08-27,
   commit `29c6d1f`); re-fixing it is not this item's work, proving it stays fixed
   is.
-- `tests/golden/022_stage3_report.json` — read, pinned byte-unchanged (AC27). It
-  serialises features only, so a threshold change cannot reach it; if it moves,
-  something outside this item's scope did.
 - `tests/corpus/manifest.json` — read, not changed. The nine cases are the
   population AC15 and AC23 measure over.
-- `tests/corpus/golden/clean_control.json`, `mode2_fragment.json`,
-  `mode3_inject_islands.json`, `mode4_relabel_swap.json`,
-  `mode5_remove_level.json`, `mode7_sequence_break.json`,
-  `mode8_force_overlap.json` — read and pinned byte-unchanged (AC25). None fires
-  `mislabel`, so none can carry the threshold; a moved byte means the
-  recalibration reached further than AC14's window allows. *(The other two
-  goldens are under **May change** above.)*
+- `tests/test_018_per_vertebra_spline_offset.py` — read, not changed. It must
+  stay green **unmodified**, which is what proves the `is_terminal` addition left
+  `compute_spline_offsets`' in-sample semantics alone (its field checks are
+  `hasattr`-style and additive-safe).
+- `tests/test_033_mislabel.py` — read, not changed. AC40 is satisfied by this
+  module staying green as committed, which is what proves an entry with no
+  `is_terminal` key is still treated as interior.
+- `tests/test_022_stage3_serialisation.py` — read, not changed. Its
+  offset-key check is `in`-style and additive-safe; its AC8 golden is regenerated
+  (AC27) but the test itself is never edited.
 - `tests/test_102_stage18_validation.py` — read, not changed. It imports
   `_PRE_098_GOLDEN_VERDICT_AND_FINDINGS` from `test_098`, so AC28's single-point
   update covers it; if this module needs its own edit, the constant was updated
   in the wrong place.
-- `src/segfacet/reference/ingest.py`, `reference/artifact.py`,
-  `reference/aggregate.py`, `reference/schema.py` — read, not changed. AC5 pins
-  `ingest_cohort`'s flat-directory + `<id>_scan.nii.gz` convention as the
-  contract staging must satisfy; AC20 pins `config_hash`'s field list as the
-  reason the default artifact must be rebuilt.
+- `src/segfacet/reference/artifact.py`, `reference/aggregate.py`,
+  `reference/schema.py` — read, not changed. AC5 pins `ingest_cohort`'s
+  flat-directory + `<id>_scan.nii.gz` convention as the contract staging must
+  satisfy; AC20 pins `config_hash`'s field list as the reason the default
+  artifact must be rebuilt. *(`ingest.py` and `delta.py` moved to **May change**
+  by the 2026-08-29 amendment — AC41, AC42.)*
 - `tests/test_115_stage26_validation.py` — read, not changed. AC33 is satisfied
   by this module staying green as committed, which is what proves the fence count
   did not grow.
@@ -647,16 +939,19 @@ the most defensible default and recorded here for audit at the queue boundary.
 stated as prose rather than as **Asserts against** entries because they carry no
 acceptance criterion, and a pin that carries no AC only adds cross-spec
 collisions — the call item 120 made for the same reason):
-`src/segfacet/features/**` (the fit, the estimator, the orientation proxy and the
-monotonic check are items 119–122's), `src/segfacet/pipeline.py`,
+`src/segfacet/features/spline.py`, `features/orientation.py`,
+`features/consistency.py`, `features/neighbourhood.py` (the fit, the orientation
+proxy, the monotonic check and the neighbourhood block are items 119–122's — only
+`features/spline_offset.py`'s terminality flag is in scope, and item 120's
+estimator inside it is not), `src/segfacet/pipeline.py`,
 `src/segfacet/synth/**`, `src/segfacet/catalogue.py`,
-`src/segfacet/feature_docs.py`, `docs/aide/feature_catalogue.generated.*`,
 `scripts/refresh_reference.py`, `docs/spinal-curve-model.md` (item 118's signed
 deliverable — its proposed `25.0` mm envelope is superseded by measurement here
 and recorded in this item's Decisions log, never by editing the signed record),
-`docs/aide/golden-decision-table.md` (its `reference_verse_v1.json` row's
-judgement — keep the sha256 pin, the artifact is not CI-regenerable — is
-unaffected; only the digest *inside* the named test moves, so no table cell
+`docs/aide/golden-decision-table.md`'s judgement columns (its
+`reference_verse_v1.json` row's disposition — keep the sha256 pin, the artifact
+is not CI-regenerable — is unaffected; only the digest *inside* the named test
+moves, so no judgement cell
 changes), `aide.toml`, `docs/aide/roadmap.md`, `docs/aide/progress.md` (beyond
 the status flip the CLI makes), `.aide/**`, `CLAUDE.md`.
 
@@ -702,19 +997,24 @@ already use), never as a package.
 - **AC25/AC26** are asserted structurally, not by a digest fence: for each of the
   nine committed goldens, walk the JSON against the pre-123 value (read from
   `git show <pre-123 rev>:<path>` inside the test, so nothing is hardcoded) and
-  assert the differing leaf paths are empty for the seven, and exactly the two
+  assert the differing leaf paths are exactly the added
+  `per_label_offsets[].is_terminal` keys for the seven, and those plus the two
   `mislabel` `reason`/`message` leaves for the other two — with each differing
-  pair equal after substituting the old threshold clause for the new. Never a
-  hardcoded literal digest ([`.aide/conventions.md`](../../../.aide/conventions.md)
-  §1; scope is proved by the diff against Authorised paths). If reading the
-  pre-123 revision from git is not available to the test runner, assert the
-  weaker but still meaningful property directly on the committed files: only
-  `mode1_displace` and `mode6_crop_at_border` contain the substring `"(threshold"`,
-  and every occurrence names the new value.
+  string pair equal after substituting `"(threshold 15.0 mm)"` for
+  `"(threshold 13.0 mm)"`. Never a hardcoded literal digest
+  ([`.aide/conventions.md`](../../../.aide/conventions.md) §1; scope is proved by
+  the diff against Authorised paths). If reading the pre-123 revision from git is
+  not available to the test runner, assert the weaker but still meaningful
+  property directly on the committed files: every `per_label_offsets` entry in
+  every golden carries a boolean `is_terminal`; exactly the first and last entry
+  of each case's list is `true`; and only `mode1_displace` and
+  `mode6_crop_at_border` contain the substring `"(threshold"`, every occurrence
+  naming `13.0`.
 - **AC27** compares `tests/golden/022_stage3_report.json` against
   `test_022_stage3_serialisation.py::test_ac8_golden_snapshot`'s produced text,
   which is the same property that test already asserts — verified, not
-  re-asserted with a second mechanism.
+  re-asserted with a second mechanism — plus a check that its offset entries
+  carry `is_terminal`.
 - **AC28** asserts the two reason strings in
   `test_098_stray_components._PRE_098_GOLDEN_VERDICT_AND_FINDINGS` name the new
   threshold, and that they equal the corresponding committed golden's `reason`.
@@ -722,6 +1022,36 @@ already use), never as a package.
   `reference-build.md`.
 - **AC33/AC34** assert the updated digest matches the committed file, and that
   the two retired test names are absent from `test_120`'s source.
+- **AC35–AC38 — terminality, on hand-built centroid sequences.** A 5-centroid
+  clean spine (indices 0 and 4 terminal, 1–3 interior) through both compute
+  functions; a 1- and a 2-centroid sequence (all terminal, AC37); and the
+  reversed-input case matched **by label**, not by index (AC38). `is_terminal` is
+  asserted to be a real `bool`, and the dataclass asserted still frozen (AC35).
+- **AC39/AC40 — `MislabelRule` over hand-built records**, in the shape
+  `test_033_mislabel.py` already uses: a record whose only over-threshold entry
+  is `is_terminal: true` fires nothing (tested at `40.0` mm against the shipped
+  threshold, so magnitude is visibly not the discriminator); the same record with
+  an additional interior over-threshold entry fires on that label only; and a
+  record whose entries carry no `is_terminal` key fires exactly as before.
+- **AC41/AC42 — the two exclusions, on small synthetic cohorts.** Ingest a
+  two-case stand-in cohort and assert the built distribution's `spline_offset_mm`
+  `count` equals the number of **interior** label occurrences, not all of them;
+  and, for delta, score a features block whose terminal entry carries a large
+  offset and assert no `spline_offset_mm` `FeatureDelta` is produced for that
+  label while an interior label still is.
+- **AC43** reads the committed artifact: `L5`'s `spline_offset_mm` count is below
+  10 (or the key is absent), no qualifying level's `p99` exceeds `13.0`, a level
+  with no interior occurrence carries no `spline_offset_mm` key, and
+  `load_artifact` still accepts the file.
+- **AC44/AC45** are direct assertions on `_DEFAULT_MAX_OFFSET_MM` and on the
+  interior maxima recomputed from the committed goldens (excluding each case's
+  first and last offset entry), so `2.510990` is verified rather than quoted.
+- **AC46–AC49** read `FEATURE_DOCS`, a fresh catalogue regeneration, the
+  `test_103` constant, the nine `golden-decision-table.md` cells against
+  `test_105`'s live recomputation, and the digest fixture.
+- **AC50/AC51** assert the nine-key expected set in `test_120`'s source, and
+  drive the schema: a report carrying `is_terminal` validates, one carrying a
+  misspelt variant fails, and one omitting it entirely still validates.
 
 **Adversarial / edge cases.**
 
@@ -768,12 +1098,19 @@ validation round fails on them, not on new code, unless they are handled):
 | `test_090_reference_derived_defaults.py` AC2/AC5/AC6/AC14 | Derives `bounds` and `fragmentation` defaults from the production artifact's `largest_component_fraction` p1 and `component_count` p99, and asserts `mode6_crop_at_border` fires `bounds` on label 22 against it. | **Expected to survive** — those percentiles come from geometry/morphology, which this item does not change. Confirm by running them and by step 11's footprint measurement; if one genuinely fails, stop and hand back rather than editing it. |
 | `test_097_stage17_validation.py::{test_ac2_bundled_production_reference_still_loads_with_l6_level, test_ac2_label_25_scores_against_renamed_l6_level_unchanged}` | Assert the rebuilt artifact still has `L6` and no `"S"`. | **No change expected** — the default `LabelConvention` names label 25 `L6`, so a fresh build keys it `L6` natively (AC19). Verify. |
 | `test_049_reference_integration.py`, `test_092`, `test_101_per_mode_cohort.py`, `test_109_attribution_scale.py` | Score cases against a reference or read per-mode detection. | **Expected to survive** once both artifacts are rebuilt. Confirm by running. |
-| `test_033_mislabel.py` | Builds its own config with explicit `max_offset_mm` values (20.0, 100.0, 7.5) and matches reasons by `startswith`. | **No change expected** — it never asserts the shipped default. Verify. |
+| `test_033_mislabel.py` | Builds its own config with explicit `max_offset_mm` values (20.0, 100.0, 7.5) and matches reasons by `startswith`; ~20 of its records are one- or two-entry offset lists whose offending entry would be "terminal" under a positional reading. | **No change expected, and that is load-bearing** — AC40 exists precisely so this module stays green unmodified. It is the evidence that decided against inferring terminality from list position (see Assumptions). If it goes red, the flag defaulted wrong. |
+| `test_120_leave_one_out_offset.py::test_ac12_per_label_offsets_entry_field_set_exact` | Asserts an exact eight-key set; `is_terminal` is the ninth. | Add the key to the expected set (AC50). Authorised. |
+| `test_119_curve_formulation.py::test_ac27_catalogue_leaf_path_set_unchanged_from_pre_119` and `test_120_leave_one_out_offset.py::test_ac12_catalogue_leaf_path_set_unchanged_from_pre_119` | Both hash the catalogue's sorted leaf-path set against `tests/corpus/119_pre_119_digests.json`; this item adds one path. | Recompute and commit the digest (AC49, step 9) — the standing obligation item 121 recorded for any item that moves the leaf-path count. No test edit. |
+| `test_103_feature_catalogue.py` AC4 (`len(paths) == 93`) | One added leaf path. | Update to `94` (AC48). Authorised. |
+| `test_104_feature_catalogue_drift.py` | The new realised path is undocumented and absent from the committed artifact until steps 0e and 9. | Red until then; green after. No test edit. |
+| `test_105_golden_decision_table.py` AC7 | Recomputes `N/M leaf paths unwired` live; `M` moves 93 → 94. | Update the nine cells in `golden-decision-table.md` (AC48). No test edit. |
+| Every schema-validating module (33 reach `serialize_report`) | `stage3OffsetEntry` sets `additionalProperties: false`, so an emitted `is_terminal` fails validation until step 0b. | Red until step 0b; green after. No test edit. |
+| `test_018_per_vertebra_spline_offset.py`, `test_022_stage3_serialisation.py` | Both enumerate offset fields, but `hasattr`-style / `in`-style respectively. | **No change expected** — both additive-safe. `test_022`'s AC8 golden is regenerated (AC27); the test itself is never edited. |
+| `test_042_golden_determinism.py`, `test_089`, `test_094`, `test_098` AC14–AC16, `test_110`, `test_116` | `reports_close` compares key **sets** exactly, so the four added keys per case fail until step 10. | Regenerate the goldens (step 10). No test edit. |
 | `test_039_identity_ordering_alignment_perturbations.py` | Mentions `max_offset_mm` only in a docstring. | **No change expected.** |
-| `test_105_golden_decision_table.py` | Enumerates the fixture inventory including `reference_verse_v1.json`; this item adds and removes no fixture. | **No change expected** — the row's cells and the count are untouched. |
+| `test_105_golden_decision_table.py` (fixture inventory) | Enumerates every non-`.py` fixture under `tests/`; this item adds and removes no fixture. | **No change expected** — the fixture count is untouched. Only the nine `N/M leaf paths unwired` evidence cells move (AC48). |
 | `test_115_stage26_validation.py::test_ac8_no_hardcoded_literal_fence_remains` | Caps the repo at one literal sha256 fence, which must be `test_098`'s. | **No change expected** — AC33 updates that fence's value, adds none. |
-| `test_042_golden_determinism.py`, `test_089`, `test_094`, `test_098` AC14–AC16, `test_110`, `test_116` | Compare fresh builds or `(rule_id, labels)` snapshots against the committed goldens. | **No change expected** — they compare structure, rule ids and label sets, none of which the threshold clause touches; the two regenerated goldens are regenerated by the same builder they compare against. Confirm by running. |
-| `test_022_stage3_serialisation.py::test_ac8_golden_snapshot` | Strict text equality against `tests/golden/022_stage3_report.json`. | **No change expected** (AC27) — it serialises features only and carries no finding. Never regenerate that golden here. |
+| `test_111_golden_guard.py` | Pins the `.gitattributes` LF coverage of both golden sets. | **No change expected** — every path regenerated here is already pinned; this item adds no fixture. |
 
 ## Validation
 
@@ -800,12 +1137,18 @@ cohort** and read the calibration as a person deciding the envelope would.
    `calibration.subject_levels_above_threshold` is a rate a reader can accept as
    the false-positive cost on clean real GT. Inspect the ten highest-offset
    subject ids listed there — these are item 125's candidates for the "a real
-   scoliotic curve is not flagged" criterion.
+   scoliotic curve is not flagged" criterion. **Also confirm the exclusion did
+   what it was chosen to do:** `calibration.terminal_count` /
+   `interior_count` are both populated, `L5` no longer attains `P`, and the
+   interior-only `P` is around `12.91` mm at `T10`. If `P` still lands above
+   `17.507445` mm, hand back — the 2026-08-29 decision did not lift that clause.
 
 3. **See the feature come alive in the artifact.** In the committed
    `reference_verse_v1.json`, `levels.L1.all.feature_stats.spline_offset_mm.mean`
    is on the order of `1e0` mm where the pre-123 artifact read `1.39e-05` mm, and
-   every level with `count >= 10` is comparably non-zero.
+   every level with `count >= 10` is comparably non-zero. `L5` is expected to
+   have dropped below the qualifying count (interior in 3 of 62 subjects) — check
+   it and record what it reads.
 
 4. **Audit the regeneration's narrowness (AC25/AC26).**
 
@@ -813,11 +1156,17 @@ cohort** and read the calibration as a person deciding the envelope would.
    git diff aide/queue-017 -- tests/corpus/golden
    ```
 
-   Exactly two files, and every changed hunk is a `(threshold 15.0 mm)` →
-   `(threshold <new> mm)` substitution inside a `mislabel` `reason` or `message`
-   string on `mode1_displace` or `mode6_crop_at_border`. A changed `"verdict"`,
-   `"rule_id"`, `"labels"` or anything under `"features"` means the
-   recalibration escaped AC14's window — hand back rather than committing it.
+   All nine files, and every changed hunk is either an added
+   `"is_terminal": true|false` line inside a `per_label_offsets` entry, or — on
+   `mode1_displace` and `mode6_crop_at_border` only — a
+   `(threshold 15.0 mm)` → `(threshold 13.0 mm)` substitution inside a `mislabel`
+   `reason` or `message`. A changed `"verdict"`, `"rule_id"`, `"labels"` or any
+   other value under `"features"` means the change reached further than this item
+   allows — hand back rather than committing it.
+
+   Sanity-check the flag itself while the diff is open: in each case exactly two
+   entries read `"is_terminal": true`, and they are the first and last of the
+   list.
 
 5. **Audit the boundary.**
 
@@ -825,9 +1174,10 @@ cohort** and read the calibration as a person deciding the envelope would.
    git diff aide/queue-017 --stat
    ```
 
-   Must list no file under `src/segfacet/features/`, no
-   `src/segfacet/pipeline.py`, no `src/segfacet/synth/`, no `tests/golden/`, and
-   no `docs/aide/feature_catalogue.generated.*`.
+   Must list no `src/segfacet/pipeline.py`, no `src/segfacet/synth/`, and under
+   `src/segfacet/features/` **only** `spline_offset.py` — the fit, the
+   orientation proxy, the monotonic check and the neighbourhood block are items
+   119–122's and must not appear.
 
 6. **Replay one real case end to end.** Pick the highest-offset subject from step
    2 and run it through the shipped CLI against the rebuilt reference, confirming
@@ -835,7 +1185,17 @@ cohort** and read the calibration as a person deciding the envelope would.
    summary predicted. This is the observation that the calibration and the shipped
    rule agree.
 
-**Environment.** Steps 1, 2, 3 and 6 need the VerSe19 cohort (80 CT/GT pairs,
+7. **Observe the exclusion on a real terminal outlier.** Run `sub-verse015` —
+   the subject whose caudal-terminal `L5` reads `26.87` mm, the largest terminal
+   offset in the cohort — through `segfacet run`. Its `per_label_offsets` entry
+   for that label must carry `"is_terminal": true`, and **no** `mislabel` offset
+   finding may name it, despite a reading twice the threshold. This is the single
+   observation that shows the human decision doing its job on the case that
+   motivated it. Then run `sub-verse406_split-verse261`, whose **interior** `T10`
+   reads `18.51` mm: that one **must** fire, because it is the genuine interior
+   outlier the rule still has to catch.
+
+**Environment.** Steps 1, 2, 3, 6 and 7 need the VerSe19 cohort (80 CT/GT pairs,
 reachable here through the gitignored symlink at `dataset-verse19training`).
 There is no `[validation]` profile for it — cohort presence is an environment
 variable, not a capability probe — so the honest downgrade is: **if the cohort
@@ -953,7 +1313,8 @@ and ticks the stage's "both reference artifacts are rebuilt from real GT and
   retired: their purpose — fencing item 120 out of item 123's work — is
   served either way, since item 123 attempted the recalibration and recorded
   why it could not land, rather than never attempting it.
-- **Next step for a person:** review this measurement against the
+- **Next step for a person** *(as recorded at the hand-back; **resolved
+  2026-08-29** — see the section below)*: review this measurement against the
   2026-08-27 gate (`progress.md`, `## Human gates`) and either (a) approve a
   wider envelope so a follow-up item can apply `21.5` mm (or a re-derived
   value, if the estimator is revised first), or (b) direct a different
@@ -961,5 +1322,66 @@ and ticks the stage's "both reference artifacts are rebuilt from real GT and
   `sub-verse015` / the other top-offset subjects named in
   `out/verse-rebuild/verse_rebuild_summary.json`'s `calibration.top_subject_ids`
   for a labelling-error explanation, or changing the derivation rule itself).
-  Until then this item's remaining acceptance criteria (AC12-AC28, AC33)
-  stay unmet by design.
+  The user took route (b), in a form the hand-back had not anticipated:
+  the exclusion is not of `L5` as a *level* but of **terminal vertebrae as a
+  population**, which is what the follow-up analysis showed `L5`'s reading
+  actually was. AC12–AC28 and AC33 are back in force, on an interior-only
+  population.
+
+### Human decision, 2026-08-29 — exclude terminal vertebrae; the hand-back is resolved
+
+**Decision.** Sequence-terminal vertebrae are excluded from the `mislabel`
+offset detector and from the `spline_offset_mm` reference distribution, as the
+simple fix for now; any smarter treatment is deferred. The recalibration
+therefore proceeds on an interior-only population, and the hand-back recorded
+above is closed. AC35-AC51 encode the decision; AC44 pins the resulting
+threshold at `13.0` mm.
+
+**What the follow-up analysis established.** A per-vertebra pass over the same
+code path that produced the hand-back (863 vertebra rows across the 80-subject
+cohort; every per-level `p99` in `verse_rebuild_summary.json` reproduced to
+better than `1e-6`) shows the `L5 = 21.209` mm ceiling is not deformity. It is
+terminal extrapolation:
+
+- **Sequence-terminal vertebrae** - the first or last of a subject's ordered
+  sequence, i.e. a field-of-view edge or an anatomical end - are `160` of `863`
+  occurrences (**18.5%**) but `41` of the `45` occurrences at or above `6` mm
+  (**91%**). At or above `15` mm, `7` of `8` are terminal, `6` of them caudal.
+- **`L5` specifically** is caudal-terminal in `59` subjects (median `4.55`,
+  `p99` `21.49`, max `26.87` mm - `sub-verse015`) and interior, with `L6`
+  following it, in only `3` (max `1.00` mm). The whole anomaly is one
+  population masquerading as another: the held-out refit has to extrapolate
+  past the end of its own parameter domain, through peak lumbar lordosis, and
+  reports the extrapolation error as an offset.
+- **Interior-only per-level `p99`s** are unremarkable: worst is `T10` at
+  `12.91` mm, then `L4` at `8.36` and `T12` at `4.41`. `T10`'s figure is driven
+  by a single genuine interior outlier - `sub-verse406_split-verse261`'s `T10`
+  at `18.51` mm, the cohort maximum under terminal-aware calibration.
+
+**Why exclusion rather than a wider envelope.** Widening the deformity envelope
+to `21.5` mm would have accepted a number produced by an estimator artefact as
+if it described anatomy, and would have silenced `mode6_crop_at_border`'s
+deliberate corpus finding at `17.507445` mm. Excluding the population the
+artefact lives in leaves the envelope where the 2026-08-27 gate put it and
+keeps the corpus behaviour intact: `13.0` mm sits inside the approved window,
+above `mode4_relabel_swap`'s `2.510990` mm interior ceiling and below
+`mode6`'s `17.507445` mm.
+
+**What it costs, stated plainly.** A genuinely displaced cranial-most or
+caudal-most vertebra is now not detected at all - not by a wider threshold, but
+by not being looked at. That is a real detection hole, accepted deliberately
+because the alternative was a threshold calibrated on noise. It is recorded in
+[`insights.md`](../insights.md) (2026-08-29) as a deferred item needing a real
+treatment: a separately calibrated terminal threshold, an extrapolation-aware
+estimator, or a curvature model that does not depend on both neighbours.
+
+**Numbers a later reader needs, since the analysis CSV was scratch and is
+gone:** terminal share `160/863` (18.5%); terminal share of `>= 6` mm outliers
+`41/45` (91%); of `>= 15` mm, `7/8` terminal, `6` caudal. `L5` terminal
+`n = 59`, median `4.55`, `p99` `21.49`, max `26.87` (`sub-verse015`); `L5`
+interior `n = 3`, max `1.00`. Interior `p99`: `T10` `12.91`, `L4` `8.36`,
+`T12` `4.41`. Interior cohort maximum `18.51` mm
+(`sub-verse406_split-verse261`, `T10`). Corpus interior non-firing ceiling
+`2.510990` mm (`mode4_relabel_swap`, label 23); firing readings `17.507445`
+(`mode6_crop_at_border`) and `18.718604` (`mode1_displace`), both on label 22,
+both interior.
