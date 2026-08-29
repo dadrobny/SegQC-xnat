@@ -431,6 +431,9 @@ the demoted `principal_axis`, as `spline_closest_u`, `spline_tangent`,
   paragraph. No judgement column (disposition, rationale, replacement
   guarantee) and no earlier dated paragraph may change.
 - `tests/test_121_tangent_orientation.py` — the new test module.
+- `tests/corpus/119_pre_119_digests.json` — the
+  `catalogue_leaf_path_set_sha256` value only, bumped to the post-121
+  leaf-path set. See [Decisions](#decisions--trade-offs).
 - `docs/aide/items/121-tangent-based-vertebra-orientation.md` — this spec.
 - `docs/aide/insights.md` — one-line out-of-scope captures only.
 
@@ -707,6 +710,30 @@ decision-table test and every schema-validating module red cannot merge at all.
 Item 120 already regenerated the goldens within this queue on the same
 reasoning. It pre-empts nothing: item 123 regenerates the same files again and
 will simply find them already carrying these keys.
+
+### The pre-119 leaf-path digest is not exempt from a leaf-count change
+
+**Decision: bump `tests/corpus/119_pre_119_digests.json`'s
+`catalogue_leaf_path_set_sha256` from the pre-121 133-leaf set to the post-121
+137-leaf set, here, in this item.**
+
+`test_119_curve_formulation.py::test_ac27_catalogue_leaf_path_set_unchanged_from_pre_119`
+and `test_120_leave_one_out_offset.py::test_ac12_catalogue_leaf_path_set_unchanged_from_pre_119`
+both hash the catalogue's sorted leaf-`path` set and compare it against this
+one committed digest — a discriminator written to prove items 119 and 120 add
+and remove no feature path. This item's Testing Strategy table (row
+`test_120_leave_one_out_offset.py`, "**Green unchanged** — `spline_offset.py`
+is untouched") missed that these two tests do not exercise
+`spline_offset.py` at all: they read the live catalogue and compare it to a
+static fixture, so any later item that legitimately grows the leaf-path count
+— as this one does, by four (133 leaves pre-121, 137 post-121) — turns both
+tests red with no code defect involved. The fixture is not a golden of
+*this* item's output; it is a trip-wire calibrated once, upstream of every
+item that can move the catalogue. Any item that adds or removes a leaf path
+must recompute and commit this digest alongside its own change, the same way
+it regenerates `feature_catalogue.generated.json`. Recomputation is
+mechanical: rerun `segfacet.catalogue.main`, take the sorted leaf `path`
+values, sha256 the newline-joined list.
 
 ### Implementation note (2026-08-29)
 
