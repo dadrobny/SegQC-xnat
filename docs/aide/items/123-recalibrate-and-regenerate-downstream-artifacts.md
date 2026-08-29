@@ -452,6 +452,71 @@ AC1–AC11, AC17 and AC29–AC31 already landed and are unaffected._
   `additionalProperties: false` stays load-bearing and every existing test that
   builds an offset entry without the key still validates.
 
+### Validation-round-1 reconciliation (added 2026-08-29, second amendment)
+
+_Added after validation round 1 reported five existing tests broken by
+AC1–AC51's implementation that the spec had not authorised or prescribed. Each
+was read in full before this amendment; see
+[Decisions & Trade-offs](#decisions--trade-offs) for the measured evidence
+behind each prescription._
+
+- [ ] **AC52: Item 119's stale mislabel-threshold fence is retired.**
+  `tests/test_119_curve_formulation.py` contains no
+  `test_ac21_mislabel_default_threshold_unchanged`. *(That test pinned
+  `_DEFAULT_MAX_OFFSET_MM == 15.0` as evidence item 119 did not touch the
+  threshold — the same fence shape as item 120's two tests AC34 retires, and
+  retired for the same reason: its purpose was served, and its assertion is
+  now definitionally false by this item's design, AC44.)*
+
+- [ ] **AC53: The config-hash literals pinned outside the reference artifacts
+  track the live committed default, not a stale value.**
+  `tests/test_065_config_intensity.py::test_ac12_config_hash_matches_committed_reference_default_provenance`
+  and
+  `tests/test_090_reference_derived_defaults.py::test_ac16_load_config_default_path_equals_default_config`
+  each compare `config_hash(bundled_default_config())` against
+  `bundled_default_reference().provenance.config_hash` — the committed
+  artifact's own recorded hash — rather than a hardcoded sha256 literal.
+  Neither file contains the pre-123 literal
+  `87c73ab35da9707054b300e15664c391ce50851c5d11490c89125381c1c96ac8` any more.
+
+- [ ] **AC54: The reference-ingestion AC3 test reflects the interior/terminal
+  split.**
+  `tests/test_044_reference_ingestion.py::test_ac3_spline_offset_populated_for_multi_level_subject`
+  asserts `spline_offset_mm` is present, finite and equal to the reconstructed
+  `offset_mm` for the subject's **interior** level(s) only, and explicitly
+  absent from `record.features` for the subject's two **terminal** levels
+  (first and last of the ordered sequence) — so the test documents AC41's
+  exclusion instead of contradicting it.
+
+- [ ] **AC55: The displace self-consistency check is terminal-aware.**
+  `tests/test_039_identity_ordering_alignment_perturbations.py`'s
+  `_designated_rule_fires_reconstructed`'s `"displace"` branch reads the
+  reconstructed record's `is_terminal` flag for the perturbed target before
+  asserting: when the target is interior, the `mislabel` finding must fire for
+  it exactly as before; when the target is terminal, the check instead asserts
+  **no** `mislabel` offset finding names it — the AC39 exclusion working as
+  designed, not a self-consistency failure. Both
+  `test_ac23_unspecified_target_is_seed_deterministic_and_self_consistent[displace]`
+  and
+  `test_adv_different_seeds_unspecified_target_stay_self_consistent[displace]`
+  pass unmodified apart from this one shared helper. No other operator's
+  branch (`"relabel_swap"`) changes.
+
+- [ ] **AC56: The L6 byte-for-byte narrowing test asserts absence, not a
+  skipped value.**
+  `tests/test_093_tptbox_label_convention.py::test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s`
+  asserts `set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS) -
+  _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT`, i.e. that `spline_offset_mm` is
+  **absent** from `L6`'s rebuilt `feature_stats` (L6 has no interior
+  occurrence in the 80-subject cohort — AC43), not merely that its value is
+  skipped from the byte comparison while the key stays present. The sibling
+  test `test_ac5_spline_offset_mm_excluded_from_byte_for_byte_is_the_only_exclusion`
+  and its constant's docstring are updated to state the exclusion is
+  *absence*, not *drift*. The module's two other AC5 tests
+  (`test_ac5_no_other_level_or_top_level_field_changed`,
+  `test_ac5_reference_verse_v1_json_is_well_formed_after_the_edit`) are
+  unchanged.
+
 ## Assumptions  <!-- MANDATORY -->
 
 Clarify mode is `assume` (`aide.toml`), so each ambiguity below was resolved with
@@ -883,15 +948,48 @@ the rebuild is re-run, because they change what the rebuild measures.
   `test_ac12_per_label_offsets_entry_field_set_exact`'s expected nine-key set
   (AC50). No other test in the module changes.
 - `tests/test_093_tptbox_label_convention.py` —
-  `test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s` only,
-  narrowed to exclude the statistics the re-fit legitimately moves, with the
-  exclusion named and justified in the test. Its four sibling AC5 tests (the
-  `"S"`-key absence, the `L6` level name, the other-levels check, the
-  well-formedness check) are unchanged.
+  `test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s`,
+  `test_ac5_spline_offset_mm_excluded_from_byte_for_byte_is_the_only_exclusion`
+  and the module-level `_AC5_FEATURES_MOVED_BY_ITEM_123_REFIT` constant's
+  docstring/comment only, narrowed to assert `spline_offset_mm`'s **absence**
+  from L6's rebuilt `feature_stats` rather than a value skipped while the key
+  stays present (AC56). Its two other sibling AC5 tests
+  (`test_ac5_no_other_level_or_top_level_field_changed`, the other-levels
+  check, and `test_ac5_reference_verse_v1_json_is_well_formed_after_the_edit`,
+  the well-formedness check) are unchanged.
 - `tests/test_035_default_config.py` —
   `test_ac3_max_offset_mm_matches_code_default` asserts the literal `15.0`;
   re-express it against `_DEFAULT_MAX_OFFSET_MM` so it pins the
   code↔config agreement rather than a superseded number. That test only.
+- `tests/test_119_curve_formulation.py` — delete
+  `test_ac21_mislabel_default_threshold_unchanged` only (AC52), the same
+  deferral-fence shape AC34 retires from `test_120`, with a retirement comment
+  in the style already used just below it in that file (the
+  `test_ac21_no_regenerated_golden_offset_reaches_2mm` retirement note). No
+  other test in the module changes.
+- `tests/test_065_config_intensity.py` —
+  `test_ac12_config_hash_matches_committed_reference_default_provenance` and
+  the now-unused `_COMMITTED_REFERENCE_DEFAULT_CONFIG_HASH` constant only
+  (AC53): compare against `bundled_default_reference().provenance.config_hash`
+  instead of a hardcoded literal. The module docstring's mention of the old
+  hash is updated to describe the live comparison. No other test changes.
+- `tests/test_090_reference_derived_defaults.py` —
+  `test_ac16_load_config_default_path_equals_default_config` only (AC53):
+  compare against `bundled_default_reference().provenance.config_hash`
+  (`bundled_default_reference` is already imported in this module) instead of
+  the hardcoded literal, mirroring the very next test in the file,
+  `test_ac16_config_hash_matches_pre_item_snapshot`, which already does this
+  against `bundled_production_reference()`. No other test changes.
+- `tests/test_044_reference_ingestion.py` —
+  `test_ac3_spline_offset_populated_for_multi_level_subject` only (AC54):
+  assert `spline_offset_mm` present for the subject's interior level(s) and
+  absent for its two terminal levels. No other test changes.
+- `tests/test_039_identity_ordering_alignment_perturbations.py` — the
+  `"displace"` branch of `_designated_rule_fires_reconstructed` only (AC55):
+  make it terminal-aware as AC55 states. No other function, branch or test in
+  the module changes — in particular the `"relabel_swap"` branch and every
+  explicit-target test (label 22 is always interior in the 5-level default
+  spine) are untouched.
 - `docs/aide/items/123-recalibrate-and-regenerate-downstream-artifacts.md` — this
   spec.
 - `docs/aide/insights.md` — append-only, per the out-of-scope-insight rule.
@@ -932,9 +1030,11 @@ the rebuild is re-run, because they change what the rebuild measures.
   "rebuild and compare to committed" tests are satisfied by AC21's rebuild.
 - `tests/test_090_reference_derived_defaults.py`,
   `tests/test_097_stage17_validation.py`, `tests/test_049_reference_integration.py`
-  — read, not changed. They read the production artifact structurally; if the
-  measured footprint (step 11) moves a percentile they derive a threshold from,
-  stop and hand back rather than editing them.
+  — read, not changed **except** `test_090`'s one test named under **May
+  change** (AC53). The rest of `test_090` and all of the other two modules
+  read the production artifact structurally; if the measured footprint (step
+  11) moves a percentile they derive a threshold from, stop and hand back
+  rather than editing them.
 **Explicitly out of scope** (an edit here means the item has overrun; these are
 stated as prose rather than as **Asserts against** entries because they carry no
 acceptance criterion, and a pin that carries no AC only adds cross-spec
@@ -1091,7 +1191,7 @@ validation round fails on them, not on new code, unless they are handled):
 | `test_120_leave_one_out_offset.py::test_ac29_reference_verse_v1_unchanged` | Imports `test_098`'s literal to assert the artifact is untouched, explicitly "item 123's, not item 120's". | Delete (AC34). Authorised. |
 | `test_120_leave_one_out_offset.py::test_ac16_default_max_offset_mm_still_15` | Asserts `_DEFAULT_MAX_OFFSET_MM == 15.0`, the deferral this item discharges. | Delete. Authorised. |
 | `test_035_default_config.py::test_ac3_max_offset_mm_matches_code_default` | Asserts the config value equals the literal `15.0`. | Re-express against `_DEFAULT_MAX_OFFSET_MM` so it keeps pinning code↔config agreement. Authorised. |
-| `test_093_tptbox_label_convention.py::test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s` | Pins L6's **entire** `feature_stats` against a literal snapshot captured before the July re-key; a re-fit moves at least `spline_offset_mm`. | Narrow to the statistics a re-fit cannot move, naming the exclusions and why. Authorised. Its four sibling AC5 tests stay green unmodified. |
+| `test_093_tptbox_label_convention.py::test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s` | Pins L6's **entire** `feature_stats` **key set** against a literal snapshot captured before the July re-key, skipping only the *value* comparison for `spline_offset_mm`. AC43 makes L6 (never interior in this 80-subject cohort — it is the last level of every sequence it appears in) carry **no** `spline_offset_mm` key at all, so the key-set equality itself fails, not merely a value inside it. Verified: `set(l6_stats)` is missing `spline_offset_mm` entirely against the committed rebuilt artifact. | Assert `set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS) - _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT` — i.e. assert the key's **absence**, not a value skipped while the key remains (AC56). Update the sibling `test_ac5_spline_offset_mm_excluded_from_byte_for_byte_is_the_only_exclusion` and the constant's docstring to say *absence*, not *drift*. Authorised. Its other two sibling AC5 tests (`test_ac5_no_other_level_or_top_level_field_changed`, `test_ac5_reference_verse_v1_json_is_well_formed_after_the_edit`) stay green unmodified. |
 | `test_045_reference_artifact.py::test_ac10_regenerating_reproduces_committed_bytes` | Compares a fresh default build against the committed one; `config_hash` moves with the threshold. | Rebuild `reference_default.json` (step 8). No test edit. |
 | `test_063_reference_intensity.py::{test_ac13_default_cohort_geometric_stats_identical_on_off_intensity, test_ac15_bundled_artifact_regenerates_byte_identically}` | Same cause. | Same. |
 | `test_081_reference_morphology.py::{test_ac12_bundled_default_geometric_and_intensity_stats_identical_on_off_morphology, test_ac17_regenerated_artifact_deterministic_and_matches_committed_within_tolerance}` | Same cause. | Same. `grep -l build_and_write_default tests/` finds this family mechanically — the sweep `insights.md` asks for (item 119, 2026-08-27). |
@@ -1107,7 +1207,10 @@ validation round fails on them, not on new code, unless they are handled):
 | Every schema-validating module (33 reach `serialize_report`) | `stage3OffsetEntry` sets `additionalProperties: false`, so an emitted `is_terminal` fails validation until step 0b. | Red until step 0b; green after. No test edit. |
 | `test_018_per_vertebra_spline_offset.py`, `test_022_stage3_serialisation.py` | Both enumerate offset fields, but `hasattr`-style / `in`-style respectively. | **No change expected** — both additive-safe. `test_022`'s AC8 golden is regenerated (AC27); the test itself is never edited. |
 | `test_042_golden_determinism.py`, `test_089`, `test_094`, `test_098` AC14–AC16, `test_110`, `test_116` | `reports_close` compares key **sets** exactly, so the four added keys per case fail until step 10. | Regenerate the goldens (step 10). No test edit. |
-| `test_039_identity_ordering_alignment_perturbations.py` | Mentions `max_offset_mm` only in a docstring. | **No change expected.** |
+| `test_039_identity_ordering_alignment_perturbations.py::test_ac23_unspecified_target_is_seed_deterministic_and_self_consistent[displace]` and `::test_adv_different_seeds_unspecified_target_stay_self_consistent[displace]` | **Superseded by measurement.** The row below this table previously read "mentions `max_offset_mm` only in a docstring, no change expected" — that undercounted the module's exposure. `DisplacePerturbation()`'s unspecified-target selection (`_choose_label`, uniform over all present labels, no terminal exclusion) draws label 24 (L5, caudal-terminal) at `seed=3` and label 20 (L1, cranial-terminal) at `seed=42`; AC39 makes `MislabelRule` never fire on a terminal offset, so `_designated_rule_fires_reconstructed`'s unconditional "displace must fire" assertion is false exactly on those draws. Verified by running both parametrised cases pre-amendment. | Make the `"displace"` branch of `_designated_rule_fires_reconstructed` terminal-aware (AC55): interior target → fires as before; terminal target → assert no `mislabel` finding names it. **Not** a `synth/` change — constraining `DisplacePerturbation`'s default target selection to interior vertebrae would be a production/corpus-generation behaviour change with downstream corpus implications, and `src/segfacet/synth/**` is explicitly out of scope for this item (see below). Authorised. |
+| `test_119_curve_formulation.py::test_ac21_mislabel_default_threshold_unchanged` | Asserts `_DEFAULT_MAX_OFFSET_MM == 15.0`, item 119's fence proving *it* did not touch the threshold — directly contradicted by AC44. | Delete (AC52), mirroring AC34's retirement of item 120's two equivalent fences; add a retirement comment in the style already used immediately below it in that file, naming this item and AC44 as the value's new owner. Authorised. |
+| `test_065_config_intensity.py::test_ac12_config_hash_matches_committed_reference_default_provenance` and `test_090_reference_derived_defaults.py::test_ac16_load_config_default_path_equals_default_config` | Both pin the pre-123 literal `87c73ab35da9707054b300e15664c391ce50851c5d11490c89125381c1c96ac8`; `config_hash` legitimately moves to `a706a888da4283885a75267f33beffc7070b311dca2f276f785caf6ab61e6ef5` with `max_offset_mm` (AC20). | Replace the literal with `bundled_default_reference().provenance.config_hash` in both (AC53) — the live committed artifact's own recorded hash, not a value that must be hand-updated on every future recalibration. `test_090` already imports `bundled_default_reference` and already uses exactly this pattern one test below (`test_ac16_config_hash_matches_pre_item_snapshot`, against `bundled_production_reference()`); mirror it. Authorised. |
+| `test_044_reference_ingestion.py::test_ac3_spline_offset_populated_for_multi_level_subject` | Builds a 3-level (`L1`/`L2`/`L3`) subject and asserts `spline_offset_mm` present for every level; `L1` and `L3` are now terminal (AC41) and carry no `spline_offset_mm` key at all. Verified: fails on `L1` first. | Assert presence + value-equality for the interior level (`L2`) and explicit absence from `record.features` for the two terminal levels (AC54). Authorised. |
 | `test_105_golden_decision_table.py` (fixture inventory) | Enumerates every non-`.py` fixture under `tests/`; this item adds and removes no fixture. | **No change expected** — the fixture count is untouched. Only the nine `N/M leaf paths unwired` evidence cells move (AC48). |
 | `test_115_stage26_validation.py::test_ac8_no_hardcoded_literal_fence_remains` | Caps the repo at one literal sha256 fence, which must be `test_098`'s. | **No change expected** — AC33 updates that fence's value, adds none. |
 | `test_111_golden_guard.py` | Pins the `.gitattributes` LF coverage of both golden sets. | **No change expected** — every path regenerated here is already pinned; this item adds no fixture. |
@@ -1433,3 +1536,189 @@ statistic — `component_count`, `eigenvalue_ratio`, `extent_x/y/z_mm`,
 `physical_volume_mm3`, `largest_component_fraction` and every `intensity_*`
 field — reproduces the pinned literal exactly), confirming the footprint
 measured at the first hand-back (`spline_offset_mm` alone moves) still holds.
+
+### Validation round 1 — five unauthorised test breakages, reconciled (2026-08-29)
+
+Validation round 1 ran the full suite against `861a4ce` and found five existing
+tests broken by AC35–AC51's implementation that this spec had not authorised or
+prescribed. Each was read in full (test body, the production code it exercises,
+and — for the two seed-based cases — the actual seeded draw) before writing the
+prescriptions below; AC52–AC56 encode them and **Authorised paths**/the
+reconciliation table above now cover all five. None required a production-code
+change beyond what AC35–AC51 already specify — every fix is either a stale-pin
+retirement or a test brought up to date with the terminal-exclusion design
+AC39/AC41/AC42/AC43 already committed to.
+
+1. **`test_119_curve_formulation.py::test_ac21_mislabel_default_threshold_unchanged`
+   (AC52).** This is item 119's own deferral fence — proof *that item* did not
+   touch `_DEFAULT_MAX_OFFSET_MM` — the identical shape to the two fences AC34
+   already retires from `test_120`. It asserts `== 15.0`; AC44 makes that
+   permanently false. Re-expressing it against the constant would just
+   duplicate AC44/AC12's own tests with no distinct meaning left to pin, so it
+   is retired, mirroring AC34's precedent exactly rather than inventing a new
+   resolution shape.
+
+2. **`test_065_config_intensity.py::test_ac12_config_hash_matches_committed_reference_default_provenance`
+   and `test_090_reference_derived_defaults.py::test_ac16_load_config_default_path_equals_default_config`
+   (AC53).** Both hardcode the pre-123 config-hash literal
+   (`87c73ab35da9707054b300e15664c391ce50851c5d11490c89125381c1c96ac8`), which
+   legitimately moved to `a706a888da4283885a75267f33beffc7070b311dca2f276f785caf6ab61e6ef5`
+   once `max_offset_mm` changed (`config_hash` hashes `config.rules`, AC20).
+   Both are re-pointed at `bundled_default_reference().provenance.config_hash`
+   — the committed artifact's own recorded hash, read live — rather than a
+   second hardcoded literal that the *next* recalibration would break again.
+   This is not a new pattern invented for this fix: `test_090` already
+   contains, one test below the broken one,
+   `test_ac16_config_hash_matches_pre_item_snapshot`, which does exactly this
+   against `bundled_production_reference()`. Mirroring an existing sibling
+   test's own established idiom was preferred over hardcoding a second literal
+   in either file.
+
+3. **`test_044_reference_ingestion.py::test_ac3_spline_offset_populated_for_multi_level_subject`
+   (AC54).** Built a 3-level (`L1`–`L3`) subject and asserted `spline_offset_mm`
+   present for every level; `L1` and `L3` are now terminal under AC41 and
+   carry no `spline_offset_mm` key in `record.features` at all — confirmed by
+   running the test, which fails on `L1` first with a `KeyError`-shaped
+   assertion. The test now asserts presence and value-equality for the
+   interior level (`L2`) and explicit absence for the two terminal levels,
+   which documents the interior/terminal split AC41 introduces instead of
+   contradicting it — the same shape AC43 already asserts at the cohort level,
+   here at the single-subject unit level test_044 already exercises.
+
+4. **`test_039_identity_ordering_alignment_perturbations.py::test_ac23_unspecified_target_is_seed_deterministic_and_self_consistent[displace]`
+   and `::test_adv_different_seeds_unspecified_target_stay_self_consistent[displace]`
+   (AC55).** This one needed a real design decision, not a mechanical update,
+   and both `src/segfacet/synth/identity_ordering_alignment.py` and the test
+   were read to make it. `DisplacePerturbation()`'s unspecified-target
+   selection (`_choose_label`, `seeded_rng(seed).integers(0, len(labels))`,
+   uniform over **all** present labels with no terminal exclusion) draws, on
+   the default 5-level (`L1`–`L5`, labels 20–24) clean spine: label 24 (`L5`,
+   caudal-terminal) at `seed=3`; label 22 (`L3`, interior) at `seed=1`; label
+   20 (`L1`, cranial-terminal) at `seed=42`. Verified directly:
+   `np.random.default_rng(3).integers(0, 5) == 4`,
+   `np.random.default_rng(42).integers(0, 5) == 0`. AC39 makes `MislabelRule`
+   never fire an offset finding on a terminal vertebra, so the helper's
+   unconditional "the designated rule must fire" assertion is now false
+   exactly on the two draws that land on an end.
+   - **Option considered and rejected: constrain `DisplacePerturbation`'s
+     default target selection to interior vertebrae.** This would keep the
+     test's original assertion true unconditionally, but it is a production
+     change to corpus-generating code with real downstream reach — every
+     existing seed/case relying on `_choose_label`'s current draw (including
+     any committed corpus fixture built with an unspecified target) could
+     silently pick a different vertebra, and `src/segfacet/synth/**` is
+     explicitly listed **out of scope** for this item precisely to keep item
+     123 from reaching into items 119–122's and the corpus's territory. Widening
+     that scope for a test-reconciliation fix would be the tail wagging the
+     dog.
+   - **Decision: make the test terminal-aware instead.** The helper
+     (`_designated_rule_fires_reconstructed`'s `"displace"` branch) now reads
+     the reconstructed record's `is_terminal` flag for the drawn target: an
+     interior target must still fire `mislabel` exactly as before; a terminal
+     target must fire **no** offset finding for it. This is not a weakened
+     test — it asserts the actual contract AC39 commits to (terminal vertebrae
+     are never flagged, regardless of magnitude) using the *real* seeded draw
+     rather than a draw constrained to avoid ever exercising that contract.
+     Only the shared helper's `"displace"` branch changes; `"relabel_swap"`'s
+     branch, every explicit-target test (label 22/`L3` is always interior in
+     the 5-level default spine, so AC1–AC22, AC24 and the adversarial
+     interior-target test are all unaffected), and every other test in the
+     module are untouched.
+
+5. **`test_093_tptbox_label_convention.py::test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s`
+   (AC56) — clarified.** The row already in this item's reconciliation table
+   said "narrow to the statistics a re-fit cannot move" but that undersold what
+   changed: the test's key-set assertion
+   (`set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS)`) requires
+   `spline_offset_mm` to still be a **key** in `l6_stats`, only skipping its
+   *value* comparison. Checked directly against the committed, rebuilt
+   `reference_verse_v1.json`: `"spline_offset_mm" not in
+   dist.levels["L6"]["all"].feature_stats` — the key is **absent entirely**,
+   because `L6` is the caudal-most (last) level of every subject sequence it
+   appears in in this 80-subject cohort, so it has zero interior occurrences
+   and AC43's "a level with no interior occurrence carries no
+   `spline_offset_mm` entry" applies to it directly. The fix is therefore to
+   assert the key's *absence* (`set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS)
+   - _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT`), not merely to keep skipping a
+   value inside a key that no longer exists. The sibling test naming the
+   exclusion (`test_ac5_spline_offset_mm_excluded_from_byte_for_byte_is_the_only_exclusion`)
+   and its constant's docstring/comment are updated to say *absence*, not
+   *drift*, so a future reader is not misled into expecting a changed value
+   they will not find.
+
+### Three further findings recorded for the builder, not the spec (2026-08-29)
+
+None of the three below changes an Acceptance Criterion — AC35–AC51 already
+commit to the behaviour each one is measured against — so nothing here is a
+spec amendment beyond this record. They are the builder's to fix (or, for the
+third, to confirm needs no fix) before validation round 2.
+
+- **`compute_leave_one_out_spline_offsets` crashes on a 1-level subject,
+  contradicting AC37.** AC37 requires "for a sequence of one or two
+  centroids, every returned record has `is_terminal` `True`". Reproduced
+  directly: `compute_leave_one_out_spline_offsets([single_centroid])` raises
+  `ValueError: fit_centroid_spline requires at least 2 centroids to define a
+  curve, but received 1.` The function calls `fit_centroid_spline(centroids,
+  backend=backend)` unconditionally (to build the reference fit for the
+  dominant-outlier search) *before* its own `if n_points <
+  _MIN_LEVELS_FOR_HELD_OUT: return compute_spline_offsets(...)` short-circuit,
+  so the guard never has a chance to run for `n_points == 1` — `n_points == 2`
+  and `3` both work today because `fit_centroid_spline` tolerates 2+ points.
+  The builder must move (or duplicate) the `n_points` check ahead of the
+  `fit_centroid_spline` call and decide what a single-centroid record's
+  `offset_mm` means with no curve to measure against (`0.0` is the
+  defensible reading — there is nothing to be offset from — and is consistent
+  with `compute_spline_offsets`' own `n_points <= 2` terminal-marking branch,
+  which this function's fallback already delegates to for `n_points` 2–3).
+  This is a real gap against a committed AC, not a hypothetical: a real VerSe
+  subject with exactly one recognised level would hit it today.
+- **`scripts/rebuild_verse_reference.py`'s collision handling degrades to an
+  uncaught crash rather than a structured skip on a real collision.**
+  `stage_cohort` does correctly append to its own `collisions` list and
+  `continue` past the *duplicate* mask it detects — but "duplicate" is decided
+  by iteration order over `sorted(root.rglob(...))`, which is lexicographic
+  over the full path string, not by which mask actually has a matching CT.
+  Reproduced directly: `test_123_recalibrate_and_regenerate.py`'s own
+  `test_adv_subject_id_collision_after_suffix_stripping_is_recorded_not_overwritten`
+  crashes with `ValueError: Scan and segmentation have mismatched shapes` when
+  run — the mask staged as the "survivor" (because its path sorts first,
+  `.../sub-verse000/dup/...` < `.../sub-verse000/sub-verse000_seg...`
+  lexicographically) is a different spine than the one whose CT the tool then
+  finds by `subject_id` (which matches both) and stages as its sibling,
+  producing a genuinely mismatched pair that `ingest_cohort` cannot ingest.
+  `main()` does not catch this, so the run crashes instead of returning `0`
+  with a structured skip — the collision *is* recorded in
+  `collisions`, but too late to prevent building an invalid pairing from it.
+  The test meant to pin this only checks
+  `summary["cohort"].get("collisions")` when `summary["cohort"]["mask_count"]
+  == 1`; `mask_count` is `len(masks)` (both masks are discovered, `== 2`), so
+  that branch never runs and the test does not currently catch its own
+  scenario either. On the real 80-subject VerSe19 cohort this pathway is
+  believed unreached (the completed rebuild recorded above discovered exactly
+  80 masks for 80 case ids with zero collisions), so it does not affect the
+  committed artifacts, but it is a real defect in newly-shipped tool code the
+  builder must fix (verify the mask has a matching CT *before* preferring it
+  as the collision survivor, or record the collision as fatal to that
+  subject's staging rather than an informational note) and the test must be
+  strengthened to actually exercise the `mask_count == 2` collision path
+  rather than only a hypothetical `mask_count == 1` one.
+- **Reported curvature drift investigated: not reproducible at HEAD; AC25/AC26
+  stand.** Investigated whether any change authorised by this item could
+  legitimately move `features.stage3.curvature.coronal_curvature_deg` (or any
+  other curvature leaf), since no authorised path under
+  `src/segfacet/features/` other than `spline_offset.py` is touched, and
+  `spline_offset.py`'s only change (the additive `is_terminal` field) has no
+  back-effect on the spline fit or the curvature reduction items 121/122
+  compute independently of it. Checked directly at `861a4ce`: a fresh
+  `write_goldens()` run into a scratch directory, diffed leaf-by-leaf against
+  every committed corpus golden, shows **zero** differing leaves anywhere
+  under `features.stage3.curvature` (or anywhere else) in any of the nine
+  cases; `test_022_stage3_serialisation.py::test_ac8_golden_snapshot` passes
+  unmodified; and two `write_goldens()` runs into two scratch directories are
+  byte-identical (AC24). So at this commit there is no curvature drift to
+  reconcile — AC25/AC26 hold exactly as specified. If validation round 2 still
+  observes a curvature diff, it is a regeneration defect (a stale cached
+  build artifact, a non-hermetic test order, or similar) for the builder to
+  fix, not a legitimate consequence of this item's design — nothing in
+  AC1–AC56 authorises a curvature change, and this investigation found no
+  mechanism by which one could occur.
