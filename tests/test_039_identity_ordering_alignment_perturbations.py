@@ -153,16 +153,26 @@ def _designated_rule_fires_reconstructed(operator_name, labelmap, expectation):
     if operator_name == "displace":
         (target,) = expectation.expected_labels
         loo = _loo_offset(labelmap, target)
+        target_is_terminal = False
         for entry in record["stage3"]["per_label_offsets"]:
             if entry["label"] == target:
                 entry["offset_mm"] = loo
+                target_is_terminal = bool(entry.get("is_terminal"))
         findings = MislabelRule().evaluate(record, cfg)
-        return any(
+        fires = any(
             f.rule_id == "mislabel"
             and f.reason.startswith("Vertebra misaligned from spinal curve:")
             and f.labels == frozenset({target})
             for f in findings
         )
+        if target_is_terminal:
+            # AC39 (docs/aide/items/123-recalibrate-and-regenerate-
+            # downstream-artifacts.md): mislabel never fires an offset
+            # finding on a terminal vertebra, regardless of magnitude -- the
+            # designated rule NOT firing here is the exclusion working as
+            # designed, not a self-consistency failure (AC55).
+            return not fires
+        return fires
     if operator_name == "relabel_swap":
         pairs = _reconstruct_mono_pairs(labelmap)
         record["stage3"]["monotonic_consistency"]["non_monotonic_pairs"] = [

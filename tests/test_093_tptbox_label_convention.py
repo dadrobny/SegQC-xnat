@@ -412,21 +412,30 @@ def test_ac5_l6_level_name_is_l6():
 
 
 #: Item 123 (docs/aide/items/123-recalibrate-and-regenerate-downstream-
-#: artifacts.md) rebuilds ``reference_verse_v1.json`` from the real VerSe19
-#: cohort under item 120's held-out ``spline_offset_mm`` estimator -- a
-#: deliberate re-*fit* of that one feature, not the re-*key* this AC5
-#: originally pinned byte-for-byte. ``spline_offset_mm`` is excluded from the
-#: byte-for-byte comparison for exactly that reason (per the item 123
-#: Assumptions, "Item 093's AC5 snapshot is narrowed, not deleted"); every
-#: other statistic in ``_PRE_RENAME_S_FEATURE_STATS`` is geometry/intensity/
-#: morphology, which item 123 does not touch, so it stays pinned exactly.
+#: artifacts.md) excludes a level's ``spline_offset_mm`` statistic entirely
+#: when that level has zero **interior** occurrences across the cohort
+#: (AC41/AC43) -- not a drifted *value* skipped from an otherwise-present
+#: key, an outright **absence** of the key itself. ``L6`` is the caudal-most
+#: (last) level of every subject sequence it appears in across this
+#: 80-subject cohort, so it is never interior and its rebuilt
+#: ``feature_stats`` carries no ``spline_offset_mm`` entry at all (verified
+#: directly against the committed, rebuilt ``reference_verse_v1.json``,
+#: AC56). Every other statistic in ``_PRE_RENAME_S_FEATURE_STATS`` is
+#: geometry/intensity/morphology, which item 123 does not touch, so it stays
+#: pinned exactly.
 _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT = frozenset({"spline_offset_mm"})
 
 
 def test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s():
+    """``spline_offset_mm`` is not merely skipped while remaining a key --
+    it is absent from ``l6_stats`` entirely (AC56), so the key-set equality
+    itself is asserted against the pre-rename set with that one key
+    subtracted, rather than an unconditional equality plus a per-feature
+    skip that would silently pass even if the key had stayed present."""
     dist = bundled_production_reference()
     l6_stats = dist.levels["L6"][ALL_STRATUM].feature_stats
-    assert set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS)
+    assert set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS) - _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT
+    assert "spline_offset_mm" not in l6_stats
     for feature_name, expected in _PRE_RENAME_S_FEATURE_STATS.items():
         if feature_name in _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT:
             continue
@@ -435,11 +444,20 @@ def test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s():
 
 
 def test_ac5_spline_offset_mm_excluded_from_byte_for_byte_is_the_only_exclusion():
-    """The item-123 narrowing removes exactly one feature from the
-    byte-for-byte set -- every other pre-rename statistic is still checked."""
+    """The item-123 narrowing removes exactly one feature -- as an absent
+    key, not a value skipped from an otherwise-present one (AC56) -- from
+    the byte-for-byte set; every other pre-rename statistic is still
+    checked."""
     assert _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT == {"spline_offset_mm"}
     still_checked = set(_PRE_RENAME_S_FEATURE_STATS) - _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT
     assert len(still_checked) == len(_PRE_RENAME_S_FEATURE_STATS) - 1
+
+    dist = bundled_production_reference()
+    l6_stats = dist.levels["L6"][ALL_STRATUM].feature_stats
+    assert "spline_offset_mm" not in l6_stats, (
+        "the excluded feature must be an ABSENT key, not a present key whose "
+        "value comparison is merely skipped"
+    )
 
 
 def test_ac5_no_other_level_or_top_level_field_changed():

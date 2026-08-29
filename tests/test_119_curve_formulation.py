@@ -690,10 +690,16 @@ def test_ac20_diff_against_committed_goldens_stays_under_stage3(tmp_path):
 # =========================================================================== #
 
 
-def test_ac21_mislabel_default_threshold_unchanged():
-    from segfacet.heuristics.mislabel import _DEFAULT_MAX_OFFSET_MM
-
-    assert _DEFAULT_MAX_OFFSET_MM == 15.0
+#: ``test_ac21_mislabel_default_threshold_unchanged`` pinned
+#: ``_DEFAULT_MAX_OFFSET_MM == 15.0`` here as evidence item 119 did not touch
+#: the threshold and is retired: item 123 recalibrates
+#: ``_DEFAULT_MAX_OFFSET_MM`` to ``13.0`` mm by design (AC44,
+#: docs/aide/items/123-recalibrate-and-regenerate-downstream-artifacts.md),
+#: making this fence's assertion permanently false rather than merely stale.
+#: The same shape item 120's two equivalent fences were retired in
+#: (``test_120_leave_one_out_offset.py``, item 123's AC34); the value's new
+#: owner is item 123's AC12/AC44. Retired per that item's Authorised paths
+#: (AC52, human decision 2026-08-29).
 
 
 #: ``test_ac21_no_regenerated_golden_offset_reaches_2mm`` pinned the pre-120

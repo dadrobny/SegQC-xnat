@@ -190,9 +190,15 @@ def _no_traceback(text: str) -> bool:
 
 
 def _walk_tree(root: Path) -> dict:
-    """Map of relative path -> mtime_ns for every file beneath *root*."""
+    """Map of relative path -> mtime_ns for every file beneath *root*.
+
+    ``.as_posix()``, never a bare ``str()`` of a ``relative_to(...)`` result
+    -- conventions.md §6: a relative Path rendered with ``str()`` carries the
+    OS-native separator, so the same tree would hash/compare differently on
+    Windows even though nothing about the tree actually changed.
+    """
     return {
-        str(p.relative_to(root)): p.stat().st_mtime_ns
+        p.relative_to(root).as_posix(): p.stat().st_mtime_ns
         for p in sorted(root.rglob("*"))
         if p.is_file()
     }
@@ -235,22 +241,51 @@ def _distribution(levels: dict) -> ReferenceDistribution:
     )
 
 
+#: The item's own recorded/suggested base -- its Validation section diffs
+#: against exactly this ref (``git diff aide/queue-017 -- tests/corpus/golden``,
+#: ``git diff aide/queue-017 --stat``). ``main`` is stale relative to it: this
+#: item's queue (queue-017) stacks its items on a queue branch that is not yet
+#: merged to ``main`` (this repo's stacked-queue shape, .aide/README.md), so
+#: ``git merge-base HEAD main`` resolves to a commit from *before* items
+#: 119-122 landed -- diffing against it would surface those items' legitimate
+#: golden changes (item 121's spline_tangent keys, item 122's curvature
+#: values) as if item 123 had caused them. ``aide/queue-017``'s tip already
+#: carries 119-122 and nothing of 123, which is the actual pre-123 state.
+_RECORDED_BASE_BRANCH = "aide/queue-017"
+_BASE_BRANCH_FALLBACK = "main"
+
+
 def _pre_123_base_rev():
-    """The commit item 123's branch diverged from ``main``, so ``git show
-    <rev>:<path>`` reads the pre-123 committed state. Returns ``None`` (never
-    raises) if git is unavailable to the test runner -- AC25/AC26 fall back
-    to the weaker text-only assertion in that case (Testing Strategy)."""
-    try:
-        result = subprocess.run(
-            ["git", "merge-base", "HEAD", "main"],
-            cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=10,
-        )
-    except Exception:
-        return None
-    if result.returncode != 0:
-        return None
-    rev = result.stdout.strip()
-    return rev or None
+    """``git merge-base HEAD <base>`` against the item's recorded base
+    (``aide/queue-017``), falling back to ``main`` only if that ref cannot be
+    resolved at all (e.g. a shallow clone / CI checkout that never fetched
+    the queue branch) -- never silently against the wrong ancestor. Returns
+    ``None`` (never raises) if git is unavailable to the test runner
+    entirely -- AC25/AC26 fall back to the weaker text-only assertion in that
+    case (Testing Strategy)."""
+    for base in (_RECORDED_BASE_BRANCH, _BASE_BRANCH_FALLBACK):
+        try:
+            verify = subprocess.run(
+                ["git", "rev-parse", "--verify", "--quiet", base],
+                cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=10,
+            )
+        except Exception:
+            continue
+        if verify.returncode != 0:
+            continue
+        try:
+            result = subprocess.run(
+                ["git", "merge-base", "HEAD", base],
+                cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=10,
+            )
+        except Exception:
+            continue
+        if result.returncode != 0:
+            continue
+        rev = result.stdout.strip()
+        if rev:
+            return rev
+    return None
 
 
 def _git_show_json(rev: str, relpath: str):
