@@ -242,7 +242,27 @@ mechanically checkable instead of a claim in prose.
   the `features` list is a cohort-level vocabulary and stays complete, but a
   **level** with no interior occurrence at all carries no `spline_offset_mm`
   entry in its own `feature_stats` — AC43. That is a per-level absence, not a
-  vocabulary change, and every other feature's per-level coverage is unchanged.)*
+  vocabulary change.)* *(Amended again 2026-08-29, third round — correcting a
+  factually wrong claim in the previous amendment: "every other feature's
+  per-level coverage is unchanged" is **false**. Measured leaf-by-leaf against
+  the pre-123 committed artifact (`git show` of the `aide/queue-017` base):
+  **every one of the 25 levels' 13 `intensity_*` statistics also moved** —
+  `intensity_mean`, `intensity_median`, `intensity_std`, `intensity_min`,
+  `intensity_max`, `intensity_p05`, `intensity_p25`, `intensity_p50`,
+  `intensity_p75`, `intensity_p95`, `intensity_range`, `intensity_iqr`,
+  `intensity_entropy` — because this item's rebuild finds a CT sibling for
+  every one of the 80 subjects (`subjects_without_scan == []` in
+  `verse_rebuild_summary.json`), where the pre-123 (2026-07-17) artifact's
+  intensity `count` was a strict subset of each level's `record_count`
+  everywhere (e.g. `L1`: `47` of `59`; `T1`: `15` of `37`) — a **legitimately
+  more complete** scan-discovery footprint, not a defect (see the Decisions
+  log's "Third-round correction" entry for the verified cause and why it is
+  not a mispairing bug). No **geometric** feature
+  (`physical_volume_mm3`, `extent_x_mm`, `extent_y_mm`, `extent_z_mm`,
+  `component_count`, `eigenvalue_ratio`, `largest_component_fraction`) moved
+  on any level, no level's `record_count` moved, and no level was added or
+  removed — coverage is unchanged for every feature **except**
+  `spline_offset_mm` (AC43) and the 13 `intensity_*` features named above.)*
 
 - [ ] **AC20: The artifact's config hash is the current config's.**
   `provenance.config_hash` equals
@@ -502,20 +522,41 @@ behind each prescription._
   pass unmodified apart from this one shared helper. No other operator's
   branch (`"relabel_swap"`) changes.
 
-- [ ] **AC56: The L6 byte-for-byte narrowing test asserts absence, not a
-  skipped value.**
+- [ ] **AC56: The L6 byte-for-byte narrowing test asserts the true, measured
+  footprint.** *(Amended 2026-08-29, third round: the footprint below was
+  re-measured leaf-by-leaf and is wider than the previous text stated — see
+  AC19's third-round correction and the Decisions log.)*
   `tests/test_093_tptbox_label_convention.py::test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s`
   asserts `set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS) -
-  _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT`, i.e. that `spline_offset_mm` is
-  **absent** from `L6`'s rebuilt `feature_stats` (L6 has no interior
-  occurrence in the 80-subject cohort — AC43), not merely that its value is
-  skipped from the byte comparison while the key stays present. The sibling
-  test `test_ac5_spline_offset_mm_excluded_from_byte_for_byte_is_the_only_exclusion`
-  and its constant's docstring are updated to state the exclusion is
-  *absence*, not *drift*. The module's two other AC5 tests
-  (`test_ac5_no_other_level_or_top_level_field_changed`,
+  _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT`, where
+  `_AC5_FEATURES_MOVED_BY_ITEM_123_REFIT` is widened to the **14-element**
+  set `{"spline_offset_mm", "intensity_mean", "intensity_median",
+  "intensity_std", "intensity_min", "intensity_max", "intensity_p05",
+  "intensity_p25", "intensity_p50", "intensity_p75", "intensity_p95",
+  "intensity_range", "intensity_iqr", "intensity_entropy"}` (the 13 names are
+  exactly `segfacet.reference.ingest.INGESTED_INTENSITY_FEATURES`). All 14
+  keys are **absent** from `L6`'s rebuilt `feature_stats`: `spline_offset_mm`
+  because `L6` has no interior occurrence in the 80-subject cohort (AC43),
+  and every `intensity_*` key because this cohort's `L6` subjects (3 of them)
+  did not all have a paired scan staged in the pre-123 build's ingestion —
+  a per-key **absence**, not merely a skipped value while the key stays
+  present. Every other key in `_PRE_RENAME_S_FEATURE_STATS`
+  (`component_count`, `eigenvalue_ratio`, `extent_x_mm`, `extent_y_mm`,
+  `extent_z_mm`, `physical_volume_mm3`, `largest_component_fraction`) is
+  still present and still byte-for-byte identical to the pinned literal —
+  verified directly against the committed rebuilt artifact. The sibling test
+  `test_ac5_spline_offset_mm_excluded_from_byte_for_byte_is_the_only_exclusion`
+  is renamed/updated to name and count the widened 14-key exclusion set (no
+  longer "the only exclusion" — its assertion becomes "these are the only
+  14 exclusions"), and its constant's docstring is updated to state the
+  exclusion is *absence*, driven by two distinct causes (an interior-only
+  feature definition for `spline_offset_mm`; incomplete scan coverage in the
+  pre-123 build for every `intensity_*` feature), not *drift*. The module's
+  two other AC5 tests (`test_ac5_no_other_level_or_top_level_field_changed`,
   `test_ac5_reference_verse_v1_json_is_well_formed_after_the_edit`) are
-  unchanged.
+  unchanged — they assert level presence and file well-formedness, not a
+  byte-for-byte value comparison, so the widened footprint does not reach
+  them.
 
 ## Assumptions  <!-- MANDATORY -->
 
@@ -674,8 +715,10 @@ the most defensible default and recorded here for audit at the queue boundary.
   edit, not about the current artifact. After a deliberate re-fit the
   byte-for-byte assertion asserts a state that no longer exists, so it is
   narrowed to the features a re-fit cannot move, with the excluded features named
-  and the reason stated in the test. If the measured footprint turns out to be
-  `spline_offset_mm` alone, only that key is excluded.
+  and the reason stated in the test. *(Measured, third round, 2026-08-29: the
+  footprint is not `spline_offset_mm` alone — it is that key plus all 13
+  `intensity_*` features, 14 in total. See AC19/AC56's third-round correction
+  and the Decisions log for the measurement and its verified cause.)*
 - **`test_098`'s digest fence is updated, not retired.**
   [`docs/aide/golden-decision-table.md`](../golden-decision-table.md) carries a
   human-signed row for `src/segfacet/reference/reference_verse_v1.json` whose
@@ -1028,10 +1071,13 @@ the rebuild is re-run, because they change what the rebuild measures.
 - `tests/test_045_reference_artifact.py`, `tests/test_063_reference_intensity.py`,
   `tests/test_081_reference_morphology.py` — read, not changed. Their five
   "rebuild and compare to committed" tests are satisfied by AC21's rebuild.
-- `tests/test_090_reference_derived_defaults.py`,
-  `tests/test_097_stage17_validation.py`, `tests/test_049_reference_integration.py`
-  — read, not changed **except** `test_090`'s one test named under **May
-  change** (AC53). The rest of `test_090` and all of the other two modules
+- `tests/test_097_stage17_validation.py`, `tests/test_049_reference_integration.py`
+  — read, not changed. *(`test_090_reference_derived_defaults.py` is listed
+  under **May change** above, not here — this item's mechanical `aide scope`
+  check treats a path listed under both sections as a contradiction
+  regardless of prose carve-outs, so it must appear in exactly one. Its one
+  authorised test is AC53's; the rest of that module is unchanged in spirit,
+  just not re-asserted here.)* Both of these two modules
   read the production artifact structurally; if the measured footprint (step
   11) moves a percentile they derive a threshold from, stop and hand back
   rather than editing them.
@@ -1191,7 +1237,7 @@ validation round fails on them, not on new code, unless they are handled):
 | `test_120_leave_one_out_offset.py::test_ac29_reference_verse_v1_unchanged` | Imports `test_098`'s literal to assert the artifact is untouched, explicitly "item 123's, not item 120's". | Delete (AC34). Authorised. |
 | `test_120_leave_one_out_offset.py::test_ac16_default_max_offset_mm_still_15` | Asserts `_DEFAULT_MAX_OFFSET_MM == 15.0`, the deferral this item discharges. | Delete. Authorised. |
 | `test_035_default_config.py::test_ac3_max_offset_mm_matches_code_default` | Asserts the config value equals the literal `15.0`. | Re-express against `_DEFAULT_MAX_OFFSET_MM` so it keeps pinning code↔config agreement. Authorised. |
-| `test_093_tptbox_label_convention.py::test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s` | Pins L6's **entire** `feature_stats` **key set** against a literal snapshot captured before the July re-key, skipping only the *value* comparison for `spline_offset_mm`. AC43 makes L6 (never interior in this 80-subject cohort — it is the last level of every sequence it appears in) carry **no** `spline_offset_mm` key at all, so the key-set equality itself fails, not merely a value inside it. Verified: `set(l6_stats)` is missing `spline_offset_mm` entirely against the committed rebuilt artifact. | Assert `set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS) - _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT` — i.e. assert the key's **absence**, not a value skipped while the key remains (AC56). Update the sibling `test_ac5_spline_offset_mm_excluded_from_byte_for_byte_is_the_only_exclusion` and the constant's docstring to say *absence*, not *drift*. Authorised. Its other two sibling AC5 tests (`test_ac5_no_other_level_or_top_level_field_changed`, `test_ac5_reference_verse_v1_json_is_well_formed_after_the_edit`) stay green unmodified. |
+| `test_093_tptbox_label_convention.py::test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s` | Pins L6's **entire** `feature_stats` **key set** against a literal snapshot captured before the July re-key. AC43 makes L6 (never interior in this 80-subject cohort — it is the last level of every sequence it appears in) carry **no** `spline_offset_mm` key at all. *(Third-round correction: this row previously understated the footprint as `spline_offset_mm` alone. Re-measured leaf-by-leaf against the pre-123 committed artifact: L6's `intensity_count` also moved `1 -> 3` — this item's rebuild finds a scan for all 3 of L6's subjects, where the pre-123 build found one — so all 13 `intensity_*` keys are **also** absent from the rebuilt `feature_stats`, not just `spline_offset_mm`. Verified against the committed rebuilt artifact: `set(l6_stats)` is missing all 14 keys, and every other key — `component_count`, `eigenvalue_ratio`, `extent_x_mm`, `extent_y_mm`, `extent_z_mm`, `physical_volume_mm3`, `largest_component_fraction` — is present and byte-identical to the pinned literal.)* | Assert `set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS) - _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT`, with `_AC5_FEATURES_MOVED_BY_ITEM_123_REFIT` widened to the 14-element set named in AC56 (`spline_offset_mm` plus the 13 `INGESTED_INTENSITY_FEATURES` names) — i.e. assert every one of the 14 keys' **absence**, not a value skipped while the key remains (AC56). Update the sibling `test_ac5_spline_offset_mm_excluded_from_byte_for_byte_is_the_only_exclusion` (and its name, since it is no longer "the only" exclusion) and the constant's docstring to say *absence*, driven by two distinct causes, not *drift*. Authorised. Its other two sibling AC5 tests (`test_ac5_no_other_level_or_top_level_field_changed`, `test_ac5_reference_verse_v1_json_is_well_formed_after_the_edit`) stay green unmodified — they check level presence and file well-formedness, not a byte-for-byte value comparison. |
 | `test_045_reference_artifact.py::test_ac10_regenerating_reproduces_committed_bytes` | Compares a fresh default build against the committed one; `config_hash` moves with the threshold. | Rebuild `reference_default.json` (step 8). No test edit. |
 | `test_063_reference_intensity.py::{test_ac13_default_cohort_geometric_stats_identical_on_off_intensity, test_ac15_bundled_artifact_regenerates_byte_identically}` | Same cause. | Same. |
 | `test_081_reference_morphology.py::{test_ac12_bundled_default_geometric_and_intensity_stats_identical_on_off_morphology, test_ac17_regenerated_artifact_deterministic_and_matches_committed_within_tolerance}` | Same cause. | Same. `grep -l build_and_write_default tests/` finds this family mechanically — the sweep `insights.md` asks for (item 119, 2026-08-27). |
@@ -1769,3 +1815,94 @@ Both of the two production defects recorded above are fixed.
   collisions (recorded in the completed rebuild's summary), so neither the
   committed `reference_verse_v1.json` nor any other committed artifact is
   affected by this fix.
+
+### Third-round correction, 2026-08-29 — the "only spline_offset_mm moved" claim was wrong
+
+**What was wrong.** Every prior round of this Decisions log (the original
+implementation, the terminal-vertebra-exclusion round, and the round-2
+builder-fixes round) stated or implied that `spline_offset_mm` was the only
+feature this item's rebuild moved on the committed `reference_verse_v1.json`,
+and the spec text derived from that claim (pre-amendment AC19, AC56, and the
+`test_093` reconciliation-table row) said so explicitly. That claim is
+**factually wrong**, caught by validation round 2 turning up one red test
+(`test_093_tptbox_label_convention.py::test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s`)
+whose failure was not explained by the narrow `spline_offset_mm` exclusion
+already carved out for it.
+
+**What is true, measured leaf-by-leaf.** Diffing the committed
+`reference_verse_v1.json` at this commit against the pre-123 committed
+version (`git show 51d8e41:src/segfacet/reference/reference_verse_v1.json`,
+the `aide/queue-017` merge-base) for **every** level, not just `L6`:
+
+- **All 13 `intensity_*` statistics moved on every one of the 25 levels** —
+  `intensity_mean`, `intensity_median`, `intensity_std`, `intensity_min`,
+  `intensity_max`, `intensity_p05`, `intensity_p25`, `intensity_p50`,
+  `intensity_p75`, `intensity_p95`, `intensity_range`, `intensity_iqr`,
+  `intensity_entropy` (exactly `segfacet.reference.ingest.
+  INGESTED_INTENSITY_FEATURES`). On every level, each statistic's `count` in
+  the pre-123 artifact was a strict subset of that level's `record_count`
+  (e.g. `L1`: `47` of `59`; `C1`/`C2`/`C3`/`C4`: `1` of `13`; `T1`: `15` of
+  `37`; `L6`: `1` of `3`); in the current artifact every level's intensity
+  `count` equals its `record_count` exactly — every subject now contributes
+  intensity statistics, none did not.
+- **`spline_offset_mm` moved or was removed on every level**, exactly as
+  already documented (AC18, AC43, AC45): the new held-out estimator (items
+  119/120, never applied to `reference_verse_v1.json` before this item) plus
+  this item's terminal-vertebra exclusion (AC41).
+- **No geometric feature moved on any level**: `physical_volume_mm3`,
+  `extent_x_mm`, `extent_y_mm`, `extent_z_mm`, `component_count`,
+  `eigenvalue_ratio`, `largest_component_fraction` are byte-identical to the
+  pre-123 artifact everywhere they are present.
+- **No level's `record_count` moved, and no level was added or removed** —
+  the discovered mask set and its per-label geometry are exactly as before.
+
+The true footprint is therefore **14 features** (`spline_offset_mm` plus the
+13 `intensity_*` names above), not 1 — AC19 and AC56 are amended above to
+state this, and the `test_093` reconciliation-table row is corrected to
+match, so the test-writer widens `_AC5_FEATURES_MOVED_BY_ITEM_123_REFIT`
+accordingly.
+
+**Verified cause: legitimately more complete scan discovery, not a
+mispairing bug.** Two hypotheses were checked directly:
+
+1. *Improved discovery (confirmed).* This item's
+   `scripts/rebuild_verse_reference.py` discovers each subject's CT by a
+   recursive glob for `<subject_id>_ct.nii.gz` beneath the cohort root, where
+   `subject_id` already carries the split-subject `_split-verseMMM` infix
+   (verified directly: `sub-verse401_split-verse201`'s mask pairs uniquely
+   with `rawdata/sub-verse401/sub-verse401_split-verse201_ct.nii.gz` — one
+   candidate, no ambiguity). The completed rebuild's own
+   `verse_rebuild_summary.json` records `staging.subjects_without_scan ==
+   []`: every one of the 80 subjects on this machine got a scan staged. The
+   pre-123 (2026-07-17) artifact's per-level intensity deficits (the
+   `count < record_count` gaps above) concentrate most heavily among
+   cervical/upper-thoracic levels and are consistent with a fixed subset of
+   subject_ids — most plausibly some or all of the 25 split-subject records
+   — having no scan at all in the pre-123 build: `docs/reference-build.md`'s
+   pre-123 hand-staging recipe (a `for d in derivatives/sub-verse*/` loop
+   keyed on each *parent* directory, copying `${sub}_ct.nii.gz`) never
+   incorporates the split infix into either the mask or the CT filename it
+   copies, so it could not correctly name a split subject's own CT file. The
+   exact historical staging process is not recoverable (no logs from July),
+   but the two directly-checkable facts — this item's discovery finds all 80
+   scans on this machine, and the documented pre-123 recipe cannot correctly
+   name a split subject's CT — are sufficient to explain the deficit as a
+   coverage gap in the old process, not a new one in this item's tool.
+2. *Scan/mask mispairing (ruled out).* A mispairing bug would most plausibly
+   still show up as a **geometric** anomaly (a mask paired with an
+   intensity-only consumer of the wrong grid, or a corrupted/implausible
+   value), since geometry and intensity are extracted from the same
+   `extract_feature_record` call per subject. Measured: zero geometric
+   features moved on any level (above), and a spot check of `L1`'s rebuilt
+   `intensity_min`/`intensity_mean`/`intensity_max` distributions
+   (`{-1284.1, -353.0, -38.4}` / `{173.4, 297.5, 475.4}` / `{1173.1, 1648.8,
+   2584.1}` HU respectively) reads as physiologically plausible CT
+   Hounsfield-unit ranges for bone-adjacent soft tissue and cortical bone,
+   not corrupted or cross-subject data. Both checks are consistent with
+   "more scans found," not "wrong scans paired."
+
+**Disposition: the artifact stands.** Since the wider coverage is legitimate
+and no geometric or mask-pairing defect was found, `reference_verse_v1.json`
+is **not** rebuilt again by this correction — only the spec's prose (AC19,
+AC56, the reconciliation table, and this entry) is corrected to describe it
+accurately.
