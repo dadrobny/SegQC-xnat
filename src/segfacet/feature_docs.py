@@ -286,7 +286,12 @@ GROUP_INTROS: Mapping[str, str] = MappingProxyType(
         "Orientation & Curvature": (
             "Per-vertebra orientation (PCA of the mean-centred, spacing-scaled "
             "voxel cloud) and case-level curvature summaries derived from the "
-            "same fitted spline's local tangent at each vertebra."
+            "same fitted spline's local tangent at each vertebra. Item 121 adds "
+            "a per-vertebra tangent-based orientation proxy -- the fitted "
+            "curve's tangent at each vertebra's own closest point on it, read "
+            "as two wrapped signed in-plane angles -- that actually varies "
+            "across levels where the PCA principal_axis is measured constant "
+            "on the committed corpus; it is not a vertebral coordinate system."
         ),
         "Spacing & Monotonic Consistency": (
             "Inter-vertebra centroid spacing regularity and whether each "
@@ -1672,8 +1677,83 @@ FEATURE_DOCS: Mapping[str, FeatureDoc] = MappingProxyType(
         ),
         'stage3.per_label_orientations[].principal_axis[]': FeatureDoc(
             measures='Per-vertebra orientation via PCA of its voxel cloud.',
-            computation='Eigenvector of the largest eigenvalue of the 3x3 covariance of the mean-centred, spacing-scaled voxel coordinates.',
+            computation=(
+                'Eigenvector of the largest eigenvalue of the 3x3 covariance of the '
+                'mean-centred, spacing-scaled voxel coordinates. Demoted (item 121): '
+                'measured across all nine committed corpus goldens (2026-08-29), every '
+                'per_label_orientations entry satisfies abs(dot(principal_axis, (1,0,0))) '
+                '>= 0.996, and on seven of the nine cases it is exactly [1.0, 0.0, 0.0] '
+                "on every vertebra -- the fixture body's widest side, which never "
+                'discriminates between vertebrae. Prefer spline_tangent_coronal_deg / '
+                'spline_tangent_sagittal_deg as the per-vertebra orientation estimate.'
+            ),
             units='',
+            scale_sensitivity='dimensionless',
+        ),
+        'stage3.per_label_orientations[].spline_closest_u': FeatureDoc(
+            measures=(
+                "Spline parameter (0-1) of the point on the fitted curve nearest this "
+                "vertebra's centroid, evaluated against the shared in-sample fit (item 121)."
+            ),
+            computation=(
+                'compute_spline_offsets(centroids, fit).closest_u for this label -- the '
+                'same coarse-scan-plus-refinement estimator stage3.per_label_offsets[].'
+                'closest_u uses, but against the in-sample fit rather than a held-out '
+                'refit (the two are distinguished by the spline_ prefix on this key).'
+            ),
+            units='',
+            scale_sensitivity='dimensionless',
+        ),
+        'stage3.per_label_orientations[].spline_tangent[]': FeatureDoc(
+            measures=(
+                "Unit-normalised tangent of the fitted spinal curve at this vertebra's "
+                "own closest point on it (item 121) -- an orientation proxy, not a "
+                "vertebral coordinate system."
+            ),
+            computation=(
+                'evaluate_spline_derivative(fit, [spline_closest_u], nu=1), '
+                'unit-normalised and negated when the ordered centroid sequence\'s net '
+                'advance is caudal, so the estimate is invariant to traversal direction. '
+                'Anatomically readable (axis 0 = Right, 1 = Anterior, 2 = Superior) only '
+                'because io.load_volume reorients every volume to axis codes (R, A, S).'
+            ),
+            units='',
+            scale_sensitivity='dimensionless',
+        ),
+        'stage3.per_label_orientations[].spline_tangent_coronal_deg': FeatureDoc(
+            measures=(
+                "Signed coronal (R-S plane) tilt of the fitted spinal curve at this "
+                "vertebra's own closest point on it -- an orientation proxy, not a "
+                "vertebral coordinate system. Varies across levels where "
+                "principal_axis is measured constant on the committed corpus."
+            ),
+            computation=(
+                'degrees(atan2(t_R, t_S)) of spline_tangent, wrapped to (-180, 180] and '
+                'deliberately not unwrapped (unlike stage3.curvature.'
+                'coronal_tangent_angles_deg, this is a single per-vertebra reading, not a '
+                'sequence to accumulate a sweep over). Positive means the curve tilts '
+                "toward the patient's right as it advances cranially. Requires RAS-ordered "
+                'mm centroids (axis 0 = Right, 1 = Anterior, 2 = Superior), guaranteed by '
+                'io.load_volume.'
+            ),
+            units='degrees',
+            scale_sensitivity='dimensionless',
+        ),
+        'stage3.per_label_orientations[].spline_tangent_sagittal_deg': FeatureDoc(
+            measures=(
+                "Signed sagittal (A-S plane) tilt of the fitted spinal curve at this "
+                "vertebra's own closest point on it -- an orientation proxy, not a "
+                "vertebral coordinate system. Varies across levels where "
+                "principal_axis is measured constant on the committed corpus."
+            ),
+            computation=(
+                'degrees(atan2(t_A, t_S)) of spline_tangent, wrapped to (-180, 180] and '
+                'deliberately not unwrapped, the same convention as '
+                'spline_tangent_coronal_deg. Positive means the curve tilts anterior. '
+                'Requires RAS-ordered mm centroids (axis 0 = Right, 1 = Anterior, 2 = '
+                'Superior), guaranteed by io.load_volume.'
+            ),
+            units='degrees',
             scale_sensitivity='dimensionless',
         ),
         'stage3.spacing_consistency.cv_spacing': FeatureDoc(

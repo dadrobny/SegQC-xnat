@@ -429,7 +429,17 @@
           "minItems": 3,
           "maxItems": 3
         },
-        "eigenvalue_ratio": {"type": "number", "description": "Ratio of the largest to the second-largest PCA eigenvalue."}
+        "eigenvalue_ratio": {"type": "number", "description": "Ratio of the largest to the second-largest PCA eigenvalue."},
+        "spline_closest_u": {"type": "number", "description": "Spline parameter (0..1) of this centroid's closest point on the fitted curve (item 121)."},
+        "spline_tangent": {
+          "type": "array",
+          "description": "Unit-normalised, direction-normalised curve tangent at spline_closest_u (item 121).",
+          "items": {"type": "number"},
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "spline_tangent_coronal_deg": {"type": "number", "description": "Signed in-plane tilt in the coronal (R-S) plane at spline_closest_u, wrapped to (-180, 180] (item 121)."},
+        "spline_tangent_sagittal_deg": {"type": "number", "description": "Signed in-plane tilt in the sagittal (A-S) plane at spline_closest_u, wrapped to (-180, 180] (item 121)."}
       }
     },
     "stage3Curvature": {

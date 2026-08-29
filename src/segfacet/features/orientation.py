@@ -24,16 +24,35 @@ Two related descriptors contribute to spinal geometry:
     this module never imports SciPy directly.  Exposed as
     :class:`SpineCurvature` and :func:`compute_spine_curvature`.
 
+**Part C — Per-Vertebra Tangent Orientation (item 121)**
+    A per-vertebra orientation *proxy* that actually varies across levels,
+    unlike Part A's ``principal_axis`` (measured constant, or within 0.996 of
+    the left-right axis, on every committed corpus vertebra). For each
+    centroid, the closest point on the fitted spline (``closest_u``, from
+    :func:`~segfacet.features.spline_offset.compute_spline_offsets`) and the
+    curve tangent there (:func:`~segfacet.features.spline.evaluate_spline_derivative`,
+    ``nu=1``), unit-normalised and direction-normalised the same way as Part
+    B, then read as two wrapped (not unwrapped) signed in-plane angles: a
+    coronal (R-S) and a sagittal (A-S) tilt. It is **not** a vertebral
+    coordinate system -- it says only which way the fitted spinal curve runs
+    at that vertebra's closest point, nothing about the vertebra's own
+    anatomical frame. Exposed as :class:`VertebralTangentOrientation` and
+    :func:`compute_vertebra_tangent_orientations`.
+
 Public API
 ----------
 ``VertebralOrientation``
     Frozen dataclass for per-vertebra PCA orientation.
 ``SpineCurvature``
     Frozen dataclass for global curvature descriptors.
+``VertebralTangentOrientation``
+    Frozen dataclass for per-vertebra tangent-based orientation (item 121).
 ``compute_vertebra_orientations(seg_img, labels, convention=None)``
     Compute per-vertebra orientation for a list of labels.
 ``compute_spine_curvature(fit, centroids)``
     Compute global curvature descriptors along the fitted spline.
+``compute_vertebra_tangent_orientations(fit, centroids, spacing_mm=None, *, backend=None)``
+    Compute per-vertebra tangent-based orientation (item 121).
 """
 
 from __future__ import annotations
@@ -45,15 +64,19 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 import nibabel as nib
 
+from segfacet.backend import Backend
 from segfacet.features.centroids import LabelCentroid
 from segfacet.features.spline import SplineFit, evaluate_spline_derivative
+from segfacet.features.spline_offset import compute_spline_offsets
 from segfacet.labels import LabelConvention
 
 __all__ = [
     "VertebralOrientation",
     "SpineCurvature",
+    "VertebralTangentOrientation",
     "compute_vertebra_orientations",
     "compute_spine_curvature",
+    "compute_vertebra_tangent_orientations",
 ]
 
 
@@ -483,3 +506,154 @@ def compute_spine_curvature(
         sagittal_curvature_deg=sagittal_curvature_deg,
         curvature_plane=curvature_plane,
     )
+
+
+# --------------------------------------------------------------------------- #
+# VertebralTangentOrientation dataclass (item 121, Part C)
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class VertebralTangentOrientation:
+    """Per-vertebra orientation from the fitted spinal curve's tangent.
+
+    This is an orientation **proxy**, not a vertebral coordinate system: it
+    says which way the fitted spinal curve runs at this vertebra's own
+    closest point on it, and nothing about the vertebra's own anatomical
+    frame (superior endplate normal, pedicle axis, and so on). It is measured
+    against the same shared in-sample fit ``compute_spine_curvature`` uses,
+    not item 120's held-out per-level refits: detecting that a vertebra is
+    displaced is ``offset_mm``'s job, and using n held-out refits here would
+    give n mutually inconsistent "spinal curves" within one case.
+
+    Both angle fields hold only under the RAS axis contract: they are
+    anatomically readable -- axis 0 = Right, axis 1 = Anterior, axis 2 =
+    Superior -- only because :func:`segfacet.io.load_volume` reorients every
+    volume to axis codes ``("R", "A", "S")`` and
+    :func:`~segfacet.features.centroids.compute_centroid` derives
+    ``centroid_mm`` as ``centroid_voxel * spacing`` with no affine of its own.
+
+    Attributes
+    ----------
+    label : int
+        The integer label value.
+    level_name : str
+        Anatomical vertebra name, copied from the source ``LabelCentroid``.
+    closest_u : float
+        Spline parameter (0..1) of this centroid's closest point on the
+        fitted curve, from :func:`~segfacet.features.spline_offset.compute_spline_offsets`.
+    tangent : Tuple[float, float, float]
+        Unit-normalised curve tangent at ``closest_u``
+        (:func:`~segfacet.features.spline.evaluate_spline_derivative`,
+        ``nu=1``), direction-normalised to a cranial-to-caudal traversal
+        (negated when the input sequence's net advance is caudal), so the
+        estimate is invariant to the caller's traversal direction.
+    coronal_deg : float
+        Signed in-plane tilt in the coronal (R-S) plane:
+        ``degrees(atan2(t_R, t_S))``, wrapped to ``(-180, 180]`` and
+        deliberately **not** unwrapped -- unlike
+        ``SpineCurvature.coronal_tangent_angles_deg``, this is a per-vertebra
+        reading, not a sequence to accumulate a sweep over. Positive means
+        the curve tilts toward the patient's right as it advances cranially.
+    sagittal_deg : float
+        Signed in-plane tilt in the sagittal (A-S) plane:
+        ``degrees(atan2(t_A, t_S))``, wrapped the same way. Positive means
+        the curve tilts anterior.
+    """
+
+    label: int
+    level_name: str
+    closest_u: float
+    tangent: Tuple[float, float, float]
+    coronal_deg: float
+    sagittal_deg: float
+
+
+def compute_vertebra_tangent_orientations(
+    fit: SplineFit,
+    centroids: Sequence[LabelCentroid],
+    spacing_mm: Optional[Tuple[float, float, float]] = None,
+    *,
+    backend: Optional[Backend] = None,
+) -> List[VertebralTangentOrientation]:
+    """Compute the tangent-based orientation proxy for each centroid (item 121).
+
+    For each centroid, finds its closest point on *fit* (via the public
+    :func:`~segfacet.features.spline_offset.compute_spline_offsets`), reads
+    the curve tangent there
+    (:func:`~segfacet.features.spline.evaluate_spline_derivative`, ``nu=1``),
+    unit-normalises it, applies the same cranial-to-caudal direction
+    normalisation :func:`compute_spine_curvature` uses, and derives two
+    wrapped signed in-plane angles.
+
+    Parameters
+    ----------
+    fit:
+        The fitted spline (from
+        :func:`~segfacet.features.spline.fit_centroid_spline`), shared with
+        :func:`compute_spine_curvature` and
+        :func:`~segfacet.features.consistency.compute_monotonic_consistency`
+        -- not item 120's held-out per-level refits.
+    centroids:
+        Ordered sequence of ``LabelCentroid``. Must be non-empty.
+    spacing_mm:
+        Forwarded to :func:`~segfacet.features.spline_offset.compute_spline_offsets`
+        (unused by this function beyond that forwarding).
+    backend:
+        Optional :class:`~segfacet.backend.Backend` handle, forwarded to
+        :func:`~segfacet.features.spline_offset.compute_spline_offsets` and
+        :func:`~segfacet.features.spline.evaluate_spline_derivative`.
+
+    Returns
+    -------
+    List[VertebralTangentOrientation]
+        One record per centroid, in input order.
+
+    Raises
+    ------
+    ValueError
+        If *centroids* is empty.
+    """
+    n = len(centroids)
+    if n == 0:
+        raise ValueError(
+            "compute_vertebra_tangent_orientations requires at least one "
+            "centroid, but received an empty sequence."
+        )
+
+    offsets = compute_spline_offsets(
+        centroids, fit, spacing_mm=spacing_mm, backend=backend
+    )
+    closest_us = [o.closest_u for o in offsets]
+
+    tangents = evaluate_spline_derivative(fit, closest_us, nu=1, backend=backend)
+    norms = np.linalg.norm(tangents, axis=1, keepdims=True)
+    norms = np.where(norms < 1e-12, 1.0, norms)
+    unit_tangents = tangents / norms
+
+    # Direction normalisation (item 122's rule, reused): negate every
+    # tangent when the ordered sequence's net advance is caudal, so the
+    # estimate is invariant to traversal direction.
+    net_advance_s = float(centroids[-1].centroid_mm[2]) - float(centroids[0].centroid_mm[2])
+    if net_advance_s < 0:
+        normalised_tangents = -unit_tangents
+    else:
+        normalised_tangents = unit_tangents
+
+    results: List[VertebralTangentOrientation] = []
+    for i, c in enumerate(centroids):
+        t = normalised_tangents[i]
+        coronal_deg = math.degrees(math.atan2(float(t[0]), float(t[2])))
+        sagittal_deg = math.degrees(math.atan2(float(t[1]), float(t[2])))
+        results.append(
+            VertebralTangentOrientation(
+                label=c.label,
+                level_name=c.level_name,
+                closest_u=closest_us[i],
+                tangent=(float(t[0]), float(t[1]), float(t[2])),
+                coronal_deg=coronal_deg,
+                sagittal_deg=sagittal_deg,
+            )
+        )
+
+    return results

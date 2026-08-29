@@ -140,6 +140,7 @@ def extract_feature_record(seg_img: "nib.Nifti1Image", config: "HeuristicConfig"
         from segfacet.features.orientation import (
             compute_spine_curvature,
             compute_vertebra_orientations,
+            compute_vertebra_tangent_orientations,
         )
         from segfacet.features.spline import fit_centroid_spline
         from segfacet.features.spline_offset import (
@@ -161,6 +162,7 @@ def extract_feature_record(seg_img: "nib.Nifti1Image", config: "HeuristicConfig"
         stage3_kwargs = {
             "spline_offsets": spline_offsets,
             "orientations": compute_vertebra_orientations(seg_img, labels),
+            "tangent_orientations": compute_vertebra_tangent_orientations(fit, ordered_centroids),
             "curvature": compute_spine_curvature(fit, ordered_centroids),
             "spacing_consistency": compute_spacing_consistency(ordered_centroids),
             "monotonic_consistency": compute_monotonic_consistency(

@@ -707,3 +707,14 @@ decision-table test and every schema-validating module red cannot merge at all.
 Item 120 already regenerated the goldens within this queue on the same
 reasoning. It pre-empts nothing: item 123 regenerates the same files again and
 will simply find them already carrying these keys.
+
+### Implementation note (2026-08-29)
+
+Implemented per the spec's three Decisions with no deviations: `closest_u`
+comes from the public `compute_spline_offsets(centroids, fit)` (`spline_offset.py`
+untouched), angles are wrapped via plain `atan2`→`degrees` with no `np.unwrap`,
+and `principal_axis`'s demotion is carried entirely by its `FEATURE_DOCS` text
+(`STATUS_OVERRIDES` untouched). All measured values matched the spec's
+Testing Strategy table exactly on first computation, including the AC5
+`clean_control` spread (`16.3287°`), AC8/AC9's C-curve angles, and the
+regenerated goldens' `26/93 leaf paths unwired` (AC25).

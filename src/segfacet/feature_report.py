@@ -67,7 +67,11 @@ if TYPE_CHECKING:
     from segfacet.features.geometry import BBox, LabelGeometry
     from segfacet.features.intensity import LabelIntensity
     from segfacet.features.neighbourhood import VertebralNeighbourhood
-    from segfacet.features.orientation import SpineCurvature, VertebralOrientation
+    from segfacet.features.orientation import (
+        SpineCurvature,
+        VertebralOrientation,
+        VertebralTangentOrientation,
+    )
     from segfacet.features.overlap import OverlapPair
     from segfacet.features.relationships import SpineRelationships
     from segfacet.features.spline_offset import VertebralSplineOffset
@@ -241,18 +245,35 @@ def spline_offset_to_dict(o: "VertebralSplineOffset") -> dict:
     }
 
 
-def orientation_to_dict(o: "VertebralOrientation") -> dict:
+def orientation_to_dict(
+    o: "VertebralOrientation",
+    tangent: "Optional[VertebralTangentOrientation]" = None,
+) -> dict:
     """Convert a :class:`~segfacet.features.orientation.VertebralOrientation` to a dict.
 
     ``principal_axis`` is emitted as a 3-element list (the source stores a
     Python tuple; lists are required for JSON compatibility).
+
+    When *tangent* (a
+    :class:`~segfacet.features.orientation.VertebralTangentOrientation`,
+    item 121) is supplied, four additional keys are emitted:
+    ``spline_closest_u``, ``spline_tangent`` (a 3-element list of floats),
+    ``spline_tangent_coronal_deg`` and ``spline_tangent_sagittal_deg``. When
+    ``None`` (the default), the dict carries exactly the four original keys
+    -- backward-compatible with every existing caller.
     """
-    return {
+    d = {
         "label": o.label,
         "level_name": o.level_name,
         "principal_axis": list(o.principal_axis),
         "eigenvalue_ratio": o.eigenvalue_ratio,
     }
+    if tangent is not None:
+        d["spline_closest_u"] = float(tangent.closest_u)
+        d["spline_tangent"] = [float(v) for v in tangent.tangent]
+        d["spline_tangent_coronal_deg"] = float(tangent.coronal_deg)
+        d["spline_tangent_sagittal_deg"] = float(tangent.sagittal_deg)
+    return d
 
 
 def curvature_to_dict(c: "SpineCurvature") -> dict:
@@ -348,6 +369,7 @@ def build_features_block(
     # --- Stage 3 (all optional, item 022) ---
     spline_offsets: "Optional[Sequence[VertebralSplineOffset]]" = None,
     orientations: "Optional[Sequence[VertebralOrientation]]" = None,
+    tangent_orientations: "Optional[Sequence[VertebralTangentOrientation]]" = None,
     curvature: "Optional[SpineCurvature]" = None,
     spacing_consistency: "Optional[SpacingConsistency]" = None,
     monotonic_consistency: "Optional[MonotonicConsistency]" = None,
@@ -388,6 +410,15 @@ def build_features_block(
         :class:`~segfacet.features.orientation.VertebralOrientation` (item 019).
         When non-``None``, serialised as ``stage3.per_label_orientations`` sorted
         by label.
+    tangent_orientations:
+        Optional sequence of
+        :class:`~segfacet.features.orientation.VertebralTangentOrientation`
+        (item 121). When non-``None``, merged into ``stage3.per_label_orientations``
+        entries **by label** (not by index): every ``orientations`` label must
+        have a matching ``tangent_orientations`` entry and vice versa, or
+        ``ValueError`` is raised naming the offending label(s). When ``None``
+        (the default), the ``per_label_orientations`` entries carry exactly
+        their original four keys -- backward-compatible.
     curvature:
         Optional :class:`~segfacet.features.orientation.SpineCurvature` (item 019).
         When non-``None``, serialised as ``stage3.curvature``.
@@ -445,7 +476,7 @@ def build_features_block(
     # Determine whether any Stage 3 data was supplied.
     has_stage3 = any(
         arg is not None
-        for arg in (spline_offsets, orientations, curvature,
+        for arg in (spline_offsets, orientations, tangent_orientations, curvature,
                     spacing_consistency, monotonic_consistency, neighbourhood)
     )
 
@@ -472,10 +503,28 @@ def build_features_block(
             ]
 
         if orientations is not None:
-            stage3["per_label_orientations"] = [
-                orientation_to_dict(o)
-                for o in sorted(orientations, key=lambda o: o.label)
-            ]
+            if tangent_orientations is not None:
+                orientation_labels = {o.label for o in orientations}
+                tangent_labels = {t.label for t in tangent_orientations}
+                if orientation_labels != tangent_labels:
+                    missing = sorted(orientation_labels - tangent_labels)
+                    extra = sorted(tangent_labels - orientation_labels)
+                    raise ValueError(
+                        "build_features_block: tangent_orientations' label set "
+                        f"does not match orientations'. Missing from "
+                        f"tangent_orientations: {missing!r}. Extra in "
+                        f"tangent_orientations: {extra!r}."
+                    )
+                tangent_by_label = {t.label: t for t in tangent_orientations}
+                stage3["per_label_orientations"] = [
+                    orientation_to_dict(o, tangent=tangent_by_label[o.label])
+                    for o in sorted(orientations, key=lambda o: o.label)
+                ]
+            else:
+                stage3["per_label_orientations"] = [
+                    orientation_to_dict(o)
+                    for o in sorted(orientations, key=lambda o: o.label)
+                ]
 
         if curvature is not None:
             stage3["curvature"] = curvature_to_dict(curvature)

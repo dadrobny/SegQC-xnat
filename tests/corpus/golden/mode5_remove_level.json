@@ -483,7 +483,15 @@
             1.0,
             0.0,
             0.0
-          ]
+          ],
+          "spline_closest_u": 5.611895432316293e-07,
+          "spline_tangent": [
+            0.13281520509798184,
+            -7.97659503182659e-17,
+            0.9911408180953809
+          ],
+          "spline_tangent_coronal_deg": 7.632302699691318,
+          "spline_tangent_sagittal_deg": -4.611102901471898e-15
         },
         {
           "eigenvalue_ratio": 1.4407051282051282,
@@ -493,7 +501,15 @@
             1.0,
             0.0,
             0.0
-          ]
+          ],
+          "spline_closest_u": 0.25062189391755657,
+          "spline_tangent": [
+            0.06618952445205346,
+            -1.4389129624698172e-16,
+            0.9978070689531173
+          ],
+          "spline_tangent_coronal_deg": 3.7951549759217276,
+          "spline_tangent_sagittal_deg": -8.262483039199677e-15
         },
         {
           "eigenvalue_ratio": 1.4407051282051282,
@@ -503,7 +519,15 @@
             1.0,
             0.0,
             0.0
-          ]
+          ],
+          "spline_closest_u": 0.7493781060824434,
+          "spline_tangent": [
+            -0.06618952445205362,
+            -8.854848999814257e-17,
+            0.9978070689531173
+          ],
+          "spline_tangent_coronal_deg": -3.7951549759217365,
+          "spline_tangent_sagittal_deg": -5.0846049471998e-15
         },
         {
           "eigenvalue_ratio": 1.4407051282051282,
@@ -513,7 +537,15 @@
             1.0,
             0.0,
             0.0
-          ]
+          ],
+          "spline_closest_u": 0.9999994401419617,
+          "spline_tangent": [
+            -0.13281520545239756,
+            0.0,
+            0.9911408180478884
+          ],
+          "spline_tangent_coronal_deg": -7.632302720179352,
+          "spline_tangent_sagittal_deg": 0.0
         }
       ],
       "spacing_consistency": {

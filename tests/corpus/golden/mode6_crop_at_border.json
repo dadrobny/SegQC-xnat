@@ -590,7 +590,15 @@
             1.0,
             0.0,
             0.0
-          ]
+          ],
+          "spline_closest_u": 5.611895432316293e-07,
+          "spline_tangent": [
+            0.09454538853186002,
+            -0.4724555719421338,
+            0.8762687384861968
+          ],
+          "spline_tangent_coronal_deg": 6.158129789483072,
+          "spline_tangent_sagittal_deg": -28.332100789317373
         },
         {
           "eigenvalue_ratio": 1.4407051282051282,
@@ -600,7 +608,15 @@
             1.0,
             0.0,
             0.0
-          ]
+          ],
+          "spline_closest_u": 0.23703538157913323,
+          "spline_tangent": [
+            0.07819759959122578,
+            0.4017194408780172,
+            0.9124180106940151
+          ],
+          "spline_tangent_coronal_deg": 4.898490368021733,
+          "spline_tangent_sagittal_deg": 23.762935862594247
         },
         {
           "eigenvalue_ratio": 1.4407051282051284,
@@ -610,7 +626,15 @@
             1.0,
             0.0,
             0.0
-          ]
+          ],
+          "spline_closest_u": 0.5000000237085487,
+          "spline_tangent": [
+            -1.0419326007483773e-08,
+            -1.2110108717845035e-07,
+            0.9999999999999927
+          ],
+          "spline_tangent_coronal_deg": -5.969834055997189e-07,
+          "spline_tangent_sagittal_deg": -6.938581189771069e-06
         },
         {
           "eigenvalue_ratio": 1.4407051282051282,
@@ -620,7 +644,15 @@
             1.0,
             0.0,
             0.0
-          ]
+          ],
+          "spline_closest_u": 0.7629646184208668,
+          "spline_tangent": [
+            -0.07819759959122582,
+            -0.4017194408780167,
+            0.9124180106940152
+          ],
+          "spline_tangent_coronal_deg": -4.898490368021735,
+          "spline_tangent_sagittal_deg": -23.76293586259422
         },
         {
           "eigenvalue_ratio": 1.4407051282051282,
@@ -630,7 +662,15 @@
             1.0,
             0.0,
             0.0
-          ]
+          ],
+          "spline_closest_u": 0.9999994401419617,
+          "spline_tangent": [
+            -0.09454538820181368,
+            0.4724555775468811,
+            0.87626873549991
+          ],
+          "spline_tangent_coronal_deg": -6.158129788976367,
+          "spline_tangent_sagittal_deg": 28.33210115481718
         }
       ],
       "spacing_consistency": {
