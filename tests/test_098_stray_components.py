@@ -70,6 +70,7 @@ from segfacet.config import HeuristicConfig, bundled_default_config, default_con
 from segfacet.features.components import ComponentsInfo, compute_components
 from segfacet.feature_report import components_to_dict
 from segfacet.heuristics import run_rules
+from segfacet.heuristics.mislabel import _DEFAULT_MAX_OFFSET_MM
 from segfacet.pipeline import extract_feature_record
 from segfacet.reference import (
     ALL_STRATUM,
@@ -834,6 +835,12 @@ def test_ac14_every_golden_still_validates_against_schema():
 #: ``border`` finding (17.5 mm, AC23). Both moves are the pipeline-detection
 #: promotion documented in docs/aide/items/120-per-vertebra-offset-that-
 #: separates.md; every other case's snapshot is still the frozen pre-098 one.
+#: Item 123 recalibrates ``mislabel``'s ``max_offset_mm`` away from ``15.0``
+#: (docs/aide/items/123-recalibrate-and-regenerate-downstream-artifacts.md,
+#: AC28) -- the two reason strings' ``"(threshold ... mm)"`` clause below is
+#: therefore built from the live ``_DEFAULT_MAX_OFFSET_MM`` rather than a
+#: hardcoded ``15.0``, so this snapshot tracks the recalibrated threshold
+#: without a second guess at its numeric value.
 _PRE_098_GOLDEN_VERDICT_AND_FINDINGS = {
     "clean_control": {"verdict": "pass", "findings": []},
     "mode1_displace": {
@@ -846,7 +853,7 @@ _PRE_098_GOLDEN_VERDICT_AND_FINDINGS = {
                 "reason": (
                     "Vertebra misaligned from spinal curve: label 22 (L3) "
                     "centroid lies 18.7 mm off the fitted spinal curve, "
-                    "predominantly left-right (threshold 15.0 mm)."
+                    f"predominantly left-right (threshold {_DEFAULT_MAX_OFFSET_MM:.1f} mm)."
                 ),
             }
         ],
@@ -916,7 +923,7 @@ _PRE_098_GOLDEN_VERDICT_AND_FINDINGS = {
                 "reason": (
                     "Vertebra misaligned from spinal curve: label 22 (L3) "
                     "centroid lies 17.5 mm off the fitted spinal curve, "
-                    "predominantly anterior-posterior (threshold 15.0 mm)."
+                    f"predominantly anterior-posterior (threshold {_DEFAULT_MAX_OFFSET_MM:.1f} mm)."
                 ),
             },
         ],
@@ -1067,7 +1074,16 @@ def test_ac17_morphology_delta_output_has_no_stray_keys():
 # AC18: reference_verse_v1.json is untouched
 # =========================================================================== #
 
-# Pinned pre-098 sha256 of the committed reference_verse_v1.json artifact.
+# sha256 of the committed reference_verse_v1.json artifact. Originally pinned
+# pre-098; item 123 (docs/aide/items/123-recalibrate-and-regenerate-
+# downstream-artifacts.md, AC33) rebuilds this artifact from the real VerSe19
+# cohort under the item-120 held-out estimator, so this literal now pins the
+# item-123 rebuilt state -- golden-decision-table.md's signed row for this
+# file is "keep" (not CI-regenerable), so the fence stays; only the digest
+# moves, updated by whoever runs the actual rebuild against the real cohort
+# (this literal cannot be computed without it). tests/test_115_stage26_
+# validation.py::test_ac8_no_hardcoded_literal_fence_remains caps the corpus
+# at exactly one such fence, which is this one.
 _PRE_098_REFERENCE_VERSE_V1_SHA256 = (
     "978c63d0367d9dd018f472aaa034740d42a04c47b95ccf0501cc128ad0638826"
 )

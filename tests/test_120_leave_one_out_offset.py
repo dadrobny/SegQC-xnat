@@ -61,7 +61,6 @@ from segfacet.features.spline_offset import (
 )
 import segfacet.heuristics.mislabel  # noqa: F401 -- triggers MislabelRule registration
 from segfacet.heuristics import run_rules
-from segfacet.heuristics.mislabel import _DEFAULT_MAX_OFFSET_MM
 from segfacet.pipeline import extract_feature_record
 from segfacet.synth.clean_gt import build_clean_spine
 from segfacet.synth.corpus import load_manifest
@@ -570,15 +569,6 @@ def test_ac15_non_finite_direction_component_omits_clause_no_exception():
 
 
 # =========================================================================== #
-# AC16: The offset threshold is untouched
-# =========================================================================== #
-
-
-def test_ac16_default_max_offset_mm_still_15():
-    assert _DEFAULT_MAX_OFFSET_MM == 15.0
-
-
-# =========================================================================== #
 # AC17: Both threshold margins hold and are asserted
 # =========================================================================== #
 
@@ -890,28 +880,6 @@ def test_ac28_spline_offset_mm_distribution_has_nonzero_mean():
     assert found_nonzero, (
         "expected at least one level's spline_offset_mm mean to be non-zero "
         "under the held-out estimator"
-    )
-
-
-# =========================================================================== #
-# AC29: reference_verse_v1.json is untouched
-# =========================================================================== #
-
-
-def test_ac29_reference_verse_v1_unchanged():
-    """AC29: reference_verse_v1.json is byte-identical to its pinned
-    pre-098 digest. Reuses ``test_098_stray_components``'s existing fence
-    rather than adding a second hardcoded literal for the same file --
-    ``tests/test_115_stage26_validation.py::
-    test_ac8_no_hardcoded_literal_fence_remains`` caps the corpus at exactly
-    one such fence."""
-    from test_098_stray_components import _PRE_098_REFERENCE_VERSE_V1_SHA256
-
-    path = _REPO_ROOT / "src" / "segfacet" / "reference" / "reference_verse_v1.json"
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    assert digest == _PRE_098_REFERENCE_VERSE_V1_SHA256, (
-        "reference_verse_v1.json changed -- its rebuild needs the real VerSe "
-        "cohort and is item 123's, not item 120's"
     )
 
 

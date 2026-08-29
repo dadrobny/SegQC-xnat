@@ -411,13 +411,35 @@ def test_ac5_l6_level_name_is_l6():
     assert dist.levels["L6"][ALL_STRATUM].level_name == "L6"
 
 
+#: Item 123 (docs/aide/items/123-recalibrate-and-regenerate-downstream-
+#: artifacts.md) rebuilds ``reference_verse_v1.json`` from the real VerSe19
+#: cohort under item 120's held-out ``spline_offset_mm`` estimator -- a
+#: deliberate re-*fit* of that one feature, not the re-*key* this AC5
+#: originally pinned byte-for-byte. ``spline_offset_mm`` is excluded from the
+#: byte-for-byte comparison for exactly that reason (per the item 123
+#: Assumptions, "Item 093's AC5 snapshot is narrowed, not deleted"); every
+#: other statistic in ``_PRE_RENAME_S_FEATURE_STATS`` is geometry/intensity/
+#: morphology, which item 123 does not touch, so it stays pinned exactly.
+_AC5_FEATURES_MOVED_BY_ITEM_123_REFIT = frozenset({"spline_offset_mm"})
+
+
 def test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s():
     dist = bundled_production_reference()
     l6_stats = dist.levels["L6"][ALL_STRATUM].feature_stats
     assert set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS)
     for feature_name, expected in _PRE_RENAME_S_FEATURE_STATS.items():
+        if feature_name in _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT:
+            continue
         actual = _feature_stats_to_plain_dict(l6_stats[feature_name])
         assert actual == expected, f"feature_stats mismatch for {feature_name!r}"
+
+
+def test_ac5_spline_offset_mm_excluded_from_byte_for_byte_is_the_only_exclusion():
+    """The item-123 narrowing removes exactly one feature from the
+    byte-for-byte set -- every other pre-rename statistic is still checked."""
+    assert _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT == {"spline_offset_mm"}
+    still_checked = set(_PRE_RENAME_S_FEATURE_STATS) - _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT
+    assert len(still_checked) == len(_PRE_RENAME_S_FEATURE_STATS) - 1
 
 
 def test_ac5_no_other_level_or_top_level_field_changed():
