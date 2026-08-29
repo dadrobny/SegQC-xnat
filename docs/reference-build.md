@@ -223,3 +223,36 @@ otherwise revising) that envelope needs a person's decision, not a rebuild.
 The full evidence (`p99_by_level`, the qualifying-level list, and the
 top-offset subject ids) is in the rebuild's own
 `verse_rebuild_summary.json`, regenerable by re-running the command above.
+
+## Rebuild record — 2026-08-29, resolved (item 123, terminal-vertebra exclusion)
+
+A follow-up per-vertebra analysis of the 2026-08-29 measurement above showed
+the `L5` anomaly was entirely a **terminal-extrapolation** artefact of item
+120's held-out estimator (terminal `L5` `p99` `21.5` mm vs. interior `L5`
+maximum `1.00` mm across the same 80-subject cohort), not real deformity. By
+human decision the same date, sequence-terminal vertebrae (a subject's
+cranial-most and caudal-most present level) are excluded from both the
+`mislabel` rule and the reference distribution
+(`src/segfacet/features/spline_offset.py`'s `is_terminal` flag;
+`reference/ingest.py` / `reference/delta.py` exclude it symmetrically; see
+the item spec's Decisions log for the full record).
+
+`scripts/rebuild_verse_reference.py` was re-run against the same 80-subject
+cohort (reusing the cached staged directory) under this exclusion. The
+interior-only ceiling `P = 12.90577608928562` mm at level `T10`
+(`count = 37`) derives a threshold of **`13.0` mm** — inside the approved
+corpus window `(5.143859, 17.507445]` — so the recalibration is applied:
+`heuristics/mislabel.py`'s `_DEFAULT_MAX_OFFSET_MM` and
+`default_config.yaml`'s `rules.mislabel.max_offset_mm` are both `13.0`;
+`reference_verse_v1.json` and `reference_default.json` are rebuilt (the
+latter via `python -m segfacet.reference.artifact`); the nine corpus goldens
+and `tests/golden/022_stage3_report.json` are regenerated to carry
+`is_terminal`, with `mode1_displace` and `mode6_crop_at_border` additionally
+moving their `mislabel` finding's threshold clause from `15.0` to `13.0` mm.
+`L5` dropped to 3 interior occurrences (below the `count >= 10` qualifying
+floor, mean `0.69` mm) and `C1` (always terminal-only in this cohort) carries
+no `spline_offset_mm` statistic at all — both expected consequences of the
+exclusion. `spline_offset_mm` is therefore now an **interior-only** feature
+end to end. Full evidence (`terminal_count`/`interior_count`, `p99_by_level`,
+the qualifying-level list, and the top-offset subject ids) is in the
+re-run's `verse_rebuild_summary.json`.

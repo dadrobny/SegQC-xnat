@@ -535,6 +535,7 @@
           "dx_mm": 0.04604639330248261,
           "dy_mm": 3.1076311643635393,
           "dz_mm": -0.36136766004063503,
+          "is_terminal": true,
           "label": 20,
           "level_name": "L1",
           "offset_mm": 3.128910083364956,
@@ -545,6 +546,7 @@
           "dx_mm": -0.205980244340914,
           "dy_mm": -8.142424393276826,
           "dz_mm": 0.4347633134558322,
+          "is_terminal": false,
           "label": 21,
           "level_name": "L2",
           "offset_mm": 8.156624424356888,
@@ -555,6 +557,7 @@
           "dx_mm": 0.5105122692373598,
           "dy_mm": 17.4999999999823,
           "dz_mm": -4.950899779032625e-08,
+          "is_terminal": false,
           "label": 22,
           "level_name": "L3",
           "offset_mm": 17.507444781475748,
@@ -565,6 +568,7 @@
           "dx_mm": -0.20598024434093531,
           "dy_mm": -8.14242439327684,
           "dz_mm": -0.434763313455619,
+          "is_terminal": false,
           "label": 23,
           "level_name": "L4",
           "offset_mm": 8.156624424356892,
@@ -575,6 +579,7 @@
           "dx_mm": 0.04604639330251814,
           "dy_mm": 3.107631164363575,
           "dz_mm": 0.36136766004051424,
+          "is_terminal": true,
           "label": 24,
           "level_name": "L5",
           "offset_mm": 3.128910083364978,
@@ -705,7 +710,7 @@
       "labels": [
         22
       ],
-      "reason": "Vertebra misaligned from spinal curve: label 22 (L3) centroid lies 17.5 mm off the fitted spinal curve, predominantly anterior-posterior (threshold 15.0 mm).",
+      "reason": "Vertebra misaligned from spinal curve: label 22 (L3) centroid lies 17.5 mm off the fitted spinal curve, predominantly anterior-posterior (threshold 13.0 mm).",
       "rule_id": "mislabel",
       "severity": "flagged-for-review"
     }
@@ -723,7 +728,7 @@
         "labels": [
           22
         ],
-        "message": "Vertebra misaligned from spinal curve: label 22 (L3) centroid lies 17.5 mm off the fitted spinal curve, predominantly anterior-posterior (threshold 15.0 mm).",
+        "message": "Vertebra misaligned from spinal curve: label 22 (L3) centroid lies 17.5 mm off the fitted spinal curve, predominantly anterior-posterior (threshold 13.0 mm).",
         "severity": "flagged-for-review"
       }
     ]

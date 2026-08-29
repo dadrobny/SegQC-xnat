@@ -411,7 +411,8 @@
         "offset_voxel": {"type": "number", "minimum": 0, "description": "Same distance in voxel units."},
         "dx_mm": {"type": "number", "description": "x-component of the displacement vector (mm)."},
         "dy_mm": {"type": "number", "description": "y-component of the displacement vector (mm)."},
-        "dz_mm": {"type": "number", "description": "z-component of the displacement vector (mm)."}
+        "dz_mm": {"type": "number", "description": "z-component of the displacement vector (mm)."},
+        "is_terminal": {"type": "boolean", "description": "True for the first/last entry of the ordered centroid sequence it was measured in (item 123). Optional -- an entry omitting it is treated as interior (False) by every consumer."}
       }
     },
     "stage3OrientationEntry": {

@@ -1338,6 +1338,37 @@
           "units": "mm"
         },
         {
+          "computation": "True for index 0 and index n-1 of the sequence (and every entry when n <= 2); false otherwise. The mislabel rule and the reference distribution both exclude a terminal entry from their offset judgement, because the held-out refit must extrapolate past the end of its own parameter domain there, which reads an implausibly large offset unrelated to real displacement.",
+          "consumers": [],
+          "consuming_rules": [
+            "mislabel"
+          ],
+          "documented": true,
+          "failure_modes": [
+            1,
+            4
+          ],
+          "measures": "Whether this entry is the first or last vertebra of the ordered centroid sequence it was measured in (item 123) -- true for a field-of-view / anatomical end, false for an interior vertebra.",
+          "mode_evidence": [
+            "rule_mode_map"
+          ],
+          "origin": "record",
+          "path": "stage3.per_label_offsets[].is_terminal",
+          "rule_evidence": [
+            [
+              "mislabel",
+              "observed"
+            ],
+            [
+              "mislabel",
+              "static"
+            ]
+          ],
+          "scale_sensitivity": "boolean",
+          "status": "keep",
+          "units": ""
+        },
+        {
           "computation": "Copied from the source VertebralSplineOffset dataclass.",
           "consumers": [],
           "consuming_rules": [
@@ -1441,7 +1472,7 @@
           "units": "voxels"
         }
       ],
-      "intro": "A cubic (degree clamped to n_points-1 when the sequence is short) smoothing B-spline is fit through the ordered centroids' mm-coordinates (scipy.interpolate.make_splprep, s = n_points by default); this spline underlies the per-vertebra offset measured here and the orientation/curvature/consistency families below. offset_mm is a held-out (leave-one-out, down-weighted) measurement (item 120): a level's offset is its closest-approach distance to a curve refit with that level and the case's dominant outlier down-weighted to a negligible constant, so the level under test cannot pull the curve toward itself. dx_mm/dy_mm/dz_mm are anatomically readable -- array axis 0 left-right, axis 1 anterior-posterior, axis 2 cranio-caudal -- only because io.load_volume reorients every volume to axis codes (R, A, S) and centroid_mm carries no affine of its own.",
+      "intro": "A cubic (degree clamped to n_points-1 when the sequence is short) smoothing B-spline is fit through the ordered centroids' mm-coordinates (scipy.interpolate.make_splprep, s = n_points by default); this spline underlies the per-vertebra offset measured here and the orientation/curvature/consistency families below. offset_mm is a held-out (leave-one-out, down-weighted) measurement (item 120): a level's offset is its closest-approach distance to a curve refit with that level and the case's dominant outlier down-weighted to a negligible constant, so the level under test cannot pull the curve toward itself. dx_mm/dy_mm/dz_mm are anatomically readable -- array axis 0 left-right, axis 1 anterior-posterior, axis 2 cranio-caudal -- only because io.load_volume reorients every volume to axis codes (R, A, S) and centroid_mm carries no affine of its own. is_terminal (item 123) marks the first/last vertebra of the sequence; the mislabel rule and the reference distribution both treat offset_mm as an interior-only feature, excluding a terminal entry from their judgement, because the held-out refit extrapolates past the end of its parameter domain there.",
       "module": "segfacet.features.spline_offset",
       "stage": "Stage 3 · item 018",
       "title": "Spline Offset"

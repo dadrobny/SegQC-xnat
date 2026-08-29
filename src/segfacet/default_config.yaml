@@ -182,9 +182,11 @@ rules:
   mislabel:
     enabled: true
     params:
-      # A centroid >= 15 mm off the fitted spinal curve is judged
-      # misaligned (item 033 default).
-      max_offset_mm: 15.0
+      # A centroid >= 13.0 mm off the fitted spinal curve is judged
+      # misaligned (item 123 recalibration, 2026-08-29, against the real
+      # VerSe19 interior-only p99 ceiling; superseded item 033 default was
+      # 15.0, tuned against a structurally-zero offset).
+      max_offset_mm: 13.0
       flag_offset_outliers: true
       flag_order_inconsistency: true
       severity: flagged-for-review

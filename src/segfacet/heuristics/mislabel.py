@@ -21,8 +21,14 @@ recomputes any geometry, offset, spline, or ordering itself.
 Design decisions (recorded per item 033 spec):
 - Two independent, config-gated detectors, combined with OR: a record may
   produce findings from either or both.
-- Detector A fires on ``offset_mm >= max_offset_mm`` (default ``15.0``,
+- Detector A fires on ``offset_mm >= max_offset_mm`` (default ``13.0``,
   inclusive) and is label-attributed (single offending label).
+- Detector A never fires on a **terminal** entry (``is_terminal`` truthy,
+  item 123) -- an entry with no ``is_terminal`` key, or one carrying
+  ``None``, is interior and still fires. See "Threshold calibration
+  (item 123)" below for why, and ``features/spline_offset.py``'s "Terminal-
+  vertebra exclusion" section for the mechanism. Detector B (ordering) is
+  unaffected -- it does not read per-vertebra offsets at all.
 - Detector A reads ``dx_mm``/``dy_mm``/``dz_mm`` when all three are present
   and finite (item 120), naming the dominant displacement direction as one
   of ``"left-right"``, ``"anterior-posterior"`` or ``"cranio-caudal"`` --
@@ -43,6 +49,39 @@ Design decisions (recorded per item 033 spec):
 - Unrecognised severity string raises ValueError before any per-record
   processing.
 - The caller's record is never mutated.
+
+Threshold calibration (item 123, recalibrated 2026-08-29)
+-----------------------------------------------------------
+``_DEFAULT_MAX_OFFSET_MM`` is derived (``scripts/rebuild_verse_reference.py
+::derive_max_offset_mm``) from the real, 80-subject VerSe19 training cohort's
+committed ``reference_verse_v1.json``: the smallest multiple of ``0.5`` mm
+strictly above ``P``, floored at ``6.0`` mm, where ``P`` is the maximum
+``spline_offset_mm`` ``p99`` over levels with at least 10 **interior**
+(non-terminal, see below) occurrences. The measured ceiling is
+``P = 12.91`` mm at level ``T10``, giving ``_DEFAULT_MAX_OFFSET_MM = 13.0``.
+
+**Terminal vertebrae are excluded from this measurement and from Detector A
+itself** (item 123, human decision 2026-08-29): the first calibration run
+measured `P = 21.209` mm at `L5`, driven entirely by the held-out
+estimator's terminal-extrapolation artefact (`features/spline_offset.py`'s
+"Terminal-vertebra exclusion" section) rather than real anatomy -- `L5`'s
+*interior* offset never exceeds `1.00` mm in the same cohort. Excluding
+terminal entries from both the reference distribution
+(`reference/ingest.py`) and Detector A brought the measurement back inside
+the approved corpus window.
+
+Corpus margins (`tests/corpus/golden/*.json`), all measured on **interior**
+entries only:
+- `mode4_relabel_swap`'s largest interior reading (label 23 / L4) is
+  `2.510990` mm and must **not** fire -- the non-firing ceiling. (Its larger
+  `5.143859` mm reading, label 20, is that case's cranial-terminal vertebra
+  and is excluded from consideration entirely.)
+- `mode6_crop_at_border`'s firing reading is `17.507445` mm and **must**
+  fire -- so ``_DEFAULT_MAX_OFFSET_MM`` sits in `(2.510990, 17.507445]`
+  (`13.0` qualifies).
+- `mode1_displace`'s firing reading is `18.718604` mm and **must** fire.
+
+Distribution calibrated against: `src/segfacet/reference/reference_verse_v1.json`.
 """
 
 from __future__ import annotations
@@ -64,7 +103,7 @@ __all__ = ["MislabelRule"]
 _MISALIGN_TAG = "Vertebra misaligned from spinal curve:"
 _MISLABEL_TAG = "Vertebra ordering inconsistent with label:"
 
-_DEFAULT_MAX_OFFSET_MM = 15.0
+_DEFAULT_MAX_OFFSET_MM = 13.0
 
 
 # --------------------------------------------------------------------------- #
@@ -232,6 +271,13 @@ class MislabelRule(Rule):
         normalised = []
         for entry in offsets:
             if not isinstance(entry, dict) or "label" not in entry:
+                continue
+            if entry.get("is_terminal"):
+                # A terminal (sequence-first/last) entry's held-out offset
+                # extrapolates past the end of the estimator's own parameter
+                # domain rather than measuring a genuine displacement -- item
+                # 123, see this module's docstring. A missing key or `None`
+                # is falsy and therefore interior, unchanged from before.
                 continue
             try:
                 label = int(entry["label"])

@@ -260,8 +260,53 @@ def _level_attaining_p(p99_by_level: Dict[str, Dict[str, Any]], qualifying_level
     return best_level
 
 
+def _population_stats(values: Sequence[float]) -> Dict[str, Any]:
+    """Cheap count/max/p99 summary over *values* (empty-safe)."""
+    if not values:
+        return {"count": 0, "max": None, "p99": None}
+    ordered = sorted(values)
+    n = len(ordered)
+    # Nearest-rank p99 -- adequate for a diagnostic summary (not the
+    # artifact's own percentile machinery, which reference/aggregate.py owns).
+    rank = max(0, min(n - 1, math.ceil(0.99 * n) - 1))
+    return {"count": n, "max": ordered[-1], "p99": ordered[rank]}
+
+
+def _terminal_interior_counts(cohort_ingest) -> Dict[str, int]:
+    """Exact terminal/interior occurrence counts (AC17), derived from
+    ``ingest_cohort``'s own per-subject record counts rather than a second
+    feature-extraction pass: every subject with `n >= 2` present, recognised
+    levels contributes exactly 2 terminal occurrences (its cranial-most and
+    caudal-most present level -- or all `n` when `n == 2`,
+    `features/spline_offset.py`'s AC37) and `max(0, n - 2)` interior ones.
+    A subject with fewer than 2 levels contributes neither (no stage3, hence
+    no offset at all)."""
+    terminal_count = 0
+    interior_count = 0
+    for subject in cohort_ingest.subjects:
+        n = len(subject.records)
+        if n < 2:
+            continue
+        terminal_count += min(n, 2)
+        interior_count += max(0, n - 2)
+    return {"terminal_count": terminal_count, "interior_count": interior_count}
+
+
 def _calibration_block(distribution, cohort_ingest, threshold: float) -> Dict[str, Any]:
-    """Build the ``calibration`` summary block (AC17)."""
+    """Build the ``calibration`` summary block (AC17).
+
+    ``p99_by_level`` / ``P`` are read from the built (interior-only, AC41)
+    ``distribution``, so the threshold derivation is unaffected by the
+    terminal exclusion. ``terminal_count`` / ``interior_count`` (amended
+    2026-08-29) make the exclusion's evidence regenerable: derived from
+    ``ingest_cohort``'s own per-subject record counts (see
+    :func:`_terminal_interior_counts`) rather than a second, terminal-value-
+    retaining feature-extraction pass, since ``reference/ingest.py``
+    deliberately discards a terminal offset's *value* before it reaches a
+    ``FeatureRecord`` (AC41) -- only its *occurrence* is countable from here.
+    ``interior_stats`` is a genuine population summary over the exact values
+    the artifact was built from.
+    """
     p99_by_level = _p99_by_level(distribution)
     qualifying_levels = sorted(
         name for name, entry in p99_by_level.items() if entry["count"] >= _MIN_QUALIFYING_COUNT
@@ -287,6 +332,9 @@ def _calibration_block(distribution, cohort_ingest, threshold: float) -> Dict[st
     top = sorted(subject_level_offsets, key=lambda e: e["offset_mm"], reverse=True)[:10]
     top_subject_ids = [entry["subject_id"] for entry in top]
 
+    counts = _terminal_interior_counts(cohort_ingest)
+    interior_stats = _population_stats([entry["offset_mm"] for entry in subject_level_offsets])
+
     return {
         "status": "ran" if qualifying_levels or p99_by_level else "skipped",
         "p99_by_level": p99_by_level,
@@ -296,6 +344,16 @@ def _calibration_block(distribution, cohort_ingest, threshold: float) -> Dict[st
         "threshold": threshold,
         "subject_levels_above_threshold": {"count": above, "fraction": fraction},
         "top_subject_ids": top_subject_ids,
+        "terminal_count": counts["terminal_count"],
+        "interior_count": counts["interior_count"],
+        "interior_stats": interior_stats,
+        "terminal_stats_note": (
+            "terminal offset values are excluded before reaching a "
+            "FeatureRecord (reference/ingest.py, AC41), so only their "
+            "occurrence count is regenerable from this tool; see the item "
+            "123 Decisions log for the one-off per-vertebra analysis that "
+            "measured their magnitude."
+        ),
     }
 
 
@@ -342,7 +400,9 @@ def run_rebuild(
             "calibration": {"status": "skipped", "p99_by_level": {}, "qualifying_levels": [], "P": None,
                              "level_at_p": None, "threshold": _FLOOR_MM,
                              "subject_levels_above_threshold": {"count": 0, "fraction": 0.0},
-                             "top_subject_ids": []},
+                             "top_subject_ids": [], "terminal_count": 0, "interior_count": 0,
+                             "interior_stats": {"count": 0, "max": None, "p99": None},
+                             "terminal_stats_note": "cohort skipped -- no offsets computed"},
         }
 
     if not root.exists():
@@ -361,7 +421,9 @@ def run_rebuild(
             "calibration": {"status": "skipped", "p99_by_level": {}, "qualifying_levels": [], "P": None,
                              "level_at_p": None, "threshold": _FLOOR_MM,
                              "subject_levels_above_threshold": {"count": 0, "fraction": 0.0},
-                             "top_subject_ids": []},
+                             "top_subject_ids": [], "terminal_count": 0, "interior_count": 0,
+                             "interior_stats": {"count": 0, "max": None, "p99": None},
+                             "terminal_stats_note": "cohort skipped -- no offsets computed"},
         }
 
     masks = discover_masks(root)
@@ -384,7 +446,9 @@ def run_rebuild(
             "calibration": {"status": "skipped", "p99_by_level": {}, "qualifying_levels": [], "P": None,
                              "level_at_p": None, "threshold": _FLOOR_MM,
                              "subject_levels_above_threshold": {"count": 0, "fraction": 0.0},
-                             "top_subject_ids": []},
+                             "top_subject_ids": [], "terminal_count": 0, "interior_count": 0,
+                             "interior_stats": {"count": 0, "max": None, "p99": None},
+                             "terminal_stats_note": "cohort skipped -- no offsets computed"},
         }
 
     case_ids = sorted({_subject_id_for_mask(m) for m in masks})

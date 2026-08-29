@@ -20,7 +20,8 @@
           "offset_voxel": 2.244758172987482e-05,
           "dx_mm": 0.0,
           "dy_mm": 0.0,
-          "dz_mm": -2.244758172987482e-05
+          "dz_mm": -2.244758172987482e-05,
+          "is_terminal": true
         },
         {
           "label": 2,
@@ -30,7 +31,8 @@
           "offset_voxel": 1.7763568394002505e-15,
           "dx_mm": 0.0,
           "dy_mm": 0.0,
-          "dz_mm": -1.7763568394002505e-15
+          "dz_mm": -1.7763568394002505e-15,
+          "is_terminal": false
         },
         {
           "label": 3,
@@ -40,7 +42,8 @@
           "offset_voxel": 0.0,
           "dx_mm": 0.0,
           "dy_mm": 0.0,
-          "dz_mm": 0.0
+          "dz_mm": 0.0,
+          "is_terminal": false
         },
         {
           "label": 4,
@@ -50,7 +53,8 @@
           "offset_voxel": 0.0,
           "dx_mm": 0.0,
           "dy_mm": 0.0,
-          "dz_mm": 0.0
+          "dz_mm": 0.0,
+          "is_terminal": false
         },
         {
           "label": 5,
@@ -60,7 +64,8 @@
           "offset_voxel": 2.2394321533170114e-05,
           "dx_mm": 0.0,
           "dy_mm": 0.0,
-          "dz_mm": 2.2394321533170114e-05
+          "dz_mm": 2.2394321533170114e-05,
+          "is_terminal": true
         }
       ],
       "per_label_orientations": [

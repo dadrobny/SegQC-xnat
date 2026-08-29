@@ -281,7 +281,12 @@ GROUP_INTROS: Mapping[str, str] = MappingProxyType(
             "anatomically readable -- array axis 0 left-right, axis 1 "
             "anterior-posterior, axis 2 cranio-caudal -- only because "
             "io.load_volume reorients every volume to axis codes (R, A, S) and "
-            "centroid_mm carries no affine of its own."
+            "centroid_mm carries no affine of its own. is_terminal (item 123) "
+            "marks the first/last vertebra of the sequence; the mislabel rule "
+            "and the reference distribution both treat offset_mm as an "
+            "interior-only feature, excluding a terminal entry from their "
+            "judgement, because the held-out refit extrapolates past the end "
+            "of its parameter domain there."
         ),
         "Orientation & Curvature": (
             "Per-vertebra orientation (PCA of the mean-centred, spacing-scaled "
@@ -1656,6 +1661,23 @@ FEATURE_DOCS: Mapping[str, FeatureDoc] = MappingProxyType(
             computation='Same as offset_mm but with each axis scaled by 1/spacing before taking the norm.',
             units='voxels',
             scale_sensitivity='voxel count',
+        ),
+        'stage3.per_label_offsets[].is_terminal': FeatureDoc(
+            measures=(
+                'Whether this entry is the first or last vertebra of the ordered '
+                'centroid sequence it was measured in (item 123) -- true for a '
+                'field-of-view / anatomical end, false for an interior vertebra.'
+            ),
+            computation=(
+                'True for index 0 and index n-1 of the sequence (and every entry '
+                'when n <= 2); false otherwise. The mislabel rule and the '
+                'reference distribution both exclude a terminal entry from their '
+                'offset judgement, because the held-out refit must extrapolate '
+                'past the end of its own parameter domain there, which reads an '
+                'implausibly large offset unrelated to real displacement.'
+            ),
+            units='',
+            scale_sensitivity='boolean',
         ),
         'stage3.per_label_orientations[].eigenvalue_ratio': FeatureDoc(
             measures='Anisotropy of the per-vertebra voxel cloud.',

@@ -1385,3 +1385,51 @@ interior `n = 3`, max `1.00`. Interior `p99`: `T10` `12.91`, `L4` `8.36`,
 `2.510990` mm (`mode4_relabel_swap`, label 23); firing readings `17.507445`
 (`mode6_crop_at_border`) and `18.718604` (`mode1_displace`), both on label 22,
 both interior.
+
+**Builder confirmation, 2026-08-29 — implemented and re-run.** AC35-AC51 are
+implemented as specified: `VertebralSplineOffset.is_terminal` (defaulting
+`False`, computed identically in `compute_spline_offsets` and
+`compute_leave_one_out_spline_offsets`, sequence-relative — the held-out
+function overrides the field the length-1-list call would otherwise always
+set `True` for, substituting the *outer* sequence's first/last position);
+`MislabelRule._detect_offset_outliers` skips a truthy `is_terminal` entry
+before the threshold comparison; `reference/ingest.py` and `reference/delta.py`
+apply the identical guard to their own `offsets_by_label` loops;
+`feature_report.py`/`report_schema_v0.json` serialise/validate the new field;
+`feature_docs.py` documents it. `scripts/rebuild_verse_reference.py`'s
+`derive_max_offset_mm` needed no change (AC10's amendment note: the exclusion
+is a property of its input, not a second code path) — its `_calibration_block`
+gained `terminal_count`/`interior_count` (derived from `ingest_cohort`'s own
+per-subject record counts, since `reference/ingest.py` discards a terminal
+offset's *value* before it reaches a `FeatureRecord`, so only its
+*occurrence* is recomputable without a second feature-extraction pass) and an
+`interior_stats` block over the genuine interior values the artifact was
+built from.
+
+Re-running the tool against the same 80-subject cohort (staged directory
+reused, no re-staging) reproduced the human decision's analysis exactly:
+`calibration.P = 12.90577608928562` mm at `T10` (`count = 37`), derived
+threshold `13.0` mm, `terminal_count = 160`, `interior_count = 703`
+(`160 + 703 = 863`, matching the analysis above), `interior_stats.max =
+18.51028119357566` mm (`sub-verse406_split-verse261`, the cohort's genuine
+interior outlier). `L5` dropped to `count = 3` (mean `0.69` mm, max `1.00` mm)
+and `C1` (always terminal-only in this cohort) carries no `spline_offset_mm`
+statistic at all. `_DEFAULT_MAX_OFFSET_MM` and `default_config.yaml` are both
+`13.0`; `reference_verse_v1.json` and `reference_default.json` are rebuilt and
+installed; all nine corpus goldens and `tests/golden/022_stage3_report.json`
+are regenerated (every entry gains `is_terminal`; `mode1_displace` and
+`mode6_crop_at_border` additionally move their `mislabel` finding's threshold
+clause `15.0` -> `13.0`, verified leaf-by-leaf against the pre-123 committed
+files — no other leaf differs); the catalogue is regenerated (`93` -> `94`
+leaf paths, the new `stage3.per_label_offsets[].is_terminal` path landing
+`status: "keep"` since `mislabel` consumes it via both `observed` and
+`static` evidence, so the golden-decision-table's nine unwired-fraction cells
+move `26/93` -> `26/94`, not `27/94`); `tests/corpus/119_pre_119_digests.json`'s
+catalogue digest and `test_098_stray_components.py`'s
+`_PRE_098_REFERENCE_VERSE_V1_SHA256` are both recomputed against the rebuilt
+artifacts. `test_093_tptbox_label_convention.py`'s narrowed L6 snapshot was
+spot-checked against the rebuilt artifact by hand (every non-`spline_offset_mm`
+statistic — `component_count`, `eigenvalue_ratio`, `extent_x/y/z_mm`,
+`physical_volume_mm3`, `largest_component_fraction` and every `intensity_*`
+field — reproduces the pinned literal exactly), confirming the footprint
+measured at the first hand-back (`spline_offset_mm` alone moves) still holds.

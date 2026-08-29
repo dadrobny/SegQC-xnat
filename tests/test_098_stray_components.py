@@ -1085,7 +1085,7 @@ def test_ac17_morphology_delta_output_has_no_stray_keys():
 # validation.py::test_ac8_no_hardcoded_literal_fence_remains caps the corpus
 # at exactly one such fence, which is this one.
 _PRE_098_REFERENCE_VERSE_V1_SHA256 = (
-    "978c63d0367d9dd018f472aaa034740d42a04c47b95ccf0501cc128ad0638826"
+    "2048804f60208a4dea0cbe8d0980e1e6228c68b52b6331375f768254fc73b5da"
 )
 
 

@@ -325,6 +325,11 @@ def compute_reference_delta(
     stage3 = features_block.get("stage3")
     if stage3 is not None:
         for offset_entry in stage3.get("per_label_offsets", []):
+            if offset_entry.get("is_terminal"):
+                # Symmetric with reference/ingest.py's exclusion (item 123):
+                # the reference distribution is interior-only, so a
+                # terminal case-side offset must never be scored against it.
+                continue
             offsets_by_label[int(offset_entry["label"])] = offset_entry["offset_mm"]
 
     per_label = {}

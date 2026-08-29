@@ -230,8 +230,8 @@ def relationships_to_dict(
 def spline_offset_to_dict(o: "VertebralSplineOffset") -> dict:
     """Convert a :class:`~segfacet.features.spline_offset.VertebralSplineOffset` to a dict.
 
-    All eight fields are serialised verbatim. The source dataclass is frozen
-    and never mutated.
+    All nine fields (item 123 added ``is_terminal``) are serialised verbatim.
+    The source dataclass is frozen and never mutated.
     """
     return {
         "label": o.label,
@@ -242,6 +242,7 @@ def spline_offset_to_dict(o: "VertebralSplineOffset") -> dict:
         "dx_mm": o.dx_mm,
         "dy_mm": o.dy_mm,
         "dz_mm": o.dz_mm,
+        "is_terminal": o.is_terminal,
     }
 
 

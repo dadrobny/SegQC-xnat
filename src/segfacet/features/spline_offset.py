@@ -83,6 +83,35 @@ limitation (not fixed by this item); the natural follow-up is withholding
 every level above some outlier cutoff, not just the single dominant one, and
 is left to future work.
 
+Terminal-vertebra exclusion (item 123, 2026-08-29 human decision)
+------------------------------------------------------------------
+Every :class:`VertebralSplineOffset` carries ``is_terminal``: ``True`` for
+the first and last entry of the ordered centroid sequence it was measured
+in (and for **every** entry when the sequence has one or two points, so
+there is no interior at all), ``False`` otherwise. It is sequence-relative,
+not label-relative -- reversing the input order still marks the same two
+anatomical ends, matched by which end they occupy, not by list index.
+
+This exists because the held-out estimator's refit must **extrapolate**
+past the end of its own parameter domain at a sequence terminus: withholding
+a terminal level's own point still fits the curve through every interior
+point, but the terminal level's closest-approach search runs past the last
+interior control point rather than between two of them, which can read an
+implausibly large offset for a vertebra that is not actually displaced.
+Measured on the real VerSe19 cohort while calibrating this module's
+``mislabel`` threshold (item 123): the caudal-terminal level (`L5` in most
+of the cohort) reached a `p99` of `21.209` mm against an *interior* maximum
+of `1.00` mm at the same level -- a purely positional artefact, not
+deformity. `heuristics/mislabel.py`, `reference/ingest.py` and
+`reference/delta.py` all read this flag and exclude a terminal entry from
+their respective offset judgements (never Detector B's ordering check, which
+does not use per-vertebra offsets at all). This is a stop-gap accepted
+knowingly, not a model of the true uncertainty: a genuinely displaced
+terminal vertebra is not detected by this rule at all until a smarter
+treatment (a separate terminal-aware calibration, an extrapolation-aware
+estimator, or a curvature model that does not need both neighbours) replaces
+it.
+
 RAS axis contract for the direction components (item 120)
 -------------------------------------------------------------
 ``dx_mm``, ``dy_mm`` and ``dz_mm`` are anatomically readable -- array axis 0
@@ -99,7 +128,7 @@ would no longer mean "left-right" / "anterior-posterior" / "cranio-caudal".
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -162,6 +191,16 @@ class VertebralSplineOffset:
         y-component of the displacement vector, in mm.
     dz_mm : float
         z-component of the displacement vector, in mm.
+    is_terminal : bool
+        ``True`` when this centroid is the first or last of the **ordered
+        sequence it was measured in** (or the sequence has 1-2 points, so
+        every entry is an end) -- item 123's terminality flag. Sequence-
+        relative, not label-relative: reversing the input order still marks
+        the same two anatomical ends (see the module docstring's
+        "Terminal-vertebra exclusion" section). Defaults to ``False`` so
+        existing hand-built records (an entry with no key, or ``None``) read
+        as interior -- item 123's ``mislabel``/reference consumers rely on
+        this default.
     """
 
     label: int
@@ -172,6 +211,7 @@ class VertebralSplineOffset:
     dx_mm: float
     dy_mm: float
     dz_mm: float
+    is_terminal: bool = False
 
 
 # --------------------------------------------------------------------------- #
@@ -280,8 +320,11 @@ def compute_spline_offsets(
         sx, sy, sz = float(spacing_mm[0]), float(spacing_mm[1]), float(spacing_mm[2])
 
     records: List[VertebralSplineOffset] = []
+    n_points = len(centroids)
 
-    for c in centroids:
+    for idx, c in enumerate(centroids):
+        is_terminal = n_points <= 2 or idx == 0 or idx == n_points - 1
+
         pt = np.array(
             [float(c.centroid_mm[0]), float(c.centroid_mm[1]), float(c.centroid_mm[2])],
             dtype=np.float64,
@@ -315,6 +358,7 @@ def compute_spline_offsets(
                 dx_mm=dx_mm,
                 dy_mm=dy_mm,
                 dz_mm=dz_mm,
+                is_terminal=is_terminal,
             )
         )
 
@@ -404,6 +448,14 @@ def compute_leave_one_out_spline_offsets(
         record = compute_spline_offsets(
             [centroids[i]], refit, spacing_mm=spacing_mm, backend=backend
         )[0]
+        # compute_spline_offsets always reads is_terminal from the length-1
+        # list it was just given (so it always reports True there) -- the
+        # terminality that actually matters is the position in the OUTER
+        # (full-cohort) sequence this function was given, so it is recomputed
+        # here and substituted onto the returned record.
+        is_terminal = n_points <= 2 or i == 0 or i == n_points - 1
+        if record.is_terminal != is_terminal:
+            record = replace(record, is_terminal=is_terminal)
         records[i] = record
 
     return records  # type: ignore[return-value]
