@@ -418,6 +418,29 @@ def compute_leave_one_out_spline_offsets(
 
     n_points = len(centroids)
 
+    if n_points == 1:
+        # No curve can be fit through a single point (fit_centroid_spline
+        # requires >= 2), so this must be handled before any fit is
+        # attempted -- unlike n_points == 2/3, which fit_centroid_spline
+        # tolerates and which fall through to the branch below. AC37 (item
+        # 123) requires every entry of a 1-2 point sequence to read
+        # is_terminal=True; offset_mm=0.0 is the defensible reading for a
+        # single point -- there is nothing to be offset from.
+        c = centroids[0]
+        return [
+            VertebralSplineOffset(
+                label=c.label,
+                level_name=c.level_name,
+                closest_u=0.0,
+                offset_mm=0.0,
+                offset_voxel=0.0,
+                dx_mm=0.0,
+                dy_mm=0.0,
+                dz_mm=0.0,
+                is_terminal=True,
+            )
+        ]
+
     reference_fit = fit_centroid_spline(centroids, backend=backend)
 
     if n_points < _MIN_LEVELS_FOR_HELD_OUT:

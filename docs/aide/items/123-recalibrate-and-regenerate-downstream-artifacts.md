@@ -1722,3 +1722,50 @@ third, to confirm needs no fix) before validation round 2.
   fix, not a legitimate consequence of this item's design — nothing in
   AC1–AC56 authorises a curvature change, and this investigation found no
   mechanism by which one could occur.
+
+### Builder fixes, 2026-08-29 (round 2)
+
+Both of the two production defects recorded above are fixed.
+
+- **AC37 crash (`compute_leave_one_out_spline_offsets` on `n_points == 1`).**
+  `fit_centroid_spline` unconditionally ran before the
+  `n_points < _MIN_LEVELS_FOR_HELD_OUT` fallback check, so a single-centroid
+  sequence hit `ValueError: fit_centroid_spline requires at least 2
+  centroids...` before the guard ever ran. Fixed by moving an `n_points ==
+  1` special case ahead of the `fit_centroid_spline` call: it returns one
+  `VertebralSplineOffset` built directly from the sole centroid, with
+  `offset_mm = offset_voxel = closest_u = dx_mm = dy_mm = dz_mm = 0.0` (the
+  defensible reading — there is nothing to be offset from) and
+  `is_terminal = True` (AC37). `n_points == 2` and `n_points >= 3` reach the
+  exact same code that ran before (the guard is a new branch taken only for
+  `n_points == 1`, not a reordering of the existing logic), so their
+  behaviour is unchanged: verified directly — `compute_leave_one_out_spline_offsets`
+  on 1/2/4-centroid sequences returns the expected `is_terminal` pattern
+  (`[True]`, `[True, True]`, `[True, False, False, True]`), and a fresh
+  `write_goldens()` run is byte-identical to all nine committed corpus
+  goldens (every case has >= 3 levels, so none exercises the new branch).
+- **`scripts/rebuild_verse_reference.py` collision handling.** `stage_cohort`
+  now groups discovered masks by `subject_id` *before* making any staging
+  decision, so every collision (a `subject_id` shared by >1 distinct mask
+  path) is known up front rather than discovered mid-iteration by path-sort
+  order. A colliding `subject_id` is recorded in `collisions` (naming every
+  colliding path) and **nothing is staged for it at all** — neither mask nor
+  scan — rather than guessing a "survivor" whose CT sibling (found by
+  `subject_id` alone, which matches every colliding mask equally) might
+  actually belong to a different one of the colliding masks. This is the
+  second alternative the finding above named ("record the collision as fatal
+  to that subject's staging"), chosen over verifying CT-shape compatibility
+  per candidate because it needs no image I/O to decide and can never
+  produce a mismatched pair by construction. Verified directly: reproducing
+  the exact two-mask collision scenario (one nested mask with a matching CT,
+  one duplicate at a different nested path with no CT of its own) now
+  returns `rc == 0` with no traceback, records the collision in both
+  `cohort.collisions` and `staging.collisions`, and `build.subject_count ==
+  0` (the sole, colliding, subject_id is excluded entirely — `ingest_cohort`
+  never sees any file for it, so it cannot see a mismatched pair either). A
+  non-colliding cohort's summary is unaffected byte-for-byte apart from
+  run-local paths, confirmed by diffing two runs of the same stand-in cohort
+  before and after this fix. The real 80-subject VerSe19 cohort has zero
+  collisions (recorded in the completed rebuild's summary), so neither the
+  committed `reference_verse_v1.json` nor any other committed artifact is
+  affected by this fix.

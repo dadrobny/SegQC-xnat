@@ -127,33 +127,57 @@ def stage_cohort(
 
     Never writes beneath *root*. Returns a dict with ``stage_mode``,
     ``staged_dir``, ``subjects_without_scan`` and ``collisions``.
+
+    A subject_id collision (two distinct masks stripping to the same id) is
+    fatal to *that subject's* staging: nothing is staged for it at all,
+    rather than picking a "survivor" by iteration order. Choosing a survivor
+    by path order and then finding its CT sibling *by subject_id* (which
+    matches every colliding mask equally) can pair the survivor mask with a
+    CT that actually belongs to a different one of the colliding masks,
+    producing a mismatched scan/seg pair ``ingest_cohort`` cannot load. Since
+    which mask is anatomically "correct" cannot be decided from the filename
+    collision alone, the safe choice is to stage neither -- recorded in
+    ``collisions`` (AC8's "recorded, never silently dropped" pattern), never
+    silently guessed.
     """
     staging_dir.mkdir(parents=True, exist_ok=True)
 
-    stage_modes = set()
-    subjects_without_scan: List[Dict[str, str]] = []
-    collisions: List[Dict[str, str]] = []
-    seen_subject_ids: Dict[str, Path] = {}
-
+    # Group by subject_id first so every collision is detected before any
+    # staging decision is made for that subject.
+    masks_by_subject: Dict[str, List[Path]] = {}
     for mask_path in masks:
         subject_id = _subject_id_for_mask(mask_path)
-        staged_mask_name = f"{subject_id}{VERSE_SEG_SUFFIX}"
-        staged_mask_path = staging_dir / staged_mask_name
+        masks_by_subject.setdefault(subject_id, []).append(mask_path)
 
-        if subject_id in seen_subject_ids and seen_subject_ids[subject_id] != mask_path:
+    collisions: List[Dict[str, str]] = []
+    colliding_subject_ids = set()
+    for subject_id, paths in masks_by_subject.items():
+        if len(paths) > 1:
+            colliding_subject_ids.add(subject_id)
             collisions.append(
                 {
                     "subject_id": subject_id,
                     "reason": (
                         f"subject_id collision after suffix stripping: "
-                        f"{seen_subject_ids[subject_id]} and {mask_path} both "
-                        f"stripped to {subject_id!r}; keeping the first, "
-                        f"skipping the duplicate"
+                        f"{len(paths)} distinct masks "
+                        f"({', '.join(str(p) for p in sorted(paths))}) all "
+                        f"stripped to {subject_id!r}; none staged -- which "
+                        f"mask is correct cannot be decided from the "
+                        f"filename collision alone, and staging one by path "
+                        f"order risks pairing it with the wrong subject's CT"
                     ),
                 }
             )
+
+    stage_modes = set()
+    subjects_without_scan: List[Dict[str, str]] = []
+
+    for subject_id, paths in masks_by_subject.items():
+        if subject_id in colliding_subject_ids:
             continue
-        seen_subject_ids[subject_id] = mask_path
+        mask_path = paths[0]
+        staged_mask_name = f"{subject_id}{VERSE_SEG_SUFFIX}"
+        staged_mask_path = staging_dir / staged_mask_name
 
         if not staged_mask_path.exists():
             mode = _link_or_copy(mask_path.resolve(), staged_mask_path)
