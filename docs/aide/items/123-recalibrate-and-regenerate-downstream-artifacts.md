@@ -893,4 +893,73 @@ and ticks the stage's "both reference artifacts are rebuilt from real GT and
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`scripts/rebuild_verse_reference.py` was implemented and run against the
+  real, 80-subject VerSe19 training cohort mounted at this machine's
+  `SEGFACET_VERSE_COHORT` (the `dataset-verse19training` symlink; no nested
+  zip-extraction wrapper on this machine — the root discovered directly
+  contains `derivatives/` and `rawdata/`, which the tool's recursive glob
+  handles with no flag). The run completed cleanly: `cohort.status == "ran"`
+  with `mask_count == 80`, no `staging`/`build` step skipped,
+  `build.subject_count == 80`, and all 25 canonical levels (`C1`-`C7`,
+  `T1`-`T12`, `L1`-`L6`) present. `derive_max_offset_mm`, AC9-AC11's pure
+  rule, is implemented exactly as specified and unit-tested independently of
+  any cohort.
+- **The measured real-GT ceiling `P` is `21.209073949050172` mm, attained at
+  level `L5` (`count = 62` subjects, comfortably above the `count >= 10`
+  qualifying floor).** Every other level's `p99` stays below `14.25` mm
+  (`T10`, the next-highest). The rule's derived threshold is
+  `S = 21.5` mm (the smallest multiple of `0.5` mm strictly greater than
+  `P`), and `max(6.0, 21.5) = 21.5`.
+- **HAND-BACK: `21.5` mm falls outside AC14's approved corpus window
+  `(5.143859, 17.507445]`.** Per this item's own Assumptions ("If the rule's
+  value exceeds `17.507445` mm, the item hands back rather than clamping"),
+  the recalibration is **not applied**. `heuristics/mislabel.py`'s
+  `_DEFAULT_MAX_OFFSET_MM` stays `15.0`; `default_config.yaml` is unchanged;
+  the committed `reference_verse_v1.json`, `reference_default.json` and the
+  nine corpus goldens are **not** touched by this item, and
+  `test_098_stray_components.py`'s `_PRE_098_REFERENCE_VERSE_V1_SHA256`
+  fence is **not** updated. AC12-AC28 and AC33 therefore do not pass as
+  committed on this branch — this is the deliberate, spec-mandated outcome
+  of the measurement landing outside the approved window, not an
+  implementation defect, and needs a **person** to decide whether to widen
+  the 2026-08-27 "Spinal curve model — the deformity envelope" gate before
+  any of that work can land. Clamping either direction was rejected for the
+  reasons the Assumptions section states: clamping down would knowingly
+  flag real, GT-clean anatomy at `L5`; clamping up would silence
+  `mode6_crop_at_border`'s deliberate corpus finding.
+- **What *is* committed by this item:** the rebuild tool itself
+  (`scripts/rebuild_verse_reference.py`, AC1-AC11 and AC17, all
+  cohort-independent or exercised against stand-in cohorts and unaffected by
+  the hand-back), and the documentation corrections that describe the tool
+  and the machine-local cohort-root configuration
+  (`docs/aide/dataset-verse19.md`, `docs/reference-build.md`, AC29-AC31 —
+  none of which asserts a specific threshold value). `docs/reference-build.md`
+  additionally records this run's outcome (cohort size, date, measured `P`,
+  derived value, and the hand-back) so a reader can tell an artifact
+  generation was attempted and why the threshold did not move — this
+  satisfies the spirit of AC32 (a dated, evidenced record of the rebuild)
+  without asserting the recalibration completed, since it did not.
+- **Why `L5` reads so high is not investigated further here** — diagnosing
+  whether this is a genuine severe-scoliosis / transitional-vertebra
+  boundary effect in the real cohort, or an artefact of item 120's held-out
+  estimator, is exactly the kind of judgement the deformity-envelope gate
+  exists to make, and is out of this item's scope regardless of outcome.
+  Captured in `insights.md` as a follow-up pointer for whoever revisits the
+  gate.
+- **Item 120's two deferral fences
+  (`test_ac29_reference_verse_v1_unchanged`,
+  `test_ac16_default_max_offset_mm_still_15`) were already retired by the
+  test-writer's commit** (`tests/test_120_leave_one_out_offset.py`), and stay
+  retired: their purpose — fencing item 120 out of item 123's work — is
+  served either way, since item 123 attempted the recalibration and recorded
+  why it could not land, rather than never attempting it.
+- **Next step for a person:** review this measurement against the
+  2026-08-27 gate (`progress.md`, `## Human gates`) and either (a) approve a
+  wider envelope so a follow-up item can apply `21.5` mm (or a re-derived
+  value, if the estimator is revised first), or (b) direct a different
+  resolution (e.g. excluding `L5` from the qualifying-level sweep, revisiting
+  `sub-verse015` / the other top-offset subjects named in
+  `out/verse-rebuild/verse_rebuild_summary.json`'s `calibration.top_subject_ids`
+  for a labelling-error explanation, or changing the derivation rule itself).
+  Until then this item's remaining acceptance criteria (AC12-AC28, AC33)
+  stay unmet by design.

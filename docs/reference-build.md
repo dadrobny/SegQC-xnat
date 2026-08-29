@@ -65,8 +65,10 @@ Real VerSe ground truth comes from the **VerSe19** training release:
   read that living reference first; this document only restates what is
   needed to stage a build.
 
-Per that reference, the dataset root (after unzipping) is
-`dataset-verse19training/dataset-verse19training/`, with:
+The dataset root's exact nesting depth beneath the configured cohort root is
+not fixed (see `docs/aide/dataset-verse19.md`'s "Git / versioning policy" —
+some extraction tools produce a wrapping `dataset-verse19training/` directory
+around the actual root, some don't); either way it contains:
 
 ```
 rawdata/sub-verseNNN/sub-verseNNN_ct.nii.gz
@@ -85,43 +87,47 @@ in `--seg-suffix`, and for each match hardcodes the sibling scan filename as
 `<id>_scan.nii.gz` (there is no `--scan-suffix` flag). Real VerSe's on-disk
 layout does not match this directly — masks live nested under
 `derivatives/sub-verseNNN/`, and CT scans are named `..._ct.nii.gz`, not
-`..._scan.nii.gz`. No code adapter is added for this (see Assumption Q3 in
-the item-082 spec); instead, an operator **stages** the cohort into one flat
-directory before invoking the build:
+`..._scan.nii.gz`.
 
-1. **Flatten the masks.** Copy or symlink every
-   `derivatives/sub-verseNNN/sub-verseNNN_seg-vert_msk.nii.gz` (and any
-   `_split-verseMMM` variants) out of its nested `derivatives/sub-verseNNN/`
-   subdirectory into one flat staging directory, keeping the filename as-is
-   (the real VerSe mask suffix `_seg-vert_msk.nii.gz` is passed straight
-   through to `--seg-suffix`).
-2. **Provide each CT as a `<id>_scan.nii.gz` sibling.** Rename or
-   (symlink-)link each `rawdata/sub-verseNNN/sub-verseNNN_ct.nii.gz` into the
-   same staging directory as `sub-verseNNN_scan.nii.gz`, so `ingest_cohort`'s
-   hardcoded sibling-scan discovery finds it and folds intensity features in.
-
-A minimal staging script (illustrative, not part of this repo's production
-code — the recipe is manual per the item-082 scope):
+**Item 123 ships the reproducible path**: `scripts/rebuild_verse_reference.py`
+resolves the cohort root (`--verse-cohort`, else the `SEGFACET_VERSE_COHORT`
+environment variable), discovers masks by a **recursive** glob for
+`*_seg-vert_msk.nii.gz` beneath that root (so either nesting layout works with
+no flag), stages a flat directory of symlinks (falling back to copies) that
+satisfies `ingest_cohort`'s convention — each mask under its own filename plus
+a `<subject_id>_scan.nii.gz` sibling for every mask whose CT was found — and
+then drives `build_reference` / `write_artifact` over the staged directory
+itself:
 
 ```bash
-mkdir -p staged_verse
-for d in dataset-verse19training/dataset-verse19training/derivatives/sub-verse*/; do
-    sub=$(basename "$d")
-    cp "$d/${sub}_seg-vert_msk.nii.gz" "staged_verse/"
-    cp "dataset-verse19training/dataset-verse19training/rawdata/${sub}/${sub}_ct.nii.gz" \
-       "staged_verse/${sub}_scan.nii.gz"
-done
+.venv/bin/python scripts/rebuild_verse_reference.py \
+    --out out/verse-rebuild \
+    --verse-cohort "$SEGFACET_VERSE_COHORT" \
+    --build-date 2026-08-29
 ```
 
-Adjust for split-subject `_split-verseMMM` infixes as needed; the exact
-staging mechanics (script vs. manual copy vs. symlinks) are an operator
-choice — the requirement is only that the staged directory be flat and that
-each mask have a `<id>_scan.nii.gz` sibling.
+(`--verse-cohort` may be omitted once `SEGFACET_VERSE_COHORT` is exported;
+the CLI flag overrides the environment variable when both are given.) The
+tool never writes beneath the cohort root, and never writes the committed
+package copy under `src/segfacet/` — it writes
+`<out>/reference_verse_v1.json` and a structured
+`<out>/verse_rebuild_summary.json` recording the discovered cohort, the
+staging outcome, the built artifact's identity, and the derived
+`mislabel.max_offset_mm` calibration (see AC9–AC17 in
+[`docs/aide/items/123-recalibrate-and-regenerate-downstream-artifacts.md`](aide/items/123-recalibrate-and-regenerate-downstream-artifacts.md)).
+Installing the rebuilt artifact — copying `<out>/reference_verse_v1.json`
+over `src/segfacet/reference/reference_verse_v1.json` — remains a separate,
+explicit operator step, exactly as it does for `scripts/refresh_reference.py`.
 
-## Build invocation
+An unreachable cohort (no root resolvable, or a root with no matching masks)
+is a structured skip recorded in the summary's `cohort` block, never a
+traceback: `main` still returns `0`.
 
-Once staged, drive the existing `segfacet build-reference` CLI directly — no
-new code, no wrapper:
+## Build invocation (manual alternative)
+
+The staging tool above is the reproducible path for a real VerSe cohort; the
+underlying `segfacet build-reference` CLI can still be driven directly
+against an already-flat staged directory when that's more convenient:
 
 ```bash
 segfacet build-reference \
@@ -194,3 +200,26 @@ filename and select it explicitly.
   real artifact when a cohort is mounted + re-evaluate), see **item 083**'s
   refresh wrapper — this document only covers the manual invocation of the
   existing `segfacet build-reference` CLI.
+
+## Rebuild record — 2026-08-29 (item 123)
+
+`scripts/rebuild_verse_reference.py` was run against the full, real 80-subject
+VerSe19 training cohort (`SEGFACET_VERSE_COHORT`, no CT/mask missing). The
+build completed cleanly — all 25 canonical levels present, `subject_count ==
+80` — and `derive_max_offset_mm` (item 123's pure `mislabel.max_offset_mm`
+derivation rule, `p99`-over-qualifying-levels rounded up to the next `0.5`
+mm, floored at `6.0` mm) measured the real-GT ceiling `P = 21.209073949050172`
+mm at level `L5` (`count = 62`), giving a derived threshold of `21.5` mm.
+
+**That value falls outside the corpus window `(5.143859, 17.507445]`** that
+the 2026-08-27 "Spinal curve model — the deformity envelope" human gate
+(`progress.md`, `## Human gates`) approved, so the recalibration was **not**
+applied: `heuristics/mislabel.py`'s `_DEFAULT_MAX_OFFSET_MM` stays `15.0`,
+and `reference_verse_v1.json` / `reference_default.json` / the corpus
+goldens are unchanged. This is the item's own spec-mandated hand-back
+outcome (see the item's Decisions log), not a build failure — the real GT
+does reach into and past the approved envelope at `L5`, and widening (or
+otherwise revising) that envelope needs a person's decision, not a rebuild.
+The full evidence (`p99_by_level`, the qualifying-level list, and the
+top-offset subject ids) is in the rebuild's own
+`verse_rebuild_summary.json`, regenerable by re-running the command above.

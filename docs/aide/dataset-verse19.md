@@ -16,24 +16,33 @@ The `.gitignore` already excludes `dataset-verse19training/` at the root level. 
 - NIfTI CT volumes are large binary blobs (~6.6 GB total); VCS is the wrong storage layer.
 - The directory *structure* is also not committed (no `.gitkeep` files). Committing empty directories would imply a guaranteed local path contract that does not hold on machines where data has not been downloaded. Instead, this document is the contract.
 
-**To reproduce:** download and unzip the archive into the project root so the path `dataset-verse19training/dataset-verse19training/` exists. No path configuration is required; code should reference the dataset relative to this expected root or via a configurable path variable.
+**To reproduce:** download and unzip the archive somewhere reachable on this
+machine. **The cohort root is machine-local configuration, not a fixed path
+contract** — set it via the `SEGFACET_VERSE_COHORT` environment variable (or
+pass `--verse-cohort` directly to `scripts/rebuild_verse_reference.py`, item
+123). Unzipping produces a nested `dataset-verse19training/` wrapper
+directory around the actual dataset root on some extraction tools and not on
+others; both layouts are supported because mask discovery is **recursive**
+(a glob for `*_seg-vert_msk.nii.gz` beneath whatever root is configured), so
+no specific nesting depth is required or assumed.
 
 ---
 
 ## Directory structure
 
+The dataset root (however deep the configured `SEGFACET_VERSE_COHORT` root
+sits relative to it — see above) contains:
+
 ```
-dataset-verse19training/                      ← gitignored (zip extraction wrapper)
-└── dataset-verse19training/                  ← actual dataset root
-    ├── rawdata/
-    │   └── sub-verseNNN/
-    │       ├── sub-verseNNN_ct.nii.gz        ← CT scan (NIfTI, gzipped)
-    │       └── sub-verseNNN_ct.json          ← scan metadata (scanner, KVP)
-    └── derivatives/
-        └── sub-verseNNN/
-            ├── sub-verseNNN_seg-vert_msk.nii.gz    ← vertebra segmentation mask (NIfTI)
-            ├── sub-verseNNN_seg-subreg_ctd.json    ← vertebra centroid coordinates (JSON)
-            └── sub-verseNNN_seg-vert_snp.png       ← 2-D preview snapshot (PNG)
+rawdata/
+└── sub-verseNNN/
+    ├── sub-verseNNN_ct.nii.gz        ← CT scan (NIfTI, gzipped)
+    └── sub-verseNNN_ct.json          ← scan metadata (scanner, KVP)
+derivatives/
+└── sub-verseNNN/
+    ├── sub-verseNNN_seg-vert_msk.nii.gz    ← vertebra segmentation mask (NIfTI)
+    ├── sub-verseNNN_seg-subreg_ctd.json    ← vertebra centroid coordinates (JSON)
+    └── sub-verseNNN_seg-vert_snp.png       ← 2-D preview snapshot (PNG)
 ```
 
 For split subjects (400-series), files include a `_split-verseMMM` infix:
