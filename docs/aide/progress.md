@@ -1198,7 +1198,7 @@ prior, so it is recorded and gated before any calculation changes.
   tracks displacement ~1:1 (measured 5 → 6.2, 10 → 10.4, 15 → 16.0 mm) and already exists as
   `_recon_leave_one_out_offset` inside the test harness; promoting it retires mode 1's
   `reconstructed_record` workaround. *(Item 120)*
-- 🔍 **D4** Tangent-based vertebra orientation. PCA's `principal_axis` is `(1, 0, 0)` for
+- ✅ **D4** Tangent-based vertebra orientation. PCA's `principal_axis` is `(1, 0, 0)` for
   every vertebra of the default fixture — a box's widest side, left-right on real anatomy
   too. `closest_u` and `splev(..., der=1)` both exist but are never joined. Retain
   `eigenvalue_ratio` (real-GT CoV 0.155); demote `principal_axis`. *(Item 121)*
