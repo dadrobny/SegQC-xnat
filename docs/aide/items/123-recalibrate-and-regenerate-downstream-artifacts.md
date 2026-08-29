@@ -525,34 +525,40 @@ behind each prescription._
 - [ ] **AC56: The L6 byte-for-byte narrowing test asserts the true, measured
   footprint.** *(Amended 2026-08-29, third round: the footprint below was
   re-measured leaf-by-leaf and is wider than the previous text stated — see
-  AC19's third-round correction and the Decisions log.)*
+  AC19's third-round correction and the Decisions log. **Corrected again
+  2026-08-29** — this AC's own third-round text overstated the correction: it
+  is not that all 14 keys are absent, it is a **split** — see below and the
+  Decisions log's dated correction note.)*
   `tests/test_093_tptbox_label_convention.py::test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s`
-  asserts `set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS) -
-  _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT`, where
-  `_AC5_FEATURES_MOVED_BY_ITEM_123_REFIT` is widened to the **14-element**
-  set `{"spline_offset_mm", "intensity_mean", "intensity_median",
-  "intensity_std", "intensity_min", "intensity_max", "intensity_p05",
-  "intensity_p25", "intensity_p50", "intensity_p75", "intensity_p95",
-  "intensity_range", "intensity_iqr", "intensity_entropy"}` (the 13 names are
-  exactly `segfacet.reference.ingest.INGESTED_INTENSITY_FEATURES`). All 14
-  keys are **absent** from `L6`'s rebuilt `feature_stats`: `spline_offset_mm`
-  because `L6` has no interior occurrence in the 80-subject cohort (AC43),
-  and every `intensity_*` key because this cohort's `L6` subjects (3 of them)
-  did not all have a paired scan staged in the pre-123 build's ingestion —
-  a per-key **absence**, not merely a skipped value while the key stays
-  present. Every other key in `_PRE_RENAME_S_FEATURE_STATS`
+  excludes **14** features from the byte-for-byte *value* comparison, named by
+  `_AC5_FEATURES_MOVED_BY_ITEM_123_REFIT` — `{"spline_offset_mm",
+  "intensity_mean", "intensity_median", "intensity_std", "intensity_min",
+  "intensity_max", "intensity_p05", "intensity_p25", "intensity_p50",
+  "intensity_p75", "intensity_p95", "intensity_range", "intensity_iqr",
+  "intensity_entropy"}` (the 13 names are exactly
+  `segfacet.reference.ingest.INGESTED_INTENSITY_FEATURES`) — but only **one**
+  of the 14 is a genuinely absent **key**: `spline_offset_mm`, because `L6`
+  has no interior occurrence in the 80-subject cohort (AC43). The other 13
+  (`intensity_*`) are **present keys whose value moved** — this item's rebuild
+  finds a CT sibling for all of `L6`'s 3 subjects where the pre-123 build
+  found only 1 (`intensity_*.count` moved `1 -> 3`), a legitimately wider
+  scan-coverage effect, not an absence. The test therefore asserts two things
+  separately: `set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS) -
+  {"spline_offset_mm"}` (only `spline_offset_mm` is missing from the key set),
+  and that every one of the other 13 excluded names is still `in l6_stats`
+  (present, value unchecked). Every other key in `_PRE_RENAME_S_FEATURE_STATS`
   (`component_count`, `eigenvalue_ratio`, `extent_x_mm`, `extent_y_mm`,
   `extent_z_mm`, `physical_volume_mm3`, `largest_component_fraction`) is
   still present and still byte-for-byte identical to the pinned literal —
   verified directly against the committed rebuilt artifact. The sibling test
-  `test_ac5_spline_offset_mm_excluded_from_byte_for_byte_is_the_only_exclusion`
-  is renamed/updated to name and count the widened 14-key exclusion set (no
-  longer "the only exclusion" — its assertion becomes "these are the only
-  14 exclusions"), and its constant's docstring is updated to state the
-  exclusion is *absence*, driven by two distinct causes (an interior-only
-  feature definition for `spline_offset_mm`; incomplete scan coverage in the
-  pre-123 build for every `intensity_*` feature), not *drift*. The module's
-  two other AC5 tests (`test_ac5_no_other_level_or_top_level_field_changed`,
+  (committed as `test_ac5_fourteen_features_are_the_only_byte_for_byte_exclusions`,
+  no longer "the only exclusion" since there are 14) names and counts the
+  widened 14-name exclusion set **and** asserts the same absent-vs-present
+  split, and its constants' docstrings state the exclusion is a mix of one
+  genuine *absence* (`spline_offset_mm`, an interior-only feature definition)
+  and 13 *value moves* (`intensity_*`, incomplete scan coverage in the pre-123
+  build), never describing all 14 as absent. The module's two other AC5 tests
+  (`test_ac5_no_other_level_or_top_level_field_changed`,
   `test_ac5_reference_verse_v1_json_is_well_formed_after_the_edit`) are
   unchanged — they assert level presence and file well-formedness, not a
   byte-for-byte value comparison, so the widened footprint does not reach
@@ -1237,7 +1243,7 @@ validation round fails on them, not on new code, unless they are handled):
 | `test_120_leave_one_out_offset.py::test_ac29_reference_verse_v1_unchanged` | Imports `test_098`'s literal to assert the artifact is untouched, explicitly "item 123's, not item 120's". | Delete (AC34). Authorised. |
 | `test_120_leave_one_out_offset.py::test_ac16_default_max_offset_mm_still_15` | Asserts `_DEFAULT_MAX_OFFSET_MM == 15.0`, the deferral this item discharges. | Delete. Authorised. |
 | `test_035_default_config.py::test_ac3_max_offset_mm_matches_code_default` | Asserts the config value equals the literal `15.0`. | Re-express against `_DEFAULT_MAX_OFFSET_MM` so it keeps pinning code↔config agreement. Authorised. |
-| `test_093_tptbox_label_convention.py::test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s` | Pins L6's **entire** `feature_stats` **key set** against a literal snapshot captured before the July re-key. AC43 makes L6 (never interior in this 80-subject cohort — it is the last level of every sequence it appears in) carry **no** `spline_offset_mm` key at all. *(Third-round correction: this row previously understated the footprint as `spline_offset_mm` alone. Re-measured leaf-by-leaf against the pre-123 committed artifact: L6's `intensity_count` also moved `1 -> 3` — this item's rebuild finds a scan for all 3 of L6's subjects, where the pre-123 build found one — so all 13 `intensity_*` keys are **also** absent from the rebuilt `feature_stats`, not just `spline_offset_mm`. Verified against the committed rebuilt artifact: `set(l6_stats)` is missing all 14 keys, and every other key — `component_count`, `eigenvalue_ratio`, `extent_x_mm`, `extent_y_mm`, `extent_z_mm`, `physical_volume_mm3`, `largest_component_fraction` — is present and byte-identical to the pinned literal.)* | Assert `set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS) - _AC5_FEATURES_MOVED_BY_ITEM_123_REFIT`, with `_AC5_FEATURES_MOVED_BY_ITEM_123_REFIT` widened to the 14-element set named in AC56 (`spline_offset_mm` plus the 13 `INGESTED_INTENSITY_FEATURES` names) — i.e. assert every one of the 14 keys' **absence**, not a value skipped while the key remains (AC56). Update the sibling `test_ac5_spline_offset_mm_excluded_from_byte_for_byte_is_the_only_exclusion` (and its name, since it is no longer "the only" exclusion) and the constant's docstring to say *absence*, driven by two distinct causes, not *drift*. Authorised. Its other two sibling AC5 tests (`test_ac5_no_other_level_or_top_level_field_changed`, `test_ac5_reference_verse_v1_json_is_well_formed_after_the_edit`) stay green unmodified — they check level presence and file well-formedness, not a byte-for-byte value comparison. |
+| `test_093_tptbox_label_convention.py::test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s` | Pins L6's **entire** `feature_stats` against a literal snapshot captured before the July re-key, checking both key presence and value equality. *(Third-round correction: this row previously understated the footprint as `spline_offset_mm` alone; a follow-up correction then overstated it as all 14 excluded features being absent **keys**. Re-measured leaf-by-leaf against the pre-123 committed artifact, the true footprint is a **split**: `spline_offset_mm` is a genuinely absent key — L6 is never interior in this 80-subject cohort (AC43) — while the 13 `intensity_*` names are **present** keys whose *value* moved (`intensity_*.count` `1 -> 3`, this item's rebuild finding a scan for all 3 of L6's subjects where the pre-123 build found one). Verified directly against the committed rebuilt artifact: `"spline_offset_mm" not in l6_stats`, but `"intensity_mean" in l6_stats` (and likewise for the other 12) is `True`. Every geometric key — `component_count`, `eigenvalue_ratio`, `extent_x_mm`, `extent_y_mm`, `extent_z_mm`, `physical_volume_mm3`, `largest_component_fraction` — is present and byte-identical to the pinned literal.)* | Exclude all 14 names from the *value* comparison via `_AC5_FEATURES_MOVED_BY_ITEM_123_REFIT` (AC56), but assert the *key-set* equality against only `{"spline_offset_mm"}` removed — i.e. `set(l6_stats) == set(_PRE_RENAME_S_FEATURE_STATS) - {"spline_offset_mm"}` — plus a separate assertion that each of the other 13 excluded names is still `in l6_stats`. Committed as `test_ac5_l6_feature_stats_byte_for_byte_identical_to_pre_rename_s` (`b27e1f7`), with the sibling renamed `test_ac5_fourteen_features_are_the_only_byte_for_byte_exclusions` (no longer "the only exclusion" since there are 14) asserting the same absent-vs-present split. Authorised. Its other two sibling AC5 tests (`test_ac5_no_other_level_or_top_level_field_changed`, `test_ac5_reference_verse_v1_json_is_well_formed_after_the_edit`) stay green unmodified — they check level presence and file well-formedness, not a byte-for-byte value comparison. *(Fourth-round correction, 2026-08-29: this row and AC56 wrongly stated all 14 excluded features as absent keys; corrected to the measured split above to match the Decisions log, which already had it right, and the committed test `b27e1f7`.)* |
 | `test_045_reference_artifact.py::test_ac10_regenerating_reproduces_committed_bytes` | Compares a fresh default build against the committed one; `config_hash` moves with the threshold. | Rebuild `reference_default.json` (step 8). No test edit. |
 | `test_063_reference_intensity.py::{test_ac13_default_cohort_geometric_stats_identical_on_off_intensity, test_ac15_bundled_artifact_regenerates_byte_identically}` | Same cause. | Same. |
 | `test_081_reference_morphology.py::{test_ac12_bundled_default_geometric_and_intensity_stats_identical_on_off_morphology, test_ac17_regenerated_artifact_deterministic_and_matches_committed_within_tolerance}` | Same cause. | Same. `grep -l build_and_write_default tests/` finds this family mechanically — the sweep `insights.md` asks for (item 119, 2026-08-27). |
