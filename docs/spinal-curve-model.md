@@ -114,6 +114,14 @@ uses for the mislabel reconstruction path; item 119 should make it the actual
 per-label evaluation method for `stage3.per_label_offsets`, not only a
 synthetic-test technique.
 
+> **How it actually landed (2026-08-28):** the work split differently from the
+> sentence above — item 119 changed the fit itself (`make_splprep` smoothing
+> spline), and item **120** promoted leave-one-out into the pipeline as
+> `compute_leave_one_out_spline_offsets`, per
+> [`docs/aide/queue/queue-017.md`](aide/queue/queue-017.md), which owns the
+> work breakdown. Item numbers in this document are the proposal's suggestion,
+> not the assignment of record.
+
 **Consequence:** every evaluated family separates a displaced vertebra almost
 identically well once leave-one-out is applied — the family choice stops
 being what makes displacement detectable, because the point under test never
@@ -225,6 +233,21 @@ Three amendments to the decision above, recorded after the measurements were
 taken. None invalidates a measured number: the comparison script fitted
 `smoothing_spline` through `splprep`, and the amended API carries identical `s`
 semantics, so every value in `## Measurements` still reproduces.
+
+> **Correction (2026-08-30, measured at item 125's stage validation):** the
+> "still reproduces" claim above is true for 15 of the 16 documented keys but
+> not all 16. Re-running `scripts/compare_curve_candidates.py --verse-cohort
+> dataset-verse19training` against the shipped `fit_centroid_spline`
+> (`make_splprep`) reproduces every key within the stated 0.001 mm tolerance
+> **except** `candidates.smoothing_spline.verse_scoliotic.max_pass_through_mm.leave_one_out`,
+> which measures `20.683092` mm against the documented `21.073357` mm.
+> `make_splprep` is an independent smoothing-spline implementation, not a
+> `splprep` wrapper — an identical `s` does not guarantee an identical fit for
+> every input, and one of the 17 selected scoliotic cases' leave-one-out fits
+> is sensitive to the difference. Immaterial to the shipped
+> `mislabel.max_offset_mm = 13.0`: item 123's interior-only recalibration
+> superseded the `25.0` mm envelope this figure fed (see
+> [`docs/reference-build.md`](reference-build.md), rebuild records 2026-08-29).
 
 ### The fit uses `make_splprep`, not `splprep`
 

@@ -251,3 +251,8 @@ docs/aide/status/*.json
 # (a trailing slash matches directories only, so a symlink would show as
 # untracked and be committable).
 dataset-verse19training
+
+# Regenerable run output. The `--out out/...` reproduction commands the repo's
+# own docs give (docs/spinal-curve-model.md, docs/reference-build.md) write
+# here; untracked leftovers otherwise fail `aide sync`'s clean-tree preflight.
+out/
