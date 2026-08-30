@@ -1210,7 +1210,7 @@ prior, so it is recorded and gated before any calculation changes.
   locally (80 CT/GT pairs, gitignored symlink at the documented root), so the real artifact
   is rebuildable; `dataset-verse19.md`'s documented nested layout needs correcting to match.
   *(Item 123)*
-- 📋 **D7** An observed-range column in the generated feature catalogue — the check that
+- 🚧 **D7** An observed-range column in the generated feature catalogue — the check that
   would have caught this at item 018. The catalogue is current and its `computation` column
   accurate, but nothing records what a feature *does*: `offset_mm` reads healthy and its
   `status` is `retune`, shared with 65 of 128 rows. *(Item 124)*
