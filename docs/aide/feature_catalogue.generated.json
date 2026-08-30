@@ -2966,9 +2966,9 @@
               "count": 24,
               "covered": true,
               "informative": false,
-              "magnitude": 3.55271e-14,
-              "maximum": 3.55271e-14,
-              "minimum": -2.84217e-14,
+              "magnitude": 0.0,
+              "maximum": 0.0,
+              "minimum": 0.0,
               "population": "corpus",
               "source": [
                 "clean",
@@ -2977,7 +2977,7 @@
                 "overlaps",
                 "sequence_break"
               ],
-              "span": 6.39488e-14
+              "span": 0.0
             },
             "numeric": true,
             "reference": {
@@ -3569,9 +3569,9 @@
               "count": 5,
               "covered": true,
               "informative": false,
-              "magnitude": 3.83431e-14,
-              "maximum": 3.83431e-14,
-              "minimum": 5.1229e-15,
+              "magnitude": 0.0,
+              "maximum": 0.0,
+              "minimum": 0.0,
               "population": "corpus",
               "source": [
                 "clean",
@@ -3580,7 +3580,7 @@
                 "overlaps",
                 "sequence_break"
               ],
-              "span": 3.32202e-14
+              "span": 0.0
             },
             "numeric": true,
             "reference": {
@@ -3616,9 +3616,9 @@
               "count": 24,
               "covered": true,
               "informative": false,
-              "magnitude": 3.58002e-14,
-              "maximum": 3.58002e-14,
-              "minimum": -5.1229e-15,
+              "magnitude": 0.0,
+              "maximum": 0.0,
+              "minimum": 0.0,
               "population": "corpus",
               "source": [
                 "clean",
@@ -3627,7 +3627,7 @@
                 "overlaps",
                 "sequence_break"
               ],
-              "span": 4.09231e-14
+              "span": 0.0
             },
             "numeric": true,
             "reference": {
@@ -4090,9 +4090,9 @@
               "count": 24,
               "covered": true,
               "informative": false,
-              "magnitude": 3.66317e-14,
-              "maximum": 3.66317e-14,
-              "minimum": -8.26248e-15,
+              "magnitude": 0.0,
+              "maximum": 0.0,
+              "minimum": 0.0,
               "population": "corpus",
               "source": [
                 "clean",
@@ -4101,7 +4101,7 @@
                 "overlaps",
                 "sequence_break"
               ],
-              "span": 4.48942e-14
+              "span": 0.0
             },
             "numeric": true,
             "reference": {

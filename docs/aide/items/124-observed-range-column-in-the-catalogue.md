@@ -587,3 +587,38 @@ from real GT rather than edited.
   reclassifies exactly `stage3.per_label_offsets[].offset_mm` as
   `"degenerate"` and nothing else, confirming the instrument catches the
   defect the item's title names.
+
+- **2026-08-30, post-merge fix: sub-floor noise digits clamped to `0.0` at
+  emission.** PR #56's CI matrix exposed cross-platform flakiness in the
+  five byte-exact catalogue-regeneration test modules (103/106/119/120/122;
+  8 tests) — the same revision against numpy 1.26.4 failed those tests in
+  one CI run and passed them in another with no code change. Root cause:
+  the committed catalogue embedded raw `corpus` measurements from
+  structurally-constant, sub-`NEGLIGIBLE_MAGNITUDE` paths (four
+  `stage3.curvature`/`stage3.per_label_offsets[]` paths measured on the
+  committed corpus — `dy_mm`, `sagittal_curvature_deg`,
+  `sagittal_tangent_angles_deg`, `spline_tangent_sagittal_deg` — e.g.
+  `magnitude=3.66317e-14`, `minimum=-8.26248e-15`) whose exact bits are
+  cancellation-scale NumPy/SciPy residue that legitimately differs across
+  NumPy builds and CPU microarchitectures while staying well under the
+  floor either way. `float(f"{v:.6g}")` quantisation (AC15) cannot
+  stabilise a value that is noise rather than signal: six significant
+  digits of noise are still noise. Fix: `segfacet.observed_range.
+  emission_range(pop)` returns `(0.0, 0.0, 0.0, 0.0)` for a
+  covered-but-not-`informative` population (an uncovered population's nulls
+  are untouched), called only from `catalogue.py`'s two serialisers
+  (`_population_range_to_dict` for the JSON, `_fmt_population` for the
+  Markdown cell) — never from `build_observed_ranges` itself, whose
+  returned `PopulationRange`/`ObservedRange` objects keep reporting the raw
+  measured values unclamped. This matters twice: (1) it keeps
+  `test_adv_floor_boundary_exactly_at_floor_not_informative` (which asserts
+  `corpus.magnitude == pytest.approx(NEGLIGIBLE_MAGNITUDE)` at the exact
+  floor, not `0.0`) passing unmodified; (2) it guarantees verdict
+  classification (`_derive_verdict`) runs on the raw, unclamped value —
+  confirmed by re-running the pre-123-defect replay after this fix:
+  `stage3.per_label_offsets[].offset_mm` still reads `"degenerate"` against
+  the pre-123 reference, and `observed_summary` is otherwise identical
+  (`degenerate: 1`, everything else unchanged). Regenerating after the fix
+  changed exactly the four sub-floor corpus blocks' four numeric fields in
+  the JSON (32 lines) and the four corresponding Markdown cells (4 lines);
+  no verdict, count, `informative`/`covered` flag, or entry moved.

@@ -965,15 +965,26 @@ def _quantise(v: Optional[float]) -> Optional[float]:
 
 
 def _population_range_to_dict(pop: Any) -> dict:
+    # emission_range clamps a covered-but-not-informative population's
+    # numeric fields to 0.0 (item 124 post-merge fix, 2026-08-30): a
+    # sub-floor measurement is numerical noise whose exact bits are
+    # platform-dependent, and this document is compared byte-exactly. See
+    # segfacet.observed_range's module docstring, "Sub-floor noise is
+    # clamped to 0.0 at emission". Classification already happened on the
+    # raw, unclamped value (build_observed_ranges._derive_verdict) -- this
+    # clamp only affects what gets written here.
+    from segfacet.observed_range import emission_range
+
+    minimum, maximum, span, magnitude = emission_range(pop)
     return {
         "population": pop.population,
         "source": list(pop.source),
         "covered": pop.covered,
         "count": pop.count,
-        "minimum": _quantise(pop.minimum),
-        "maximum": _quantise(pop.maximum),
-        "span": _quantise(pop.span),
-        "magnitude": _quantise(pop.magnitude),
+        "minimum": _quantise(minimum),
+        "maximum": _quantise(maximum),
+        "span": _quantise(span),
+        "magnitude": _quantise(magnitude),
         "informative": pop.informative,
     }
 
@@ -1044,10 +1055,17 @@ def _md_escape(text: str) -> str:
 
 
 def _fmt_population(pop: Any) -> str:
-    if not pop.covered:
+    # See _population_range_to_dict: emission_range clamps sub-floor noise
+    # to 0.0 so the Markdown table's "observed range" cell agrees with the
+    # JSON's clamped values instead of embedding platform-dependent noise
+    # digits into a byte-compared document.
+    from segfacet.observed_range import emission_range
+
+    minimum, maximum, _span, _magnitude = emission_range(pop)
+    if minimum is None:
         return "\u2014"
-    minimum = _quantise(pop.minimum)
-    maximum = _quantise(pop.maximum)
+    minimum = _quantise(minimum)
+    maximum = _quantise(maximum)
     return f"{minimum:.6g}\u2013{maximum:.6g}"
 
 

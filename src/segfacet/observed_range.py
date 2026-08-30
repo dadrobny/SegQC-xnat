@@ -47,6 +47,40 @@ Public API
     ``{reference_feature_name: leaf_path}``, three ordered resolution rules.
 ``build_observed_ranges(*, driver_records=None, reference=None) -> dict[str, ObservedRange]``
     The whole computation, one entry per realised/reference-resolved path.
+``emission_range(pop) -> (minimum, maximum, span, magnitude)``
+    The values a byte-compared artifact should emit for *pop* (see "Sub-floor
+    noise is clamped to 0.0 at emission" below).
+
+Sub-floor noise is clamped to 0.0 at emission
+----------------------------------------------
+A population whose magnitude sits below :data:`NEGLIGIBLE_MAGNITUDE` is, by
+construction, ``informative == False`` -- but its raw ``minimum``/
+``maximum``/``span``/``magnitude`` are still real floating-point measurements
+(e.g. a corpus block on a `principal_axis`-family path measured
+``magnitude=3.66317e-14``, ``minimum=-8.26248e-15``). Below the floor those
+digits are numerical noise: cancellation-scale residue from NumPy/SciPy
+linear algebra that legitimately differs by more than one ULP across NumPy
+builds and even CPU microarchitectures, while remaining well within the
+floor either way. Discovered 2026-08-30 when PR #56's CI matrix ran the
+identical revision against numpy 1.26.4 twice and got two different
+byte-exact results on those paths -- ``float(f"{v:.6g}")`` quantisation
+(item 124's AC15) cannot stabilise a value that is noise rather than signal;
+six significant digits of noise are still noise.
+
+:func:`build_observed_ranges` therefore keeps reporting the raw measured
+values on :class:`PopulationRange` (``minimum``/``maximum``/``span``/
+``magnitude`` are never altered there, and neither is ``informative``,
+``covered``, ``count``, or ``source``) -- callers that want the exact
+measurement, or that classify on it, still see it. Only
+:func:`emission_range`, called from :mod:`segfacet.catalogue`'s serialisers
+(``catalogue_to_dict`` / ``render_markdown``) when building the byte-compared
+JSON/Markdown artifacts, clamps a covered-but-not-informative population's
+four numeric fields to ``0.0``; an uncovered population's fields stay
+``None`` (nulls stay nulls -- AC4 is unaffected). Verdict classification
+(:func:`_derive_verdict`, and therefore ``informative`` itself) is computed
+from the raw, unclamped :class:`PopulationRange` *before* any call to
+:func:`emission_range` ever happens -- clamping is applied only at emission,
+never before deriving a verdict, so no verdict is affected by it.
 """
 
 from __future__ import annotations
@@ -63,6 +97,7 @@ __all__ = [
     "iter_leaf_values",
     "resolve_reference_features",
     "build_observed_ranges",
+    "emission_range",
 ]
 
 #: Magnitude floor below which a population is not "informative" -- one
@@ -111,6 +146,35 @@ class ObservedRange:
     corpus: PopulationRange
     reference: PopulationRange
     verdict: str
+
+
+def emission_range(
+    pop: "PopulationRange",
+) -> Tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
+    """``(minimum, maximum, span, magnitude)`` as a byte-compared artifact
+    should emit them for *pop* -- see the module docstring, "Sub-floor noise
+    is clamped to 0.0 at emission".
+
+    - Uncovered (``pop.covered is False``): all four ``None`` (AC4's null,
+      never ``0`` -- unaffected by this function).
+    - Covered and ``informative`` (magnitude strictly above
+      :data:`NEGLIGIBLE_MAGNITUDE`): the raw measured values, unchanged.
+    - Covered but not ``informative``: ``(0.0, 0.0, 0.0, 0.0)`` -- the raw
+      measurement is sub-floor numerical noise whose exact bits are
+      platform-dependent; reported as ``0.0`` by design rather than
+      round-tripped verbatim into a byte-compared document.
+
+    Does not read or affect ``pop.informative``/``pop.covered``/
+    ``pop.count``/``pop.source`` themselves, and is never consulted by verdict
+    derivation -- :func:`build_observed_ranges` classifies every path from
+    the raw, unclamped :class:`PopulationRange` before this function is ever
+    called.
+    """
+    if not pop.covered:
+        return (None, None, None, None)
+    if not pop.informative:
+        return (0.0, 0.0, 0.0, 0.0)
+    return (pop.minimum, pop.maximum, pop.span, pop.magnitude)
 
 
 def _empty_population(population: str, source: Tuple[str, ...] = ()) -> PopulationRange:
