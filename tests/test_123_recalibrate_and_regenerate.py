@@ -95,7 +95,13 @@ from segfacet.heuristics import run_rules
 from segfacet.pipeline import extract_feature_record
 from segfacet.synth.clean_gt import build_clean_spine
 from segfacet.synth.corpus import load_manifest
-from segfacet.synth.golden import GOLDEN_DIR, check_case_golden, load_golden, write_goldens
+from segfacet.synth.golden import (
+    GOLDEN_DIR,
+    check_case_golden,
+    load_golden,
+    reports_close,
+    write_goldens,
+)
 from segfacet.synth.intensity import paint_clean_scan
 from segfacet.synth.regression import pipeline_findings, pipeline_verdict_label
 
@@ -918,10 +924,19 @@ def test_ac20_config_hash_matches_current_config():
 # =========================================================================== #
 
 
-def test_ac21_reference_default_byte_identical_to_fresh_build(tmp_path):
+def test_ac21_reference_default_matches_fresh_build_within_tolerance(tmp_path):
+    """AC21: a fresh build matches the committed ``reference_default.json``
+    within numeric tolerance, not byte-for-byte -- the committed artifact's
+    float values differ from a freshly-computed one by ~1 ULP across numpy
+    versions and platforms (item 078's ``reports_close`` convention; see
+    CLAUDE.md "Note what the golden tests actually assert"). Same-session
+    determinism (two fresh builds are byte-identical) is covered separately
+    by test_ac21_two_fresh_builds_are_byte_identical below."""
     dest = tmp_path / "reference_default.json"
     build_and_write_default(dest)
-    assert dest.read_bytes() == default_artifact_path().read_bytes()
+    fresh = json.loads(dest.read_text(encoding="utf-8"))
+    committed = json.loads(default_artifact_path().read_text(encoding="utf-8"))
+    assert reports_close(fresh, committed)
 
 
 def test_ac21_two_fresh_builds_are_byte_identical(tmp_path):

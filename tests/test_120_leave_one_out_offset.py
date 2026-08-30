@@ -855,12 +855,34 @@ def test_ac27_stage3_report_golden_matches_test_022_output():
 # =========================================================================== #
 
 
-def test_ac28_reference_default_matches_fresh_build(tmp_path):
+def test_ac28_two_fresh_builds_are_byte_identical(tmp_path):
+    """Same-session determinism: two fresh builds on this platform/session
+    are byte-identical (item 078's convention -- byte-identity is reserved
+    for run-to-run comparisons within one session, never for comparison
+    against a committed artifact built elsewhere)."""
+    from segfacet.reference.artifact import build_and_write_default
+
+    dest_a = tmp_path / "a.json"
+    dest_b = tmp_path / "b.json"
+    build_and_write_default(dest_a)
+    build_and_write_default(dest_b)
+    assert dest_a.read_bytes() == dest_b.read_bytes()
+
+
+def test_ac28_reference_default_matches_fresh_build_within_tolerance(tmp_path):
+    """AC28: a fresh build matches the committed ``reference_default.json``
+    within numeric tolerance, not byte-for-byte -- the committed artifact's
+    float values differ from a freshly-computed one by ~1 ULP across numpy
+    versions and platforms (item 078's ``reports_close`` convention; see
+    CLAUDE.md "Note what the golden tests actually assert")."""
     from segfacet.reference.artifact import build_and_write_default, default_artifact_path
+    from segfacet.synth.golden import reports_close
 
     dest = tmp_path / "reference_default.json"
     build_and_write_default(dest)
-    assert dest.read_bytes() == default_artifact_path().read_bytes()
+    fresh = json.loads(dest.read_text(encoding="utf-8"))
+    committed = json.loads(default_artifact_path().read_text(encoding="utf-8"))
+    assert reports_close(fresh, committed)
 
 
 def test_ac28_spline_offset_mm_distribution_has_nonzero_mean():

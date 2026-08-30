@@ -414,11 +414,19 @@ def test_ac11_compute_vertebra_orientations_signature_unchanged():
 
 
 # =========================================================================== #
-# AC12: eigenvalue_ratio and principal_axis values are unchanged (exact)
+# AC12: eigenvalue_ratio and principal_axis values are unchanged (within
+# tight numeric tolerance -- committed-vs-fresh, not exact; item 078)
 # =========================================================================== #
 
 
-def test_ac12_pca_values_match_fresh_computation_exactly():
+def test_ac12_pca_values_match_fresh_computation_within_tolerance():
+    """AC12: eigenvalue_ratio and principal_axis are unchanged, compared
+    within tight numeric tolerance rather than exact equality -- the
+    committed golden's float values differ from a freshly-computed PCA by
+    ~1 ULP across numpy versions/platforms (item 078's convention; see
+    CLAUDE.md "Note what the golden tests actually assert"). Observed on
+    ``mode3_inject_islands`` in CI's numpy/Windows matrix, not locally or on
+    ubuntu-latest."""
     cases = load_manifest()["cases"]
     assert cases
     for case in cases:
@@ -436,8 +444,12 @@ def test_ac12_pca_values_match_fresh_computation_exactly():
             continue
         for entry in stage3["per_label_orientations"]:
             fresh_o = fresh[entry["label"]]
-            assert entry["principal_axis"] == list(fresh_o.principal_axis), case["case_id"]
-            assert entry["eigenvalue_ratio"] == fresh_o.eigenvalue_ratio, case["case_id"]
+            assert entry["principal_axis"] == pytest.approx(
+                list(fresh_o.principal_axis), abs=1e-9
+            ), case["case_id"]
+            assert entry["eigenvalue_ratio"] == pytest.approx(
+                fresh_o.eigenvalue_ratio, abs=1e-9
+            ), case["case_id"]
 
 
 # =========================================================================== #
