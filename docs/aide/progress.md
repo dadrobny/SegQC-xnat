@@ -1214,7 +1214,7 @@ prior, so it is recorded and gated before any calculation changes.
   would have caught this at item 018. The catalogue is current and its `computation` column
   accurate, but nothing records what a feature *does*: `offset_mm` reads healthy and its
   `status` is `retune`, shared with 65 of 128 rows. *(Item 124)*
-- 📋 Stage 28 end-to-end validation: gate-before-implementation check, red-then-green replay
+- 🚧 Stage 28 end-to-end validation: gate-before-implementation check, red-then-green replay
   of modes 1 and 4 through `segfacet run`, a real scoliotic case not flagged, honest
   before/after detection count, and a fresh-clone byte-reproducibility run. *(Item 125)*
 
@@ -1226,18 +1226,50 @@ corpus alone cannot separate that from a broken feature. Do not widen on that ev
 
 **Acceptance.**
 
-- [ ] The formulation decision is recorded with its measurements and signed off at its human
-  gate before D2 lands (**G8**).
-- [ ] A clean GT spine stays within a **1.0 mm** pass-through bound across level counts
+- [x] The formulation decision is recorded with its measurements and signed off at its human
+  gate before D2 lands (**G8**). *(Item 125's 2026-08-30 replay: the gate row above reads
+  ✅ Approved (2026-08-27) at commit 82d4b7f (17:36 local); item 119's first implementation
+  commit (4947d59, "feat(119): implement the smoothing-spline curve formulation") is dated
+  the same day at 19:53, after the approval — ordering held. Re-running
+  `scripts/compare_curve_candidates.py --verse-cohort dataset-verse19training` reproduced
+  15 of the 16 documented `docs/spinal-curve-model.md` measurements within the stated
+  0.001 mm tolerance (10 non-VerSe rows exactly, 4 of 5 VerSe rows); one VerSe leave-one-out
+  figure diverged by 0.39 mm — logged to insights.md rather than treated as a reproduction
+  of every quoted number.)*
+- [x] A clean GT spine stays within a **1.0 mm** pass-through bound across level counts
   and spacings, while a displaced vertebra separates by a stated margin (**G2**).
   *(Raised from 0.5 mm on 2026-08-28. The original line reused item 017's AC1 — a unit
   tolerance on that item's own fixtures — across a far wider sweep, which the approved
   smoothing formulation does not satisfy: `0.19198` mm on item 017's fixtures versus
   `0.552139` mm at the sweep's worst grid point. Rationale in `roadmap.md`'s Stage 28
-  acceptance note. Item 017's AC1 is unchanged.)*
+  acceptance note. Item 017's AC1 is unchanged. Item 125's 2026-08-30 replay: re-measured peak is
+  `0.552139` mm at level count 5, spacing (0.8, 0.8, 1.0) mm, level L3 — comfortably under
+  the 1.0 mm bound; `mode1_displace`'s max offset (`18.7186` mm) separates from
+  `clean_control`'s (`0.6733` mm) by an ~18 mm margin, both clear of the shipped `13.0` mm
+  threshold on opposite sides.)*
 - [ ] `mislabel` fires through plain `run_qc` on the mode-1 case and `is_monotonic` is
   `False` on the mode-4 case, with the clean control still firing nothing (**G2**).
+  *(Unticked — item 125's 2026-08-30 replay: the `mislabel`/clean-control halves hold — `mislabel`
+  fires on `mode1_displace` naming label 22 (L3) both through plain `run_qc` and through a
+  real `segfacet run --no-reference` CLI invocation, and `clean_control` fires nothing
+  through either path — but `mode4_relabel_swap`'s `is_monotonic` measures `True` with zero
+  `non_monotonic_pairs`, not `False`. Pinned by `tests/test_125_stage28_validation.py`'s
+  `test_ac7_mode4_relabel_swap_is_monotonic_pinned_true`; the gap was already logged to
+  insights.md by item 120's 2026-08-28 entry, and mode 4 stays `reconstructed_record` in
+  `tests/corpus/manifest.json`.)*
 - [ ] A real scoliotic curve in the VerSe cohort is not flagged as an offset outlier
-  (**G3**).
-- [ ] Both reference artifacts are rebuilt from real GT and `spline_offset_mm` shows real
-  spread; every regenerated golden is byte-reproducible run-to-run (**G7**).
+  (**G3**). *(Unticked — item 125's 2026-08-30 replay: of the 17 real VerSe19 subjects the decision
+  document's scoliosis-selection rule selects (`coronal_deviation_mm >= 8.0` mm, 17 of 80
+  discovered — reproduced), 1 fires a genuine `mislabel` finding through the shipped
+  `run_qc` with `bundled_default_config()`: `sub-verse406_split-verse261`, label 17 (T10),
+  `offset_mm = 18.51028` mm against the shipped `13.0` mm threshold — the same
+  subject/level item 123 already identified as the value that calibrated that threshold.
+  Logged to insights.md; not remediated here.)*
+- [x] Both reference artifacts are rebuilt from real GT and `spline_offset_mm` shows real
+  spread; every regenerated golden is byte-reproducible run-to-run (**G7**). *(Item 125's
+  2026-08-30 replay: `reference_verse_v1.json`'s `subject_count` is `80` and every level's
+  `spline_offset_mm` mean clears a 1e-3 mm non-degeneracy floor by 2-3 orders of magnitude
+  (e.g. `T10` mean `1.505` mm, max `18.510` mm); `reference_default.json` likewise shows
+  real spread. Two successive in-session regenerations of all nine corpus goldens and
+  `tests/golden/022_stage3_report.json` are byte-identical to each other and to the
+  committed files.)*
