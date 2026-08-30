@@ -70,7 +70,9 @@
       "Edit(src/segfacet/**)",
       "Write(tests/**)",
       "Edit(tests/**)",
-      "Write(.claude/settings.local.json)"
+      "Write(.claude/settings.local.json)",
+      "Write(scripts/*.py)",
+      "Write(docs/*.md)"
     ],
     "ask": [
       "Bash(git push --force:*)",

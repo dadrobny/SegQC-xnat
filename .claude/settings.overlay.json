@@ -19,6 +19,21 @@
     "`allow.add` list below, not in the generated settings.json."
   ],
   "permissions": {
-    "allow": { "add": [] }
+    "//allow": [
+      "Write(scripts/*.py) + Write(docs/*.md): both directories hold committed,",
+      "reviewed, non-shipped project artifacts (project tools and durable",
+      "technical documents — the shape of scripts/refresh_reference.py and",
+      "docs/reference-build.md), and an item whose deliverable is one of them",
+      "stalled an unattended builder on a prompt per file (insights.md,",
+      "item 118, 2026-08-27; approved at the 2026-08-30 triage). Single-star",
+      "globs match direct children only, so docs/aide/** living documents and",
+      "vision/roadmap stay PR-gated by their own entries."
+    ],
+    "allow": {
+      "add": [
+        "Write(scripts/*.py)",
+        "Write(docs/*.md)"
+      ]
+    }
   }
 }
