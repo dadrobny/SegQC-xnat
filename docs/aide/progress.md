@@ -1293,18 +1293,33 @@ per-deliverable provenance.
 
 **Deliverables.**
 
-- 📋 The golden retirement executed: nine `tests/corpus/golden/*.json` and two
+- 📋 **D1** The golden retirement executed: nine `tests/corpus/golden/*.json` and two
   `tests/golden/` snapshots gone, the four per-row replacements in place, nothing
-  regenerated on the way out (D1).
-- 📋 Tolerance by construction: shared committed-artifact comparison helper plus an
-  enforcing guard extending `tests/test_111_golden_guard.py`'s byte-exact allowlist (D2).
-- 📋 The remaining hygiene and located-defect sweep: the `reference_verse_v1` integrity
-  pin relocated and the `test_102` fence header renamed (D3); `fit_centroid_spline`
-  degenerate-input handling (D4); the 4-centroid held-out fallback boundary (D5); spline
-  plumbing consolidation (D6); `tangent_angles_deg[]` direction normalisation (D7);
-  `consistency.py` monotonicity against the smoothed fit so mode 4 fires (D8); the
-  `tptbox` ≥ 0.7.6 pin (D9); `refresh_reference.py --verse-cohort` delegated or retired
-  (D10); the decision table's live counts split into a generated companion (D11).
+  regenerated on the way out. *(Item 126)*
+- 📋 **D2** Tolerance by construction: shared committed-artifact comparison helper plus an
+  enforcing guard extending `tests/test_111_golden_guard.py`'s byte-exact allowlist.
+  *(Item 127)*
+- 📋 **D3** The `reference_verse_v1` integrity pin relocated to a test named for the
+  artifact (its `.gitattributes` pin carried across) and the `test_102` fence header
+  renamed to say what it checks. *(Item 128)*
+- 📋 **D4 + D5** Coincident centroids degrade to a report instead of a traceback at the
+  pipeline level (the fit's descriptive error already exists — item 119 AC16), and the
+  4-centroid held-out fallback boundary moves to `< 5` with the affected reference
+  distributions rebuilt. *(Item 129)*
+- 📋 **D6** Spline plumbing consolidation: one closest-point search, one in-sample fit per
+  case. *(Item 130)*
+- 📋 **D7** `tangent_angles_deg[]` traversal-direction normalisation to item 122's
+  convention. *(Item 131)*
+- 📋 **D8** `consistency.py` monotonicity judged against the smoothed fit so mode 4 fires.
+  *(Item 132)*
+- 📋 **D9 + D10** The `tptbox` ≥ 0.7.6 pin (non-AGPL metadata), and
+  `refresh_reference.py --verse-cohort` delegated to `rebuild_verse_reference.py` or
+  retired. *(Item 133)*
+- 📋 **D11** The decision table's live `N/M leaf paths unwired` counts split into a
+  generated, byte-reproducible companion the signed document references. *(Item 134)*
+- 📋 Stage 29 end-to-end validation: retirement audit, guard replay on a scratch branch,
+  mode-4 replay closing Stage 28's unticked acceptance half, fails-before-the-fix
+  verification per defect, fresh-clone suite. *(Item 135)*
 
 **Acceptance.**
 
