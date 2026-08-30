@@ -1159,7 +1159,7 @@ justified in writing.
 
 ---
 
-## Stage 28 — Spinal Curve Model: Formulation, Offset & Orientation (G2, G7) — 🚧
+## Stage 28 — Spinal Curve Model: Formulation, Offset & Orientation (G2, G7) — ✅
 
 **Goal.** `features/spline.py` fits an **interpolating** spline (`splprep(..., s=0)`), so
 the curve passes exactly through every centroid it is meant to judge. Measured 2026-08-27:
@@ -1214,7 +1214,7 @@ prior, so it is recorded and gated before any calculation changes.
   would have caught this at item 018. The catalogue is current and its `computation` column
   accurate, but nothing records what a feature *does*: `offset_mm` reads healthy and its
   `status` is `retune`, shared with 65 of 128 rows. *(Item 124)*
-- 🔍 Stage 28 end-to-end validation: gate-before-implementation check, red-then-green replay
+- ✅ Stage 28 end-to-end validation: gate-before-implementation check, red-then-green replay
   of modes 1 and 4 through `segfacet run`, a real scoliotic case not flagged, honest
   before/after detection count, and a fresh-clone byte-reproducibility run. *(Item 125)*
 
