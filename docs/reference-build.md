@@ -256,3 +256,18 @@ exclusion. `spline_offset_mm` is therefore now an **interior-only** feature
 end to end. Full evidence (`terminal_count`/`interior_count`, `p99_by_level`,
 the qualifying-level list, and the top-offset subject ids) is in the
 re-run's `verse_rebuild_summary.json`.
+
+**Intensity coverage changed with this rebuild.** The pre-123 (2026-07-17)
+committed `reference_verse_v1.json` computed every level's `intensity_*`
+statistics from a strict *subset* of that level's subjects (e.g. `L1`: 47 of
+59; `C1`–`C4`: 1 of 13) — most likely because the manual staging recipe this
+document used to carry iterated over each split-subject's *parent* directory
+and so could never name a split subject's own `${sub}_split-verseMMM_ct.nii.gz`
+CT. Item 123's rebuild tool discovers CTs recursively and split-infix-aware,
+finds one for all 80 subjects, and the rebuilt artifact's intensity coverage is
+complete (`count == record_count` on every level). Verified not to be a
+scan/mask mispairing: zero geometric features moved on any level, and
+spot-checked HU ranges are physiologically plausible. Anything measuring or
+re-deriving thresholds from `reference_verse_v1.json`'s `intensity_*`
+statistics (e.g. `heuristics/intensity_reference_delta.py` defaults) should
+know a pre-123 baseline undercounted every level.

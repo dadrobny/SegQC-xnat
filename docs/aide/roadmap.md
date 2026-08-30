@@ -1270,6 +1270,45 @@ and was not weakened.
   large per-case magnitude, which makes this a natural rider on **Stage 21**'s perturbation
   corpus rather than an idea in its own right.
 
+- **`feature_docs.STATUS_OVERRIDES` has no sanctioned retirement path** *(insights.md,
+  item 122, 2026-08-27)*. The overrides are a verbatim transcript of the item-106
+  maintainer walkthrough, so an item that *fixes* a recorded concern (item 122 split
+  `total_curvature_deg` per plane, partly delivering its override's ask) cannot rewrite
+  the recorded human call from inside an item. Needs either a dated append-trail
+  convention like `insights.md`'s, or a queue-boundary review pass that re-asks the
+  maintainer. Same family as the next entry.
+- **`golden-decision-table.md` mixes a dated human sign-off with live measured counts**
+  *(insights.md, item 122, 2026-08-27)*. The `N/M leaf paths unwired` cells are live
+  values off `build_catalogue()`, so every feature-adding item (106, 110, 122) must touch
+  a human-signed document and explain that no judgement moved. Separating the measured
+  counts into a small generated companion table the signed document references would let
+  a count refresh never touch signed text.
+- **Is a scoliosis-vs-normal envelope FACET's to build at all?** *(insights.md, item 118,
+  2026-08-27)*. Stage 28's deformity envelope is one threshold over all anatomy; the
+  anticipated refinement — separate normal and scoliotic envelopes — is **pathology
+  differentiation**, a different objective from deciding whether a *segmentation* is
+  wrong. Recorded in `docs/spinal-curve-model.md` §"The deformity envelope is expected to
+  be revised"; whether it belongs in FACET is a `vision.md` question to answer there
+  before any item implements it.
+- **Held-out offset estimator: two known blind spots, deferred by owner decision**
+  *(insights.md, items 120/123, 2026-08-28/29)*. (i) Only the single dominant outlier is
+  withheld per refit, so with ≥2 genuinely displaced levels a clean vertebra can outread
+  an actual offender (measured: clean 31.96 mm vs displaced 19.31 mm on the two-opposite-
+  displacements adversarial case) — natural follow-up is withholding every level above an
+  outlier cutoff. (ii) Sequence-terminal vertebrae are excluded outright (item 123), so a
+  genuinely displaced terminal vertebra is not looked at — yet terminals are 41/45 of the
+  ≥6 mm VerSe19 outliers. Real treatments: a separately calibrated terminal threshold, an
+  extrapolation-aware estimator, or a curvature model not needing both neighbours.
+- **Adjudicate `sub-verse406_split-verse261` T10 before treating `max_offset_mm = 13.0`
+  as settled — it currently holds Stage 28's G3 box open** *(insights.md, items 123/125,
+  2026-08-29/30)*. Its interior T10 reads 18.51 mm held-out offset — the single value that
+  set the calibrated 13.0 mm threshold, and, measured end-to-end on 2026-08-30, the one
+  real scoliotic subject (of the 17 the selection rule picks) that trips `mislabel`
+  through the shipped pipeline. Whether that reading is genuine anatomy the envelope must
+  accommodate or a GT labelling artefact decides both whether 13.0 mm is calibrated on
+  signal and whether Stage 28's "no real scoliotic curve flagged as offset outlier"
+  acceptance can tick. Needs a person looking at the case, not more measurement.
+
 # Carried defects — no stage owns them yet
 
 > Distinct from the ideas above: each is a **known, located defect** that survived its
@@ -1347,3 +1386,69 @@ and was not weakened.
   an independent second-platform scope signal, with none of the collateral risk it used to
   carry. *(insights.md 2026-08-20, item 117; re-assessed against engine 1.20.0 on
   2026-08-25)*
+- **Committed-artifact comparisons keep being re-authored byte-exact.** Item 078's
+  convention (byte-identity for run-to-run determinism only; `reports_close` numeric
+  tolerance against anything committed — CLAUDE.md "Note what the golden tests actually
+  assert") was reintroduced wrongly by three separate items' test-writing passes
+  (120/121/123), each passing locally and on ubuntu-latest and caught only by PR #56's CI
+  matrix (~1 ULP float drift across numpy versions/platforms). Prose has now failed three
+  times; the fix is structural: a shared helper whose name makes "comparing against a
+  committed artifact" reach for tolerance by construction, plus a guard test (extending
+  `tests/test_111_golden_guard.py`'s hand-surveyed byte-exact allowlist into an enforced
+  one) that fails any new exact comparison of freshly generated output against a committed
+  float-carrying artifact. Relatedly, a spec that changes a feature the reference artifact
+  aggregates must survey *every* consumer mechanically (`grep -l build_and_write_default
+  tests/` — item 119's hand-listed subset missed three files). The larger relief valve
+  already has an owner: the 11 corpus-golden rows are maintainer-dispositioned **retire**
+  (`golden-decision-table.md`), assigned to Stage 21 (or Stage 27, whichever lands first) —
+  pulling that retirement forward shrinks the whole surface this entry polices.
+  *(insights.md, items 119/120–123, 2026-08-27/30)*
+- **`stage3.curvature.tangent_angles_deg[]` carries no traversal-direction
+  normalisation.** A cranial-first centroid sequence reads ~175° per level where a
+  caudal-first one reads ~5° — same spine, two readings, and no consumer can tell which it
+  got; latent only because every committed fixture happens to advance superiorly. Item 122
+  normalised direction for its new signed per-plane arrays but deliberately left this
+  array alone (scope fence), so the record carries two tangent-angle conventions side by
+  side. Reconciling them sits naturally with Stage 20's traceability audit.
+  *(insights.md, item 122, 2026-08-27)*
+- **`fit_centroid_spline` crashes uninformatively on all-coincident centroids.**
+  `features/spline.py` propagates SciPy's bare `ValueError: Invalid inputs.` when every
+  supplied centroid is identical (zero-length chords), rather than degrading or raising a
+  descriptive error naming the cause; item 122 could not exercise its degenerate
+  adversarial case against the crash and substituted a 1e-6 mm near-coincident fixture.
+  *(insights.md, item 122, 2026-08-27)*
+- **Stage 28's mode-4 acceptance premise has no owner.** The stage text asserts a
+  smoothed fit detects the mode-4 swap via `is_monotonic == False`, but no queue-017 item
+  owned `features/consistency.py`, and measured on the shipped item-119 fit
+  `is_monotonic` is `True` on all nine corpus cases — so `mode4_relabel_swap` stays a
+  `reconstructed_record` case and the criterion is unmet as recorded at item 125's
+  validation. An item owning `consistency.py`'s monotonicity check against the smoothed
+  fit is the missing piece. *(insights.md, item 120, 2026-08-28)*
+- **The `tptbox==0.7.5` pin ships wrong licence metadata.** The 0.7.5 wheel's published
+  metadata declares AGPL v3.0 while TPTBox's own `LICENSE` is Apache-2.0; upstream fixed
+  the metadata in v0.7.6 (TPTBox PR #119). Any SBOM or compliance scan reading installed
+  metadata currently sees an AGPL dependency. Bumping the pin is a dependency change with
+  the golden corpus as its regression surface, so it needs an item, not a drive-by edit.
+  *(insights.md, 2026-08-28)*
+- **The closest-point-on-spline search exists three times, and the pipeline refits the
+  same spline twice per case.** `_find_closest_u` lives in `features/spline_offset.py`
+  (backend-aware), `features/consistency.py` (not), and a third copy in
+  `scripts/compare_curve_candidates.py`; a scan-resolution or `xatol` change must be made
+  in three places, and divergence would surface as inconsistency between features, not a
+  test failure. Separately, `pipeline.py`'s curvature fit and
+  `compute_leave_one_out_spline_offsets`'s internal reference refit fit the identical
+  in-sample spline twice — harmless, redundant. One consolidation item covers both.
+  *(insights.md, items 121 and 119–123, 2026-08-29/30)*
+- **At exactly 4 centroids the held-out estimator silently reads 0.0 everywhere.**
+  `compute_leave_one_out_spline_offsets`'s `< 4` in-sample fallback boundary is one level
+  too low: at `k = 3` with four points the held-out refit has zero smoothing freedom and
+  interpolates, so a 4-level field of view cannot raise a `mislabel` offset finding at all
+  (measured on real `sub-verse065`). The boundary belongs at `< 5`, with the fallback's
+  documented semantics carried along. *(insights.md, item 123, 2026-08-29)*
+- **Item 083's one-command refresh has never rebuilt the real artifact.**
+  `scripts/refresh_reference.py --verse-cohort` hands the cohort root straight to
+  `ingest_cohort`, which lists one directory non-recursively and hardcodes `_scan.nii.gz`
+  siblings — incompatible with VerSe's `derivatives/` nesting and `_ct.nii.gz` naming, so
+  the wrapper records `verse-build: failed` by construction. Item 123 shipped staging in
+  `scripts/rebuild_verse_reference.py` instead; the wrapper should either delegate to it
+  or retire its `--verse-cohort` mode. *(insights.md, item 123, 2026-08-29)*

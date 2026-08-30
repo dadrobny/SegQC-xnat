@@ -297,6 +297,23 @@ from the local working tree):
   path reached through `tmp_path`, a function argument or an imported constant
   resolves to nothing and is skipped in silence — so a warning is authoritative
   and its absence is not a clean bill of health.
+- **A test that reads the insight inbox must also search its archives.** `aide
+  insights archive` moves closed entries from `docs/aide/insights.md` to
+  `docs/aide/insights/archive-YYYY-QN.md` as routine housekeeping, so a test
+  asserting a captured claim's presence must search the inbox *and* every
+  `insights/archive-*.md` (the contract is that the claim survives verbatim and
+  ticked — not which of the two files holds it). `tests/test_117_scope_verb_swap.py`'s
+  AC4 tests are the worked example; pinning the live inbox alone turns an
+  archive sweep into a red suite. Same defect class as pinning a warning's line
+  number: asserting what the loop's own verbs are built to move.
+- **`segfacet run` with no reference flag runs against the real-VerSe19
+  reference by default** (item 090), which is not calibrated for the tiny
+  synthetic corpus fixtures — a bare CLI run on `clean_control_seg.nii.gz`
+  reports ~40 `bounds`/`reference_delta` findings and `flagged-for-review`,
+  not the "zero findings, pass" the corpus documentation describes. To
+  reproduce a stage's "clean control fires nothing end-to-end" claim via the
+  CLI, pass `--no-reference` (measured 2026-08-30, item 125). Not a
+  regression; it is the documented default operating out of its calibration.
 
 ## Durable artifacts must read cold
 
