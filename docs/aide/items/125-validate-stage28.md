@@ -456,4 +456,173 @@ authored as a queue only after Stage 28 closes.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+All measurements below were made on this checkout at HEAD (branch
+`aide/125-validate-stage-28-spinal-curve`, on top of `d22478c`, 2026-08-30) with
+`SEGFACET_VERSE_COHORT=dataset-verse19training` reachable.
+
+**AC1 — gate ordering.** `progress.md`'s spinal-curve-model gate row reads
+`✅ Approved (2026-08-27)`, committed at `82d4b7f` ("docs: human gate 3
+approved") dated `2026-08-27 17:36:23 +0100`. Item 119's first production-code
+commit is `4947d59` ("feat(119): implement the smoothing-spline curve
+formulation"), dated `2026-08-27 19:53:31 +0100` — the same day, ~2h17m after
+the approval. Ordering held.
+
+**AC2/AC3 — decision-document reproduction.** Ran
+`.venv/bin/python scripts/compare_curve_candidates.py --out <scratch>
+--verse-cohort dataset-verse19training`. Of the 16 documented `## Measurements`
+keys: all 10 non-VerSe rows (`clean_pass_through` x4, `separation` x6, plus the
+count-valued `determinism.compared_samples`) resolved to within 1e-6 mm of the
+documented value (well inside the stated 0.001 mm tolerance; the count matched
+exactly). Of the 5 VerSe-sourced rows, 4 resolved within tolerance
+(`verse_scoliotic.max_pass_through_mm.in_sample` for `smoothing_spline`,
+`lsq_bspline_fixed_knots`, `polynomial_per_plane`, `interpolating_cubic`).
+The fifth —
+`candidates.smoothing_spline.verse_scoliotic.max_pass_through_mm.leave_one_out`
+— measured `20.683092` mm against the documented `21.073357` mm, a `0.390` mm
+divergence, ~400x the stated tolerance. `docs/spinal-curve-model.md`'s
+"Revisions to apply when item 119 implements this" section states this
+switch (raw `splprep` → the shipped `fit_centroid_spline`/`make_splprep`,
+identical `s = n_points`) leaves "every value in `## Measurements` still
+reproduces"; measured false for this one key. `make_splprep` is SciPy's newer,
+independent smoothing-spline implementation rather than a `splprep` wrapper
+with identical numerics, so an identical `s` does not guarantee an identical
+fit for every input. Immaterial to the shipped `max_offset_mm = 13.0` (item
+123's interior-only recalibration superseded the original 25.0 mm envelope
+this figure fed), but the document's specific claim does not hold for this
+key. Logged to `insights.md`. AC3's VerSe scoliosis-selection sub-check:
+80 masks discovered, 17 selected at `coronal_deviation_mm >= 8.0` mm —
+matches the documented "17 of 80".
+
+**AC4 — shipped fit is the decided fit.** `src/segfacet/features/spline.py`
+resolves its default smoothing as `s = float(n_points) if smoothing is None
+else float(smoothing)` (scale-free, no `s=0`/bare-numeric default) and lets
+`make_splprep` compute chord-length parameterisation by default (no
+cranio-caudal remapping). Confirmed by inspection and by
+`tests/test_125_stage28_validation.py`'s AC4 tests (pass).
+
+**AC5/AC6 — CLI replay.** `segfacet run --scan
+tests/corpus/fixtures/base_scan.nii.gz --seg
+tests/corpus/fixtures/mode1_displace_seg.nii.gz --out <scratch>
+--no-reference` emits exactly one finding: `[flagged-for-review] (mislabel)
+Vertebra misaligned from spinal curve: label 22 (L3) centroid lies 18.7 mm off
+the fitted spinal curve, predominantly left-right (threshold 13.0 mm).` The
+same command against `clean_control_seg.nii.gz` emits zero findings and
+verdict `pass`. `--no-reference` is required to reproduce this: the CLI's
+*default* invocation (no reference flag) enables reference mode against the
+bundled real-VerSe19 artifact (item 090's default), which fires dozens of
+`bounds`/`reference_delta` findings against the corpus's tiny synthetic
+fixtures (never calibrated against a 30x25x25 mm box) even for
+`clean_control`, verdict `flagged-for-review` — not a Stage 28 regression;
+logged to `insights.md` since it is not obviously documented anywhere that
+"the clean control fires nothing end-to-end" needs `--no-reference` to hold
+through the bare CLI.
+
+**AC7/AC9/AC15/AC16 — full corpus table** (plain `run_qc`,
+`bundled_default_config()`):
+
+| Case | Rules fired | `is_monotonic` | max `offset_mm` |
+|---|---|---|---|
+| `clean_control` | *(none)* | `True` | `0.6733` |
+| `mode1_displace` | `mislabel` | `True` | `18.7186` |
+| `mode2_fragment` | `fragmentation` | `True` | `0.6733` |
+| `mode3_inject_islands` | `fragmentation` | `True` | `0.6543` |
+| `mode4_relabel_swap` | *(none)* | **`True`** (`non_monotonic_pairs=()`) | `5.1439` |
+| `mode5_remove_level` | `coverage` | `True` | `0.0001` |
+| `mode6_crop_at_border` | `border`, **`mislabel`** | `True` | `17.5074` |
+| `mode7_sequence_break` | `sequence` | `True` | `0.6733` |
+| `mode8_force_overlap` | *(none)* | `True` | `0.2172` |
+
+Unchanged from the 2026-08-30 HEAD figures the item spec's Description quoted.
+AC15: `tests/corpus/manifest.json`'s pipeline-detected mode count (excluding
+mode 0) is 6 — `{1, 2, 3, 5, 6, 7}` — versus 5 before this stage (mode 1 moved
+in at item 120); modes 4 and 8 still do not fire through plain `run_qc`.
+Agrees with `test_040`'s `_PIPELINE_ONLY_MODES`/`_RECONSTRUCTED_MODES` and
+`test_057`'s `_PIPELINE_DETECTABLE_MODES`. AC16: `mode6_crop_at_border` fires
+both `border` (expected) and `mislabel` (not in its manifest
+`expected_rule_ids = ["border"]`) — already logged to `insights.md` at item
+120, 2026-08-28; recorded here again as a fact, not re-logged.
+
+**AC8 — clean-GT pass-through sweep.** Peak in-sample max is `0.552139` mm at
+level count 5, spacing `(0.8, 0.8, 1.0)` mm, level `L3` — strictly under the
+1.0 mm bound.
+
+**AC10/AC11 — real scoliotic measurement.** All 17 selected subjects run
+through the shipped pipeline (`run_qc`, `bundled_default_config()`) directly
+against their real VerSe19 masks (`nib.load` on each
+`sub-*_seg-vert_msk.nii.gz`). 1 of 17 fires `mislabel`:
+`sub-verse406_split-verse261`, label 17 (T10), `offset_mm = 18.51028119357566`
+— the same subject/level item 123 recorded as the value that calibrated the
+shipped `13.0` mm threshold, now confirmed to genuinely trip the rule
+end-to-end (`18.51 > 13.0`, not a spuriously-fired rule). No other selected
+subject fires `mislabel`. This means the G3 acceptance box is **not** met —
+recorded unticked in `progress.md` naming the subject, and logged to
+`insights.md` rather than remediated here (out of this item's scope per its
+Description). Whether `18.51` mm reflects genuine anatomy or a GT artefact
+was already flagged as unresolved by item 123 (2026-08-29 entries in
+`insights.md`); this item adds the fact that it *does* trip the shipped rule.
+Processing all 17 real full-resolution VerSe19 CT masks took roughly 45
+minutes wall-clock on this machine — the two largest FOVs
+(`sub-verse074`: 512x512x688; `sub-verse082`: 444x444x709) each took on the
+order of 20-25 minutes alone, versus under a minute for the smaller subjects
+— a real-CT-scale performance characteristic worth knowing for anyone
+re-running this measurement, not investigated further here.
+
+**AC12 — reference artifacts.** `reference_verse_v1.json`:
+`subject_count = 80`; per-level `spline_offset_mm` means run `0.69`-`2.07` mm
+across levels (all >> the 2.9e-05 mm pre-123 noise floor), with `T10`'s
+`mean = 1.505` mm / `max = 18.510` mm being the level/subject that sets the
+shipped threshold. `reference_default.json` (5-subject synthetic reference)
+likewise shows non-degenerate `spline_offset_mm` (e.g. `L3` mean `0.252` mm,
+max `0.673` mm). Note: neither artifact's `provenance`/calibration block
+records the derived `13.0` mm threshold itself (only `subject_count`,
+`build_date`, `config_hash`, `source` are recorded there) — the threshold
+lives in `default_config.yaml` and in this gate's `progress.md` decision
+cell, not inside the reference JSON. Recorded as observed, not treated as a
+defect since AC12 only asks that the artifact record the cohort and show real
+spread, both true.
+
+**AC13 — golden byte-reproducibility.** Two independent in-session calls to
+`segfacet.synth.golden.write_goldens` into two fresh scratch directories
+produced byte-identical output for all 9 corpus cases; two independent calls
+to `serialize_report_json` for the `022_stage3_report.json` fixture were
+byte-identical to each other and to the committed golden. No divergence.
+
+**AC14 — fresh-clone suite.** Cloned this branch's HEAD (`d22478c`) via `git
+clone` into a scratch directory outside this checkout, built a fresh venv
+(`python3 -m venv`), installed with `pip install -e .[dev]` (numpy 2.4.6,
+scipy 1.17.1 resolved — no `constraints.txt` pin used, matching this repo's
+loose `pyproject.toml` bounds), and ran the full suite
+(`python -m pytest -q`) with `SEGFACET_VERSE_COHORT` unset in that
+environment. Result: `1 failed, 5470 passed, 58 skipped` in 668.88s. The one
+failure was `test_ac17_every_stage28_box_ticked_implies_evidence_or_unticked_implies_reason`
+— expected per this item's own test module docstring ("Expected to FAIL until
+the builder adds the annotations") measured *before* this item's `progress.md`
+edit landed in that clone. Re-running the same suite against the final commit
+(after the `progress.md` edit below) is expected to go green; not re-run a
+second time in a fresh clone given the ~11-minute cost, since the only
+changed file between the two runs is `progress.md` and the AC17 test reads it
+directly.
+
+**AC17/AC18 — `progress.md` edits.** Stage 28's five acceptance boxes ticked
+2 of 5 (AC8/AC9's bound-and-margin box; AC12/AC13's reference-artifact box)
+with an evidence note each; left 2 unticked with a reason (the mode-4
+monotonicity box; the G3 real-scoliotic box); ticked the gate/decision box
+with an evidence note that also names the one AC3 divergence. No
+Environment-Gated Capability Verification row needed touching: this stage's
+measurements go through the `SEGFACET_VERSE_COHORT` pattern directly (per the
+item spec's Assumptions), not a named `[validation]` profile, and the "Real
+VerSe GT" row (if any) is item 123's to own since its rebuild is what that row
+evidences, not this item's replay.
+
+**AC19 — `aide check`.** Before and after this item's edits: `aide check: OK
+(4 warning(s))` — the same 4 warnings named in the item spec's Assumptions
+(32 legacy specs missing `## Assumptions`, 2 pending Stage 16 gates, 1 stale
+`aide/123-…` claim branch). No new warning class.
+
+**AC20 — findings logged.** Three new dated entries appended to
+`insights.md` this item (2026-08-30): the `docs/spinal-curve-model.md`
+"still reproduces" claim not holding for one VerSe leave-one-out key; the
+default-CLI-reference-mode discrepancy for AC5/AC6 reproduction; and the G3
+real-GT false positive on `sub-verse406_split-verse261`. The mode-4 gap and
+the mode-6 co-firing were already logged at items 120/123 and are referenced,
+not duplicated.
