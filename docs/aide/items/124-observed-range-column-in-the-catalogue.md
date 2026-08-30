@@ -526,4 +526,64 @@ from real GT rather than edited.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`ObservedRange.numeric` is a tri-state `Optional[bool]`**, not just an
+  echo of `corpus.covered`: `None` means the path was never structurally
+  reached by any given driver record (no value of any kind); `False` means
+  it was reached but every realised value was non-numeric (a `bool`, a
+  string, or only `None`s); `True` means at least one numeric value was
+  collected. This is what lets rule 1 (`"unobserved"`) and rule 2
+  (`"non-numeric"`) separate cleanly without a second walk: `has_any_value`
+  is derived from path membership in the per-driver realisation map (built
+  once, inside `build_observed_ranges`), and `numeric_flag` is `corpus.covered`
+  only when `has_any_value` is true, else `None`.
+
+- **`iter_leaf_values` always creates a key for every leaf position it
+  visits, even when every value at that leaf is excluded** (a `bool`, a
+  `None`, or an empty dict/list) — mirroring `catalogue._walk_leaf_paths`'s
+  "empty container is still a leaf" rule exactly, so the two walks' path
+  sets are provably identical and `build_catalogue` can index
+  `observed_ranges[path]` for every `path in leaf_union` without a
+  fallback. A `bool` value is dropped from its path's collected list (never
+  appended) rather than being excluded from the walk entirely — otherwise a
+  boolean-only path (`is_terminal`, `is_continuous`) would never get a key
+  and would misclassify as `"unobserved"` instead of `"non-numeric"`.
+
+- **`resolve_reference_features(leaf_paths)` takes no explicit feature-name
+  list.** Rule 3 (unique last-segment match) is evaluated over every last
+  segment that actually occurs among `leaf_paths`, not just the reference
+  distribution's own `features` tuple — resolution is therefore a pure
+  function of the catalogue's own leaf-path set. A resolved name whose
+  target path the *given* reference distribution does not actually carry in
+  `feature_stats` simply produces no reference coverage for that path
+  (`_aggregate_reference_stats` only emits an entry when at least one
+  `(level, stratum)` carries the feature); it never fabricates a `0`. This
+  keeps AC23's ambiguity discipline exact — an ambiguous name is dropped
+  before any reference-specific data is consulted — with no dependency on
+  which artifact happens to be injected.
+
+- **`_load_reference_distribution` treats "anything that is not `None` and
+  not a `ReferenceDistribution` instance" as a filesystem path**, not just
+  `str`/`Path`, so an `os.PathLike` also works, and wraps `load_artifact` in
+  a bare `except Exception` rather than enumerating failure types — a
+  directory path raises `IsADirectoryError`, which `reference.artifact.
+  load_artifact` does not itself catch (it only guards `FileNotFoundError`
+  around the read and JSON/schema errors), so the broader catch here is
+  load-bearing for AC21's directory case, not redundant with the loader's
+  own guards.
+
+- **The Markdown `observed range` cell's own formatting (`f"{v:.6g}"`) is
+  independent of, but numerically consistent with, `_quantise`'s JSON
+  quantisation** — both use the same six-significant-digit format spec, so
+  the Markdown and JSON representations of the same value always agree
+  even though the Markdown renderer never calls `_quantise` on the raw
+  dataclass floats (it formats directly, since the cell is prose, not a
+  JSON float that needs float-round-trip identity).
+
+- **Verified against the item's pinned baseline (2026-08-30):** the shipped
+  catalogue's `observed_summary` is `{"varies": 83, "non-numeric": 39,
+  "placeholder": 12, "constant-synthetic": 4, "degenerate": 0, "unobserved":
+  0}` (138 total), all 21 reference features resolve, and replaying the
+  pre-123 `reference_verse_v1.json` (`ae3e9f4`) through `--reference`
+  reclassifies exactly `stage3.per_label_offsets[].offset_mm` as
+  `"degenerate"` and nothing else, confirming the instrument catches the
+  defect the item's title names.

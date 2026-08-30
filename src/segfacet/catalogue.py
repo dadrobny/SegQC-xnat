@@ -91,12 +91,13 @@ Public API
     The deterministic, in-package driver-record set.
 ``trace_record_access(record, callable) -> set[str]``
     Non-invasive dynamic-access tracer (mechanism A's primitive).
-``build_catalogue(*, strict=True) -> FeatureCatalogue``
-    Assemble the full catalogue.
+``build_catalogue(*, strict=True, reference=None) -> FeatureCatalogue``
+    Assemble the full catalogue. ``reference`` (item 124) steers the
+    observed-range reference population; see :mod:`segfacet.observed_range`.
 ``catalogue_to_dict(cat) -> dict``, ``render_markdown(cat) -> str``
     Deterministic serialisers.
 ``main(argv=None) -> int``
-    ``python -m segfacet.catalogue [--json PATH] [--md PATH]``.
+    ``python -m segfacet.catalogue [--json PATH] [--md PATH] [--reference PATH]``.
 """
 
 from __future__ import annotations
@@ -105,7 +106,10 @@ import json
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Mapping, Optional, Sequence, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Mapping, Optional, Sequence, Set, Tuple
+
+if TYPE_CHECKING:  # pragma: no cover - typing only, no runtime import cycle
+    from segfacet.observed_range import ObservedRange
 
 __all__ = [
     "CatalogueError",
@@ -123,7 +127,7 @@ __all__ = [
     "main",
 ]
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_JSON_PATH = _REPO_ROOT / "docs" / "aide" / "feature_catalogue.generated.json"
@@ -135,7 +139,14 @@ _CATALOGUE_NOTE = (
     "mode anchors / status overrides) and regenerate. `record[\"reference\"]` "
     "is deliberately excluded: the `bounds` and `fragmentation` rules read it, "
     "but it is a `ReferenceDistribution` object handle, not serialised feature "
-    "data with a leaf path."
+    "data with a leaf path. Item 124's `observed` block reports each numeric "
+    "path's observed range across two independent populations -- the "
+    "in-package synthetic driver corpus (never flags a feature dead) and the "
+    "committed real-GT reference distribution (the only population that can "
+    "produce the `\"degenerate\"` verdict) -- but only the 21 of 99 numeric "
+    "paths the reference vocabulary covers can ever read `\"degenerate\"`; "
+    "the rest get their numbers reported and no verdict stronger than "
+    "`\"constant-synthetic\"`."
 )
 
 
@@ -177,6 +188,7 @@ class CatalogueEntry:
     failure_modes: Tuple[int, ...]
     mode_evidence: Tuple[str, ...]
     status: str
+    observed: "ObservedRange"
 
 
 @dataclass(frozen=True)
@@ -701,10 +713,19 @@ def _group_for_path(path: str, block_owners: Sequence[Tuple[str, str, str, str]]
     return (best[1], best[2], best[3])
 
 
-def build_catalogue(*, strict: bool = True) -> FeatureCatalogue:
+def build_catalogue(*, strict: bool = True, reference: Any = None) -> FeatureCatalogue:
     """Assemble the full :class:`FeatureCatalogue` (AC6-AC17).
 
     Never mutates any input. Two calls return equal catalogues.
+
+    Parameters
+    ----------
+    reference:
+        The reference population for item 124's ``observed`` block: ``None``
+        (the bundled production reference), a ``ReferenceDistribution``
+        instance, or a path to a reference artifact on disk. A missing or
+        unparseable artifact degrades every entry's ``observed.reference`` to
+        ``covered=False`` rather than raising.
 
     Raises
     ------
@@ -718,10 +739,12 @@ def build_catalogue(*, strict: bool = True) -> FeatureCatalogue:
     from segfacet import feature_docs as _feature_docs_module
     from segfacet.config import bundled_default_config
     from segfacet.heuristics.rule import iter_rules
+    from segfacet.observed_range import build_observed_ranges
 
     config = bundled_default_config()
 
     driver_records = list(iter_driver_records())
+    observed_ranges = build_observed_ranges(driver_records=driver_records, reference=reference)
 
     leaf_union: Set[str] = set()
     for _driver_id, record in driver_records:
@@ -890,6 +913,7 @@ def build_catalogue(*, strict: bool = True) -> FeatureCatalogue:
                 failure_modes=failure_modes,
                 mode_evidence=mode_evidence,
                 status=status,
+                observed=observed_ranges[path],
             )
         )
 
@@ -933,12 +957,57 @@ def build_catalogue(*, strict: bool = True) -> FeatureCatalogue:
 # =========================================================================== #
 
 
+def _quantise(v: Optional[float]) -> Optional[float]:
+    """Six-significant-digit quantisation (AC15): the value it would
+    round-trip to at six significant digits. ``None`` passes through
+    unchanged (AC4's null, never ``0``)."""
+    return None if v is None else float(f"{v:.6g}")
+
+
+def _population_range_to_dict(pop: Any) -> dict:
+    return {
+        "population": pop.population,
+        "source": list(pop.source),
+        "covered": pop.covered,
+        "count": pop.count,
+        "minimum": _quantise(pop.minimum),
+        "maximum": _quantise(pop.maximum),
+        "span": _quantise(pop.span),
+        "magnitude": _quantise(pop.magnitude),
+        "informative": pop.informative,
+    }
+
+
+def _observed_range_to_dict(observed: Any) -> dict:
+    return {
+        "numeric": observed.numeric,
+        "verdict": observed.verdict,
+        "corpus": _population_range_to_dict(observed.corpus),
+        "reference": _population_range_to_dict(observed.reference),
+    }
+
+
+_VERDICT_VOCABULARY = (
+    "varies",
+    "degenerate",
+    "constant-synthetic",
+    "placeholder",
+    "non-numeric",
+    "unobserved",
+)
+
+
 def catalogue_to_dict(cat: FeatureCatalogue) -> dict:
     """A deterministic, JSON-ready dict for *cat*. No timestamp, hostname,
     absolute path, or dependency-version string."""
+    observed_summary = {verdict: 0 for verdict in _VERDICT_VOCABULARY}
+    for entry in cat.entries:
+        observed_summary[entry.observed.verdict] += 1
+
     return {
         "schema_version": cat.schema_version,
         "note": cat.note,
+        "observed_summary": observed_summary,
         "groups": [
             {
                 "title": g.title,
@@ -960,6 +1029,7 @@ def catalogue_to_dict(cat: FeatureCatalogue) -> dict:
                         "failure_modes": list(e.failure_modes),
                         "mode_evidence": list(e.mode_evidence),
                         "status": e.status,
+                        "observed": _observed_range_to_dict(e.observed),
                     }
                     for e in g.entries
                 ],
@@ -973,6 +1043,18 @@ def _md_escape(text: str) -> str:
     return text.replace("|", "\\|").replace("\n", " ").strip()
 
 
+def _fmt_population(pop: Any) -> str:
+    if not pop.covered:
+        return "\u2014"
+    minimum = _quantise(pop.minimum)
+    maximum = _quantise(pop.maximum)
+    return f"{minimum:.6g}\u2013{maximum:.6g}"
+
+
+def _fmt_observed_range(observed: Any) -> str:
+    return f"corpus {_fmt_population(observed.corpus)} \u00b7 ref {_fmt_population(observed.reference)}"
+
+
 def render_markdown(cat: FeatureCatalogue) -> str:
     """Render *cat* as a single Markdown table, one row per entry, in the
     catalogue's own deterministic order."""
@@ -982,8 +1064,9 @@ def render_markdown(cat: FeatureCatalogue) -> str:
         _md_escape(cat.note),
         "",
         "| path | module / item | measures | computation | units | "
-        "scale sensitivity | \u00a76 mode(s) | consuming rules | status |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "scale sensitivity | observed range | observed verdict | "
+        "\u00a76 mode(s) | consuming rules | status |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for e in cat.entries:
         module_item = f"{e.stage_label} \u00b7 {e.module}" if e.stage_label else e.module
@@ -996,6 +1079,8 @@ def render_markdown(cat: FeatureCatalogue) -> str:
             _md_escape(e.computation),
             _md_escape(e.units),
             _md_escape(e.scale_sensitivity),
+            _md_escape(_fmt_observed_range(e.observed)),
+            e.observed.verdict,
             modes,
             rules,
             e.status,
@@ -1017,9 +1102,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     parser.add_argument("--json", type=Path, default=_DEFAULT_JSON_PATH)
     parser.add_argument("--md", type=Path, default=_DEFAULT_MD_PATH)
+    parser.add_argument(
+        "--reference",
+        type=Path,
+        default=None,
+        help=(
+            "Path to a reference-distribution artifact to build the "
+            "observed-range reference population from (item 124). Defaults "
+            "to the bundled production reference."
+        ),
+    )
     args = parser.parse_args(argv)
 
-    cat = build_catalogue(strict=True)
+    cat = build_catalogue(strict=True, reference=args.reference)
 
     json_text = json.dumps(catalogue_to_dict(cat), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
     md_text = render_markdown(cat)

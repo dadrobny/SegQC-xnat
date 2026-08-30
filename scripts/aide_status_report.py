@@ -826,7 +826,7 @@ def _render_corpus_section(model: ReportModel) -> str:
 # --------------------------------------------------------------------------- #
 
 FEATURE_CATALOGUE_PATH = AIDE_DIR / "feature_catalogue.generated.json"
-_FEATURE_CATALOGUE_SCHEMA_VERSION = "1.0"
+_FEATURE_CATALOGUE_SCHEMA_VERSION = "1.1"
 
 
 @dataclass(frozen=True)
