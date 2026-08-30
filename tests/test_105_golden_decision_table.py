@@ -257,8 +257,8 @@ def _walk_tests_non_py_files() -> set:
     return found
 
 
-def test_ac3_current_tree_has_29_non_py_fixtures():
-    assert len(_walk_tests_non_py_files()) == 29
+def test_ac3_current_tree_has_30_non_py_fixtures():
+    assert len(_walk_tests_non_py_files()) == 30
 
 
 def test_ac3_section1_fixture_set_equals_filesystem_walk_both_directions(section1_rows):
@@ -639,7 +639,7 @@ def test_adv_ac3_empty_header_only_table_fails_with_full_missing_list():
     assert rows == []
     documented_set = {r["fixture"] for r in rows}
     missing = sorted(_walk_tests_non_py_files() - documented_set)
-    assert len(missing) == 29, "an empty table must not trivially pass on two empty sets"
+    assert len(missing) == 30, "an empty table must not trivially pass on two empty sets"
 
 
 def test_adv_ac6_asserted_by_naming_nonexistent_module_is_detectable():

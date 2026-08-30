@@ -331,44 +331,61 @@
     },
     "stage3": {
       "curvature": {
+        "coronal_curvature_deg": 12.316259151851128,
+        "coronal_tangent_angles_deg": [
+          6.158129575925575,
+          4.8693316311385795,
+          -1.3463492044979293e-14,
+          -4.869331631138575,
+          -6.158129575925551
+        ],
+        "curvature_plane": "sagittal",
         "inter_tangent_angles_deg": [
-          62.298932508160156,
-          27.46583519993168,
-          27.46583519993169,
-          62.29893250816018
+          52.09361901827347,
+          24.34760961427048,
+          24.347609614270436,
+          52.093619018273564
+        ],
+        "sagittal_curvature_deg": 56.66450967278964,
+        "sagittal_tangent_angles_deg": [
+          -28.332254836394767,
+          23.961638010311898,
+          -5.385396817991717e-15,
+          -23.961638010311887,
+          28.332254836394874
         ],
         "tangent_angles_deg": [
-          35.67203935148414,
-          27.46583519993168,
+          28.804661799959494,
+          24.347609614270464,
           0.0,
-          27.46583519993169,
-          35.67203935148412
+          24.34760961427045,
+          28.804661799959586
         ],
-        "total_curvature_deg": 35.67203935148414
+        "total_curvature_deg": 56.66450967278964
       },
       "monotonic_consistency": {
         "is_monotonic": true,
         "non_monotonic_pairs": [],
         "u_values": [
           5.611895432316293e-07,
-          0.23955117583146715,
-          0.49999999339219015,
-          0.7604488241685328,
+          0.23703538157913323,
+          0.5000000237085487,
+          0.7629646184208668,
           0.9999994401419617
         ]
       },
       "per_label_neighbourhood": [
         {
-          "deviation_score": 105.68560450091103,
+          "deviation_score": 5027714.340991932,
           "is_outlier": true,
           "label": 20,
           "level_name": "L1",
           "stats": {
             "offset_mm": {
-              "mean": 6.985718383133166e-05,
-              "median": 6.985718383133166e-05,
-              "std": 5.2842802250455513e-05,
-              "z_score": 105.68560450091103
+              "mean": 5.642767253860923,
+              "median": 5.642767253860923,
+              "std": 2.513857170495966,
+              "z_score": 5027714.340991932
             },
             "spacing_mm": {
               "mean": 41.95295466874198,
@@ -395,10 +412,10 @@
           "level_name": "L2",
           "stats": {
             "offset_mm": {
-              "mean": 4.690446904948945e-05,
-              "median": 1.7014381580876146e-05,
-              "std": 5.399285815272571e-05,
-              "z_score": 0.7368082575686418
+              "mean": 9.597659763065865,
+              "median": 8.156624424356888,
+              "std": 5.957796133456848,
+              "z_score": 0.3006638789622245
             },
             "spacing_mm": {
               "mean": 42.537438730161455,
@@ -426,10 +443,10 @@
           "level_name": "L3",
           "stats": {
             "offset_mm": {
-              "mean": 1.1675934211283011e-05,
-              "median": 1.701438156716785e-05,
-              "std": 7.549704662400355e-06,
-              "z_score": 16.015342088216954
+              "mean": 11.273564543396509,
+              "median": 8.156624424356892,
+              "std": 4.408018989450639,
+              "z_score": 9350820.357118858
             },
             "spacing_mm": {
               "mean": 42.53743873016145,
@@ -457,10 +474,10 @@
           "level_name": "L4",
           "stats": {
             "offset_mm": {
-              "mean": 4.680742788696995e-05,
-              "median": 1.701438156716785e-05,
-              "std": 5.385663372570579e-05,
-              "z_score": 0.7361771614599552
+              "mean": 9.597659763065872,
+              "median": 8.156624424356892,
+              "std": 5.95779613345684,
+              "z_score": 0.30066387896222596
             },
             "spacing_mm": {
               "mean": 41.36847060732251,
@@ -482,16 +499,16 @@
           ]
         },
         {
-          "deviation_score": 105.39448104076912,
+          "deviation_score": 5027714.340991913,
           "is_outlier": true,
           "label": 24,
           "level_name": "L5",
           "stats": {
             "offset_mm": {
-              "mean": 6.971162208755241e-05,
-              "median": 6.971162208755241e-05,
-              "std": 5.269724052038456e-05,
-              "z_score": 105.39448104076912
+              "mean": 5.642767253860935,
+              "median": 5.642767253860935,
+              "std": 2.5138571704959567,
+              "z_score": 5027714.340991913
             },
             "spacing_mm": {
               "mean": 40.19950248448356,
@@ -514,54 +531,59 @@
       ],
       "per_label_offsets": [
         {
-          "closest_u": 5.611895432316293e-07,
-          "dx_mm": -1.0256806469044477e-05,
-          "dy_mm": 7.081276173792617e-05,
-          "dz_mm": -9.967766690976987e-05,
+          "closest_u": 0.002035746673572817,
+          "dx_mm": 0.04604639330248261,
+          "dy_mm": 3.1076311643635393,
+          "dz_mm": -0.36136766004063503,
+          "is_terminal": true,
           "label": 20,
           "level_name": "L1",
-          "offset_mm": 0.00012269998608178717,
-          "offset_voxel": 0.00012269998608178717
+          "offset_mm": 3.128910083364956,
+          "offset_voxel": 3.128910083364956
         },
         {
-          "closest_u": 0.23955117583146715,
-          "dx_mm": -1.316053591438049e-06,
-          "dy_mm": -7.736225356325122e-06,
-          "dz_mm": -1.5096622163923712e-05,
+          "closest_u": 0.2368070091633968,
+          "dx_mm": -0.205980244340914,
+          "dy_mm": -8.142424393276826,
+          "dz_mm": 0.4347633134558322,
+          "is_terminal": false,
           "label": 21,
           "level_name": "L2",
-          "offset_mm": 1.7014381580876146e-05,
-          "offset_voxel": 1.7014381580876146e-05
+          "offset_mm": 8.156624424356888,
+          "offset_voxel": 8.156624424356888
         },
         {
-          "closest_u": 0.49999999339219015,
-          "dx_mm": 1.4210854715202004e-14,
-          "dy_mm": 2.842170943040401e-14,
-          "dz_mm": 9.990394858050422e-07,
+          "closest_u": 0.5000000003274603,
+          "dx_mm": 0.5105122692373598,
+          "dy_mm": 17.4999999999823,
+          "dz_mm": -4.950899779032625e-08,
+          "is_terminal": false,
           "label": 22,
           "level_name": "L3",
-          "offset_mm": 9.990394858050426e-07,
-          "offset_voxel": 9.990394858050426e-07
+          "offset_mm": 17.507444781475748,
+          "offset_voxel": 17.507444781475748
         },
         {
-          "closest_u": 0.7604488241685328,
-          "dx_mm": -1.3160535772271942e-06,
-          "dy_mm": -7.736225356325122e-06,
-          "dz_mm": 1.5096622149712857e-05,
+          "closest_u": 0.7631929908366022,
+          "dx_mm": -0.20598024434093531,
+          "dy_mm": -8.14242439327684,
+          "dz_mm": -0.434763313455619,
+          "is_terminal": false,
           "label": 23,
           "level_name": "L4",
-          "offset_mm": 1.701438156716785e-05,
-          "offset_voxel": 1.701438156716785e-05
+          "offset_mm": 8.156624424356892,
+          "offset_voxel": 8.156624424356892
         },
         {
-          "closest_u": 0.9999994401419617,
-          "dx_mm": -1.0232470678772643e-05,
-          "dy_mm": 7.064474855411618e-05,
-          "dz_mm": 9.944116698079597e-05,
+          "closest_u": 0.997964253326429,
+          "dx_mm": 0.04604639330251814,
+          "dy_mm": 3.107631164363575,
+          "dz_mm": 0.36136766004051424,
+          "is_terminal": true,
           "label": 24,
           "level_name": "L5",
-          "offset_mm": 0.00012240886260793697,
-          "offset_voxel": 0.00012240886260793697
+          "offset_mm": 3.128910083364978,
+          "offset_voxel": 3.128910083364978
         }
       ],
       "per_label_orientations": [
@@ -573,7 +595,15 @@
             1.0,
             0.0,
             0.0
-          ]
+          ],
+          "spline_closest_u": 5.611895432316293e-07,
+          "spline_tangent": [
+            0.09454538853186002,
+            -0.4724555719421338,
+            0.8762687384861968
+          ],
+          "spline_tangent_coronal_deg": 6.158129789483072,
+          "spline_tangent_sagittal_deg": -28.332100789317373
         },
         {
           "eigenvalue_ratio": 1.4407051282051282,
@@ -583,7 +613,15 @@
             1.0,
             0.0,
             0.0
-          ]
+          ],
+          "spline_closest_u": 0.23703538157913323,
+          "spline_tangent": [
+            0.07819759959122578,
+            0.4017194408780172,
+            0.9124180106940151
+          ],
+          "spline_tangent_coronal_deg": 4.898490368021733,
+          "spline_tangent_sagittal_deg": 23.762935862594247
         },
         {
           "eigenvalue_ratio": 1.4407051282051284,
@@ -593,7 +631,15 @@
             1.0,
             0.0,
             0.0
-          ]
+          ],
+          "spline_closest_u": 0.5000000237085487,
+          "spline_tangent": [
+            -1.0419326007483773e-08,
+            -1.2110108717845035e-07,
+            0.9999999999999927
+          ],
+          "spline_tangent_coronal_deg": -5.969834055997189e-07,
+          "spline_tangent_sagittal_deg": -6.938581189771069e-06
         },
         {
           "eigenvalue_ratio": 1.4407051282051282,
@@ -603,7 +649,15 @@
             1.0,
             0.0,
             0.0
-          ]
+          ],
+          "spline_closest_u": 0.7629646184208668,
+          "spline_tangent": [
+            -0.07819759959122582,
+            -0.4017194408780167,
+            0.9124180106940152
+          ],
+          "spline_tangent_coronal_deg": -4.898490368021735,
+          "spline_tangent_sagittal_deg": -23.76293586259422
         },
         {
           "eigenvalue_ratio": 1.4407051282051282,
@@ -613,7 +667,15 @@
             1.0,
             0.0,
             0.0
-          ]
+          ],
+          "spline_closest_u": 0.9999994401419617,
+          "spline_tangent": [
+            -0.09454538820181368,
+            0.4724555775468811,
+            0.87626873549991
+          ],
+          "spline_tangent_coronal_deg": -6.158129788976367,
+          "spline_tangent_sagittal_deg": 28.33210115481718
         }
       ],
       "spacing_consistency": {
@@ -643,6 +705,14 @@
       "reason": "Partial vertebra clipped by FOV: label 22 (L3) touches image face(s): anterior.",
       "rule_id": "border",
       "severity": "flagged-for-review"
+    },
+    {
+      "labels": [
+        22
+      ],
+      "reason": "Vertebra misaligned from spinal curve: label 22 (L3) centroid lies 17.5 mm off the fitted spinal curve, predominantly anterior-posterior (threshold 13.0 mm).",
+      "rule_id": "mislabel",
+      "severity": "flagged-for-review"
     }
   ],
   "per_label": {
@@ -652,6 +722,13 @@
           22
         ],
         "message": "Partial vertebra clipped by FOV: label 22 (L3) touches image face(s): anterior.",
+        "severity": "flagged-for-review"
+      },
+      {
+        "labels": [
+          22
+        ],
+        "message": "Vertebra misaligned from spinal curve: label 22 (L3) centroid lies 17.5 mm off the fitted spinal curve, predominantly anterior-posterior (threshold 13.0 mm).",
         "severity": "flagged-for-review"
       }
     ]

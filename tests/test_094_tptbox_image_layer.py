@@ -168,7 +168,7 @@ def test_ac1_existing_core_dependencies_unchanged():
     dependencies = _load_pyproject()["project"]["dependencies"]
     unchanged = {
         "numpy>=1.26,<3",
-        "scipy>=1.7",
+        "scipy>=1.15",
         "scikit-image>=0.19",
         "nibabel>=4.0",
         "PyYAML>=5.4",

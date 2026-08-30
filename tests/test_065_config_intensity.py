@@ -16,8 +16,11 @@ Covers Acceptance Criteria AC11, AC12:
 - AC12: ``set(load_config(default_config_path()).rules.keys())`` still
   equals exactly the seven active rule ids; ``config_hash(
   bundled_default_config())`` equals the value already committed in
-  ``reference_default.json``'s provenance
-  (``87c73ab35da9707054b300e15664c391ce50851c5d11490c89125381c1c96ac8``).
+  ``reference_default.json``'s own provenance
+  (``bundled_default_reference().provenance.config_hash``, read live --
+  item 123 AC53, docs/aide/items/123-recalibrate-and-regenerate-downstream-
+  artifacts.md -- rather than a hardcoded literal that would break on every
+  future recalibration).
 
 Adversarial / edge-case scenarios included:
 - ``intensity:`` section present but only partially populated -- unset keys
@@ -46,13 +49,10 @@ from segfacet.config import (
     default_config_path,
     load_config,
 )
+from segfacet.reference.artifact import bundled_default_reference
 
 _SEVEN_RULE_IDS = frozenset(
     {"bounds", "fragmentation", "coverage", "sequence", "border", "overlap", "mislabel"}
-)
-
-_COMMITTED_REFERENCE_DEFAULT_CONFIG_HASH = (
-    "87c73ab35da9707054b300e15664c391ce50851c5d11490c89125381c1c96ac8"
 )
 
 
@@ -117,10 +117,18 @@ def test_ac12_bundled_default_config_rule_ids_are_exactly_the_seven():
 
 
 def test_ac12_config_hash_matches_committed_reference_default_provenance():
+    """Compared against ``bundled_default_reference().provenance.config_hash``
+    (the live committed artifact's own recorded hash) rather than a
+    hardcoded sha256 literal -- item 123 legitimately moves ``config_hash``
+    when it recalibrates ``mislabel.max_offset_mm`` (AC20/AC53 of
+    docs/aide/items/123-recalibrate-and-regenerate-downstream-artifacts.md),
+    and a second hardcoded literal here would just break again on the next
+    recalibration. Mirrors ``test_090_reference_derived_defaults.py::
+    test_ac16_config_hash_matches_pre_item_snapshot``'s existing idiom."""
     from segfacet.reference.artifact import config_hash
 
     cfg = bundled_default_config()
-    assert config_hash(cfg) == _COMMITTED_REFERENCE_DEFAULT_CONFIG_HASH
+    assert config_hash(cfg) == bundled_default_reference().provenance.config_hash
 
 
 # =========================================================================== #

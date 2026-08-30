@@ -112,6 +112,7 @@ def _fake_gpu_backend():
     fake_cupy = types.ModuleType("fake_cupy")
     fake_cupy.splprep = _forbidden
     fake_cupy.splev = _forbidden
+    fake_cupy.make_splprep = _forbidden
     fake_ndimage = types.SimpleNamespace(
         label=_forbidden,
         distance_transform_edt=_forbidden,

@@ -411,7 +411,8 @@
         "offset_voxel": {"type": "number", "minimum": 0, "description": "Same distance in voxel units."},
         "dx_mm": {"type": "number", "description": "x-component of the displacement vector (mm)."},
         "dy_mm": {"type": "number", "description": "y-component of the displacement vector (mm)."},
-        "dz_mm": {"type": "number", "description": "z-component of the displacement vector (mm)."}
+        "dz_mm": {"type": "number", "description": "z-component of the displacement vector (mm)."},
+        "is_terminal": {"type": "boolean", "description": "True for the first/last entry of the ordered centroid sequence it was measured in (item 123). Optional -- an entry omitting it is treated as interior (False) by every consumer."}
       }
     },
     "stage3OrientationEntry": {
@@ -429,14 +430,33 @@
           "minItems": 3,
           "maxItems": 3
         },
-        "eigenvalue_ratio": {"type": "number", "description": "Ratio of the largest to the second-largest PCA eigenvalue."}
+        "eigenvalue_ratio": {"type": "number", "description": "Ratio of the largest to the second-largest PCA eigenvalue."},
+        "spline_closest_u": {"type": "number", "description": "Spline parameter (0..1) of this centroid's closest point on the fitted curve (item 121)."},
+        "spline_tangent": {
+          "type": "array",
+          "description": "Unit-normalised, direction-normalised curve tangent at spline_closest_u (item 121).",
+          "items": {"type": "number"},
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "spline_tangent_coronal_deg": {"type": "number", "description": "Signed in-plane tilt in the coronal (R-S) plane at spline_closest_u, wrapped to (-180, 180] (item 121)."},
+        "spline_tangent_sagittal_deg": {"type": "number", "description": "Signed in-plane tilt in the sagittal (A-S) plane at spline_closest_u, wrapped to (-180, 180] (item 121)."}
       }
     },
     "stage3Curvature": {
       "type": "object",
       "description": "Global spinal curvature descriptors.",
       "additionalProperties": false,
-      "required": ["tangent_angles_deg", "inter_tangent_angles_deg", "total_curvature_deg"],
+      "required": [
+        "tangent_angles_deg",
+        "inter_tangent_angles_deg",
+        "total_curvature_deg",
+        "coronal_tangent_angles_deg",
+        "sagittal_tangent_angles_deg",
+        "coronal_curvature_deg",
+        "sagittal_curvature_deg",
+        "curvature_plane"
+      ],
       "properties": {
         "tangent_angles_deg": {
           "type": "array",
@@ -451,7 +471,32 @@
         "total_curvature_deg": {
           "type": "number",
           "minimum": 0,
-          "description": "Cobb-like proxy: range (max - min) of tangent angles."
+          "description": "The larger of coronal_curvature_deg and sagittal_curvature_deg -- the sweep in the anatomical plane the spine turns in most. See curvature_plane for which one."
+        },
+        "coronal_tangent_angles_deg": {
+          "type": "array",
+          "description": "Signed tangent angle (degrees) in the coronal (R-S) plane at each centroid: degrees(atan2(t_R, t_S)), unwrapped along the spine and computed from tangents normalised to a cranial-to-caudal traversal direction. Positive tilts toward the patient's right as the spine advances cranially. Requires RAS-ordered mm centroids (io.load_volume reorients every volume to R, A, S).",
+          "items": {"type": "number"}
+        },
+        "sagittal_tangent_angles_deg": {
+          "type": "array",
+          "description": "Signed tangent angle (degrees) in the sagittal (A-S) plane at each centroid: degrees(atan2(t_A, t_S)), unwrapped and direction-normalised the same way as coronal_tangent_angles_deg. Positive tilts anterior. Requires RAS-ordered mm centroids (io.load_volume reorients every volume to R, A, S).",
+          "items": {"type": "number"}
+        },
+        "coronal_curvature_deg": {
+          "type": "number",
+          "minimum": 0,
+          "description": "max - min of coronal_tangent_angles_deg -- the coronal-plane sweep. 0.0 for a curve confined to the sagittal plane."
+        },
+        "sagittal_curvature_deg": {
+          "type": "number",
+          "minimum": 0,
+          "description": "max - min of sagittal_tangent_angles_deg -- the sagittal-plane sweep. 0.0 for a curve confined to the coronal plane."
+        },
+        "curvature_plane": {
+          "type": "string",
+          "enum": ["coronal", "sagittal"],
+          "description": "\"coronal\" when coronal_curvature_deg >= sagittal_curvature_deg, else \"sagittal\". An exact tie (including 0.0/0.0) resolves to \"coronal\"."
         }
       }
     },

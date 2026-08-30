@@ -816,9 +816,18 @@ def test_ac16_load_config_default_path_equals_default_config():
     pre-existing, already-documented false equality unrelated to item 090
     (default_config().rules == {} while load_config() materialises all 7
     rules -- see tests/test_065_config_intensity.py's docstring). Assert
-    config_hash byte-stability instead, mirroring that test's pattern."""
+    config_hash byte-stability instead, mirroring that test's pattern.
+
+    Compared against ``bundled_default_reference().provenance.config_hash``
+    (the live committed artifact's own recorded hash) rather than a
+    hardcoded sha256 literal -- item 123's recalibration of
+    ``mislabel.max_offset_mm`` legitimately moves ``config_hash`` (it hashes
+    ``config.rules``, AC20 of docs/aide/items/123-recalibrate-and-regenerate-
+    downstream-artifacts.md), and a second hardcoded literal here would just
+    break again on the next recalibration (AC53). Mirrors the pattern already
+    used one test below, against ``bundled_production_reference()``."""
     bundled = bundled_default_config()
-    expected_hash = "87c73ab35da9707054b300e15664c391ce50851c5d11490c89125381c1c96ac8"
+    expected_hash = bundled_default_reference().provenance.config_hash
     assert config_hash(bundled) == expected_hash
 
 

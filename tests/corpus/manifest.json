@@ -48,8 +48,8 @@
         ]
       },
       "case_id": "mode1_displace",
-      "detail": "displace: translated label 22 by (13, 13) voxels along (array axis 0, array axis 1) -- the two non-stacking axes -- off the spinal curve defined by the remaining vertebrae. Not surfaced by plain run_qc (the interpolating spline refit absorbs the displaced centroid) -- asserted via a reconstructed leave-one-out offset fed to MislabelRule directly (see item 039 Assumptions).",
-      "detection": "reconstructed_record",
+      "detail": "displace: translated label 22 by (13, 13) voxels along (array axis 0, array axis 1) -- the two non-stacking axes -- off the spinal curve defined by the remaining vertebrae. Caught by plain run_qc's held-out per-label spline offset (item 120), which measures the target against a curve it did not shape.",
+      "detection": "pipeline",
       "expected_labels": [
         22
       ],
@@ -63,7 +63,7 @@
       "perturbation_params": {
         "target_label": 22
       },
-      "reconstruction": "leave_one_out_offset",
+      "reconstruction": null,
       "scan_fixture": "fixtures/base_scan.nii.gz",
       "seed": 0,
       "seg_fixture": "fixtures/mode1_displace_seg.nii.gz"

@@ -311,6 +311,13 @@ def ingest_subject(
     stage3 = block.get("stage3")
     if stage3 is not None:
         for entry in stage3.get("per_label_offsets", []):
+            if entry.get("is_terminal"):
+                # A terminal (sequence-first/last) offset is the held-out
+                # estimator's extrapolation artefact, not a measurement of
+                # interior anatomy -- item 123. Excluded here so
+                # spline_offset_mm describes interior vertebrae alone;
+                # mislabel.py and reference/delta.py exclude it symmetrically.
+                continue
             offsets_by_label[int(entry["label"])] = entry["offset_mm"]
         for entry in stage3.get("per_label_orientations", []):
             orientations_by_label[int(entry["label"])] = entry["eigenvalue_ratio"]

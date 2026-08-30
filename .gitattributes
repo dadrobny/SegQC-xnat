@@ -11,6 +11,10 @@ src/segfacet/reference/reference_verse_*.json text eol=lf
 tests/corpus/intensity/manifest.json text eol=lf
 tests/corpus/intensity/fixtures/*.nii.gz binary
 tests/corpus/094_pre_migration_snapshot.json text eol=lf
+# Item 119's pre-119 blast-radius digests. Read via read_text(), so a CRLF
+# checkout would not break it today, but pinned on the same principle as
+# every committed text fixture above rather than relying on that.
+tests/corpus/119_pre_119_digests.json text eol=lf
 
 # Items 099-101 introduced "scope fence" tests that hash committed source
 # files verbatim (read_bytes()) to prove later items didn't touch them.

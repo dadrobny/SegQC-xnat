@@ -14,13 +14,14 @@ naming the induced §6 failure mode and the offending label(s):
   affine -- item 116) while keeping its label. Targets the misalignment
   detector of
   :class:`~segfacet.heuristics.mislabel.MislabelRule` (item 033, Detector A,
-  §6 mode 1). Because the real pipeline refits an *interpolating* spline
-  through **all** present centroids in ascending-label order every time
-  (item 017, ``splprep(..., s=0)``), the displaced centroid is absorbed back
-  onto the refit and plain ``run_qc`` cannot surface this -- it is asserted
-  via a **reconstructed** ``per_label_offsets`` record (the target's
-  leave-one-out offset) fed to ``MislabelRule`` directly, the same pattern
-  item 038's ``force_overlap`` used for ``OverlapRule``.
+  §6 mode 1). Since item 120 promoted a **held-out** (leave-one-out,
+  down-weighted) per-label spline offset into the pipeline itself, the
+  target's ``offset_mm`` is measured against a curve it did not shape, so
+  the displacement separates through plain ``run_qc`` -- no reconstruction
+  is needed for this case (before item 120, the pipeline's single in-sample
+  smoothing-spline refit absorbed the displaced centroid, and this case
+  needed a reconstructed ``per_label_offsets`` record; that limitation no
+  longer holds).
 * :class:`RelabelSwapPerturbation` (``"relabel_swap"``) -- exchanges two
   adjacent vertebra bodies' integer labels, so each label sits at the
   other's anatomical position while the present-label set is unchanged.
@@ -153,13 +154,12 @@ class DisplacePerturbation(Perturbation):
     by ``displacement_mm`` (split evenly across the two axes, spacing-aware),
     keeping the body >= 1 voxel inset from every face so it stays a single
     solid block with no bounds / fragmentation / border side-effect (§6 mode
-    1). Because the real
-    pipeline's interpolating spline refit absorbs the displaced centroid
-    (see the module docstring), the misalignment finding is asserted via a
-    reconstructed leave-one-out ``per_label_offsets`` record fed to
-    ``MislabelRule`` directly, not through plain ``run_qc``. Rejects an
-    explicit target not present, or a ``displacement_mm`` too large to fit
-    inside the field of view with the required margin.
+    1). The pipeline's held-out per-label spline offset (item 120) measures
+    the target against a curve it did not shape, so the misalignment
+    finding is asserted through plain ``run_qc`` -- see the module
+    docstring. Rejects an explicit target not present, or a
+    ``displacement_mm`` too large to fit inside the field of view with the
+    required margin.
     """
 
     name = "displace"
@@ -237,11 +237,10 @@ class DisplacePerturbation(Perturbation):
                 f"displace: translated label {target} by ({da_vox}, "
                 f"{db_vox}) voxels along (array axis {axis_a}, array axis "
                 f"{axis_b}) -- the two non-stacking axes -- off the spinal "
-                "curve defined by the remaining vertebrae. Not surfaced by "
-                "plain run_qc (the interpolating spline refit absorbs the "
-                "displaced centroid) -- asserted via a reconstructed "
-                "leave-one-out offset fed to MislabelRule directly (see "
-                "item 039 Assumptions)."
+                "curve defined by the remaining vertebrae. Caught by plain "
+                "run_qc's held-out per-label spline offset (item 120), "
+                "which measures the target against a curve it did not "
+                "shape."
             ),
         )
         return PerturbationResult(labelmap=out_img, expectation=expectation)

@@ -27,7 +27,7 @@ classifiers = [
 # lockfile/constraints (Stage 9), not in library metadata. See item 001.
 dependencies = [
     "numpy>=1.26,<3",
-    "scipy>=1.7",
+    "scipy>=1.15",
     "scikit-image>=0.19",
     "nibabel>=4.0",
     "PyYAML>=5.4",

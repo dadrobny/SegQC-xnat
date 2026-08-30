@@ -135,9 +135,16 @@ def test_ac3_min_overlap_voxels_matches_code_default():
 
 
 def test_ac3_max_offset_mm_matches_code_default():
-    """AC3: mislabel.max_offset_mm == 15.0."""
+    """AC3: mislabel.max_offset_mm equals the shipped code default.
+
+    Re-expressed against ``_DEFAULT_MAX_OFFSET_MM`` (item 123,
+    docs/aide/items/123-recalibrate-and-regenerate-downstream-artifacts.md)
+    rather than the superseded literal ``15.0`` -- this test pins the
+    code<->config agreement, not a specific number."""
+    from segfacet.heuristics.mislabel import _DEFAULT_MAX_OFFSET_MM
+
     cfg = load_config(default_config_path())
-    assert cfg.rule_param("mislabel", "max_offset_mm", None) == 15.0
+    assert cfg.rule_param("mislabel", "max_offset_mm", None) == _DEFAULT_MAX_OFFSET_MM
 
 
 def test_ac3_flag_escalation_count_matches_code_default():

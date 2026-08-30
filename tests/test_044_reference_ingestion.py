@@ -173,6 +173,12 @@ def test_ac2_emitted_features_match_extracted_geometry(tmp_path):
 
 
 def test_ac3_spline_offset_populated_for_multi_level_subject(tmp_path):
+    """Item 123 (docs/aide/items/123-recalibrate-and-regenerate-downstream-
+    artifacts.md, AC41/AC54) excludes a subject's two terminal levels (the
+    first and last of its ordered sequence) from ``spline_offset_mm``
+    entirely -- so a 3-level (L1-L3) subject's interior level (L2) carries
+    the feature and its two terminal levels (L1, L3) do not, documenting the
+    exclusion rather than contradicting it."""
     spine = build_clean_spine(levels=("L1", "L2", "L3"), spacing=(1.0, 1.0, 1.0))
     _write_subject(tmp_path, "sub-000", spine.seg_img, spine.scan_img)
 
@@ -181,22 +187,34 @@ def test_ac3_spline_offset_populated_for_multi_level_subject(tmp_path):
     subject = result.subjects[0]
 
     block = extract_feature_record(spine.seg_img, config)
-    offsets_by_label = {
-        entry["label"]: entry["offset_mm"]
-        for entry in block["stage3"]["per_label_offsets"]
+    offset_entries_by_label = {
+        entry["label"]: entry for entry in block["stage3"]["per_label_offsets"]
     }
     level_name_by_label = {
         int(k): v["level_name"] for k, v in block["per_label"].items()
     }
 
+    terminal_levels = set()
+    interior_levels = set()
     for record in subject.records:
         label = next(
             lbl for lbl, name in level_name_by_label.items() if name == record.level_name
         )
-        assert "spline_offset_mm" in record.features
-        offset = record.features["spline_offset_mm"]
-        assert offset == pytest.approx(offsets_by_label[label])
-        assert np.isfinite(offset)
+        entry = offset_entries_by_label[label]
+        if entry.get("is_terminal"):
+            terminal_levels.add(record.level_name)
+            assert "spline_offset_mm" not in record.features, (
+                f"{record.level_name} is terminal and must carry no spline_offset_mm"
+            )
+        else:
+            interior_levels.add(record.level_name)
+            assert "spline_offset_mm" in record.features
+            offset = record.features["spline_offset_mm"]
+            assert offset == pytest.approx(entry["offset_mm"])
+            assert np.isfinite(offset)
+
+    assert terminal_levels == {"L1", "L3"}
+    assert interior_levels == {"L2"}
 
 
 # =========================================================================== #

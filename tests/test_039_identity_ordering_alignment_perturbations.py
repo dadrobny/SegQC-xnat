@@ -7,9 +7,10 @@ Covers Acceptance Criteria AC1-AC24:
   the mislabel threshold; body translated wholesale (single component,
   preserved voxel count, no bounds/fragmentation/border finding); fires the
   misalignment finding via a reconstructed ``per_label_offsets`` record fed
-  to ``MislabelRule`` directly (the interpolating spline makes this
-  structurally invisible to plain ``run_qc``); ``run_qc`` stays silent on
-  ``mislabel`` (documented limitation); Expectation well-formed.
+  to ``MislabelRule`` directly; since item 120 promoted a held-out per-label
+  spline offset into the pipeline, plain ``run_qc`` now fires ``mislabel`` on
+  the displaced label too (no longer a documented limitation); Expectation
+  well-formed.
 - AC7-AC13 (Group B, ``relabel_swap``): registration; swaps two adjacent
   bodies' identities while preserving the present-label set; the swap is
   non-monotonic on the true spatial (stacking-axis) curve; fires the
@@ -152,16 +153,26 @@ def _designated_rule_fires_reconstructed(operator_name, labelmap, expectation):
     if operator_name == "displace":
         (target,) = expectation.expected_labels
         loo = _loo_offset(labelmap, target)
+        target_is_terminal = False
         for entry in record["stage3"]["per_label_offsets"]:
             if entry["label"] == target:
                 entry["offset_mm"] = loo
+                target_is_terminal = bool(entry.get("is_terminal"))
         findings = MislabelRule().evaluate(record, cfg)
-        return any(
+        fires = any(
             f.rule_id == "mislabel"
             and f.reason.startswith("Vertebra misaligned from spinal curve:")
             and f.labels == frozenset({target})
             for f in findings
         )
+        if target_is_terminal:
+            # AC39 (docs/aide/items/123-recalibrate-and-regenerate-
+            # downstream-artifacts.md): mislabel never fires an offset
+            # finding on a terminal vertebra, regardless of magnitude -- the
+            # designated rule NOT firing here is the exclusion working as
+            # designed, not a self-consistency failure (AC55).
+            return not fires
+        return fires
     if operator_name == "relabel_swap":
         pairs = _reconstruct_mono_pairs(labelmap)
         record["stage3"]["monotonic_consistency"]["non_monotonic_pairs"] = [
@@ -231,19 +242,17 @@ def test_ac3_displace_translates_body_wholesale_no_spurious_flags():
     )
 
 
-def test_ac4_displace_fires_misalignment_finding_via_reconstructed_offsets():
-    """AC4: replacing the target entry's offset_mm with the leave-one-out
-    offset and feeding the record to MislabelRule fires a "mislabel" finding
-    tagged "Vertebra misaligned from spinal curve:" on {22}."""
+def test_ac4_displace_fires_misalignment_finding_via_run_qc():
+    """AC4: the item-120 held-out per-label spline offset makes the
+    displaced label's own offset_mm large through plain extract_feature_record
+    (no reconstruction needed), and feeding that record to MislabelRule fires
+    a "mislabel" finding tagged "Vertebra misaligned from spinal curve:" on
+    {22}."""
     clean = _clean()
     cfg = bundled_default_config()
     result = DisplacePerturbation(target_label=22).apply(clean.seg_img, seed=0)
 
     record = extract_feature_record(result.labelmap, cfg)
-    loo = _loo_offset(result.labelmap, 22)
-    for entry in record["stage3"]["per_label_offsets"]:
-        if entry["label"] == 22:
-            entry["offset_mm"] = loo
 
     findings = MislabelRule().evaluate(record, cfg)
     matches = [
@@ -256,14 +265,20 @@ def test_ac4_displace_fires_misalignment_finding_via_reconstructed_offsets():
     assert matches
 
 
-def test_ac5_displace_run_qc_does_not_surface_mislabel_finding():
-    """AC5: plain run_qc on the displaced map emits no "mislabel" finding --
-    the interpolating spline is refit through all present centroids, so the
-    displaced centroid sits back on the curve (documented limitation)."""
+def test_ac5_displace_run_qc_surfaces_mislabel_finding():
+    """AC5: plain run_qc on the displaced map emits a "mislabel" finding on
+    the displaced label -- the pipeline's held-out per-label spline offset
+    (item 120) measures the target against a curve it did not shape, so the
+    displacement is no longer absorbed."""
     clean = _clean()
     result = DisplacePerturbation(target_label=22).apply(clean.seg_img, seed=0)
     findings = _findings(result.labelmap)
-    assert not any(f.rule_id == "mislabel" for f in findings)
+    mislabel = [f for f in findings if f.rule_id == "mislabel"]
+    assert mislabel
+    union = set()
+    for f in mislabel:
+        union |= set(f.labels)
+    assert union == {22}
 
 
 def test_ac6_displace_expectation_well_formed():
