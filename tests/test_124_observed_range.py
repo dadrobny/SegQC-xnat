@@ -264,11 +264,19 @@ def test_ac2_every_reference_feature_resolves_uniquely(observed_range_module, fu
 def test_ac3_reference_covered_paths_have_populated_reference_range(
     observed_range_module, full_catalogue
 ):
+    # Restricted to the reference's actual 21 feature names, mirroring
+    # test_ac2's pattern -- resolve_reference_features(leaf_paths) also
+    # resolves names the reference does not carry (e.g. rule 3's unique
+    # last-segment match on a name like item 121's
+    # "spline_tangent_sagittal_deg", which legitimately has no backing stats
+    # and so is `covered: False`; that is AC4's concern, not AC3's).
     reference = _bundled_reference()
     leaf_paths = {e.path for e in full_catalogue.entries}
     resolved = observed_range_module.resolve_reference_features(leaf_paths)
 
-    for feature_name, path in resolved.items():
+    for feature_name in reference.features:
+        assert feature_name in resolved, feature_name
+        path = resolved[feature_name]
         entry = _entry(full_catalogue, path)
         ref = entry.observed.reference
         assert ref.covered is True, (feature_name, path)
@@ -694,20 +702,50 @@ def test_adv_verdict_order_degenerate_beats_varies(observed_range_module):
 
 def test_adv_verdict_order_placeholder_beats_varies(observed_range_module):
     # A driver record realising a placeholder-only path with a large
-    # hand-typed constant must still read "placeholder", not "varies".
+    # hand-typed constant must still read "placeholder", not "varies". Built
+    # through the real dataclasses/converter (mirroring catalogue.py's own
+    # "reference_delta" placeholder driver) so the record has the true
+    # ``reference_delta.per_label.<label>...`` shape that
+    # ``normalise_leaf_path`` rule (d) collapses to
+    # ``reference_delta.{label}...`` -- a hand-nested
+    # ``{"reference_delta": {"L1": ...}}`` dict does not normalise that way.
+    from segfacet.reference.delta import (
+        FeatureDelta,
+        LabelDelta,
+        ReferenceDelta,
+        reference_delta_to_dict,
+    )
+
+    large_feature_delta = FeatureDelta(
+        feature="physical_volume_mm3",
+        value=18750.0,
+        z_score=999999.0,
+        robust_z=0.2,
+        percentile_rank=55.0,
+        out_of_range=False,
+    )
+    large_label_delta = LabelDelta(
+        label=1,
+        level_name="L1",
+        stratum="all",
+        available=True,
+        features=(large_feature_delta,),
+        distribution_distance=0.2,
+        out_of_range_features=(),
+    )
+    large_reference_delta = ReferenceDelta(
+        reference_delta_version="1.0",
+        reference_schema_version="1.0",
+        reference_source="synthetic-placeholder",
+        stratum="all",
+        lower_pct=1,
+        upper_pct=99,
+        per_label={1: large_label_delta},
+    )
     driver_records = [
         (
             "reference_delta",
-            {
-                "reference_delta": {
-                    "L1": {
-                        "features": {
-                            "physical_volume_mm3": {"z_score": 999999.0},
-                        },
-                        "out_of_range_features": [],
-                    }
-                }
-            },
+            {"reference_delta": reference_delta_to_dict(large_reference_delta)},
         )
     ]
     ranges = observed_range_module.build_observed_ranges(driver_records=driver_records)
