@@ -73,6 +73,14 @@
 > fit), not two, and the FOV-headroom remedy Stage 20 proposed for mode 1 is measurably
 > not the cause. Run order from here: **28 → 20 → 27 → 21 → 16**.
 
+> **Stage 29 scoped 2026-08-30** (queue-017 boundary triage), the same construction as
+> Stages 26–28: numbered for stability, **runs next, ahead of Stage 20**. It executes the
+> maintainer-signed golden retirement (pulled forward from Stages 21/27), makes
+> committed-artifact comparisons tolerance-by-construction, and sweeps the located defects
+> queue 017 recorded — including `consistency.py`'s mode-4 monotonicity, which closes
+> Stage 28's one unticked non-adjudication acceptance half. Run order from here:
+> **29 → 20 → 27 → 21 → 16**.
+
 ## Two kinds of "done" — implementation vs. validation
 
 This tracker separates two claims that are easy to conflate:
@@ -1273,3 +1281,38 @@ corpus alone cannot separate that from a broken feature. Do not widen on that ev
   real spread. Two successive in-session regenerations of all nine corpus goldens and
   `tests/golden/022_stage3_report.json` are byte-identical to each other and to the
   committed files.)*
+
+## Stage 29 — Golden Retirement & Test-Artifact Hygiene (G2, G7) — 📋
+
+**Goal.** Execute the maintainer-signed retirement of the 11 whole-record snapshot goldens
+(`golden-decision-table.md`, dispositioned *retire* 2026-07-28, execution pulled forward
+from Stages 21/27), make committed-artifact comparisons reach for numeric tolerance by
+construction, and sweep the located defects the queue-017 triage routed to
+[`roadmap.md`](roadmap.md)'s Stage 29 — see there for the full deliverable list and
+per-deliverable provenance.
+
+**Deliverables.**
+
+- 📋 The golden retirement executed: nine `tests/corpus/golden/*.json` and two
+  `tests/golden/` snapshots gone, the four per-row replacements in place, nothing
+  regenerated on the way out (D1).
+- 📋 Tolerance by construction: shared committed-artifact comparison helper plus an
+  enforcing guard extending `tests/test_111_golden_guard.py`'s byte-exact allowlist (D2).
+- 📋 The remaining hygiene and located-defect sweep: the `reference_verse_v1` integrity
+  pin relocated and the `test_102` fence header renamed (D3); `fit_centroid_spline`
+  degenerate-input handling (D4); the 4-centroid held-out fallback boundary (D5); spline
+  plumbing consolidation (D6); `tangent_angles_deg[]` direction normalisation (D7);
+  `consistency.py` monotonicity against the smoothed fit so mode 4 fires (D8); the
+  `tptbox` ≥ 0.7.6 pin (D9); `refresh_reference.py --verse-cohort` delegated or retired
+  (D10); the decision table's live counts split into a generated companion (D11).
+
+**Acceptance.**
+
+- [ ] All 11 retired snapshots are gone with their named replacements in place, and no
+  snapshot was regenerated on the way out; the guard fails a deliberately added byte-exact
+  comparison against a committed float-carrying artifact (**G7**).
+- [ ] `mode4_relabel_swap` yields `is_monotonic == False` through `extract_feature_record`,
+  closing Stage 28's unticked mode-4 acceptance half (**G2**).
+- [ ] A 4-level field of view yields non-degenerate held-out offsets; `pip show tptbox`
+  reports a non-AGPL licence; each fixed defect carries a regression test that fails
+  before the fix (**G7**).

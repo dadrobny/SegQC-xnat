@@ -900,7 +900,8 @@ Make the **three rungs of realism** explicit, and stop conflating them:
   fast unit tests only.
 - **Act on Stage 19's golden decision** — retire the corpus-snapshot goldens as their
   cases are superseded. Do **not** regenerate the nine snapshots against the new corpus;
-  that recreates the same problem one rung up.
+  that recreates the same problem one rung up. *(Pulled forward into Stage 29 D1 on
+  2026-08-30 — by the time this stage runs, the retirement should already be executed.)*
 
 **Dependencies.** Stages 13 (VerSe adapter), 19 (golden decision), 20 (specificity
 harness — the new corpus is exactly what the ratchet is there to police).
@@ -1064,7 +1065,8 @@ to fall out of module provenance.
 which features are load-bearing before any of them are renamed). Should land **before**
 Stages 23/24, which both consume the feature vector as a vector. This stage renames leaf
 paths wholesale, so it is the natural moment to execute item 105's golden retire
-dispositions if Stage 21 has not already.
+dispositions if Stage 21 has not already. *(Superseded 2026-08-30: Stage 29 D1 owns the
+retirement and runs before both.)*
 
 **Validation / acceptance.** The taxonomy is documented with its rationale and every
 deviation from the starting proposal justified, and is signed off by the maintainer before
@@ -1201,6 +1203,119 @@ and was not weakened.
 
 ---
 
+# Stage scoped 2026-08-30 (queue-017 boundary triage)
+
+> Same construction as Stages 26–28: numbered after the placeholders so numbering stays
+> stable, **runs earlier than its number suggests**. Scoped from the carried defects the
+> queue-017 triage routed to this file plus the two surviving 2026-08-25 entries — every
+> deliverable is a known, located defect or an already-signed decision awaiting execution;
+> this stage does no discovery.
+
+## Stage 29 — Golden Retirement & Test-Artifact Hygiene (G2, G7)
+
+**Goal.** Execute the maintainer-signed retirement of the whole-record snapshot goldens and
+make "comparing against a committed artifact" reach for numeric tolerance by construction —
+then sweep the small located defects that queue 017 recorded but was (correctly) forbidden
+from fixing in scope. The motivating cost is measured, not speculative: items 119/120/123
+each regenerated nine snapshot goldens plus both reference artifacts and touched ~8 pinning
+test files, and three of those items' test-writing passes reintroduced byte-exact
+comparisons against committed float-carrying artifacts that only PR #56's CI matrix caught
+(~1 ULP float drift across numpy versions and platforms).
+
+**Deliverables** (each a candidate item; D1–D2 are the load-bearing ones, D3–D5 batch
+naturally, and D1 should land first so D5/D7/D8's regeneration surface is already smaller):
+
+- **D1 — execute the golden retirement.** All 11 snapshot rows of
+  [`golden-decision-table.md`](golden-decision-table.md) (the nine `tests/corpus/golden/*.json`
+  whole-record reports and the two `tests/golden/` snapshots, items 016/022) are
+  maintainer-dispositioned **retire** (signed 2026-07-28, item 106), with the four
+  replacements specified per row: (i) intra-run determinism survives via the existing
+  run-to-run tests; (ii) schema validity re-points at a freshly built report; (iii) the
+  load-bearing "verdict/findings unchanged" use moves to a narrow verdict+findings shape
+  expectation that pins no feature values and so survives a feature retune; (iv) Stage 21's
+  real-GT corpus takes over the snapshot role. Execution was assigned to Stage 21 (or 27,
+  whichever first) and is pulled forward here — it needs no new corpus, and every queue
+  meanwhile pays the regeneration cascade. Do **not** regenerate the snapshots on the way
+  out; that is the exact move the disposition forbids.
+- **D2 — tolerance by construction.** A shared comparison helper whose name makes
+  "fresh output vs committed artifact" go through `reports_close`-style numeric tolerance,
+  plus a guard test extending `tests/test_111_golden_guard.py`'s hand-surveyed
+  `_KNOWN_BYTE_EXACT_FIXTURE_FAMILIES` into an enforced allowlist: a new byte-exact
+  comparison of freshly generated output against a committed float-carrying artifact fails
+  with a message naming the helper. The spec carries item 124's emission-clamp rule for
+  what legitimately stays byte-compared: an artifact reporting a raw float measurement
+  alongside its own "meaningfully nonzero" threshold must clamp sub-threshold noise to a
+  fixed sentinel at the serialisation boundary (`segfacet.observed_range.emission_range`
+  is the shipped example — quantisation cannot stabilise cancellation-scale noise), and
+  a spec that changes a feature the reference artifact aggregates must survey every
+  consumer mechanically (`grep -l build_and_write_default tests/`), not by hand-listing.
+- **D3 — relocate the surviving artifact-integrity pin, rename the mislabelled fence.**
+  `tests/test_098_stray_components.py::test_ac18_reference_verse_v1_bytes_unchanged` pins
+  `reference_verse_v1.json`'s bytes under an item-098 scope-fence name; the invariant is
+  legitimate (a released production artifact must not change silently) but belongs in a
+  test named for the artifact beside `reference/artifact.py` — carrying its
+  `.gitattributes` pin across deliberately, since engine 1.19.0's lint cannot see a path
+  reached through a helper function. And `tests/test_102_stage18_validation.py`'s
+  `# AC24: the scope fence` header sits over a legitimate intra-run determinism assertion —
+  renaming the header to say what it checks is the whole fix. *(Both routed 2026-08-25.)*
+- **D4 — `fit_centroid_spline` degenerate input.** `features/spline.py` propagates SciPy's
+  bare `ValueError: Invalid inputs.` when all supplied centroids are exactly coincident;
+  degrade gracefully or raise a descriptive error naming the cause, and let item 122's
+  substituted 1e-6 mm adversarial fixture become the real all-coincident case.
+- **D5 — the 4-centroid silent zero.** `compute_leave_one_out_spline_offsets`'s `< 4`
+  in-sample fallback boundary is one too low: at `k = 3` with four points the held-out
+  refit interpolates and every offset reads exactly `0.0` (measured on real
+  `sub-verse065`), so a 4-level field of view cannot raise a `mislabel` offset finding.
+  Move the boundary to `< 5` and regenerate the affected reference distributions.
+- **D6 — spline plumbing consolidation.** The coarse-scan-plus-`minimize_scalar`
+  closest-point search exists three times (`features/spline_offset.py`,
+  `features/consistency.py`, `scripts/compare_curve_candidates.py`) with no link between
+  them, and the pipeline fits the identical in-sample spline twice per case (`pipeline.py`'s
+  curvature fit and `spline_offset.py`'s internal reference refit). One implementation,
+  one fit.
+- **D7 — `tangent_angles_deg[]` traversal-direction normalisation.** The unsigned angle to
+  `+S` reads ~175° per level on a cranial-first centroid sequence and ~5° on a caudal-first
+  one — same spine, two readings, latent only because every committed fixture happens to
+  advance superiorly. Normalise to the convention item 122 already established for its
+  signed per-plane arrays, so the record carries one tangent-angle convention.
+- **D8 — give the mode-4 acceptance an owner.** Stage 28 asserts a smoothed fit detects
+  the mode-4 swap via `is_monotonic == False`, but no queue-017 item owned
+  `features/consistency.py`, and the criterion is measured unmet (item 125's replay pins
+  `is_monotonic == True` on `mode4_relabel_swap`). Make the monotonicity check judge the
+  smoothed fit so the swap fires, closing Stage 28's unticked mode-4 acceptance half.
+- **D9 — bump `tptbox` to ≥ 0.7.6.** The 0.7.5 wheel's published metadata declares AGPL
+  v3.0 while TPTBox's `LICENSE` is Apache-2.0; upstream fixed the metadata in v0.7.6
+  (TPTBox PR #119). A dependency bump's regression surface is the golden corpus — smaller
+  after D1, which is why this sits here and not in a drive-by edit.
+- **D10 — `scripts/refresh_reference.py --verse-cohort` has never worked.** It hands the
+  cohort root to `ingest_cohort`, which lists one directory non-recursively and hardcodes
+  `_scan.nii.gz` siblings — incompatible with VerSe's layout, so the wrapper records
+  `verse-build: failed` by construction. Delegate to item 123's
+  `scripts/rebuild_verse_reference.py` or retire the mode.
+- **D11 — split the decision table's live counts from its signed judgement.**
+  `golden-decision-table.md`'s `N/M leaf paths unwired` cells are live values off
+  `build_catalogue()`, so every feature-adding item (106, 110, 122) edits a human-signed
+  document to refresh a count while asserting no judgement moved. Generate the measured
+  counts into a small companion artifact the signed document references, so a count
+  refresh never touches signed text.
+
+**Dependencies.** None. **Runs next, ahead of Stage 20** — D1/D7/D8 change the surfaces
+Stage 20 audits and the specificity baseline it pins, and D8 closes a Stage 28 acceptance
+line Stage 20 would otherwise re-record as a reachability hole. The Stage 21 deliverable
+"Act on Stage 19's golden decision" and Stage 27's "natural moment to execute item 105's
+golden retire dispositions" are both superseded by D1.
+
+**Validation / acceptance.** The nine corpus snapshot goldens and both `tests/golden/`
+snapshots are gone with all four named replacements in place, and no snapshot was
+regenerated on the way out; the D2 guard fails a deliberately added byte-exact comparison
+against a committed float-carrying artifact on a scratch branch (**G7**);
+`mode4_relabel_swap` yields `is_monotonic == False` through `extract_feature_record` and
+Stage 28's mode-4 acceptance half is closed (**G2**); a 4-level field of view yields
+non-degenerate held-out offsets; `pip show tptbox` reports a non-AGPL licence; each fixed
+defect carries a regression test that fails before the fix (**G7**).
+
+---
+
 # Backlog — unowned ideas
 
 > Recorded so they are not lost. **No stage owns these**; each was raised deliberately as
@@ -1276,13 +1391,9 @@ and was not weakened.
   `total_curvature_deg` per plane, partly delivering its override's ask) cannot rewrite
   the recorded human call from inside an item. Needs either a dated append-trail
   convention like `insights.md`'s, or a queue-boundary review pass that re-asks the
-  maintainer. Same family as the next entry.
-- **`golden-decision-table.md` mixes a dated human sign-off with live measured counts**
-  *(insights.md, item 122, 2026-08-27)*. The `N/M leaf paths unwired` cells are live
-  values off `build_catalogue()`, so every feature-adding item (106, 110, 122) must touch
-  a human-signed document and explain that no judgement moved. Separating the measured
-  counts into a small generated companion table the signed document references would let
-  a count refresh never touch signed text.
+  maintainer. Same signed-text-vs-live-state family as Stage 29 D11 (the decision table's
+  measured counts), but unlike a count refresh this one needs the maintainer's judgement,
+  so it stays a decision rather than a deliverable.
 - **Is a scoliosis-vs-normal envelope FACET's to build at all?** *(insights.md, item 118,
   2026-08-27)*. Stage 28's deformity envelope is one threshold over all anatomy; the
   anticipated refinement — separate normal and scoliotic envelopes — is **pathology
@@ -1313,49 +1424,13 @@ and was not weakened.
 
 > Distinct from the ideas above: each is a **known, located defect** that survived its
 > originating item because the file it lives in was outside that item's authorised paths.
-> Stage 26 was the vehicle for this class and has closed ✅, so these are unowned. Routed
-> here from `insights.md` at triage on 2026-08-25 so the next `/aide-create-queue` sees
-> them; each names the entry it came from.
+> Stage 26 was the vehicle for this class and has closed ✅. Routed here from
+> `insights.md` at triage (2026-08-25, then ten more on 2026-08-30) so the next
+> `/aide-create-queue` sees them. **Stage 29 was scoped from this section on 2026-08-30**
+> and took ownership of everything routed here except the entry below, whose remedy is a
+> process decision rather than code — see Stage 29's deliverables for the moved entries
+> (each names its originating `insights.md` date).
 
-- **A byte-hash scope fence survives in an unrelated module.**
-  `tests/test_098_stray_components.py::test_ac18_reference_verse_v1_bytes_unchanged` pins
-  `reference_verse_v1.json`'s bytes through `_PRE_098_REFERENCE_VERSE_V1_SHA256` — the last
-  of the three fences item 107's retirement missed, because that item's AC1 grep searched
-  five named `_PRE_NNN_*` prefixes rather than the *shape* of the assertion. The invariant
-  itself is defensible on reflection: `reference_verse_v1.json` is a released production
-  artifact (80 real VerSe19 subjects, the CLI default since item 090) that arguably should
-  not change silently. What is wrong is where it lives — a module about stray-component
-  detection, under a name and docstring reading "item 098's state", so a legitimate future
-  regeneration fires an assertion that looks like an accidental scope violation rather than
-  an integrity check. The fix is to move it to a properly-named artifact-integrity test
-  beside `reference/artifact.py`, not to delete it — which is not this repo's own judgement
-  call but the framework's documented disposition: `.aide/conventions.md` §1 already
-  distinguishes a *diff-time scope claim* ("item N did not touch X"), which belongs under
-  **Asserts against** and should retire with its item, from an *artifact-integrity
-  invariant* ("this released artifact must never change silently"), which is legitimate and
-  durable "but then it belongs in a test named for the artifact, living beside it, not
-  inside an unrelated item's regression module under a `_PRE_NNN_` name."
-
-  **The `.gitattributes` pin must be carried across deliberately.** Engine 1.19.0 added a
-  lint that warns when a byte-exact comparison's fixture is not pinned `eol=lf`, and it
-  reports nothing for this test — but not because it checked it. The lint resolves a fixture
-  path through the AST from `Path(__file__)` joined with string literals, and this test gets
-  its path from `bundled_production_reference_path()`, a function call, which resolves to
-  nothing and is skipped in silence. The file is covered only by an unrelated explicit glob
-  (`src/segfacet/reference/reference_verse_*.json text eol=lf`) that predates the lint. A
-  relocated test written the natural way — through the same helper — will be equally
-  invisible to it, so the remediation must keep the pin by hand and must not read a green
-  `aide check` as evidence of coverage. *(insights.md 2026-08-12 and 2026-08-15, items 116
-  and 115; lint blind spot confirmed 2026-08-25)*
-- **A comment header names a fence that is not one.**
-  `tests/test_102_stage18_validation.py` carries `# AC24: the scope fence -- no production
-  code changed by this item` directly above `_SRC_TREE_HASH_AT_COLLECTION`, which hashes the
-  source tree at collection and re-hashes it within the same run — an intra-run determinism
-  assertion, and by item 115's own discriminator the legitimate kind that must stay. The
-  header is the hazard: the next shape-based audit, human or grep, meets text that reads
-  like a fence and either raises a false flag or, worse, retires a good assertion. Renaming
-  the header to say what it actually checks is the whole fix. *(insights.md 2026-08-15,
-  item 115)*
 - **The `scope-check` CI job matches nothing under this repo's git mode.**
   `.github/workflows/ci.yml`'s job resolves its item number from an `aide/NNN-` head ref,
   but `[git] mode = "auto-merge"` means an item branch is merged and deleted locally and
@@ -1386,69 +1461,3 @@ and was not weakened.
   an independent second-platform scope signal, with none of the collateral risk it used to
   carry. *(insights.md 2026-08-20, item 117; re-assessed against engine 1.20.0 on
   2026-08-25)*
-- **Committed-artifact comparisons keep being re-authored byte-exact.** Item 078's
-  convention (byte-identity for run-to-run determinism only; `reports_close` numeric
-  tolerance against anything committed — CLAUDE.md "Note what the golden tests actually
-  assert") was reintroduced wrongly by three separate items' test-writing passes
-  (120/121/123), each passing locally and on ubuntu-latest and caught only by PR #56's CI
-  matrix (~1 ULP float drift across numpy versions/platforms). Prose has now failed three
-  times; the fix is structural: a shared helper whose name makes "comparing against a
-  committed artifact" reach for tolerance by construction, plus a guard test (extending
-  `tests/test_111_golden_guard.py`'s hand-surveyed byte-exact allowlist into an enforced
-  one) that fails any new exact comparison of freshly generated output against a committed
-  float-carrying artifact. Relatedly, a spec that changes a feature the reference artifact
-  aggregates must survey *every* consumer mechanically (`grep -l build_and_write_default
-  tests/` — item 119's hand-listed subset missed three files). The larger relief valve
-  already has an owner: the 11 corpus-golden rows are maintainer-dispositioned **retire**
-  (`golden-decision-table.md`), assigned to Stage 21 (or Stage 27, whichever lands first) —
-  pulling that retirement forward shrinks the whole surface this entry polices.
-  *(insights.md, items 119/120–123, 2026-08-27/30)*
-- **`stage3.curvature.tangent_angles_deg[]` carries no traversal-direction
-  normalisation.** A cranial-first centroid sequence reads ~175° per level where a
-  caudal-first one reads ~5° — same spine, two readings, and no consumer can tell which it
-  got; latent only because every committed fixture happens to advance superiorly. Item 122
-  normalised direction for its new signed per-plane arrays but deliberately left this
-  array alone (scope fence), so the record carries two tangent-angle conventions side by
-  side. Reconciling them sits naturally with Stage 20's traceability audit.
-  *(insights.md, item 122, 2026-08-27)*
-- **`fit_centroid_spline` crashes uninformatively on all-coincident centroids.**
-  `features/spline.py` propagates SciPy's bare `ValueError: Invalid inputs.` when every
-  supplied centroid is identical (zero-length chords), rather than degrading or raising a
-  descriptive error naming the cause; item 122 could not exercise its degenerate
-  adversarial case against the crash and substituted a 1e-6 mm near-coincident fixture.
-  *(insights.md, item 122, 2026-08-27)*
-- **Stage 28's mode-4 acceptance premise has no owner.** The stage text asserts a
-  smoothed fit detects the mode-4 swap via `is_monotonic == False`, but no queue-017 item
-  owned `features/consistency.py`, and measured on the shipped item-119 fit
-  `is_monotonic` is `True` on all nine corpus cases — so `mode4_relabel_swap` stays a
-  `reconstructed_record` case and the criterion is unmet as recorded at item 125's
-  validation. An item owning `consistency.py`'s monotonicity check against the smoothed
-  fit is the missing piece. *(insights.md, item 120, 2026-08-28)*
-- **The `tptbox==0.7.5` pin ships wrong licence metadata.** The 0.7.5 wheel's published
-  metadata declares AGPL v3.0 while TPTBox's own `LICENSE` is Apache-2.0; upstream fixed
-  the metadata in v0.7.6 (TPTBox PR #119). Any SBOM or compliance scan reading installed
-  metadata currently sees an AGPL dependency. Bumping the pin is a dependency change with
-  the golden corpus as its regression surface, so it needs an item, not a drive-by edit.
-  *(insights.md, 2026-08-28)*
-- **The closest-point-on-spline search exists three times, and the pipeline refits the
-  same spline twice per case.** `_find_closest_u` lives in `features/spline_offset.py`
-  (backend-aware), `features/consistency.py` (not), and a third copy in
-  `scripts/compare_curve_candidates.py`; a scan-resolution or `xatol` change must be made
-  in three places, and divergence would surface as inconsistency between features, not a
-  test failure. Separately, `pipeline.py`'s curvature fit and
-  `compute_leave_one_out_spline_offsets`'s internal reference refit fit the identical
-  in-sample spline twice — harmless, redundant. One consolidation item covers both.
-  *(insights.md, items 121 and 119–123, 2026-08-29/30)*
-- **At exactly 4 centroids the held-out estimator silently reads 0.0 everywhere.**
-  `compute_leave_one_out_spline_offsets`'s `< 4` in-sample fallback boundary is one level
-  too low: at `k = 3` with four points the held-out refit has zero smoothing freedom and
-  interpolates, so a 4-level field of view cannot raise a `mislabel` offset finding at all
-  (measured on real `sub-verse065`). The boundary belongs at `< 5`, with the fallback's
-  documented semantics carried along. *(insights.md, item 123, 2026-08-29)*
-- **Item 083's one-command refresh has never rebuilt the real artifact.**
-  `scripts/refresh_reference.py --verse-cohort` hands the cohort root straight to
-  `ingest_cohort`, which lists one directory non-recursively and hardcodes `_scan.nii.gz`
-  siblings — incompatible with VerSe's `derivatives/` nesting and `_ct.nii.gz` naming, so
-  the wrapper records `verse-build: failed` by construction. Item 123 shipped staging in
-  `scripts/rebuild_verse_reference.py` instead; the wrapper should either delegate to it
-  or retire its `--verse-cohort` mode. *(insights.md, item 123, 2026-08-29)*
