@@ -44,6 +44,7 @@ Adversarial / edge cases:
 from __future__ import annotations
 
 import ast
+import importlib.util
 import re
 import subprocess
 from pathlib import Path
@@ -54,6 +55,7 @@ _TESTS_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _TESTS_DIR.parent
 _NEW_MODULE_NAME = "test_128_reference_verse_v1_integrity.py"
 _NEW_MODULE_PATH = _TESTS_DIR / _NEW_MODULE_NAME
+_AIDE_SCRIPT = _REPO_ROOT / ".aide" / "scripts" / "aide.py"
 _ARTIFACT_PATH = (
     _REPO_ROOT / "src" / "segfacet" / "reference" / "reference_verse_v1.json"
 )
@@ -758,23 +760,63 @@ def test_ac22_guard_module_absent_from_this_items_diff():
 # =========================================================================== #
 
 
-def test_ac23_aide_check_reports_the_same_three_baseline_warnings():
-    result = subprocess.run(
-        ["python", ".aide/scripts/aide.py", "check"],
-        cwd=_REPO_ROOT,
-        capture_output=True,
-        text=True,
-        timeout=120,
+# Whole-corpus warning that names no single location: 32 of this repo's item
+# specs predate the mandatory '## Assumptions' block and are reported as one
+# aggregated line (engine 1.14.0). Not this item's concern to fix, and its
+# count drifts as unrelated specs are authored, so it is excluded from the
+# baseline by shape rather than pinned by count.
+_AGGREGATED_ASSUMPTIONS_RE = re.compile(
+    r"^\d+ item spec\(s\) have no mandatory '## Assumptions' block:"
+)
+
+# Human-gate warnings (engine 1.13.0) for the two Stage-16 gates. Location-
+# based but excluded rather than pinned: each reports a person's pending
+# decision and disappears the moment someone runs `aide gate approve`, so
+# pinning it would fail this test on the approval -- exactly backwards.
+_GATE_DECISION_RE = re.compile(r"^progress\.md:\d+: human gate \d+ \(")
+
+
+def _aide_check_warnings() -> list:
+    """Return `aide check`'s warnings as a list of strings.
+
+    Calls ``run_checks`` in-process rather than shelling out to
+    ``aide.py check``: that subprocess shape is exactly what engine 1.21.0's
+    `cli_subprocess_test_warnings` lint flags, so a subprocess-based version
+    of this test would make this module report a warning about itself and
+    could never reach a clean `aide check`. ``run_checks`` is the same
+    function ``cmd_check`` calls; it returns ``(errors, warnings)`` as
+    structured data, so there is no stdout, no encoding and no subprocess to
+    go wrong.
+    """
+    spec = importlib.util.spec_from_file_location("_aide_cli_128", _AIDE_SCRIPT)
+    aide = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(aide)
+    repo_root = aide.find_repo_root(_REPO_ROOT)
+    _errors, warnings = aide.run_checks(repo_root, aide.load_config(repo_root))
+    return list(warnings)
+
+
+def test_ac23_aide_check_reports_no_warning_beyond_the_pinned_baseline():
+    warnings = _aide_check_warnings()
+    # A capture/plumbing failure must fail loudly, not silently pass an empty
+    # loop: `aide check` always reports the baseline warnings on this branch.
+    assert warnings, "run_checks returned no warnings at all -- expected the pinned baseline"
+    unexplained = [
+        warning
+        for warning in warnings
+        if not _AGGREGATED_ASSUMPTIONS_RE.match(warning)
+        and not _GATE_DECISION_RE.match(warning)
+    ]
+    assert not unexplained, (
+        "aide check produced warning(s) beyond the pinned baseline (the "
+        "32-spec Assumptions audit note and the two Stage-16 gate notices), "
+        f"including any relocation-related .gitattributes lint:\n{unexplained}"
     )
-    combined = result.stdout + result.stderr
-    assert "OK (3 warning(s))" in combined, (
-        f"expected aide check to report exactly 3 warnings; got:\n{combined}"
+    assert not any(".gitattributes" in warning for warning in warnings), (
+        f"aide check emitted a .gitattributes lint warning:\n{warnings}"
     )
-    assert ".gitattributes" not in combined, (
-        f"aide check emitted a .gitattributes lint warning:\n{combined}"
-    )
-    assert _NEW_MODULE_NAME not in combined, (
-        f"aide check named the new module in a warning:\n{combined}"
+    assert not any(_NEW_MODULE_NAME in warning for warning in warnings), (
+        f"aide check named the new module in a warning:\n{warnings}"
     )
 
 

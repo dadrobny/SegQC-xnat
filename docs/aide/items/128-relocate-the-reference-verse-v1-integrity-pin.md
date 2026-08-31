@@ -303,6 +303,9 @@ are the only non-test edits.
 
 - `tests/test_128_reference_verse_v1_integrity.py` — the relocated pin's new home
   (AC1–AC8).
+- `tests/test_128_relocation_checks.py` — the item's own AC-checking module,
+  omitted from this list at authoring time (2026-08-31 Decisions-log entry
+  below); fixes its AC23 test's `cli_subprocess_test_warnings` self-trigger.
 - `tests/test_098_stray_components.py` — remove the constant, the two AC18 tests
   and the section header; repoint the docstring bullet (AC9–AC11).
 - `tests/test_102_stage18_validation.py` — comment/docstring wording only
@@ -517,3 +520,13 @@ profile is required — all three run on any machine with the repo and its venv.
   violation, and it predates this builder's commit. Recorded here rather
   than silently widening `## Authorised paths` to cover a file this item's
   instructions forbid editing.
+
+- **2026-08-31: `tests/test_128_relocation_checks.py` added to `## Authorised
+  paths`.** The item's own AC-checking module was omitted from the list at
+  authoring time, producing the two self-inflicted problems recorded above
+  (the AC23 subprocess self-trigger and the `aide scope 128` violation). The
+  module is now listed under **May change**, and AC23's test rewritten to
+  call `run_checks` in-process (the pattern
+  `tests/test_114_documentation_corrections.py::test_ac8_no_new_aide_check_warning_beyond_pinned_baseline`
+  established) rather than shelling out to `aide.py check`, so the
+  `cli_subprocess_test_warnings` lint no longer fires on this module.
