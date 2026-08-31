@@ -681,15 +681,17 @@ def test_adv_fewer_than_two_centroids_raises_value_error():
 # =========================================================================== #
 
 
-def test_adv_all_centroids_coincident_no_crash_finite():
-    """Exactly-coincident centroids make ``fit_centroid_spline`` raise inside
-    ``scipy.interpolate.splprep`` -- a pre-existing spline-fit limitation
-    outside item 122's scope (item 122 owns ``compute_spine_curvature`` /
-    ``SpineCurvature`` in ``orientation.py``, not the spline fit itself; see
-    ``docs/aide/insights.md``). This fixture instead uses near-coincident
-    centroids (a 1e-6 mm perturbation, well under any meaningful tolerance)
-    so the spline fit succeeds and item 122's signed-angle logic is actually
-    exercised on the degenerate near-zero-tangent case it is meant to handle.
+def test_adv_near_coincident_1e6mm_perturbation_no_crash_finite():
+    """Uses near-coincident centroids (a 1e-6 mm perturbation, well under any
+    meaningful tolerance) so the spline fit succeeds and item 122's
+    signed-angle logic is actually exercised on the degenerate
+    near-zero-tangent case it is meant to handle. The exactly-coincident
+    input (which makes ``fit_centroid_spline`` raise) is outside item 122's
+    scope (item 122 owns ``compute_spine_curvature`` / ``SpineCurvature`` in
+    ``orientation.py``, not the spline fit itself) and is instead exercised,
+    through the pipeline's graceful degradation, by item 129
+    (``tests/test_129_coincident_centroids_and_held_out_floor.py``, via
+    ``extract_feature_record``).
     """
     centroids = [
         _centroid(_LEVELS[i], (5.0 + i * 1e-6, 5.0, 5.0 + i * 1e-6), label=i + 1)

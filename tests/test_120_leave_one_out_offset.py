@@ -323,12 +323,17 @@ def test_ac6_tie_break_rule_is_documented():
 
 
 # =========================================================================== #
-# AC7: Fewer than four levels falls back to the in-sample measurement
+# AC7: Fewer than five levels falls back to the in-sample measurement
+#
+# Parametrisation extended to include n=4 by item 129 (docs/aide/items/
+# 129-coincident-centroids-in-the-pipeline.md, AC24): item 129 moves the
+# held-out floor (_MIN_LEVELS_FOR_HELD_OUT) from 4 to 5, so a 4-level
+# sequence now takes this same in-sample fallback.
 # =========================================================================== #
 
 
-@pytest.mark.parametrize("n", [2, 3])
-def test_ac7_fewer_than_four_levels_falls_back_to_in_sample(n):
+@pytest.mark.parametrize("n", [2, 3, 4])
+def test_ac7_fewer_than_five_levels_falls_back_to_in_sample(n):
     centroids = _straight_spine(n)
     fit = fit_centroid_spline(centroids)
     expected = compute_spline_offsets(centroids, fit)
