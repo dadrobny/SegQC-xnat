@@ -157,7 +157,12 @@ import numpy as np
 import segfacet.backend as _backend_mod
 from segfacet.backend import Backend
 from segfacet.features.centroids import LabelCentroid
-from segfacet.features.spline import SplineFit, find_closest_point, fit_centroid_spline
+from segfacet.features.spline import (
+    SplineFit,
+    evaluate_spline,
+    find_closest_point,
+    fit_centroid_spline,
+)
 
 __all__ = [
     "VertebralSplineOffset",
@@ -299,6 +304,15 @@ def compute_spline_offsets(
     records: List[VertebralSplineOffset] = []
     n_points = len(centroids)
 
+    # Route the curve evaluation `find_closest_point` performs through this
+    # module's own `evaluate_spline` name (rather than handing it the
+    # `SplineFit` directly) so that name stays the observable seam for
+    # backend forwarding -- item 072, AC10 patches this module's
+    # `evaluate_spline` attribute and asserts it is both called and handed
+    # `backend`.
+    def _evaluate(u_values):
+        return evaluate_spline(fit, u_values, backend=backend)
+
     for idx, c in enumerate(centroids):
         is_terminal = n_points <= 2 or idx == 0 or idx == n_points - 1
 
@@ -307,7 +321,7 @@ def compute_spline_offsets(
             dtype=np.float64,
         )
 
-        closest = find_closest_point(pt, fit, backend=backend)
+        closest = find_closest_point(pt, _evaluate, backend=backend)
         u_star = closest.closest_u
 
         # Displacement vector: centroid - closest spline point.

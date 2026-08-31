@@ -562,6 +562,36 @@ rather than adding a fourth copy. Item 135 replays Stage 29's acceptance.
 
 ## Decisions & Trade-offs
 
+**Amended post-merge (2026-08-31): the `test_072` "needs no reconciliation"
+Assumption was wrong.**
+
+`compute_spline_offsets` originally passed the `SplineFit` straight to
+`find_closest_point`, which wraps it in a closure over
+`segfacet.features.spline.evaluate_spline` — not `spline_offset`'s own name.
+`spline_offset.py` no longer imported `evaluate_spline` at all (only
+`find_closest_point`), so
+`tests/test_072_backend_feature_port.py::test_ac10_spline_offsets_forwards_backend_to_evaluate_spline`,
+which `monkeypatch.setattr(spline_offset_mod, "evaluate_spline", spy)`, raised
+`AttributeError: <module 'segfacet.features.spline_offset'> does not have the
+attribute 'evaluate_spline'` — a genuine regression, not a false alarm; that
+test asserts a real observable (backend forwarding), pinned before this item
+existed. Fixed on the production side, honestly: `spline_offset.py` now
+imports `evaluate_spline` at module level and builds its own
+`_evaluate(u_values) -> evaluate_spline(fit, u_values, backend=backend)`
+closure, passed to `find_closest_point` as the callable-evaluator curve
+(rather than the bare `SplineFit`) so the search's evaluation route runs
+through `spline_offset`'s own patchable name and still forwards `backend`.
+Numerically identical to the pre-fix path — `find_closest_point`'s own
+`SplineFit` branch built the same closure over the *same* `evaluate_spline`
+function, just reached from `spline.py`'s namespace instead of
+`spline_offset`'s — so no `_sq_distance`/`minimize_scalar` call count,
+`u_values`, or catalogue value changes; verified directly (non-pytest) by
+reproducing AC10's monkeypatch and asserting `len(received) > 0` and
+`sentinel_backend in received`. The Assumptions section's "Item 072's
+eight-function `backend` roster is not extended... so `test_072` needs no
+reconciliation" claim is superseded by this note — no roster edit was needed,
+but a production-side call-routing fix was.
+
 **Confirmed at implementation time (2026-08-31):**
 
 - **`find_closest_point` normalises `curve` internally, no new public
