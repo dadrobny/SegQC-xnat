@@ -1302,7 +1302,7 @@ per-deliverable provenance.
 - ✅ **D3** The `reference_verse_v1` integrity pin relocated to a test named for the
   artifact (its `.gitattributes` pin carried across) and the `test_102` fence header
   renamed to say what it checks. *(Item 128)*
-- 📋 **D4 + D5** Coincident centroids degrade to a report instead of a traceback at the
+- 🚧 **D4 + D5** Coincident centroids degrade to a report instead of a traceback at the
   pipeline level (the fit's descriptive error already exists — item 119 AC16), and the
   4-centroid held-out fallback boundary moves to `< 5` with the affected reference
   distributions rebuilt. *(Item 129)*
