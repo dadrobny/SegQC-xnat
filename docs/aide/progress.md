@@ -1286,7 +1286,7 @@ corpus alone cannot separate that from a broken feature. Do not widen on that ev
   `tests/golden/022_stage3_report.json` are byte-identical to each other and to the
   committed files.)*
 
-## Stage 29 — Golden Retirement & Test-Artifact Hygiene (G2, G7) — 🚧
+## Stage 29 — Golden Retirement & Test-Artifact Hygiene (G2, G7) — ✅
 
 **Goal.** Execute the maintainer-signed retirement of the 11 whole-record snapshot goldens
 (`golden-decision-table.md`, dispositioned *retire* 2026-07-28, execution pulled forward
@@ -1321,7 +1321,7 @@ per-deliverable provenance.
   retired. *(Item 133)*
 - ✅ **D11** The decision table's live `N/M leaf paths unwired` counts split into a
   generated, byte-reproducible companion the signed document references. *(Item 134)*
-- 🔍 Stage 29 end-to-end validation: retirement audit, guard replay on a scratch branch,
+- ✅ Stage 29 end-to-end validation: retirement audit, guard replay on a scratch branch,
   mode-4 replay closing Stage 28's unticked acceptance half, fails-before-the-fix
   verification per defect, fresh-clone suite. *(Item 135)*
 
