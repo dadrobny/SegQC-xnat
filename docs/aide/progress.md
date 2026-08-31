@@ -1293,7 +1293,7 @@ per-deliverable provenance.
 
 **Deliverables.**
 
-- 🔍 **D1** The golden retirement executed: nine `tests/corpus/golden/*.json` and two
+- ✅ **D1** The golden retirement executed: nine `tests/corpus/golden/*.json` and two
   `tests/golden/` snapshots gone, the four per-row replacements in place, nothing
   regenerated on the way out. *(Item 126)*
 - 📋 **D2** Tolerance by construction: shared committed-artifact comparison helper plus an
