@@ -1310,7 +1310,7 @@ per-deliverable provenance.
   case. *(Item 130)*
 - ✅ **D7** `tangent_angles_deg[]` traversal-direction normalisation to item 122's
   convention. *(Item 131)*
-- 📋 **D8** `consistency.py` monotonicity judged against the smoothed fit so mode 4 fires.
+- 🚧 **D8** `consistency.py` monotonicity judged against the smoothed fit so mode 4 fires.
   *(Item 132)*
 - 📋 **D9 + D10** The `tptbox` ≥ 0.7.6 pin (non-AGPL metadata), and
   `refresh_reference.py --verse-cohort` delegated to `rebuild_verse_reference.py` or
