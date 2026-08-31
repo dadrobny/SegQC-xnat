@@ -501,7 +501,7 @@ def test_ac14_every_allowlisted_path_is_line_ending_pinned():
     for entry in guard.ALLOWLIST:
         matches = sorted(REPO_ROOT.glob(entry.path))
         assert matches, f"allowlist entry {entry.path!r} matches no file"
-        rel_paths = [str(match.relative_to(REPO_ROOT)) for match in matches]
+        rel_paths = [match.relative_to(REPO_ROOT).as_posix() for match in matches]
 
         result = subprocess.run(
             ["git", "check-attr", "text", "eol", "binary", "--", *rel_paths],
