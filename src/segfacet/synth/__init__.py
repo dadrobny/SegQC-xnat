@@ -93,8 +93,6 @@ from segfacet.synth.intensity import (
 )
 from segfacet.synth.golden import (
     GOLDEN_ABS_TOL,
-    GOLDEN_DIR,
-    GOLDEN_DIRNAME,
     GOLDEN_REL_TOL,
     VOLATILE_POINTERS,
     VOLATILE_SENTINEL,
@@ -150,8 +148,6 @@ __all__ = [
     "pipeline_hides_designated_rule",
     "verify_case",
     "GOLDEN_ABS_TOL",
-    "GOLDEN_DIR",
-    "GOLDEN_DIRNAME",
     "GOLDEN_REL_TOL",
     "VOLATILE_POINTERS",
     "VOLATILE_SENTINEL",

@@ -70,8 +70,10 @@ terminal entries from both the reference distribution
 (`reference/ingest.py`) and Detector A brought the measurement back inside
 the approved corpus window.
 
-Corpus margins (`tests/corpus/golden/*.json`), all measured on **interior**
-entries only:
+Corpus margins (from `tests/corpus/manifest.json`'s nine cases, each measured
+via a freshly built `build_report_for_case` report -- item 126 retired the
+committed corpus-golden snapshots these margins used to cite),
+all measured on **interior** entries only:
 - `mode4_relabel_swap`'s largest interior reading (label 23 / L4) is
   `2.510990` mm and must **not** fire -- the non-firing ceiling. (Its larger
   `5.143859` mm reading, label 20, is that case's cranial-terminal vertebra
