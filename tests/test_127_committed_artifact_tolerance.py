@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -486,23 +487,50 @@ def test_ac13_no_stale_allowlist_entry():
 
 
 def test_ac14_every_allowlisted_path_is_line_ending_pinned():
+    """AC14: every allowlisted path is covered by a `.gitattributes` rule --
+    effective coverage as `git check-attr` resolves it, not a literal
+    string-prefix match against `.gitattributes` text. A glob-pinned file
+    allowlisted by its exact path (e.g.
+    `src/segfacet/reference/reference_verse_v1.json`, pinned via
+    `src/segfacet/reference/reference_verse_*.json text eol=lf`, required by
+    AC21 to be an exact-path entry) is genuinely covered even though no
+    `.gitattributes` line starts with that literal path."""
     import committed_artifact_guard as guard
 
-    attrs_lines = [
-        line.strip()
-        for line in GITATTRIBUTES_PATH.read_text(encoding="utf-8").splitlines()
-    ]
-    unpinned = [
-        entry.path
-        for entry in guard.ALLOWLIST
-        if not any(
-            line.startswith(entry.path) and ("eol=lf" in line or "binary" in line)
-            for line in attrs_lines
+    unpinned = []
+    for entry in guard.ALLOWLIST:
+        matches = sorted(REPO_ROOT.glob(entry.path))
+        assert matches, f"allowlist entry {entry.path!r} matches no file"
+        rel_paths = [str(match.relative_to(REPO_ROOT)) for match in matches]
+
+        result = subprocess.run(
+            ["git", "check-attr", "text", "eol", "binary", "--", *rel_paths],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
-    ]
+        assert result.returncode == 0, result.stderr
+        output = result.stdout
+
+        for rel_path in rel_paths:
+            file_lines = [
+                line
+                for line in output.splitlines()
+                if line.startswith(f"{rel_path}:")
+            ]
+            assert file_lines, (
+                f"git check-attr reported nothing for {rel_path}:\n{output}"
+            )
+            pinned = any("eol: lf" in line for line in file_lines) or any(
+                "binary: set" in line for line in file_lines
+            )
+            if not pinned:
+                unpinned.append(rel_path)
+
     assert not unpinned, (
-        f"these allowlist entries have no text eol=lf / binary .gitattributes "
-        f"pin: {unpinned}"
+        f"these allowlisted files have no effective text eol=lf / binary "
+        f".gitattributes pin: {unpinned}"
     )
 
 
