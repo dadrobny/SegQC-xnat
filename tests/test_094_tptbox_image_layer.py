@@ -154,13 +154,13 @@ def _constraints_pins() -> dict:
 
 def test_ac1_tptbox_is_a_pinned_core_dependency():
     dependencies = _load_pyproject()["project"]["dependencies"]
-    assert "tptbox==0.7.5" in dependencies
+    assert "tptbox==0.7.6" in dependencies
 
 
 def test_ac1_tptbox_pin_is_exact_not_a_range():
     dependencies = _load_pyproject()["project"]["dependencies"]
     tptbox_specs = [dep for dep in dependencies if dep.lower().startswith("tptbox")]
-    assert tptbox_specs == ["tptbox==0.7.5"]
+    assert tptbox_specs == ["tptbox==0.7.6"]
 
 
 def test_ac1_existing_core_dependencies_unchanged():
@@ -183,7 +183,7 @@ def test_ac1_existing_core_dependencies_unchanged():
 
 def test_ac2_constraints_pins_tptbox_exactly():
     pins = _constraints_pins()
-    assert pins.get("tptbox") == "0.7.5"
+    assert pins.get("tptbox") == "0.7.6"
 
 
 @pytest.mark.parametrize("package_name", TPTBOX_TRANSITIVE_PACKAGE_NAMES)

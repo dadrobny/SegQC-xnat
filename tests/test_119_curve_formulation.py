@@ -695,7 +695,7 @@ def test_ac23_scipy_floor_raised_other_bounds_unchanged():
         '"nibabel>=4.0"',
         '"PyYAML>=5.4"',
         '"jsonschema>=3.2"',
-        '"tptbox==0.7.5"',
+        '"tptbox==0.7.6"',
     ):
         assert other in text, f"unexpected change to dependency bound: {other!r} missing"
 
