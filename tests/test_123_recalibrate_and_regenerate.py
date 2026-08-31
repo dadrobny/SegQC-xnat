@@ -96,8 +96,8 @@ from segfacet.pipeline import extract_feature_record
 from segfacet.synth.clean_gt import build_clean_spine
 from segfacet.synth.corpus import load_manifest
 from segfacet.synth.golden import (
+    assert_matches_committed_artifact,
     build_report_for_case,
-    reports_close,
     write_goldens,
 )
 from segfacet.synth.intensity import paint_clean_scan
@@ -934,8 +934,7 @@ def test_ac21_reference_default_matches_fresh_build_within_tolerance(tmp_path):
     dest = tmp_path / "reference_default.json"
     build_and_write_default(dest)
     fresh = json.loads(dest.read_text(encoding="utf-8"))
-    committed = json.loads(default_artifact_path().read_text(encoding="utf-8"))
-    assert reports_close(fresh, committed)
+    assert_matches_committed_artifact(fresh, default_artifact_path())
 
 
 def test_ac21_two_fresh_builds_are_byte_identical(tmp_path):

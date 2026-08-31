@@ -81,7 +81,7 @@ from segfacet.reference.ingest import (
     ingest_subject,
 )
 from segfacet.synth.clean_gt import build_clean_spine
-from segfacet.synth.golden import reports_close
+from segfacet.synth.golden import assert_matches_committed_artifact
 from segfacet.synth.intensity import paint_clean_scan
 
 # INGESTED_INTENSITY_FEATURES is item 063's new companion constant -- not yet
@@ -570,13 +570,13 @@ def test_ac15_bundled_artifact_regenerates_byte_identically(tmp_path):
 
     # Item 081: the bundled artifact now carries a platform-sensitive PCA
     # float (eigenvalue_ratio), so the regenerated-vs-committed comparison
-    # switches to numeric tolerance (item 078's reports_close). Intra-platform
-    # determinism across two independent regenerations stays byte-exact
-    # (asserted separately above).
+    # switches to numeric tolerance (item 127's assert_matches_committed_artifact,
+    # item 078's reports_close semantics). Intra-platform determinism across
+    # two independent regenerations stays byte-exact (asserted separately
+    # above).
     assert dest1.read_bytes() == dest2.read_bytes()
     regenerated = json.loads(dest1.read_text(encoding="utf-8"))
-    committed = json.loads(default_artifact_path().read_text(encoding="utf-8"))
-    assert reports_close(regenerated, committed)
+    assert_matches_committed_artifact(regenerated, default_artifact_path())
 
 
 def test_ac15_gitattributes_still_pins_bundled_artifact_lf():

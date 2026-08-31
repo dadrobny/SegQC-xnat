@@ -39,10 +39,12 @@ from pathlib import Path
 
 import pytest
 
+import committed_artifact_guard
 import test_016_features_json as mod016
 import test_022_stage3_serialisation as mod022
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+TESTS_DIR = Path(__file__).resolve().parent
 GITATTRIBUTES_PATH = REPO_ROOT / ".gitattributes"
 GOLDEN_REL = "tests/golden/report_format_contract.json"
 
@@ -346,3 +348,20 @@ def test_adv_read_only_golden_directory_still_names_missing_path(
         )
     finally:
         readonly_dir.chmod(stat.S_IRWXU)
+
+
+# =========================================================================== #
+# Item 127: committed_artifact_guard enforcement (AC15, AC17)
+# =========================================================================== #
+
+
+def test_committed_artifact_guard_reports_zero_violations():
+    """Item 127 AC15: sweeping every module under tests/ with
+    tests/committed_artifact_guard.py's classifier finds no byte-exact
+    fresh-vs-committed comparison whose committed artifact is outside the
+    allowlist. A future item that reintroduces the open-coded
+    ``fresh.read_bytes() == committed.read_bytes()`` idiom this item retired
+    trips this test; the failure message (AC17) names
+    ``assert_matches_committed_artifact`` as the fix."""
+    violations = list(committed_artifact_guard.iter_violations(TESTS_DIR))
+    assert not violations, committed_artifact_guard.violation_message(violations)

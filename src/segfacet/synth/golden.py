@@ -44,7 +44,7 @@ import copy
 import json
 import math
 from pathlib import Path
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple, Union
 
 from segfacet.config import bundled_default_config
 from segfacet.empty import check_empty
@@ -60,6 +60,7 @@ __all__ = [
     "build_report_for_case",
     "canonical_json",
     "reports_close",
+    "assert_matches_committed_artifact",
     "GOLDEN_REL_TOL",
     "GOLDEN_ABS_TOL",
     "golden_path",
@@ -222,6 +223,114 @@ def reports_close(
     if isinstance(a, (int, float)) and isinstance(b, (int, float)):
         return math.isclose(a, b, rel_tol=rel_tol, abs_tol=abs_tol)
     return a == b
+
+
+def _pointer_str(pointer: Tuple[object, ...]) -> str:
+    """Render a sequence of dict-key / list-index steps as a JSON pointer
+    (``""`` for the root; ``/features/a``, ``/levels/0`` otherwise)."""
+    if not pointer:
+        return "(root)"
+    return "/" + "/".join(str(step) for step in pointer)
+
+
+def _first_difference(
+    a,
+    b,
+    *,
+    rel_tol: float,
+    abs_tol: float,
+    _pointer: Tuple[object, ...] = (),
+) -> Optional[Tuple[Tuple[object, ...], object, object]]:
+    """Walk *a* and *b* with exactly :func:`reports_close`'s rules and return
+    ``(pointer, a_value, b_value)`` for the first leaf where they diverge, or
+    ``None`` if they agree everywhere. *pointer* is a tuple of dict keys /
+    list indices identifying where the walk currently is."""
+    if isinstance(a, bool) or isinstance(b, bool):
+        if a is b:
+            return None
+        return (_pointer, a, b)
+    if isinstance(a, dict) and isinstance(b, dict):
+        if a.keys() != b.keys():
+            return (_pointer, a, b)
+        for key in a:
+            diff = _first_difference(
+                a[key], b[key], rel_tol=rel_tol, abs_tol=abs_tol, _pointer=_pointer + (key,)
+            )
+            if diff is not None:
+                return diff
+        return None
+    if isinstance(a, list) and isinstance(b, list):
+        if len(a) != len(b):
+            return (_pointer, a, b)
+        for index, (x, y) in enumerate(zip(a, b)):
+            diff = _first_difference(
+                x, y, rel_tol=rel_tol, abs_tol=abs_tol, _pointer=_pointer + (index,)
+            )
+            if diff is not None:
+                return diff
+        return None
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        if math.isclose(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
+            return None
+        return (_pointer, a, b)
+    if a == b:
+        return None
+    return (_pointer, a, b)
+
+
+def assert_matches_committed_artifact(
+    fresh: Union[Path, str, object],
+    committed_path: Union[Path, str],
+    *,
+    rel_tol: float = GOLDEN_REL_TOL,
+    abs_tol: float = GOLDEN_ABS_TOL,
+) -> None:
+    """Assert that *fresh* matches the committed artifact at *committed_path*,
+    using :func:`reports_close` semantics: numeric leaves within tolerance,
+    everything else (dict key sets, list length and order, strings, bools,
+    ``None``) exact.
+
+    Byte-exact comparison against a committed artifact is the wrong default:
+    full-precision floats in a committed JSON artifact differ by ~1 ULP
+    across NumPy versions, platform BLAS/SIMD and libm rounding, so any test
+    comparing freshly-generated output to a committed artifact should reach
+    for this helper rather than open-coding
+    ``json.loads(...) == json.loads(...)`` or a bare ``reports_close`` call
+    (item 078; item 127). ``tests/committed_artifact_guard.py`` enforces this
+    with a static classifier and an allowlist of the byte-exact comparisons
+    that are legitimate and why.
+
+    *fresh* is either a ``Path``/``str`` to a freshly written JSON file (read
+    as UTF-8 and parsed) or an already-parsed structure. *committed_path* is
+    always a path: read as UTF-8 text and parsed as JSON. A missing
+    *committed_path* raises ``FileNotFoundError`` naming that path -- this
+    helper never skips, never silently passes, and never writes the missing
+    file.
+
+    Raises ``AssertionError`` naming *committed_path*, the JSON pointer of
+    the first differing leaf, and both values, iff ``reports_close(fresh,
+    committed)`` is ``False``.
+    """
+    if isinstance(fresh, (Path, str)):
+        fresh_obj = json.loads(Path(fresh).read_text(encoding="utf-8"))
+    else:
+        fresh_obj = fresh
+
+    committed_path = Path(committed_path)
+    if not committed_path.exists():
+        raise FileNotFoundError(
+            f"committed artifact not found: {committed_path}"
+        )
+    committed_obj = json.loads(committed_path.read_text(encoding="utf-8"))
+
+    diff = _first_difference(fresh_obj, committed_obj, rel_tol=rel_tol, abs_tol=abs_tol)
+    if diff is not None:
+        pointer, fresh_value, committed_value = diff
+        raise AssertionError(
+            f"fresh structure does not match committed artifact "
+            f"{committed_path} at {_pointer_str(pointer)}: "
+            f"fresh={fresh_value!r} committed={committed_value!r}"
+        )
 
 
 # --------------------------------------------------------------------------- #

@@ -97,7 +97,7 @@ from segfacet.reference.ingest import (
     ingest_subject,
 )
 from segfacet.synth.clean_gt import build_clean_spine
-from segfacet.synth.golden import reports_close
+from segfacet.synth.golden import assert_matches_committed_artifact
 
 PROV = Provenance(
     source="test-cohort-081", config_hash="cfg-hash-081", build_date="2000-01-01"
@@ -643,8 +643,7 @@ def test_ac17_regenerated_artifact_deterministic_and_matches_committed_within_to
     assert dest1.read_bytes() == dest2.read_bytes()
 
     regenerated = json.loads(dest1.read_text(encoding="utf-8"))
-    committed = json.loads(default_artifact_path().read_text(encoding="utf-8"))
-    assert reports_close(regenerated, committed)
+    assert_matches_committed_artifact(regenerated, default_artifact_path())
 
 
 def test_ac20_scope_guard_no_features_engine_edit_and_gitattributes_pin():

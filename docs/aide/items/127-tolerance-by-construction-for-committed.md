@@ -450,4 +450,58 @@ branch as part of the Stage 29 acceptance.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`AllowlistEntry` for the format fixture is keyed by the `.gitattributes`
+  glob, not the filename.** `tests/golden/*.json` (matching the existing
+  `.gitattributes` line verbatim), not the spec table's illustrative
+  `tests/golden/report_format_contract.json`, because AC14's check is a plain
+  string `line.startswith(entry.path)` over `.gitattributes` text — a literal
+  filename entry does not match a glob line that begins with `*`. No AC pins
+  the exact string for this entry, so this substitution is free. `AC13`
+  (`REPO_ROOT.glob(entry.path)`) still resolves the glob to the one file that
+  exists.
+
+- **`src/segfacet/reference/reference_verse_v1.json`'s allowlist entry cannot
+  satisfy AC14 as written, and this is a real spec/`.gitattributes` gap, not
+  an implementation bug.** AC21 requires the entry's `path` to equal the
+  literal string `"src/segfacet/reference/reference_verse_v1.json"` exactly.
+  `.gitattributes` pins that file only via the glob line
+  `src/segfacet/reference/reference_verse_*.json text eol=lf` — a *different*
+  string that does not start with the literal AC21 requires character-for-
+  character (`*` vs `v1` at the same offset), so AC14's `line.startswith(entry.path)`
+  check fails for this one entry regardless of how the allowlist is built.
+  Fixing it needs a `.gitattributes` line that literally begins with
+  `src/segfacet/reference/reference_verse_v1.json` (e.g. an additive,
+  behaviour-preserving pin alongside the existing glob — `git check-attr`
+  already resolves `eol=lf` for this file via the glob, so this would not
+  change any git-checkout behaviour). `.gitattributes` is not in this item's
+  **Authorised paths**, so it was left untouched rather than silently
+  widening scope; the entry itself is built with the literal path AC21
+  requires, and this known AC14 failure was verified directly (not just
+  inferred) before being recorded here. Resolving it needs either the spec to
+  add `.gitattributes` to **May change** with that one additive line, or a
+  human decision to relax AC14/AC21's coupling.
+
+- **`_is_file_root_chain` requires at least two `.parent` steps past
+  `Path(__file__)`, not "any depth."** A single `.parent` denotes a module's
+  *own* containing directory (`tests/`, for every module directly under it),
+  not the repo root, and the classifier has no notion of a module's real
+  on-disk depth (documented limitation). Treating a one-`.parent` chain as
+  "the root" produced a real false positive on
+  `tests/test_126_golden_retirement.py`'s `_TESTS_DIR = Path(__file__).resolve().parent`
+  → `_FORMAT_FIXTURE = _TESTS_DIR / "golden" / "report_format_contract.json"`,
+  which resolves to `golden/report_format_contract.json` (missing the
+  `tests/` prefix every allowlist entry assumes) under the naive model.
+  Requiring ≥2 `.parent` steps matches every real `_REPO_ROOT`/`REPO_ROOT`
+  constant actually used to reach committed artifacts across `tests/`
+  (verified 2026-08-31: `iter_violations` over the real tree drops from 1
+  false positive to 0 with this change) and still resolves the item's own
+  three-`.parent` alias-resolution edge case (AC-adjacent adversarial test).
+
+- **Local-variable "read-result" tracking (`local_reads`) was added beyond the
+  literal Implementation Steps text** to make the AC18 "unchanged fence" idiom
+  (`before = p.read_bytes()` ... `assert p.read_bytes() == before`) resolve
+  correctly: `before` itself is not a second `.read_bytes()` call, so without
+  tracking that it was *derived from* one, the classifier would see only one
+  resolvable operand and misclassify the fence as a violation. This is the
+  concrete mechanism behind the Assumptions' "local variable assigned from
+  one of those in the same function" clause.

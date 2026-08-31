@@ -842,13 +842,12 @@ def test_ac28_reference_default_matches_fresh_build_within_tolerance(tmp_path):
     versions and platforms (item 078's ``reports_close`` convention; see
     CLAUDE.md "Note what the golden tests actually assert")."""
     from segfacet.reference.artifact import build_and_write_default, default_artifact_path
-    from segfacet.synth.golden import reports_close
+    from segfacet.synth.golden import assert_matches_committed_artifact
 
     dest = tmp_path / "reference_default.json"
     build_and_write_default(dest)
     fresh = json.loads(dest.read_text(encoding="utf-8"))
-    committed = json.loads(default_artifact_path().read_text(encoding="utf-8"))
-    assert reports_close(fresh, committed)
+    assert_matches_committed_artifact(fresh, default_artifact_path())
 
 
 def test_ac28_spline_offset_mm_distribution_has_nonzero_mean():
