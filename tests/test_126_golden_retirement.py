@@ -53,6 +53,7 @@ _GOLDEN_022 = _TESTS_DIR / "golden" / "022_stage3_report.json"
 _FORMAT_FIXTURE = _TESTS_DIR / "golden" / "report_format_contract.json"
 _DECISION_TABLE = _REPO_ROOT / "docs" / "aide" / "golden-decision-table.md"
 _GITATTRIBUTES = _REPO_ROOT / ".gitattributes"
+_COMPANION_PATH = _REPO_ROOT / "docs" / "aide" / "golden_evidence.generated.json"
 _SCHEMA_PATH = _REPO_ROOT / "src" / "segfacet" / "report_schema_v0.json"
 
 _GOLDEN_MARKERS = ("GOLDEN_DIR", "load_golden", "read_golden_text", "check_case_golden")
@@ -731,29 +732,34 @@ def _section1_rows() -> list:
 
 def _row_cell_digest(row: dict) -> str:
     combined = "\x1f".join(
-        [row["what it asserts today"], row["evidence"], row["disposition"], row["replacement guarantee"]]
+        [row["what it asserts today"], row["disposition"], row["replacement guarantee"]]
     )
     return hashlib.sha256(combined.encode("utf-8")).hexdigest()
 
 
-#: Pre-item digests of (what it asserts today, evidence, disposition,
-#: replacement guarantee) for the eleven retired Section-1 rows, computed
-#: from the document as it stood before this item touched it (2026-08-30).
-#: AC18 requires these four cells stay byte-unchanged; "asserted by" is
+#: Pre-item digests of (what it asserts today, disposition, replacement
+#: guarantee) for the eleven retired Section-1 rows, computed from the
+#: document as it stood before this item touched it (2026-08-30). AC18
+#: requires these three cells stay byte-unchanged; "asserted by" is
 #: explicitly reconciled by this item's Implementation Steps (step 9) so it
-#: is deliberately excluded from the digest.
+#: is deliberately excluded from the digest, and (item 134) "evidence" is
+#: likewise excluded and recomputed here: item 134 is the authorised
+#: reconciler of the nine Group-A `evidence` cells, which move from a
+#: transcribed N/M fraction to a stable pointer at
+#: docs/aide/golden_evidence.generated.json -- narrowing this fence to the
+#: three columns that are actually *judgement*, not measurement.
 _AC18_PRE_ITEM_ROW_DIGESTS = {
-    "tests/corpus/golden/clean_control.json": "9083b5e696afe83b1f7b4ded0f82176bdb5356ea6107bbbf2d3fc9c0fc8e082e",
-    "tests/corpus/golden/mode1_displace.json": "fee45dfe9c4980fdcc3d5e098106fab85610d675053428f5b35777c3ce925251",
-    "tests/corpus/golden/mode2_fragment.json": "6bd593f8cbf4f39fcc7c2ee9bf3d1bba66fb23ddbe01043f12540164392312db",
-    "tests/corpus/golden/mode3_inject_islands.json": "02cc2b0e7fd5cecc2ed61b60da1ffda550142c77c5f8715589258ae53c91a108",
-    "tests/corpus/golden/mode4_relabel_swap.json": "a162e08177932833eca6b8b6bc6810c7366025216df8eae1b42e9e944a564c70",
-    "tests/corpus/golden/mode5_remove_level.json": "d74647ac604e22475d0b8760fe80fb3f496b81636d62aeeaaa33fd0395924ace",
-    "tests/corpus/golden/mode6_crop_at_border.json": "f586cf86bedf681f8490aaa7e0f6e11288b580c8240d2a062ddb88616c8ee7b3",
-    "tests/corpus/golden/mode7_sequence_break.json": "d20c537604ba3eccde0edf26dc78439cb5e097fe0f62db5921e42ed4f5332c9e",
-    "tests/corpus/golden/mode8_force_overlap.json": "592edb7228d937b1290e59b42a274f5b2483971a66ec3a21eeb6a33ea4b48c9b",
-    "tests/golden/016_features_report.json": "39de9871731a4392857b41a5cb2d389d92bf459aaa6ebed0c83e5c5b45aa0eb3",
-    "tests/golden/022_stage3_report.json": "56786a2f5d5450a37494c58a9667fdc6a2a64c10e36462f3b409f442ba183076",
+    "tests/corpus/golden/clean_control.json": "06c98a414c9f5153dffd57b337f73eedd9429c2d22cb87e73c32888114381e4e",
+    "tests/corpus/golden/mode1_displace.json": "0ae6c0c86aa3bb317fa7b2f2746ee70e98012d6eae2d02d9183c8c21dd5d6d37",
+    "tests/corpus/golden/mode2_fragment.json": "4e3147522be51f4e58510c9333b5d67606490d8423b160718fd183c329f324ab",
+    "tests/corpus/golden/mode3_inject_islands.json": "5a4498419b0629dc709f69853a7abc150a76b054adc3e86f66ea8469b05bb459",
+    "tests/corpus/golden/mode4_relabel_swap.json": "464028945b250726b97e4aa041ed9008e35ce7019312426bb91f5d40ae52e871",
+    "tests/corpus/golden/mode5_remove_level.json": "533d5be7be316510ad1d4b3c7b2957c8a1e8bc649d3f2bb6452cda06d446b57a",
+    "tests/corpus/golden/mode6_crop_at_border.json": "23e7b3121567574ea4955bcb27d7be151daac79d12969590eec50dabc1cc20ad",
+    "tests/corpus/golden/mode7_sequence_break.json": "2107420259c2264d60706f2c47e73255b1496efebae5ff955db65e38044d13f6",
+    "tests/corpus/golden/mode8_force_overlap.json": "9328b5ee5e83d9ebad3267119b11d1799273347162bf938d0376076c15dc63aa",
+    "tests/golden/016_features_report.json": "385e852ac9f0f45f91645c0c4a82ad914c80938dfea76eacc33b15f003b9ecdd",
+    "tests/golden/022_stage3_report.json": "d037b5c3c02272728a32bf6715963a8b00e72ce578b23bea51d32637dca9d432",
 }
 
 assert len(_AC18_PRE_ITEM_ROW_DIGESTS) == 11
@@ -972,17 +978,20 @@ def test_ac22_test105_evidence_test_reads_fresh_output_not_committed_file():
 
 @pytest.mark.parametrize("case_id", _CASE_IDS)
 def test_ac22_documented_2694_evidence_still_verifies_unchanged(case_id):
+    """Item 134: the signed row no longer carries the N/M fraction (it
+    carries a stable pointer, see test_105's AC9 test), so the pin now reads
+    (26, 94) from the companion this item introduces
+    (docs/aide/golden_evidence.generated.json) instead of the row -- still
+    cross-checked against a live build_report_for_case measurement."""
     import segfacet.catalogue as catalogue
 
     from segfacet.synth.golden import build_report_for_case
 
     cases = {c["case_id"]: c for c in _run_manifest_cases()}
-    rows = _section1_rows()
-    row = [r for r in rows if r["fixture"] == f"tests/corpus/golden/{case_id}.json"]
-    assert len(row) == 1
-    match = re.match(r"^(\d+)/(\d+) leaf paths unwired$", row[0]["evidence"].strip())
-    assert match, f"unexpected evidence cell shape: {row[0]['evidence']!r}"
-    documented_n, documented_m = int(match.group(1)), int(match.group(2))
+    companion = json.loads(_COMPANION_PATH.read_bytes().decode("utf-8"))
+    assert case_id in companion["cases"], f"{case_id!r} missing from the companion"
+    entry = companion["cases"][case_id]
+    documented_n, documented_m = entry["unwired_leaf_paths"], entry["total_leaf_paths"]
     assert (documented_n, documented_m) == (26, 94), (
         f"{case_id!r}'s documented evidence has moved off the pinned 26/94 "
         f"value: {documented_n}/{documented_m}"
@@ -991,7 +1000,7 @@ def test_ac22_documented_2694_evidence_still_verifies_unchanged(case_id):
     report = build_report_for_case(cases[case_id])
     leaf_paths = catalogue.iter_leaf_paths(report["features"])
     cat = catalogue.build_catalogue()
-    status_by_path = {entry.path: entry.status for entry in cat.entries}
+    status_by_path = {entry2.path: entry2.status for entry2 in cat.entries}
     measured_m = len(leaf_paths)
     measured_n = sum(1 for p in leaf_paths if status_by_path.get(p) == "unwired")
     assert (measured_n, measured_m) == (documented_n, documented_m), case_id

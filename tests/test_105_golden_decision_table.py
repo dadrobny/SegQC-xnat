@@ -27,9 +27,12 @@ Covers Acceptance Criteria AC1-AC14:
         ``—`` in that cell.
 - AC6:  every ``asserted by`` cell names real, on-disk test modules (and,
         where ``::``-qualified, real test functions in them).
-- AC7:  the nine corpus-golden rows' ``evidence`` cells carry a *measured*
-        (not transcribed) unwired-leaf fraction, recomputed via
-        ``segfacet.catalogue.build_catalogue()``/``iter_leaf_paths``.
+- AC7:  the nine corpus-golden rows' ``evidence`` cells carry a stable
+        pointer at the companion artifact (item 134,
+        ``docs/aide/golden_evidence.generated.json``); the drift oracle
+        reads the companion and re-derives its own measurement via
+        ``segfacet.catalogue.build_catalogue()``/``iter_leaf_paths``,
+        independent of ``segfacet.golden_evidence`` itself.
 - AC8:  the byte-reproducibility disclaimer cites ``synth/golden.py`` and
         names three surviving determinism assertions by fully-qualified id,
         each resolving to a real test function.
@@ -54,8 +57,7 @@ Adversarial / edge-case scenarios included: a disposition cell surviving
 strip with a trailing period or wrong case; a ``retire`` replacement cell of
 ``—``/``TBD``/``see above``; a duplicated fixture path where the *sets*
 still match; an ``asserted by`` cell naming a nonexistent module or missing
-function; a malformed/degenerate ``evidence`` cell (missing trailing words,
-``N > M``); a synthetic ``**Signed off:**`` line; a Divergences section
+function; a synthetic ``**Signed off:**`` line; a Divergences section
 naming a ``retire`` row; an empty (header-only) Section-1 table; a malformed
 pipe table with a cell-count mismatch, asserted to fail naming the offending
 line rather than raising ``IndexError``.
@@ -354,7 +356,7 @@ def test_ac6_asserted_by_cells_resolve_to_real_tests(section1_rows, section2_row
 # AC7: the nine corpus-golden rows carry a *measured* unwired fraction
 # =========================================================================== #
 
-_EVIDENCE_RE = re.compile(r"^(\d+)/(\d+) leaf paths unwired$")
+_COMPANION_PATH = _REPO_ROOT / "docs" / "aide" / "golden_evidence.generated.json"
 
 _GOLDEN_CASE_IDS = (
     "clean_control",
@@ -370,28 +372,26 @@ _GOLDEN_CASE_IDS = (
 
 
 @pytest.mark.parametrize("case_id", _GOLDEN_CASE_IDS)
-def test_ac7_golden_row_evidence_is_measured_not_transcribed(section1_rows, case_id):
-    """Item 126 AC22: derives each row's leaf-path fraction from
-    build_report_for_case(case) rather than a committed file -- the
-    committed golden this used to read was retired, see
-    docs/aide/golden-decision-table.md's "## Retirement execution log"."""
+def test_ac7_golden_row_evidence_is_measured_not_transcribed(case_id):
+    """Item 134: the signed row's evidence cell is now a stable pointer (see
+    test_ac9 below), not a transcribed N/M fraction -- so the drift oracle
+    reads the *companion* (docs/aide/golden_evidence.generated.json)
+    instead, and re-derives its own measurement from
+    build_report_for_case(case) independently of segfacet.golden_evidence
+    (the module under test elsewhere): the oracle must not call the
+    generator it is meant to be checking. Reads no cell of
+    golden-decision-table.md."""
     import segfacet.catalogue as catalogue
     from segfacet.synth.corpus import load_manifest
     from segfacet.synth.golden import build_report_for_case
 
-    # Matched by suffix (not a literal retired-directory path) so this
-    # module's own source carries no live reference to the retired
-    # directory -- item 126 AC17.
-    matches = [r for r in section1_rows if r["fixture"].endswith(f"/{case_id}.json")]
-    assert len(matches) == 1, (
-        f"expected exactly one Section-1 row ending '/{case_id}.json', got {len(matches)}"
+    companion = json.loads(_COMPANION_PATH.read_bytes().decode("utf-8"))
+    assert case_id in companion["cases"], (
+        f"{case_id!r} missing from the companion's 'cases'"
     )
-    row = matches[0]
-    match = _EVIDENCE_RE.match(row["evidence"].strip())
-    assert match, (
-        f"evidence cell does not match 'N/M leaf paths unwired': {row['evidence']!r}"
-    )
-    documented_n, documented_m = int(match.group(1)), int(match.group(2))
+    entry = companion["cases"][case_id]
+    documented_n = entry["unwired_leaf_paths"]
+    documented_m = entry["total_leaf_paths"]
     assert 0 <= documented_n <= documented_m
     assert documented_m > 0
 
@@ -407,6 +407,24 @@ def test_ac7_golden_row_evidence_is_measured_not_transcribed(section1_rows, case
 
     assert documented_m == measured_m, (case_id, "M", documented_m, measured_m)
     assert documented_n == measured_n, (case_id, "N", documented_n, measured_n)
+
+
+def test_ac9_golden_case_evidence_cells_are_identical_pointer_and_digit_free(section1_rows):
+    """Item 134 AC9: the nine golden-case rows' evidence cells are all
+    byte-identical, name the companion path, and carry no digit -- matched
+    by fixture-path suffix (never a literal retired-directory path, item
+    126 AC17)."""
+    matches = [
+        r
+        for r in section1_rows
+        if any(r["fixture"].endswith(f"/{cid}.json") for cid in _GOLDEN_CASE_IDS)
+    ]
+    assert len(matches) == 9, f"expected nine golden-case Section-1 rows, got {len(matches)}"
+    cells = {r["evidence"] for r in matches}
+    assert len(cells) == 1, f"golden-case evidence cells are not byte-identical: {cells}"
+    cell = cells.pop()
+    assert "docs/aide/golden_evidence.generated.json" in cell, cell
+    assert not re.search(r"\d", cell), f"evidence cell still carries a digit: {cell!r}"
 
 
 # =========================================================================== #
@@ -679,17 +697,6 @@ def test_adv_ac6_asserted_by_naming_missing_function_is_detectable():
     func = "test_does_not_exist_at_all_item105"
     source = (_REPO_ROOT / module).read_text(encoding="utf-8")
     assert not re.search(rf"def {re.escape(func)}\b", source)
-
-
-@pytest.mark.parametrize(
-    "cell", ["34/67", "34 of 67 leaf paths unwired", "70/67 leaf paths unwired"]
-)
-def test_adv_ac7_malformed_evidence_cell_fails_format_before_arithmetic(cell):
-    match = _EVIDENCE_RE.match(cell.strip())
-    if match is None:
-        return  # correctly rejected on format alone
-    n, m = int(match.group(1)), int(match.group(2))
-    assert not (0 <= n <= m), "expected the N>M case to fail on arithmetic instead"
 
 
 def test_adv_ac13_divergences_naming_a_retire_fixture_is_flagged():
