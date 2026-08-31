@@ -871,7 +871,7 @@ def test_adv_synthetic_deliverable_bullet_status_line_is_flagged():
     """Adversarial: a synthetic diff line hand-flipping a deliverable
     bullet's status icon must be caught by the AC26 pattern directly,
     independent of whatever the real git diff currently contains."""
-    offending_line = "✅ **D12** A hand-typed deliverable that was never through aide progress set."
+    offending_line = "- ✅ **D12** A hand-typed deliverable that was never through aide progress set."
     assert _DELIVERABLE_BULLET_STATUS_RE.match(offending_line)
 
 

@@ -619,6 +619,9 @@ _AC17_ALLOWLISTED_FILES = frozenset(
     {
         "tests/test_116_ras_native_corpus.py",
         "tests/test_126_golden_retirement.py",
+        # item 135: validation module checks the retirement, so it legitimately
+        # names the retired path.
+        "tests/test_135_stage29_validation.py",
     }
 )
 

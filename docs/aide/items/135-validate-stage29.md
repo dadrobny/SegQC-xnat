@@ -410,6 +410,9 @@ of them added during this queue) is the **queue boundary's** job
 **May change:**
 
 - `tests/test_135_stage29_validation.py` — the item's own test module.
+- `tests/test_126_golden_retirement.py` — AC17's allowlist of files legitimately
+  naming the retired path; adds this item's own validation module (it names
+  the retired path while checking the retirement).
 - `docs/aide/progress.md` — Stage 29's three acceptance boxes, Stage 28's
   mode-4 acceptance box, and Environment-Gated Capability Verification rows only
   if AC23 finds one genuinely affected. No status icon is hand-edited;
@@ -833,3 +836,10 @@ this item re-measured (the eleven retired paths, the four replacements, the
 guard replay, mode 4/clean control, the four/five/six-level offset arrays, the
 nested-label-map reading, the tptbox version/license, all eight
 fails-before-the-fix nodes) matched the spec's cited starting values exactly.
+
+**AC17 allowlist gap fixed, recorded 2026-08-31.** `tests/test_126_golden_retirement.py`'s
+`_AC17_ALLOWLISTED_FILES` did not name `tests/test_135_stage29_validation.py`,
+which legitimately references the retired `tests/corpus/golden` path while
+checking the retirement — the same missed-consumer shape items 106/115/125/126/132
+already hit for their own paths. Added to the allowlist and to this item's own
+Authorised paths above.
