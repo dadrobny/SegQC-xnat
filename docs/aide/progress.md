@@ -1321,7 +1321,7 @@ per-deliverable provenance.
   retired. *(Item 133)*
 - ✅ **D11** The decision table's live `N/M leaf paths unwired` counts split into a
   generated, byte-reproducible companion the signed document references. *(Item 134)*
-- 🚧 Stage 29 end-to-end validation: retirement audit, guard replay on a scratch branch,
+- 🔍 Stage 29 end-to-end validation: retirement audit, guard replay on a scratch branch,
   mode-4 replay closing Stage 28's unticked acceptance half, fails-before-the-fix
   verification per defect, fresh-clone suite. *(Item 135)*
 
