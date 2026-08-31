@@ -16,12 +16,6 @@ feature or config can rebuild and re-check *everything* with one command
    into ``<out>/eval_cohort/``.
 3. Runs ``segfacet evaluate`` over that cohort (in-process, via
    ``segfacet.cli.main``), producing ``<out>/eval_synthetic/eval_report.json``.
-4. Optionally builds the versioned real-VerSe artifact -- only if
-   ``--verse-cohort <dir>`` is supplied *and* exists -- via item 045's
-   ``build_reference`` following item 082's recipe, and re-evaluates a
-   self-vs-self cohort synthesized from that VerSe GT. When absent, both
-   VerSe steps degrade to a genuine, structured skip (never a failure) and
-   the synthetic path still completes with exit 0.
 
 Every step's outcome is recorded in a machine-checkable structured summary: a
 ``dict`` returned from :func:`run_refresh` *and* written to
@@ -31,9 +25,12 @@ Every step's outcome is recorded in a machine-checkable structured summary: a
 Usage::
 
     python scripts/refresh_reference.py --out out/refresh
-    python scripts/refresh_reference.py --out out/refresh --verse-cohort /mnt/verse
-    python scripts/refresh_reference.py --out out/refresh --verse-cohort /mnt/verse \\
-        --verse-seg-suffix _seg-vert_msk.nii.gz --build-date 2026-07-15
+
+For a real VerSe cohort, use ``scripts/rebuild_verse_reference.py`` (item
+123) instead -- this wrapper's real-VerSe mode is retired (item 133,
+2026-08-31): it never handled the real nested VerSe19 layout, and the
+dedicated script owns discovery, staging, build and threshold calibration
+end to end.
 
 Self-contained: imports only ``segfacet.*`` production modules; never imports
 the ``tests`` package nor reads the test corpus fixtures, so it runs unmodified
@@ -54,12 +51,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 STEP_SYNTH_REBUILD = "synthetic-default-rebuild"
 STEP_EVAL_COHORT = "synthetic-eval-cohort"
 STEP_SYNTH_EVALUATE = "synthetic-evaluate"
-STEP_VERSE_BUILD = "verse-build"
-STEP_VERSE_EVALUATE = "verse-evaluate"
-
-#: Default real-VerSe mask suffix (item 082 recipe) used when a
-#: ``--verse-cohort`` is supplied.
-DEFAULT_VERSE_SEG_SUFFIX = "_seg-vert_msk.nii.gz"
 
 #: Fixed, literal recipe for the self-vs-self synthesis cohort -- deterministic
 #: ``build_clean_spine`` parameters only (no RNG, no wall clock).
@@ -160,17 +151,11 @@ def _run_synthetic_eval(manifest_path: Path, out_subdir: Path, *, build_date: st
 def run_refresh(
     out_dir: "Path | str",
     *,
-    verse_cohort: "Optional[Path | str]" = None,
-    verse_seg_suffix: str = DEFAULT_VERSE_SEG_SUFFIX,
     build_date: str = "2026-07-15",
 ) -> Dict[str, Any]:
-    """Orchestrate the refresh; write only under ``out_dir``; return the
-    summary dict.
-
-    Never raises for an absent/missing ``verse_cohort`` -- that path is
-    always a structured skip, not an exception.
-    """
-    from segfacet.reference import build_and_write_default, build_reference, write_artifact
+    """Orchestrate the synthetic refresh; write only under ``out_dir``;
+    return the summary dict."""
+    from segfacet.reference import build_and_write_default
 
     out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
@@ -214,83 +199,26 @@ def run_refresh(
         )
     )
 
-    # -- verse-build / verse-evaluate ------------------------------------ #
-    verse_path = Path(verse_cohort) if verse_cohort is not None else None
-    if verse_path is None:
-        reason = "no --verse-cohort supplied"
-        steps.append(_step(STEP_VERSE_BUILD, "skipped", reason, None))
-        steps.append(_step(STEP_VERSE_EVALUATE, "skipped", reason, None))
-    elif not verse_path.exists():
-        reason = f"--verse-cohort path does not exist: {verse_path}"
-        steps.append(_step(STEP_VERSE_BUILD, "skipped", reason, None))
-        steps.append(_step(STEP_VERSE_EVALUATE, "skipped", reason, None))
-    else:
-        try:
-            verse_dist = build_reference(
-                verse_path,
-                source="verse-refresh-v1",
-                build_date=build_date,
-                seg_suffix=verse_seg_suffix,
-            )
-            verse_json = out_path / "reference_verse_v1.json"
-            write_artifact(verse_dist, verse_json)
-            steps.append(
-                _step(
-                    STEP_VERSE_BUILD,
-                    "ran",
-                    f"built the versioned real-VerSe artifact from {verse_path}",
-                    str(verse_json),
-                )
-            )
-        except Exception as exc:  # noqa: BLE001 -- never let verse-build crash the run
-            reason = f"verse-build failed: {exc}"
-            steps.append(_step(STEP_VERSE_BUILD, "failed", reason, None))
-            steps.append(
-                _step(
-                    STEP_VERSE_EVALUATE,
-                    "skipped",
-                    "verse-build did not produce a GT cohort to evaluate",
-                    None,
-                )
-            )
-        else:
-            try:
-                verse_eval_manifest = synthesize_eval_cohort(out_path / "eval_verse_cohort_src")
-                verse_eval_out = out_path / "eval_verse"
-                verse_eval_report = _run_synthetic_eval(
-                    verse_eval_manifest,
-                    verse_eval_out,
-                    build_date=build_date,
-                    cohort_id="refresh-verse",
-                )
-                steps.append(
-                    _step(
-                        STEP_VERSE_EVALUATE,
-                        "ran",
-                        "ran segfacet evaluate over a self-vs-self cohort synthesized "
-                        "alongside the real-VerSe GT",
-                        str(verse_eval_report),
-                    )
-                )
-            except Exception as exc:  # noqa: BLE001
-                steps.append(
-                    _step(STEP_VERSE_EVALUATE, "failed", f"verse-evaluate failed: {exc}", None)
-                )
-
     return {
         "out_dir": str(out_path),
-        "verse_cohort": str(verse_cohort) if verse_cohort is not None else None,
         "steps": steps,
     }
+
+
+#: Pointer message for the retired VerSe mode (AC8) -- a single line, no
+#: traceback, naming the tool that actually does the job.
+_VERSE_RETIRED_MESSAGE = (
+    "refresh_reference: --verse-cohort is retired; use "
+    "scripts/rebuild_verse_reference.py <verse-root> --out <dir> instead."
+)
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="refresh_reference",
         description=(
-            "Refresh every reference artifact (synthetic default + optional "
-            "versioned real-VerSe) and re-run the Stage-7 evaluation in one "
-            "command."
+            "Refresh the synthetic default reference artifact and re-run "
+            "the Stage-7 evaluation in one command."
         ),
     )
     parser.add_argument(
@@ -304,15 +232,18 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="<dir>",
         help=(
-            "Directory of a real (or stand-in) VerSe-shaped cohort. When "
-            "omitted or nonexistent, the real-VerSe steps skip cleanly."
+            "Retired (item 133): use scripts/rebuild_verse_reference.py "
+            "instead. Supplying this flag is a hard error."
         ),
     )
     parser.add_argument(
         "--verse-seg-suffix",
-        default=DEFAULT_VERSE_SEG_SUFFIX,
+        default=None,
         metavar="<suffix>",
-        help=f"Real-VerSe mask filename suffix (default: {DEFAULT_VERSE_SEG_SUFFIX}).",
+        help=(
+            "Retired (item 133): use scripts/rebuild_verse_reference.py "
+            "instead. Supplying this flag is a hard error."
+        ),
     )
     parser.add_argument(
         "--build-date",
@@ -327,13 +258,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = _build_arg_parser()
     args = parser.parse_args(argv)
 
+    if args.verse_cohort is not None or args.verse_seg_suffix is not None:
+        print(_VERSE_RETIRED_MESSAGE, file=sys.stderr)
+        return 2
+
     out_path = Path(args.out)
-    summary = run_refresh(
-        out_path,
-        verse_cohort=args.verse_cohort,
-        verse_seg_suffix=args.verse_seg_suffix,
-        build_date=args.build_date,
-    )
+    summary = run_refresh(out_path, build_date=args.build_date)
 
     summary_path = out_path / "refresh_summary.json"
     summary_path.write_text(

@@ -32,7 +32,10 @@ dependencies = [
     "nibabel>=4.0",
     "PyYAML>=5.4",
     "jsonschema>=3.2",
-    "tptbox==0.7.5",
+    # Exact pin: 0.7.6 is the version whose distribution metadata declares
+    # Apache-2.0 in its License field (0.7.5 misdeclared AGPL). Item 133,
+    # 2026-08-31.
+    "tptbox==0.7.6",
 ]
 dynamic = ["version"]
 

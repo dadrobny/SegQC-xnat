@@ -427,4 +427,59 @@ ingestion, but it is a design change to the reference-building path, outside
 both options the queue put to this item and outside queue-018's "this stage does
 no discovery" fence.
 
-To be updated during implementation.
+**Implementation notes (2026-08-31).**
+
+- `.venv/bin/python -m pip install "tptbox==0.7.6"` succeeded (network
+  available). `importlib.metadata.metadata("tptbox")["License"]` observed
+  verbatim: `Apache License Version 2.0, January 2004` — matches the spec's
+  measurement exactly; neither `agpl` nor `affero` (case-insensitive)
+  appears. `importlib.metadata.version("tptbox")` reports `0.7.6`.
+- D9 edits: `pyproject.toml`'s single tptbox specifier moved to the exact
+  literal `tptbox==0.7.6` with a one-line dated comment; `constraints.txt`
+  line 29 moved the same way with no other line touched (the transitive
+  block's 40-entry pin map, minus tptbox, is unchanged — verified against
+  `test_133`'s recorded pre-item map); `docs/tptbox-install-numpy1.md`'s
+  title, every `tptbox==0.7.5`/`v0.7.5`/wheel-filename occurrence, and the
+  `sha256sum` expectation were retargeted to 0.7.6 and
+  `16fdbcccf4192447897b41825eb2b7249d2e8a860ce4905e7e6c2a18f1fdf5d4`.
+- D10 edits: `scripts/refresh_reference.py` dropped `STEP_VERSE_BUILD`,
+  `STEP_VERSE_EVALUATE`, `DEFAULT_VERSE_SEG_SUFFIX`, the whole
+  verse-build/verse-evaluate block, and `run_refresh`'s `verse_cohort`/
+  `verse_seg_suffix` parameters and the summary's `verse_cohort` key.
+  `--verse-cohort`/`--verse-seg-suffix` stay registered (default `None` on
+  both, so "supplied" is detectable) with retired-flag help text; `main`
+  checks for either before any directory is touched, prints one line to
+  stderr naming `scripts/rebuild_verse_reference.py` and `return`s `2`. The
+  module docstring's real-VerSe usage step is gone and it now points at
+  `scripts/rebuild_verse_reference.py`; note the docstring text itself
+  avoids the literal substring `--verse-cohort` (unlike the surrounding
+  prose) because AC12's test asserts that substring's absence from the
+  docstring specifically.
+- Manually verified (not via pytest, per the no-flag-run/retired-flag
+  validation steps in this spec): a no-flag run into a scratch dir returns
+  0 with exactly the three synthetic steps `ran`, in order, and no
+  `verse_cohort` key in the summary; a `--verse-cohort /nonexistent` run
+  returns 2, prints exactly one stderr line naming
+  `scripts/rebuild_verse_reference.py`, and creates no `--out` directory at
+  all (not even empty).
+- Also ran (explicitly asked for by this spec's Validation §2, to catch a
+  wheel-induced snapshot/behaviour change rather than a general suite run):
+  `tests/test_093_tptbox_label_convention.py` +
+  `tests/test_094_tptbox_image_layer.py` — **142 passed, 0 skipped**, no
+  change to `test_094`'s AC3 loader-snapshot or AC7 verdict/findings-shape
+  expectations under the new wheel. Also ran
+  `tests/test_083_refresh_reference.py` (13 passed) since D10 changed the
+  module it exercises directly.
+- **Test defect found, not fixed:** `tests/test_133_…py`'s
+  `test_ac6_no_stale_pin_literal_anywhere_under_tests` walks every `*.py`
+  under `tests/` — including itself — for the literal `tptbox==0.7.5`. The
+  test module's own prose (its docstring and the assertion's failure
+  message, e.g. line 21/323/325) contains that literal as documentation of
+  what it is checking for, so the test fails against itself regardless of
+  what any other file contains (`25 passed, 1 failed` when run in
+  isolation). This is a self-referential false positive in the test, not a
+  production-code defect — every non-test-133 file is clean, and AC1/AC2/
+  AC4/AC5 independently confirm the pin moved correctly. Per the builder
+  role's hard limit, this was not fixed here (no test-file edits); flagging
+  for the validator/test-writer, since the spec's own Authorised-paths list
+  does name `tests/test_133_…py` as changeable — just not by this role.

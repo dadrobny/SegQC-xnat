@@ -26,7 +26,7 @@ scikit-image==0.26.0
 nibabel==5.4.2
 PyYAML==6.0.3
 jsonschema==4.26.0
-tptbox==0.7.5
+tptbox==0.7.6
 
 # --- transitive dependencies of the core stack ---
 attrs==26.1.0
