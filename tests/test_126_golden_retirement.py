@@ -452,9 +452,17 @@ def test_ac12_fence_function_no_longer_defined(module, func_name):
 
 
 def test_ac12_no_test_function_iterates_a_retired_golden_glob():
-    glob_re = re.compile(r"GOLDEN_DIR\.glob\(|GOLDEN_DIR\s*/\s*['\"]\*")
+    # Anchored on a word boundary so the retired `segfacet.synth.golden.GOLDEN_DIR`
+    # symbol is caught while this module's own `_CORPUS_GOLDEN_DIR` (a distinct,
+    # never-retired identifier that merely ends with the same substring) is not.
+    glob_re = re.compile(r"(?<![A-Za-z0-9_])GOLDEN_DIR\.glob\(|(?<![A-Za-z0-9_])GOLDEN_DIR\s*/\s*['\"]\*")
     offenders = []
     for path in sorted(_TESTS_DIR.glob("test_*.py")):
+        if path.name == Path(__file__).name:
+            # This module's own AC1/adversarial probes legitimately glob
+            # _CORPUS_GOLDEN_DIR (never the retired GOLDEN_DIR symbol) to
+            # prove tests/corpus/golden/ is empty -- not a subject of AC12.
+            continue
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
         for node in ast.walk(tree):
@@ -867,11 +875,20 @@ def test_ac20_test105_inventory_constant_is_20():
     tree = _module_ast(module)
     source = _function_source(tree, "test_ac3_current_tree_has_30_non_py_fixtures", where=module)
     uncommented = re.sub(r"#.*", "", source)
-    assert re.search(r"\b20\b", uncommented), (
+    # The `def` line keeps "30" in the function name for AC identity, and the
+    # docstring narrates the pre-retirement historical count (and a
+    # 2026-08-30 date) -- neither is the live constant this check pins.
+    # Only a line carrying the actual comparison is in scope.
+    assertion_lines = "\n".join(line for line in uncommented.splitlines() if "assert" in line)
+    assert assertion_lines, (
+        f"{module}::test_ac3_current_tree_has_30_non_py_fixtures has no "
+        "assert statement to check"
+    )
+    assert re.search(r"\b20\b", assertion_lines), (
         f"{module}::test_ac3_current_tree_has_30_non_py_fixtures does not "
         "reference the post-retirement inventory count of 20"
     )
-    assert not re.search(r"\b30\b", uncommented), (
+    assert not re.search(r"\b30\b", assertion_lines), (
         f"{module}::test_ac3_current_tree_has_30_non_py_fixtures still "
         "hardcodes the pre-retirement count of 30"
     )
@@ -1169,6 +1186,19 @@ def test_adv_format_fixture_floats_do_not_appear_in_any_fresh_corpus_report():
     _collect_floats(fixture_mod.format_contract_inputs(), fixture_floats)
     assert fixture_floats, "expected the format fixture inputs to carry float literals"
 
+    # Restrict the disjointness check to the fixture's distinctive literals
+    # (module-level _LONG_DECIMAL_FLOAT / _NEGATIVE_FLOAT / _NEAR_ZERO_FLOAT).
+    # Trivial values like 0.0/0.5/1.0 are ordinary computed values (zero
+    # extents, midpoint offsets, unit axis components) that legitimately
+    # recur in real reports -- their presence proves nothing about coupling.
+    distinctive_floats = {
+        v for v in fixture_floats if v not in (0.0, 0.5, 1.0)
+    }
+    assert distinctive_floats, (
+        "expected the format fixture inputs to carry distinctive (non-trivial) "
+        "float literals"
+    )
+
     from segfacet.synth.golden import build_report_for_case
 
     fresh_floats = set()
@@ -1177,10 +1207,10 @@ def test_adv_format_fixture_floats_do_not_appear_in_any_fresh_corpus_report():
         _collect_floats(report, fresh_floats)
     assert fresh_floats, "expected at least one float in a freshly built report"
 
-    overlap = fixture_floats & fresh_floats
+    overlap = distinctive_floats & fresh_floats
     assert not overlap, (
-        f"the format fixture's hand-picked floats reappear in a freshly "
-        f"built corpus report, which would re-couple the two: {overlap}"
+        f"the format fixture's hand-picked distinctive floats reappear in a "
+        f"freshly built corpus report, which would re-couple the two: {overlap}"
     )
 
 
