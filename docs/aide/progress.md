@@ -1306,7 +1306,7 @@ per-deliverable provenance.
   pipeline level (the fit's descriptive error already exists — item 119 AC16), and the
   4-centroid held-out fallback boundary moves to `< 5` with the affected reference
   distributions rebuilt. *(Item 129)*
-- 🚧 **D6** Spline plumbing consolidation: one closest-point search, one in-sample fit per
+- 🔍 **D6** Spline plumbing consolidation: one closest-point search, one in-sample fit per
   case. *(Item 130)*
 - 📋 **D7** `tangent_angles_deg[]` traversal-direction normalisation to item 122's
   convention. *(Item 131)*
