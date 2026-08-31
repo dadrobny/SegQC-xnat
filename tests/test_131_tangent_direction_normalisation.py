@@ -151,9 +151,13 @@ def _zero_net_advance_horizontal_pair() -> List[LabelCentroid]:
 
 def _zero_net_advance_doubling_back() -> List[LabelCentroid]:
     """A non-flat path that goes up in S and returns to its starting S --
-    net advance exactly 0.0, but the path itself is not flat."""
+    net advance exactly 0.0, but the path itself is not flat. The last
+    centroid's R differs from the first's (5.0 vs 0.0) so all five
+    centroids land at distinct mm-coordinates -- coincident first/last
+    centroids would make ``fit_centroid_spline`` raise before this fixture
+    could be used."""
     zs = [0.0, 20.0, 40.0, 20.0, 0.0]
-    xs = [0.0, 10.0, 0.0, -10.0, 0.0]
+    xs = [0.0, 10.0, 0.0, -10.0, 5.0]
     return [
         _centroid(_LEVELS[i], (xs[i], 0.0, zs[i]), label=i + 1) for i in range(len(xs))
     ]
@@ -539,7 +543,7 @@ def test_ac12_retired_phrase_absent_under_src_segfacet():
         except (UnicodeDecodeError, ValueError):
             continue
         if _RETIRED_PHRASE in text:
-            offenders.append(str(path.relative_to(_REPO_ROOT)))
+            offenders.append(path.relative_to(_REPO_ROOT).as_posix())
     assert offenders == [], (
         f"{_RETIRED_PHRASE!r} still present under src/segfacet/ in: {offenders}"
     )
@@ -881,6 +885,10 @@ def test_ac24_zero_net_advance_doubling_back_deterministic_and_finite():
     centroids = _zero_net_advance_doubling_back()
     net = float(centroids[-1].centroid_mm[2]) - float(centroids[0].centroid_mm[2])
     assert net == 0.0
+    mm_coords = [c.centroid_mm for c in centroids]
+    assert len(set(mm_coords)) == len(mm_coords), (
+        f"fixture centroids are not pairwise distinct: {mm_coords!r}"
+    )
 
     result_a = _curvature_for(centroids)
     result_b = _curvature_for(centroids)
