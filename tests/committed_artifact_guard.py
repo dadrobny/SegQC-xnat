@@ -101,7 +101,9 @@ class AllowlistEntry:
 
 
 #: Every entry below is measured against the post-item-126 inventory
-#: (2026-08-31): the nine ``tests/corpus/golden/*.json`` snapshots and the two
+#: (2026-08-31): the nine snapshots from the retired corpus golden-snapshot
+#: store (see item 126 / ``docs/aide/golden-decision-table.md``'s Retirement
+#: execution log) and the two
 #: ``tests/golden/0NN_*.json`` snapshots item 126 retired are absent here, and
 #: ``tests/golden/report_format_contract.json`` -- the surviving fixture -- is
 #: keyed by the same ``tests/golden/*.json`` glob its ``.gitattributes`` pin
@@ -412,5 +414,5 @@ def iter_violations(tests_dir) -> Iterator[Violation]:
     tests_dir = Path(tests_dir)
     for path in sorted(tests_dir.glob("*.py")):
         source = path.read_text(encoding="utf-8")
-        for violation in classify_module(source, str(path)):
+        for violation in classify_module(source, path.as_posix()):
             yield violation

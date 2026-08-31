@@ -131,8 +131,8 @@ it rather than repurposing it.
   structural cases, `assert_matches_committed_artifact` raises `AssertionError`
   if and only if `reports_close` on the same two parsed structures is `False`.
 
-- [ ] **AC11: the four existing comparisons go through the helper.**
-  `tests/test_063_reference_intensity.py`,
+- [ ] **AC11: the five existing comparisons go through the helper.**
+  `tests/test_045_reference_artifact.py`, `tests/test_063_reference_intensity.py`,
   `tests/test_081_reference_morphology.py`,
   `tests/test_120_leave_one_out_offset.py` and
   `tests/test_123_recalibrate_and_regenerate.py` call the helper for their
@@ -323,6 +323,7 @@ committed JSON):
 - `tests/test_111_golden_guard.py` — the enforcement test (AC15, AC17); the
   existing `_KNOWN_BYTE_EXACT_FIXTURE_FAMILIES` block is left as-is (AC23).
 - `tests/test_127_committed_artifact_tolerance.py` — new: this item's tests.
+- `tests/test_045_reference_artifact.py` — migrate one comparison (AC11).
 - `tests/test_063_reference_intensity.py` — migrate one comparison (AC11).
 - `tests/test_081_reference_morphology.py` — migrate one comparison (AC11).
 - `tests/test_120_leave_one_out_offset.py` — migrate one comparison (AC11).
@@ -505,3 +506,20 @@ branch as part of the Stage 29 acceptance.
   resolvable operand and misclassify the fence as a violation. This is the
   concrete mechanism behind the Assumptions' "local variable assigned from
   one of those in the same function" clause.
+
+- **The 2026-08-31 consumer survey missed a fifth open-coded comparison,
+  `tests/test_045_reference_artifact.py::test_ac10_regenerating_reproduces_committed_bytes`,
+  and AC11's own mechanical sweep (`test_ac11_no_module_calls_reports_close_directly_on_committed_data`)
+  is what found it, during validation.** That test open-coded
+  `assert reports_close(regenerated, json.loads(default_artifact_path().read_text(...)))`
+  — the exact idiom this item retires — but was never hand-listed alongside
+  the other four migrated modules, because item 123's precedent
+  (`grep -l build_and_write_default tests/`) surveys only
+  `build_and_write_default` call sites and this module reaches the committed
+  artifact through `default_artifact_path()` directly. This is the failure
+  mode the consumer-survey rule's own AC11 sweep exists to catch: a
+  mechanical, exhaustive check over every module under `tests/`, not a
+  second hand-list. `tests/test_045_reference_artifact.py` is added to
+  **Authorised paths** and to AC11's module list; the module now calls
+  `assert_matches_committed_artifact(regenerated, default_artifact_path())`
+  and no longer imports `reports_close`. *(2026-08-31)*
