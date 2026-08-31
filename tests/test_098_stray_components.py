@@ -85,7 +85,7 @@ from segfacet.reference import (
 from segfacet.reference.delta import compute_morphology_reference_delta
 from segfacet.reference.ingest import INGESTED_MORPHOLOGY_FEATURES
 from segfacet.synth.corpus import load_manifest
-from segfacet.synth.golden import GOLDEN_DIR, load_golden, write_goldens, reports_close
+from segfacet.synth.golden import build_report_for_case, write_goldens
 from segfacet.synth.regression import loaded_seg_image
 
 
@@ -792,11 +792,12 @@ def test_ac13_reference_derived_excess_finding_matches_frozen_snapshot():
 
 
 def test_ac14_every_golden_components_block_has_four_new_keys():
-    """AC14: every per-label components block in every committed golden
-    carries the four new keys (post-regeneration)."""
+    """AC14 (item 126 replacement): every per-label components block in
+    every freshly built report carries the four new keys. Re-pointed at
+    fresh output -- the committed golden this used to read was retired."""
     manifest = load_manifest()
     for case in manifest["cases"]:
-        golden = load_golden(case["case_id"])
+        golden = build_report_for_case(case)
         per_label = golden.get("features", {}).get("per_label", {})
         assert per_label, f"case {case['case_id']!r} has no per_label entries"
         for label_key, entry in per_label.items():
@@ -816,10 +817,12 @@ def test_ac14_every_golden_components_block_has_four_new_keys():
 
 
 def test_ac14_every_golden_still_validates_against_schema():
+    """AC14 (item 126 replacement): re-pointed at fresh output -- the
+    committed golden this used to read and validate was retired."""
     schema = _report_schema()
     manifest = load_manifest()
     for case in manifest["cases"]:
-        golden = load_golden(case["case_id"])
+        golden = build_report_for_case(case)
         jsonschema.validate(golden, schema)
 
 
@@ -971,21 +974,26 @@ def _finding_summary(f, *, include_reason: bool) -> dict:
     "case_id", sorted(_PRE_098_GOLDEN_VERDICT_AND_FINDINGS.keys())
 )
 def test_ac15_golden_verdict_and_findings_unchanged(case_id):
-    """AC15: the regenerated golden's top-level verdict and findings array
-    (length, order, rule_id/severity/labels, and -- except for the one
-    face-name-sensitive case, item 116 -- reason) are identical to the
-    pre-098 committed golden's, for every case except ``mode1_displace`` and
-    ``mode6_crop_at_border`` -- item 120 deliberately fires a ``mislabel``
-    finding through plain ``run_qc`` for both (AC18/AC23), so their entries
-    in ``_PRE_098_GOLDEN_VERDICT_AND_FINDINGS`` above are the post-120
-    values, not the frozen pre-098 ones. For every other case only the
-    features block grew."""
-    golden = load_golden(case_id)
+    """AC15 (item 126 replacement iii): the freshly built report's top-level
+    verdict and findings array (length, order, rule_id/severity/labels, and
+    -- except for the one face-name-sensitive case, item 116 -- reason) are
+    identical to the pre-098 committed golden's, for every case except
+    ``mode1_displace`` and ``mode6_crop_at_border`` -- item 120 deliberately
+    fires a ``mislabel`` finding through plain ``run_qc`` for both
+    (AC18/AC23), so their entries in ``_PRE_098_GOLDEN_VERDICT_AND_FINDINGS``
+    above are the post-120 values, not the frozen pre-098 ones. For every
+    other case only the features block grew. Re-pointed at fresh output
+    (item 126) -- the committed golden this used to read was retired; the
+    ``_PRE_098_GOLDEN_VERDICT_AND_FINDINGS`` constant this compares against
+    is unchanged and still importable by test_102."""
+    manifest = load_manifest()
+    case = next(c for c in manifest["cases"] if c["case_id"] == case_id)
+    fresh = build_report_for_case(case)
     expected = _PRE_098_GOLDEN_VERDICT_AND_FINDINGS[case_id]
-    assert golden["verdict"] == expected["verdict"]
+    assert fresh["verdict"] == expected["verdict"]
 
     include_reason = case_id not in _FACE_NAME_SENSITIVE_CASES
-    got_findings = [_finding_summary(f, include_reason=include_reason) for f in golden["findings"]]
+    got_findings = [_finding_summary(f, include_reason=include_reason) for f in fresh["findings"]]
     expected_findings = [
         _finding_summary(f, include_reason=include_reason) for f in expected["findings"]
     ]
@@ -1011,18 +1019,10 @@ def test_ac16_write_goldens_intra_run_determinism(tmp_path):
         assert (dest1 / name).read_bytes() == (dest2 / name).read_bytes()
 
 
-def test_ac16_write_goldens_matches_committed_within_tolerance(tmp_path):
-    """AC16: reports_close(fresh, committed) is true for each case."""
-    dest = tmp_path / "fresh"
-    write_goldens(dest)
-
-    manifest = load_manifest()
-    for case in manifest["cases"]:
-        fresh = json.loads((dest / f"{case['case_id']}.json").read_text(encoding="utf-8"))
-        committed = json.loads(
-            (GOLDEN_DIR / f"{case['case_id']}.json").read_text(encoding="utf-8")
-        )
-        assert reports_close(fresh, committed), case["case_id"]
+# (item 126: test_ac16_write_goldens_matches_committed_within_tolerance was
+# discharged -- its subject, the committed golden corpus, was retired. Its
+# determinism sibling above, test_ac16_write_goldens_intra_run_determinism,
+# survives and needs no committed file.)
 
 
 # =========================================================================== #

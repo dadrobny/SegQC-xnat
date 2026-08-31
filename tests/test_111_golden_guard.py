@@ -1,8 +1,15 @@
 """Golden-fixture test hygiene (item 111).
 
 Closes two independent defects in how the ``tests/golden/*.json`` snapshots
-(item 016's ``016_features_report.json`` and item 022's
-``022_stage3_report.json``) are guarded:
+were guarded. Originally these were item 016's ``016_features_report.json``
+and item 022's ``022_stage3_report.json``; item 126 retired both and
+replaced them with one shared, feature-value-free fixture,
+``tests/golden/report_format_contract.json`` (see
+``docs/aide/golden-decision-table.md``'s Section 1 "retire" rows and its
+"## Retirement execution log") -- this module's guarantees carry over
+unchanged onto the replacement, which both ``test_016_features_json.py`` and
+``test_022_stage3_serialisation.py`` now compare against via the same
+module-level ``GOLDEN_PATH`` name this module monkeypatches.
 
 (a) both were the only committed byte-reproducible text fixtures absent from
     ``.gitattributes``, latent only because both consumers compare via
@@ -14,7 +21,8 @@ Closes two independent defects in how the ``tests/golden/*.json`` snapshots
     golden made the check pass. AC5-AC9 pin the fixed behaviour (fail loudly,
     name the path) and confirm it now matches the sibling
     ``test_016_features_json.py::test_ac5_golden_snapshot``, which never had
-    the self-healing branch.
+    the self-healing branch. Item 126's AC11 requires the replacement arrive
+    already holding this property.
 
 These tests exercise the real ``test_ac5_golden_snapshot`` /
 ``test_ac8_golden_snapshot`` functions directly, with their module-level
@@ -36,17 +44,19 @@ import test_022_stage3_serialisation as mod022
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 GITATTRIBUTES_PATH = REPO_ROOT / ".gitattributes"
-GOLDEN_016_REL = "tests/golden/016_features_report.json"
-GOLDEN_022_REL = "tests/golden/022_stage3_report.json"
+GOLDEN_REL = "tests/golden/report_format_contract.json"
 
 # Every family of committed fixture this repo's test suite compares
 # byte-exactly against a committed copy (surveyed by hand for AC4 against
 # every `.read_bytes()` / golden `.read_text()` comparison under `tests/`;
 # everything else found is two freshly-generated files compared to each
 # other within one run -- a determinism check, not a committed fixture).
+#
+# The committed corpus-golden snapshot family's `*.json` pin was removed by
+# item 126, which retired the family it named (docs/aide/golden-decision-
+# table.md's "## Retirement execution log").
 _KNOWN_BYTE_EXACT_FIXTURE_FAMILIES = (
     "tests/corpus/manifest.json",
-    "tests/corpus/golden/*.json",
     "tests/corpus/intensity/manifest.json",
     "tests/corpus/094_pre_migration_snapshot.json",
     "src/segfacet/reference/reference_default.json",
@@ -95,16 +105,18 @@ def test_ac1_gitattributes_pins_golden_dir():
     ]
     assert matching, (
         ".gitattributes has no 'tests/golden/*.json ... eol=lf' pin; "
-        "016_features_report.json and 022_stage3_report.json are the only "
-        "committed byte-reproducible text fixtures still unpinned"
+        "report_format_contract.json is the only committed byte-reproducible "
+        "text fixture the two consumers compare against"
     )
 
 
 def test_ac2_check_attr_reports_lf_pin_for_both_files():
-    """AC2: `git check-attr text eol -- <path>` reports the LF pin for both
-    016_features_report.json and 022_stage3_report.json."""
+    """AC2: `git check-attr text eol -- <path>` reports the LF pin for the
+    shared format-contract fixture both test_016 and test_022 compare
+    against (item 126 collapsed the former two per-module snapshots into
+    this one shared fixture)."""
     result = subprocess.run(
-        ["git", "check-attr", "text", "eol", "--", GOLDEN_016_REL, GOLDEN_022_REL],
+        ["git", "check-attr", "text", "eol", "--", GOLDEN_REL],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -113,14 +125,13 @@ def test_ac2_check_attr_reports_lf_pin_for_both_files():
     assert result.returncode == 0, result.stderr
     output = result.stdout
 
-    for rel_path in (GOLDEN_016_REL, GOLDEN_022_REL):
-        file_lines = [
-            line for line in output.splitlines() if line.startswith(f"{rel_path}:")
-        ]
-        assert any("eol: lf" in line for line in file_lines), (
-            f"git check-attr does not report an effective eol=lf pin for "
-            f"{rel_path}:\n{output}"
-        )
+    file_lines = [
+        line for line in output.splitlines() if line.startswith(f"{GOLDEN_REL}:")
+    ]
+    assert any("eol: lf" in line for line in file_lines), (
+        f"git check-attr does not report an effective eol=lf pin for "
+        f"{GOLDEN_REL}:\n{output}"
+    )
 
 
 # =========================================================================== #
@@ -128,7 +139,7 @@ def test_ac2_check_attr_reports_lf_pin_for_both_files():
 # =========================================================================== #
 
 
-@pytest.mark.parametrize("rel_path", [GOLDEN_016_REL, GOLDEN_022_REL])
+@pytest.mark.parametrize("rel_path", [GOLDEN_REL])
 def test_ac3_committed_blob_has_no_carriage_returns(rel_path):
     """AC3: the committed blob (as stored in git, independent of the working
     tree's checkout line endings) contains zero \\r bytes -- so pinning
@@ -200,12 +211,12 @@ def test_ac5_no_self_healing_branch_in_test_ac8():
 
 
 def test_ac6_ac7_missing_golden_fails_loudly_and_names_path(monkeypatch, tmp_path):
-    """AC6: with tests/golden/022_stage3_report.json absent, the test fails
+    """AC6: with the shared format-contract fixture absent, the test fails
     -- it does not skip and does not pass. AC7: the failure names the
     missing path. Driven by monkeypatching the module's GOLDEN_PATH to a
     file that does not exist under tmp_path, so the real committed fixture
     is never touched."""
-    missing_path = tmp_path / "022_stage3_report.json"
+    missing_path = tmp_path / "report_format_contract.json"
     assert not missing_path.exists()
     monkeypatch.setattr(mod022, "GOLDEN_PATH", missing_path)
 
@@ -246,11 +257,11 @@ def test_ac9_sibling_test_016_unchanged_and_agrees_on_missing_golden(
         "has grown a self-healing write branch of its own"
     )
 
-    missing_016 = tmp_path / "016_features_report.json"
+    missing_016 = tmp_path / "report_format_contract_016.json"
     monkeypatch.setattr(mod016, "GOLDEN_PATH", missing_016)
     _assert_missing_golden_fails_loudly(mod016.test_ac5_golden_snapshot, missing_016)
 
-    missing_022 = tmp_path / "022_stage3_report.json"
+    missing_022 = tmp_path / "report_format_contract_022.json"
     monkeypatch.setattr(mod022, "GOLDEN_PATH", missing_022)
     _assert_missing_golden_fails_loudly(mod022.test_ac8_golden_snapshot, missing_022)
 
@@ -263,7 +274,7 @@ def test_ac9_sibling_test_016_unchanged_and_agrees_on_missing_golden(
 def test_adv_golden_present_but_empty_fails_with_assertion(monkeypatch, tmp_path):
     """Adversarial: an empty (but present) golden must fail the content
     comparison cleanly -- an AssertionError, not a crash or a silent pass."""
-    empty_golden = tmp_path / "022_stage3_report.json"
+    empty_golden = tmp_path / "report_format_contract.json"
     empty_golden.write_text("", encoding="utf-8")
     monkeypatch.setattr(mod022, "GOLDEN_PATH", empty_golden)
 
@@ -287,7 +298,7 @@ def test_adv_golden_present_with_crlf_content_is_well_defined(monkeypatch, tmp_p
     but it means today's comparison itself is predictable, not a crash.)"""
     real_golden_path = mod022.GOLDEN_PATH
     real_golden_text = real_golden_path.read_text(encoding="utf-8")
-    crlf_golden = tmp_path / "022_stage3_report.json"
+    crlf_golden = tmp_path / "report_format_contract.json"
     crlf_golden.write_bytes(real_golden_text.replace("\n", "\r\n").encode("utf-8"))
     monkeypatch.setattr(mod022, "GOLDEN_PATH", crlf_golden)
 
@@ -310,7 +321,7 @@ def test_adv_read_only_golden_directory_still_names_missing_path(
     test flaky rather than informative."""
     readonly_dir = tmp_path / "readonly_golden_dir"
     readonly_dir.mkdir()
-    missing_path = readonly_dir / "022_stage3_report.json"
+    missing_path = readonly_dir / "report_format_contract.json"
 
     readonly_dir.chmod(stat.S_IREAD | stat.S_IEXEC)
     probe = readonly_dir / "probe.tmp"

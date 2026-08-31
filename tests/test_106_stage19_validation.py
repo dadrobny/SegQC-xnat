@@ -1102,9 +1102,17 @@ def test_ac21_environment_gated_table_row_count_and_status_cells_unchanged():
         assert cells[3].startswith(expected_status_icon), cells[3]
 
 
-def test_ac22_nine_goldens_match_corpus_case_ids():
-    golden_dir = _TESTS_DIR / "corpus" / "golden"
-    files = sorted(golden_dir.glob("*.json"))
+def test_ac22_nine_goldens_match_corpus_case_ids(tmp_path):
+    """Item 126 re-pointed this at a regeneration -- the committed
+    corpus-golden snapshot store this used to glob was retired, see
+    docs/aide/golden-decision-table.md's "## Retirement execution log". The
+    harness (write_goldens) survives and is exercised here into a fresh
+    caller-supplied directory instead."""
+    from segfacet.synth.golden import write_goldens
+
+    out_dir = tmp_path / "regen_ac22"
+    write_goldens(out_dir)
+    files = sorted(out_dir.glob("*.json"))
     assert len(files) == 9
     stems = {f.stem for f in files}
     manifest = json.loads((_TESTS_DIR / "corpus" / "manifest.json").read_text(encoding="utf-8"))

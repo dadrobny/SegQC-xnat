@@ -555,34 +555,41 @@ def test_ac15_border_and_coverage_agree_on_covered_span_ends():
 
 
 def test_ac16_committed_corpus_coverage_and_border_findings_unchanged():
-    """AC16: For every committed Stage-5 corpus case, the freshly-computed
-    coverage / border findings under default_config() equal the committed
-    golden's coverage / border findings -- the FOV-restriction does not alter
-    output on any existing corpus fixture (default-config goldens don't
-    exercise partial-FOV inputs or an active expected_levels)."""
+    """AC16 (item 126 replacement): For every committed Stage-5 corpus case,
+    the freshly-computed coverage / border findings under default_config()
+    equal the pinned pre-098 verdict+findings coverage/border subset -- the
+    FOV-restriction does not alter output on any existing corpus fixture
+    (the pinned shape doesn't exercise partial-FOV inputs or an active
+    expected_levels). Re-pointed at fresh output; the committed golden this
+    used to read was retired -- see
+    docs/aide/golden-decision-table.md's "## Retirement execution log"."""
     import segfacet.synth  # noqa: F401 -- triggers self-registration of every operator
     from segfacet.synth.corpus import load_manifest
-    from segfacet.synth.golden import build_report_for_case, load_golden
+    from segfacet.synth.golden import build_report_for_case
+    from test_098_stray_components import _PRE_098_GOLDEN_VERDICT_AND_FINDINGS
 
     manifest = load_manifest()
     cases = manifest["cases"]
     assert cases, "committed manifest must be non-empty for this check to be meaningful"
 
-    def _rule_findings(report: dict) -> list:
+    def _rule_findings(findings: list) -> list:
         return [
             f
-            for f in report.get("findings", [])
+            for f in findings
             if f.get("rule_id") in ("coverage", "border")
         ]
 
     for case in cases:
+        case_id = case["case_id"]
+        if case_id not in _PRE_098_GOLDEN_VERDICT_AND_FINDINGS:
+            continue
         fresh_report = build_report_for_case(case)
-        golden_report = load_golden(case["case_id"])
-        fresh = _rule_findings(fresh_report)
-        golden = _rule_findings(golden_report)
-        assert fresh == golden, (
-            f"coverage/border findings changed for case {case['case_id']!r}:\n"
-            f"fresh={fresh}\ngolden={golden}"
+        expected = _PRE_098_GOLDEN_VERDICT_AND_FINDINGS[case_id]
+        fresh = _rule_findings(fresh_report.get("findings", []))
+        pinned = _rule_findings(expected["findings"])
+        assert fresh == pinned, (
+            f"coverage/border findings changed for case {case_id!r}:\n"
+            f"fresh={fresh}\npinned={pinned}"
         )
 
 

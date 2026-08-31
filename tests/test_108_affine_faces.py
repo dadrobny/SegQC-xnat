@@ -66,7 +66,7 @@ from segfacet.pipeline import extract_feature_record
 
 import segfacet.synth  # noqa: F401 -- triggers self-registration of every operator
 from segfacet.synth.corpus import load_manifest
-from segfacet.synth.golden import build_report_for_case, load_golden, write_goldens
+from segfacet.synth.golden import build_report_for_case, write_goldens
 
 
 # =========================================================================== #
@@ -440,17 +440,25 @@ def _face_insensitive_findings(findings, rule_ids):
 
 @pytest.mark.parametrize("case", _CASES, ids=lambda c: c["case_id"])
 def test_ac8_border_and_coverage_presence_and_labels_unchanged(case):
-    """AC8: for every committed corpus case, the (rule_id, severity, labels)
-    triples of every border/coverage finding exactly match the committed
-    golden -- only face names inside `reason` may differ."""
+    """AC8 (item 126 replacement): for every committed corpus case, the
+    (rule_id, severity, labels) triples of every border/coverage finding
+    exactly match the pinned pre-098 verdict+findings shape -- only face
+    names inside `reason` may differ. Re-pointed at fresh output; the
+    committed golden this used to read was retired, see
+    docs/aide/golden-decision-table.md's "## Retirement execution log"."""
+    from test_098_stray_components import _PRE_098_GOLDEN_VERDICT_AND_FINDINGS
+
+    case_id = case["case_id"]
+    if case_id not in _PRE_098_GOLDEN_VERDICT_AND_FINDINGS:
+        pytest.skip(f"no pinned pre-098 shape for {case_id!r}")
     report = build_report_for_case(case)
-    golden = load_golden(case["case_id"])
+    expected = _PRE_098_GOLDEN_VERDICT_AND_FINDINGS[case_id]
 
     fresh = _face_insensitive_findings(report["findings"], {"border", "coverage"})
-    committed = _face_insensitive_findings(golden["findings"], {"border", "coverage"})
-    assert fresh == committed, (
-        f"case {case['case_id']!r}: border/coverage finding presence or "
-        f"offending labels changed -- fresh={fresh!r} committed={committed!r}"
+    pinned = _face_insensitive_findings(expected["findings"], {"border", "coverage"})
+    assert fresh == pinned, (
+        f"case {case_id!r}: border/coverage finding presence or "
+        f"offending labels changed -- fresh={fresh!r} pinned={pinned!r}"
     )
 
 

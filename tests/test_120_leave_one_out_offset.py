@@ -64,7 +64,7 @@ from segfacet.heuristics import run_rules
 from segfacet.pipeline import extract_feature_record
 from segfacet.synth.clean_gt import build_clean_spine
 from segfacet.synth.corpus import load_manifest
-from segfacet.synth.golden import GOLDEN_DIR, check_case_golden, load_golden, write_goldens
+from segfacet.synth.golden import build_report_for_case, write_goldens
 from segfacet.synth.regression import (
     loaded_seg_image,
     pipeline_findings,
@@ -578,6 +578,10 @@ def test_ac15_non_finite_direction_component_omits_clause_no_exception():
 
 
 def test_ac17_threshold_margins_hold_on_corpus():
+    """AC17 (item 126 replacement): re-pointed at fresh output -- the live
+    calibration margin, not a committed golden. The committed golden this
+    used to read was retired, see docs/aide/golden-decision-table.md's
+    "## Retirement execution log"."""
     manifest = load_manifest()
     # These two cases are the item's own deliberate new mislabel firings
     # (AC18, AC23); the "must not raise" ceiling excludes them.
@@ -587,14 +591,15 @@ def test_ac17_threshold_margins_hold_on_corpus():
     for case in manifest["cases"]:
         if case["case_id"] in firing_cases:
             continue
-        golden = load_golden(case["case_id"])
-        offsets = golden.get("features", {}).get("stage3", {}).get("per_label_offsets", [])
+        report = build_report_for_case(case)
+        offsets = report.get("features", {}).get("stage3", {}).get("per_label_offsets", [])
         for o in offsets:
             ceiling = max(ceiling, o["offset_mm"])
     assert ceiling < 15.0, f"non-firing ceiling {ceiling} mm reaches the threshold"
 
-    mode1_golden = load_golden("mode1_displace")
-    mode1_offsets = mode1_golden["features"]["stage3"]["per_label_offsets"]
+    mode1_case = next(c for c in manifest["cases"] if c["case_id"] == "mode1_displace")
+    mode1_report = build_report_for_case(mode1_case)
+    mode1_offsets = mode1_report["features"]["stage3"]["per_label_offsets"]
     displaced = next(o for o in mode1_offsets if o["label"] == 22)
     assert displaced["offset_mm"] > 15.0, "displaced label 22 must exceed the threshold"
 
@@ -701,8 +706,10 @@ def test_ac23_border_crop_case_gains_mislabel_finding_border_unchanged():
         border_union |= set(f.labels)
     assert border_union == {22}
 
-    golden = load_golden("mode6_crop_at_border")
-    offsets = golden["features"]["stage3"]["per_label_offsets"]
+    manifest = load_manifest()
+    border_case = next(c for c in manifest["cases"] if c["case_id"] == "mode6_crop_at_border")
+    report = build_report_for_case(border_case)
+    offsets = report["features"]["stage3"]["per_label_offsets"]
     entry = next(o for o in offsets if o["label"] == 22)
     assert entry["offset_mm"] == pytest.approx(17.507, abs=0.05)
 
@@ -745,13 +752,10 @@ def test_ac24_corpus_pipeline_detection_is_six_of_eight():
 
 # =========================================================================== #
 # AC25: The nine corpus goldens are regenerated and reproducible
+# (item 126: test_ac25_every_manifest_case_matches_committed_golden was
+# discharged -- its subject, the committed golden corpus, was retired. See
+# docs/aide/golden-decision-table.md's "## Retirement execution log".)
 # =========================================================================== #
-
-
-def test_ac25_every_manifest_case_matches_committed_golden():
-    manifest = load_manifest()
-    for case in manifest["cases"]:
-        assert check_case_golden(case), f"{case['case_id']} does not match its committed golden"
 
 
 def test_ac25_write_goldens_into_two_dirs_is_byte_identical(tmp_path):
@@ -790,64 +794,26 @@ _PRE_120_VERDICTS_AND_FINDINGS = {
 }
 
 
-def test_ac26_regeneration_moves_no_verdict_outside_mode1s_own_deliverable():
-    manifest = load_manifest()
-    assert set(c["case_id"] for c in manifest["cases"]) == set(_PRE_120_VERDICTS_AND_FINDINGS)
-
-    for case in manifest["cases"]:
-        case_id = case["case_id"]
-        golden = load_golden(case_id)
-        expected_verdict, _ = _PRE_120_VERDICTS_AND_FINDINGS[case_id]
-
-        if case_id == "mode1_displace":
-            # AC18: this item's literal deliverable -- the displaced level
-            # now separates through plain run_qc, so this one case's verdict
-            # moves pass -> flagged-for-review.
-            assert golden["verdict"] == "flagged-for-review"
-        else:
-            assert golden["verdict"] == expected_verdict, f"{case_id}: verdict moved"
-
-
-def test_ac26_changes_confined_to_stage3_and_findings_and_verdict(tmp_path):
-    fresh_dir = tmp_path / "fresh"
-    write_goldens(fresh_dir)
-
-    for case_path in GOLDEN_DIR.glob("*.json"):
-        case_id = case_path.stem
-        committed = json.loads(case_path.read_text(encoding="utf-8"))
-        fresh = json.loads((fresh_dir / case_path.name).read_text(encoding="utf-8"))
-
-        for key in committed:
-            if key in ("features", "findings", "verdict"):
-                continue
-            assert fresh.get(key) == committed.get(key), f"{case_id}: {key} changed"
-
-        committed_features = committed.get("features", {})
-        fresh_features = fresh.get("features", {})
-        assert set(fresh_features) == set(committed_features), f"{case_id}: feature block set changed"
-        for key in committed_features:
-            if key == "stage3":
-                continue
-            assert fresh_features.get(key) == committed_features.get(key), (
-                f"{case_id}: features.{key} changed"
-            )
+# (item 126: test_ac26_regeneration_moves_no_verdict_outside_mode1s_own_deliverable
+# was discharged -- subsumed by test_042's replacement-(iii) verdict+findings
+# check (AC7), which pins the same live shape without a committed file.
+# test_ac26_changes_confined_to_stage3_and_findings_and_verdict was discharged
+# for the same reason as test_119's sibling: it would iterate an empty glob
+# over the retired corpus-golden snapshot directory. See
+# docs/aide/golden-decision-table.md's "## Retirement execution log".)
 
 
 # =========================================================================== #
 # AC27: The Stage-3 report golden is regenerated
+# (item 126: test_ac27_stage3_report_golden_matches_test_022_output was
+# discharged for the same reason as test_119's sibling
+# test_ac19_stage3_report_golden_matches_test_022_output -- it compared its
+# own _straight_spine(5)-derived content against t022.GOLDEN_PATH, which now
+# names the shared, feature-value-free tests/golden/report_format_contract.json
+# (item 126 replacement iv), content unrelated to this test's input. See
+# docs/aide/golden-decision-table.md's "## Retirement execution log" and
+# this item's Decisions & Trade-offs log.)
 # =========================================================================== #
-
-
-def test_ac27_stage3_report_golden_matches_test_022_output():
-    import test_022_stage3_serialisation as t022
-
-    centroids = t022._straight_spine(5)
-    block = t022._full_block_for_spine(centroids)
-    produced = t022.serialize_report_json(
-        t022._empty_verdict(), "golden-case-022", t022._config(), features=block
-    )
-    committed = t022.GOLDEN_PATH.read_text(encoding="utf-8")
-    assert produced == committed
 
 
 # =========================================================================== #

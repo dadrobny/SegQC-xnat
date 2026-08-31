@@ -1,0 +1,183 @@
+{
+  "schema_version": "0.1",
+  "config_version": "0.1",
+  "case_id": "report-format-contract",
+  "verdict": "flagged-for-review",
+  "reasons": [
+    {
+      "message": "format-contract case-level reason",
+      "severity": "pass",
+      "labels": []
+    }
+  ],
+  "per_label": {
+    "7": [
+      {
+        "message": "format-contract per-label reason",
+        "severity": "flagged-for-review",
+        "labels": [
+          7
+        ]
+      }
+    ]
+  },
+  "features": {
+    "features_version": "0.2",
+    "per_label": {
+      "7": {
+        "label": 7,
+        "level_name": "L3",
+        "geometry": {
+          "voxel_count": 42,
+          "physical_volume_mm3": 106.9841827768014,
+          "extent_x_mm": 1.0,
+          "extent_y_mm": -2.5,
+          "extent_z_mm": 1e-12,
+          "bbox_voxel": {
+            "x_min": 0.0,
+            "x_max": 6.0,
+            "y_min": 0.0,
+            "y_max": 6.0,
+            "z_min": 0.0,
+            "z_max": 6.0
+          },
+          "bbox_physical": {
+            "x_min": 0.0,
+            "x_max": 12.0,
+            "y_min": 0.0,
+            "y_max": 12.0,
+            "z_min": 0.0,
+            "z_max": 12.0
+          },
+          "touches_inferior": false,
+          "touches_superior": true,
+          "touches_left": false,
+          "touches_right": false,
+          "touches_anterior": false,
+          "touches_posterior": false
+        },
+        "components": {
+          "component_count": 1,
+          "component_sizes": [
+            42
+          ],
+          "component_volumes_mm3": [
+            106.9841827768014
+          ],
+          "largest_component_fraction": 1.0,
+          "small_fragments": [],
+          "fragmentation_index": 1.0,
+          "stray_component_count": 0,
+          "stray_component_sizes": [],
+          "stray_volume_mm3": 0.0,
+          "stray_volume_fraction": 0.0
+        },
+        "centroid": {
+          "centroid_voxel": [
+            3.0,
+            3.0,
+            3.0
+          ],
+          "centroid_mm": [
+            6.0,
+            6.0,
+            1e-12
+          ]
+        }
+      }
+    },
+    "overlaps": [
+      {
+        "label_a": 6,
+        "label_b": 7,
+        "name_a": "L4",
+        "name_b": "L3",
+        "overlap_voxels": 3
+      }
+    ],
+    "relationships": {
+      "present_levels": [
+        "L4",
+        "L3"
+      ],
+      "missing_levels": [],
+      "neighbour_spacings_mm": [
+        106.9841827768014
+      ],
+      "is_continuous": true,
+      "out_of_order_labels": []
+    },
+    "stage3": {
+      "per_label_offsets": [
+        {
+          "label": 7,
+          "level_name": "L3",
+          "closest_u": 0.5,
+          "offset_mm": 2.5,
+          "offset_voxel": 1.0,
+          "dx_mm": -2.5,
+          "dy_mm": 1e-12,
+          "dz_mm": 106.9841827768014
+        }
+      ],
+      "per_label_orientations": [
+        {
+          "label": 7,
+          "level_name": "L3",
+          "principal_axis": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "eigenvalue_ratio": 106.9841827768014
+        }
+      ],
+      "curvature": {
+        "tangent_angles_deg": [
+          1e-12
+        ],
+        "inter_tangent_angles_deg": [],
+        "total_curvature_deg": 1.0,
+        "coronal_tangent_angles_deg": [
+          -2.5
+        ],
+        "sagittal_tangent_angles_deg": [
+          106.9841827768014
+        ],
+        "coronal_curvature_deg": 1.0,
+        "sagittal_curvature_deg": 0.0,
+        "curvature_plane": "coronal"
+      },
+      "spacing_consistency": {
+        "mean_spacing_mm": 106.9841827768014,
+        "cv_spacing": 0.0,
+        "spacings_mm": [
+          106.9841827768014
+        ],
+        "deviations_mm": [
+          -2.5
+        ],
+        "outlier_pairs": []
+      },
+      "monotonic_consistency": {
+        "is_monotonic": true,
+        "non_monotonic_pairs": [],
+        "u_values": [
+          0.0,
+          0.5,
+          1.0
+        ]
+      }
+    }
+  },
+  "findings": [
+    {
+      "rule_id": "format_contract",
+      "severity": "flagged-for-review",
+      "reason": "format-contract synthetic finding",
+      "labels": [
+        7
+      ]
+    }
+  ]
+}

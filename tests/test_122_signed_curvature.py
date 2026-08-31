@@ -50,8 +50,7 @@ from segfacet.features.orientation import (  # noqa: E402
 from segfacet.report import _SCHEMA, serialize_report  # noqa: E402
 from segfacet.synth.corpus import load_manifest  # noqa: E402
 from segfacet.synth.golden import (  # noqa: E402
-    GOLDEN_DIR,
-    check_case_golden,
+    build_report_for_case,
     write_goldens,
 )
 from segfacet.verdict import Verdict  # noqa: E402
@@ -141,8 +140,8 @@ def _mode4_relabel_swap_shape() -> List[LabelCentroid]:
     spatial (S) order, producing a local backward loop in the cranio-caudal
     direction combined with a coronal (R) excursion; the resulting coronal
     tangent-angle sequence sweeps past the +/-180 degree atan2 wrap boundary
-    (measured 355.2389 deg unwrapped, confirmed by the committed golden
-    ``tests/corpus/golden/mode4_relabel_swap.json``). This fixture reproduces
+    (measured 355.2389 deg unwrapped, confirmed by the ``mode4_relabel_swap``
+    corpus-golden snapshot, retired by item 126). This fixture reproduces
     that shape at unit-test scale: an R excursion (out, past the pole, and
     back) combined with a local S-order swap between two adjacent centroids
     (indices 2 and 3 below), which is enough to push the unwrapped coronal
@@ -604,11 +603,9 @@ def test_ac19_generated_catalogue_md_contains_new_paths():
 # =========================================================================== #
 
 
-def test_ac20_every_corpus_golden_matches_fresh_build():
-    cases = load_manifest()["cases"]
-    assert cases, "corpus manifest has no cases -- cannot verify golden agreement"
-    for case in cases:
-        assert check_case_golden(case), f"golden mismatch for case {case['case_id']!r}"
+# (item 126: test_ac20_every_corpus_golden_matches_fresh_build was
+# discharged -- its subject, the committed golden corpus, was retired. See
+# docs/aide/golden-decision-table.md's "## Retirement execution log".)
 
 
 def test_ac20_regeneration_is_byte_identical_across_two_runs(tmp_path):
@@ -627,11 +624,13 @@ def test_ac20_regeneration_is_byte_identical_across_two_runs(tmp_path):
 
 
 def test_ac20_new_curvature_keys_present_in_every_committed_golden():
+    """AC20 (item 126 replacement): re-pointed at fresh output; the
+    committed golden this used to read was retired, see
+    docs/aide/golden-decision-table.md's "## Retirement execution log"."""
     cases = load_manifest()["cases"]
     assert cases
     for case in cases:
-        golden_file = GOLDEN_DIR / f"{case['case_id']}.json"
-        data = json.loads(golden_file.read_text(encoding="utf-8"))
+        data = build_report_for_case(case)
         curv = data["features"]["stage3"]["curvature"]
         for key in (
             "coronal_tangent_angles_deg",
@@ -640,26 +639,20 @@ def test_ac20_new_curvature_keys_present_in_every_committed_golden():
             "sagittal_curvature_deg",
             "curvature_plane",
         ):
-            assert key in curv, f"{case['case_id']!r} golden missing {key!r}"
+            assert key in curv, f"{case['case_id']!r} fresh report missing {key!r}"
 
 
 # =========================================================================== #
 # AC21: The Stage-3 report golden is regenerated
+# (item 126: test_ac21_stage3_report_golden_is_present_and_carries_new_keys
+# was discharged -- its subject, item 022's committed Stage-3 report
+# snapshot, was retired and replaced with the shared, feature-value-free
+# report_format_contract.json fixture (item 126 replacement iv), which
+# carries the same curvature key set -- already covered by this module's
+# sibling test_ac20_new_curvature_keys_present_in_every_committed_golden
+# above and by test_016/test_022's own key-set assertions (item 126 AC10).
+# See docs/aide/golden-decision-table.md's "## Retirement execution log".)
 # =========================================================================== #
-
-
-def test_ac21_stage3_report_golden_is_present_and_carries_new_keys():
-    golden_path = Path(__file__).resolve().parent / "golden" / "022_stage3_report.json"
-    text = golden_path.read_text(encoding="utf-8")
-    assert text.strip(), "022_stage3_report.json golden is empty"
-    for key in (
-        "coronal_tangent_angles_deg",
-        "sagittal_tangent_angles_deg",
-        "coronal_curvature_deg",
-        "sagittal_curvature_deg",
-        "curvature_plane",
-    ):
-        assert key in text, f"022 golden missing {key!r} -- regenerate per item 122 step 7"
 
 
 # =========================================================================== #

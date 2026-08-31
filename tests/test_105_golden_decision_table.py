@@ -73,7 +73,6 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 _TESTS_DIR = Path(__file__).resolve().parent
 _DOC_PATH = _REPO_ROOT / "docs" / "aide" / "golden-decision-table.md"
 _PROGRESS_PATH = _REPO_ROOT / "docs" / "aide" / "progress.md"
-_CORPUS_GOLDEN_DIR = _TESTS_DIR / "corpus" / "golden"
 
 _EXPECTED_COLUMNS = (
     "fixture",
@@ -258,10 +257,18 @@ def _walk_tests_non_py_files() -> set:
 
 
 def test_ac3_current_tree_has_30_non_py_fixtures():
-    assert len(_walk_tests_non_py_files()) == 30
+    """Item 126 reconciled this count: 30 (surveyed 2026-08-30) minus the
+    eleven retired snapshots plus the one new format-contract fixture = 20."""
+    assert len(_walk_tests_non_py_files()) == 20
 
 
-def test_ac3_section1_fixture_set_equals_filesystem_walk_both_directions(section1_rows):
+def test_ac3_section1_fixture_set_equals_filesystem_walk_both_directions(section1_rows, sections):
+    """Item 126 relaxed this in one direction only: "documented ⊇ on-disk"
+    still holds exactly (nothing on disk may go undocumented); "on-disk
+    ⊇ documented" is relaxed only for a Section-1 row whose fixture is
+    absent from disk *and* named in the "## Retirement execution log"
+    section -- a row naming a nonexistent file with no log line still
+    fails."""
     documented = [row["fixture"] for row in section1_rows]
     documented_set = set(documented)
     duplicates = sorted({p for p in documented_set if documented.count(p) > 1})
@@ -269,10 +276,14 @@ def test_ac3_section1_fixture_set_equals_filesystem_walk_both_directions(section
 
     on_disk = _walk_tests_non_py_files()
     missing = sorted(on_disk - documented_set)
+    assert not missing, f"Section 1 completeness mismatch -- missing from table: {missing}"
+
     extra = sorted(documented_set - on_disk)
-    assert not missing and not extra, (
-        f"Section 1 completeness mismatch -- missing from table: {missing}; "
-        f"extra rows not on disk: {extra}"
+    execution_log_body = sections.get("Retirement execution log", "")
+    unexplained_extra = sorted(p for p in extra if p not in execution_log_body)
+    assert not unexplained_extra, (
+        "Section 1 rows naming absent files with no execution-log line: "
+        f"{unexplained_extra}"
     )
 
 
@@ -360,10 +371,22 @@ _GOLDEN_CASE_IDS = (
 
 @pytest.mark.parametrize("case_id", _GOLDEN_CASE_IDS)
 def test_ac7_golden_row_evidence_is_measured_not_transcribed(section1_rows, case_id):
+    """Item 126 AC22: derives each row's leaf-path fraction from
+    build_report_for_case(case) rather than a committed file -- the
+    committed golden this used to read was retired, see
+    docs/aide/golden-decision-table.md's "## Retirement execution log"."""
     import segfacet.catalogue as catalogue
+    from segfacet.synth.corpus import load_manifest
+    from segfacet.synth.golden import build_report_for_case
 
-    fixture_path = f"tests/corpus/golden/{case_id}.json"
-    row = _row_for_fixture(section1_rows, fixture_path)
+    # Matched by suffix (not a literal retired-directory path) so this
+    # module's own source carries no live reference to the retired
+    # directory -- item 126 AC17.
+    matches = [r for r in section1_rows if r["fixture"].endswith(f"/{case_id}.json")]
+    assert len(matches) == 1, (
+        f"expected exactly one Section-1 row ending '/{case_id}.json', got {len(matches)}"
+    )
+    row = matches[0]
     match = _EVIDENCE_RE.match(row["evidence"].strip())
     assert match, (
         f"evidence cell does not match 'N/M leaf paths unwired': {row['evidence']!r}"
@@ -372,8 +395,10 @@ def test_ac7_golden_row_evidence_is_measured_not_transcribed(section1_rows, case
     assert 0 <= documented_n <= documented_m
     assert documented_m > 0
 
-    golden = json.loads((_CORPUS_GOLDEN_DIR / f"{case_id}.json").read_bytes())
-    leaf_paths = catalogue.iter_leaf_paths(golden["features"])
+    manifest = load_manifest()
+    case = next(c for c in manifest["cases"] if c["case_id"] == case_id)
+    report = build_report_for_case(case)
+    leaf_paths = catalogue.iter_leaf_paths(report["features"])
     cat = catalogue.build_catalogue()
     status_by_path = {entry.path: entry.status for entry in cat.entries}
 
@@ -639,7 +664,7 @@ def test_adv_ac3_empty_header_only_table_fails_with_full_missing_list():
     assert rows == []
     documented_set = {r["fixture"] for r in rows}
     missing = sorted(_walk_tests_non_py_files() - documented_set)
-    assert len(missing) == 30, "an empty table must not trivially pass on two empty sets"
+    assert len(missing) == 20, "an empty table must not trivially pass on two empty sets"
 
 
 def test_adv_ac6_asserted_by_naming_nonexistent_module_is_detectable():

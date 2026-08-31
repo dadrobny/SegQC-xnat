@@ -39,13 +39,12 @@ Strategy; no automated test is fabricated for it):
 - AC6: every ``FacetInputError`` path from ``tests/test_io.py`` re-exercised.
 - AC7: a full case (scan + seg) is run through ``segfacet``'s report
   construction (mirroring ``segfacet run``, via
-  ``segfacet.synth.golden.build_report_for_case``) and compared against the
-  already-committed golden JSON under ``tests/corpus/golden/`` using
-  ``reports_close``'s numeric tolerance. Those golden files were themselves
-  built and committed with the pre-migration loader (item 042), so comparing
-  a post-migration report against them **is** the pre/post-migration
-  end-to-end snapshot comparison AC7 asks for -- no new golden capture was
-  needed.
+  ``segfacet.synth.golden.build_report_for_case``) and compared -- via
+  ``rule_id``/verdict identity -- against the pinned pre-098
+  verdict+findings shape (frozen before this migration and unaffected by
+  it; item 126 retired the committed golden JSON this AC originally
+  compared against with ``reports_close``'s numeric tolerance -- see
+  docs/aide/golden-decision-table.md's "## Retirement execution log").
 
 Adversarial / edge cases (per the item's Testing Strategy):
 - A NIfTI whose affine already resolves to RAS axcodes but via a
@@ -443,21 +442,28 @@ def test_ac6_load_case_tolerant_affine(tmp_path):
 
 def test_ac7_report_matches_committed_golden_within_tolerance():
     """Builds a fresh report (mirroring ``segfacet run``) for every committed
-    Stage-5 corpus case through the post-migration loader, and compares it
-    against the already-committed golden JSON (built + committed under the
-    pre-migration loader, item 042) within ``reports_close``'s numeric
-    tolerance. This *is* the pre/post-migration end-to-end comparison AC7
-    asks for -- the goldens are the pre-migration snapshot, already on disk.
-    """
+    Stage-5 corpus case through the post-migration loader, and compares its
+    verdict/findings against the pinned pre-098 verdict+findings shape
+    (``_PRE_098_GOLDEN_VERDICT_AND_FINDINGS``, itself frozen before this
+    migration and unaffected by it). This is the pre/post-migration
+    identity check AC7 asks for, re-pointed (item 126) at fresh output --
+    the committed golden JSON this used to compare against was retired, see
+    docs/aide/golden-decision-table.md's "## Retirement execution log"."""
     import segfacet.synth  # noqa: F401 -- self-registers synth operators
     from segfacet.synth.corpus import load_manifest
-    from segfacet.synth.golden import check_case_golden
+    from segfacet.synth.golden import build_report_for_case
+    from test_098_stray_components import _PRE_098_GOLDEN_VERDICT_AND_FINDINGS
 
     manifest = load_manifest()
     for case in manifest["cases"]:
-        assert check_case_golden(case), (
-            f"case {case['case_id']!r}: post-migration report diverges from "
-            "the committed pre-migration golden beyond tolerance"
+        case_id = case["case_id"]
+        if case_id not in _PRE_098_GOLDEN_VERDICT_AND_FINDINGS:
+            continue
+        fresh = build_report_for_case(case)
+        expected = _PRE_098_GOLDEN_VERDICT_AND_FINDINGS[case_id]
+        assert fresh["verdict"] == expected["verdict"], (
+            f"case {case_id!r}: post-migration report diverges from the "
+            "pinned pre-098 verdict"
         )
 
 
