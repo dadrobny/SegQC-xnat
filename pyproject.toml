@@ -25,6 +25,9 @@ classifiers = [
 # Core scientific stack. Lower-bound pins are chosen for the Python 3.11 floor
 # (item 095); exact reproducibility pins belong in the deployable container's
 # lockfile/constraints (Stage 9), not in library metadata. See item 001.
+# tptbox exact pin: 0.7.6 is the version whose distribution metadata declares
+# Apache-2.0 in its License field (0.7.5 misdeclared AGPL). Item 133,
+# 2026-08-31.
 dependencies = [
     "numpy>=1.26,<3",
     "scipy>=1.15",
@@ -32,9 +35,6 @@ dependencies = [
     "nibabel>=4.0",
     "PyYAML>=5.4",
     "jsonschema>=3.2",
-    # Exact pin: 0.7.6 is the version whose distribution metadata declares
-    # Apache-2.0 in its License field (0.7.5 misdeclared AGPL). Item 133,
-    # 2026-08-31.
     "tptbox==0.7.6",
 ]
 dynamic = ["version"]

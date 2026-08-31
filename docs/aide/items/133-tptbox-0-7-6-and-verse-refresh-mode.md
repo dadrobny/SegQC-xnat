@@ -483,3 +483,14 @@ no discovery" fence.
   role's hard limit, this was not fixed here (no test-file edits); flagging
   for the validator/test-writer, since the spec's own Authorised-paths list
   does name `tests/test_133_…py` as changeable — just not by this role.
+- **2026-08-31 — validator finding fixed:** the 3-line tptbox pin rationale
+  comment had landed *inside* `[project.dependencies]`'s array (above the
+  `"tptbox==0.7.6",` line), where `test_084`'s and `test_091`'s
+  `test_ac*_no_new_dependency` naive line-by-line array parsers (items
+  084/091, out of this item's scope) choke on any `#`-prefixed line. Moved
+  the same content up into the existing comment block directly above
+  `dependencies = [` instead, leaving the array itself carrying only
+  quoted specifier lines. No dependency added or removed; still exactly one
+  `tptbox==0.7.6` line. Verified with a non-pytest script mirroring both
+  tests' parser: no array line starts with `#`, and the recovered
+  dependency-name set is unchanged.
