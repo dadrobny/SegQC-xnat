@@ -600,3 +600,17 @@ retirement audit).
   is prose-only (re-cites the corpus manifest plus a freshly built report
   instead of the retired corpus-golden snapshots); no threshold, margin
   value, or rule behaviour changed.
+
+- **`aide scope` flags `docs/aide/progress.md` as an out-of-scope change,
+  even though this item's own Description states it "does not touch
+  `docs/aide/progress.md`".** That line describes this item's *content*
+  scope (no hand-edit of the Stage-19 attestation or any other prose); it
+  did not anticipate that the mandatory `python .aide/scripts/aide.py
+  progress set 126 in-progress` step every item runs — status-tracking, not
+  golden-retirement content — necessarily touches the same file, and the
+  spec's own "Asserts against" list pins it as unchanged rather than
+  exempting the routine status flip. No other item spec in the tree pins
+  `progress.md` this way, so this is very likely a one-off drafting
+  oversight rather than a deliberate constraint; captured here rather than
+  edited into the spec's own "Asserts against" list, which is outside this
+  section's edit scope.
