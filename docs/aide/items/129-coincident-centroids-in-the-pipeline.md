@@ -245,7 +245,16 @@ them.
   `build_and_write_default` into `tmp_path` compares equal to the committed
   `src/segfacet/reference/reference_default.json` under
   `segfacet.synth.golden.assert_matches_committed_artifact` (item 127's
-  tolerance helper) — no regeneration was needed.
+  tolerance helper). **Revised 2026-08-31:** the committed artifact *was*
+  regenerated (see the dated Decisions & Trade-offs entry) because
+  `tests/test_063_reference_intensity.py::
+  test_ac13_default_cohort_geometric_stats_identical_on_off_intensity`
+  compares `bundled_default_reference()` (the committed artifact, loaded)
+  against a fresh `build_reference(..., with_intensity=False)` under exact
+  `FeatureStats.__eq__`, not item 127's tolerance helper — a consumer this
+  item's original AC31 text did not survey. Regeneration is the fix; AC31
+  itself still holds, now trivially, since the committed bytes are the
+  fresh-build bytes.
 
 - [ ] **AC32: the calibrated threshold is unchanged.**
   `heuristics.mislabel._DEFAULT_MAX_OFFSET_MM == 13.0`, it still equals
@@ -291,14 +300,17 @@ them.
   item 135 both proceed honestly — and a gate row whose `Blocks` names work that
   can complete would be a false blocker. The question is captured in
   [`insights.md`](../insights.md) for triage at the queue boundary.
-- **`reference_default.json` is not regenerated.** Two of the five subjects in
-  `reference/artifact.py`'s `_DEFAULT_COHORT_RECIPE` (`default-sub-001`,
-  `default-sub-002`) carry exactly four levels, so their `spline_offset_mm`
-  contributions shift by ~1e-13 mm under the code-path change. That is far inside
-  the tolerance item 078/127 established for fresh-vs-committed comparison, so the
-  committed artifact stays as it is and AC31 proves the comparison still holds.
-  Regenerating would add diff noise to a committed artifact for a change no
-  consumer can observe.
+- **`reference_default.json` is not regenerated — superseded 2026-08-31, see
+  Decisions & Trade-offs.** Two of the five subjects in `reference/artifact.py`'s
+  `_DEFAULT_COHORT_RECIPE` (`default-sub-001`, `default-sub-002`) carry exactly
+  four levels, so their `spline_offset_mm` contributions shift by ~1e-13 mm under
+  the code-path change. That is far inside the tolerance item 078/127 established
+  for fresh-vs-committed comparison via `assert_matches_committed_artifact` — but
+  `test_063_reference_intensity.py`'s AC13 consumer compares the committed
+  artifact against a fresh build under *exact* `FeatureStats.__eq__`, not that
+  tolerance helper, and does not survive a ~1e-13 mm shift. The committed artifact
+  was regenerated to keep that exact-equality consumer green; see the dated
+  Decisions & Trade-offs entry for the reconciliation.
 - **`reference_verse_v1.json` is not rebuilt.** It is not regenerable in CI, its
   rebuild needs the machine-local VerSe19 cohort, and by the same measurement its
   four-level subjects' contributions move by ~1e-13 mm. Rebuilding would move a
@@ -410,6 +422,11 @@ them.
 - `src/segfacet/human_report.py` — the `Degraded features:` section (step 5).
 - `src/segfacet/features/spline_offset.py` — the boundary constant and the
   docstring that explains it (step 6).
+- `src/segfacet/reference/reference_default.json` — regenerated 2026-08-31 via
+  `build_and_write_default` so the committed artifact matches a fresh build
+  under exact `FeatureStats.__eq__` (`test_063_reference_intensity.py` AC13);
+  see the dated Decisions & Trade-offs entry. No hand-editing — the generator
+  wrote every byte.
 - `tests/test_129_coincident_centroids_and_held_out_floor.py` — this item's tests.
 - `tests/test_120_leave_one_out_offset.py` — AC24 only: extend the
   fewer-than-the-floor fallback parametrisation from `[2, 3]` to `[2, 3, 4]`.
@@ -423,8 +440,6 @@ them.
 
 - `src/segfacet/reference/reference_verse_v1.json` — AC30 pins its bytes via
   `test_128`'s recorded digest; this item must not change it.
-- `src/segfacet/reference/reference_default.json` — AC31 compares it against a
-  freshly built artifact through item 127's tolerance helper; not changed.
 - `src/segfacet/default_config.yaml` — AC32 pins
   `rules.mislabel.max_offset_mm == 13.0`; not changed.
 - `tests/corpus/manifest.json` — AC28/AC29 drive every corpus case from it;
@@ -598,3 +613,35 @@ unmet with its measurement.
   the coordinate in one line (AC8), so re-deriving a second rendering from the
   structured fields would duplicate that sentence for no benefit and risk the
   two drifting apart.
+- **Revised 2026-08-31: `reference_default.json` *is* regenerated, reversing
+  the Assumptions-section "not regenerated" decision for this one artifact.**
+  The validator's full-suite run found `tests/test_063_reference_intensity.py::
+  test_ac13_default_cohort_geometric_stats_identical_on_off_intensity` failing:
+  it compares `bundled_default_reference()` (the committed artifact, loaded)
+  against a fresh `build_reference(cohort, with_intensity=False)` per level
+  under exact `FeatureStats.__eq__` — not `assert_matches_committed_artifact`,
+  the tolerance helper the original Assumptions bullet and AC31 reasoned about.
+  That test was not in the consumer survey this item's Assumptions section
+  performed before deciding not to regenerate, so the ~1e-13 mm shift on the
+  two four-level subjects (`default-sub-001`, `default-sub-002`, from the
+  `_MIN_LEVELS_FOR_HELD_OUT` boundary move: mean `spline_offset_mm` moves from
+  `0.11599938990000808` to `0.11599938990000813`) broke an exact-equality
+  consumer no amount of numeric tolerance reasoning excuses. Regenerated via
+  `build_and_write_default(Path("src/segfacet/reference/reference_default.json"))`
+  — no hand-edited bytes; a second regeneration to a scratch path is
+  byte-identical to the first (run-to-run determinism), and the diff against
+  the pre-129 committed file is confined to the float leaves of the two
+  affected subjects' offset-derived statistics. `derive_max_offset_mm` and
+  every `default_config.yaml`-derived threshold (AC32) are unchanged by the
+  regeneration — verified by hand, not just by the unchanged `git status` on
+  those paths.
+  `src/segfacet/reference/reference_verse_v1.json` is **not** rebuilt by this
+  revision: no test compares it against a fresh build under exact equality
+  (`test_128` pins its committed sha256 instead, and AC30 asserts that digest
+  unchanged), so the same ~1e-13 mm shift on its own four-level subjects is
+  invisible to every current consumer. It is recorded here as a known
+  1e-13-scale staleness for the next VerSe rebuild (item 135 or later) to
+  absorb rather than a defect this item must fix — rebuilding it now would
+  reopen the `max_offset_mm` threshold derivation (`test_123`'s AC12) for a
+  cohort that needs the machine-local VerSe19 corpus, for a change no current
+  test can observe.
