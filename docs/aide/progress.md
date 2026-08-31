@@ -1312,7 +1312,7 @@ per-deliverable provenance.
   convention. *(Item 131)*
 - ✅ **D8** `consistency.py` monotonicity judged against the smoothed fit so mode 4 fires.
   *(Item 132)*
-- 🚧 **D9 + D10** The `tptbox` ≥ 0.7.6 pin (non-AGPL metadata), and
+- 🔍 **D9 + D10** The `tptbox` ≥ 0.7.6 pin (non-AGPL metadata), and
   `refresh_reference.py --verse-cohort` delegated to `rebuild_verse_reference.py` or
   retired. *(Item 133)*
 - 📋 **D11** The decision table's live `N/M leaf paths unwired` counts split into a
