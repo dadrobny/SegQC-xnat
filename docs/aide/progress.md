@@ -1282,7 +1282,7 @@ corpus alone cannot separate that from a broken feature. Do not widen on that ev
   `tests/golden/022_stage3_report.json` are byte-identical to each other and to the
   committed files.)*
 
-## Stage 29 — Golden Retirement & Test-Artifact Hygiene (G2, G7) — 📋
+## Stage 29 — Golden Retirement & Test-Artifact Hygiene (G2, G7) — 🚧
 
 **Goal.** Execute the maintainer-signed retirement of the 11 whole-record snapshot goldens
 (`golden-decision-table.md`, dispositioned *retire* 2026-07-28, execution pulled forward
@@ -1293,7 +1293,7 @@ per-deliverable provenance.
 
 **Deliverables.**
 
-- 📋 **D1** The golden retirement executed: nine `tests/corpus/golden/*.json` and two
+- 🚧 **D1** The golden retirement executed: nine `tests/corpus/golden/*.json` and two
   `tests/golden/` snapshots gone, the four per-row replacements in place, nothing
   regenerated on the way out. *(Item 126)*
 - 📋 **D2** Tolerance by construction: shared committed-artifact comparison helper plus an
