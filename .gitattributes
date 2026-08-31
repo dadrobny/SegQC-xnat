@@ -40,6 +40,10 @@ src/segfacet/**/*.yaml text eol=lf
 docs/aide/feature_catalogue.generated.json text eol=lf
 docs/aide/feature_catalogue.generated.md text eol=lf
 
+# Item 134's golden decision table evidence companion -- byte-reproducible,
+# same Windows core.autocrlf gotcha as the pins above.
+docs/aide/golden_evidence.generated.json text eol=lf
+
 # Item 105's golden-file decision table (AC1: must be write_bytes with \n
 # newlines) -- same Windows core.autocrlf gotcha as everything else here.
 docs/aide/golden-decision-table.md text eol=lf

@@ -517,3 +517,25 @@ Recorded at spec time; the builder appends to this section as it goes.
   against itself and pass on any self-consistent bug. It re-derives the
   measurement from `build_catalogue()` in its own body — which also satisfies
   item 126's AC22 source assertion for free.
+
+- **Builder execution (2026-08-31).** `src/segfacet/golden_evidence.py`
+  implemented per the Implementation Steps: `EVIDENCE_PATH` /
+  `SCHEMA_VERSION` / `_NOTE` module constants, heavy imports deferred into
+  `build_evidence()`'s body, `render_json()` and `main(argv=None)` mirroring
+  `catalogue.py`'s `write_bytes` shape. `python -m segfacet.golden_evidence`
+  regenerated `docs/aide/golden_evidence.generated.json`; measured `26/94`
+  for all nine corpus cases, unchanged from the pre-item value the spec
+  pinned — no upstream drift to hand back for. `.gitattributes` gained the
+  `text eol=lf` pin beside the item-103 catalogue pins. The nine signed
+  `evidence` cells in `docs/aide/golden-decision-table.md` were replaced with
+  the identical pointer `` measured in `docs/aide/golden_evidence.generated.json` ``
+  (digit-free) via a whole-file substitution — safe because the string
+  `26/94 leaf paths unwired` occurred exactly nine times, one per golden row,
+  verified by count before the edit — and the dated preamble paragraph was
+  added directly above `## Section 1`. `tests/test_105_golden_decision_table.py`
+  and `tests/test_126_golden_retirement.py` arrived pre-reconciled (per this
+  item's committed test set) and needed no further edits. `aide check` and
+  `aide scope 134` both ran clean; `git diff --exit-code` on the companion
+  after a second `python -m segfacet.golden_evidence` run confirmed
+  committed-vs-fresh byte identity per Validation step 1, and a hand
+  recomputation for `clean_control` independently confirmed `26/94`.
