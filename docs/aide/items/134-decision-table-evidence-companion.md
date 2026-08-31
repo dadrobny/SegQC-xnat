@@ -293,6 +293,9 @@ default, recorded here for audit rather than blocking on a question.
 - `tests/test_126_golden_retirement.py` — AC18 digest narrowed and AC22
   re-pointed (step 7).
 - `tests/test_134_decision_table_evidence_companion.py` — new test module.
+- `tests/test_132_monotonicity_against_traversal_order.py` — AC30's
+  whole-branch `git diff <base>...HEAD` fence narrowed to item 132's own
+  commit range (2026-08-31, see Decisions log).
 
 **Asserts against:**
 
@@ -539,3 +542,19 @@ Recorded at spec time; the builder appends to this section as it goes.
   after a second `python -m segfacet.golden_evidence` run confirmed
   committed-vs-fresh byte identity per Validation step 1, and a hand
   recomputation for `clean_control` independently confirmed `26/94`.
+
+- **`test_132`'s AC30 whole-branch fence narrowed to item 132's own commit
+  range (2026-08-31).** `test_132_monotonicity_against_traversal_order.py`'s
+  `test_ac30_golden_decision_table_untouched_vs_base` asserted
+  `docs/aide/golden-decision-table.md` absent from `git diff --name-only
+  <recorded base>...HEAD` — a fence written for AC30's narrower claim ("item
+  132's own change leaves the table untouched"), but implemented against the
+  whole branch. This item is separately authorised to edit that same file
+  (nine Group-A `evidence` cells re-pointed, one dated preamble paragraph
+  added), so the fence started failing on this branch — a missed-consumer
+  conflict of the same shape as `test_126`'s AC18 digest above: a scope fence
+  written before a later, authorised item legitimately touches the file it
+  guards. Fixed by pinning the fence to item 132's own commit range
+  (`dd0af13~1..57b8bf1`, skip-guarded like `test_116`'s pinned-SHA reference)
+  rather than the recorded base — narrowed, not re-baselined, per the same
+  precedent.

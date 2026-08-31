@@ -654,38 +654,90 @@ def test_ac30_status_overrides_byte_identical():
         )
 
 
+#: item 132's own commits on the queue-018 branch (not the whole branch,
+#: which item 134 legitimately continues past). Pinned rather than resolved
+#: via the recorded base because item 134 is explicitly authorised to edit
+#: ``docs/aide/golden-decision-table.md`` (nine Group-A ``evidence`` cells,
+#: transcribed N/M fraction -> a digit-free pointer at
+#: docs/aide/golden_evidence.generated.json, plus one dated preamble
+#: paragraph) -- a whole-branch ``base...HEAD`` fence written for AC30's
+#: narrower claim ("item 132's own change leaves the table untouched") fails
+#: once a later, authorised item on the same branch touches that file. See
+#: ``test_126``'s narrowed ``test_ac18_retired_row_cells_are_byte_unchanged``
+#: for the same "narrow the fence to the authoring item's own range, don't
+#: re-baseline it away" idiom, applied there to a digest set rather than a
+#: commit range.
+_AC30_ITEM_132_RANGE_START = "dd0af13"
+_AC30_ITEM_132_RANGE_END = "57b8bf1"
+
+
+def _ac30_item_132_range_reachable() -> bool:
+    for sha in (_AC30_ITEM_132_RANGE_START, _AC30_ITEM_132_RANGE_END):
+        try:
+            probe = subprocess.run(
+                ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
+                cwd=_REPO_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return False
+        if probe.returncode != 0:
+            return False
+    return True
+
+
+@pytest.mark.skipif(
+    not _ac30_item_132_range_reachable(),
+    reason=(
+        "item 132's own commits "
+        f"({_AC30_ITEM_132_RANGE_START}, {_AC30_ITEM_132_RANGE_END}) are not "
+        "reachable in this clone"
+    ),
+)
 def test_ac30_golden_decision_table_untouched_vs_base():
-    """AC30: item 132's diff against its recorded base carries no change to
+    """AC30: item 132's *own* commits carry no change to
     ``docs/aide/golden-decision-table.md`` -- the item's Description
-    explicitly leaves this document untouched. Uses ``git diff`` against the
-    recorded base rather than a hardcoded sha256 fence: the committed-artifact
-    guard (item 127) flags a raw fresh-vs-committed byte/hash comparison, and
-    this document is deliberately excluded from its allowlist (it is
-    read-only prose, never regenerated) -- see
-    ``tests/committed_artifact_guard.py``'s module docstring and
-    ``test_126``'s ``test_ac22_guard_module_absent_from_this_items_diff`` for
-    the same idiom.
+    explicitly leaves this document untouched. Scoped to item 132's own
+    commit range (``dd0af13~1..57b8bf1``) rather than the whole branch since
+    2026-08-31: item 134 is separately authorised to edit that file (nine
+    Group-A ``evidence`` cells re-pointed, plus one dated preamble
+    paragraph), and a fence against ``<recorded base>...HEAD`` cannot tell
+    132's own change apart from 134's later, authorised one. The
+    signed-judgement-column protection this file also cares about
+    (STATUS_OVERRIDES, and the three judgement cells of the decision table
+    itself) now lives in ``test_134_decision_table_evidence_companion.py``'s
+    AC10 and in ``test_126``'s narrowed
+    ``test_ac18_retired_row_cells_are_byte_unchanged``. Uses ``git diff``
+    rather than a hardcoded sha256 fence: the committed-artifact guard (item
+    127) flags a raw fresh-vs-committed byte/hash comparison, and this
+    document is deliberately excluded from its allowlist (it is read-only
+    prose, never regenerated) -- see ``tests/committed_artifact_guard.py``'s
+    module docstring and ``test_126``'s
+    ``test_ac22_guard_module_absent_from_this_items_diff`` for the same
+    idiom.
     """
-    result = None
-    for base_ref in ("origin/aide/queue-018", "aide/queue-018"):
-        result = subprocess.run(
-            ["git", "diff", "--name-only", f"{base_ref}...HEAD", "--"],
-            cwd=_REPO_ROOT,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if result.returncode == 0:
-            break
-    if result is None or result.returncode != 0:
-        pytest.skip(
-            f"git diff against the recorded base is unavailable: "
-            f"{result.stderr if result else 'no ref resolved'}"
-        )
+    result = subprocess.run(
+        [
+            "git",
+            "diff",
+            "--name-only",
+            f"{_AC30_ITEM_132_RANGE_START}~1..{_AC30_ITEM_132_RANGE_END}",
+            "--",
+        ],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, (
+        f"git diff over item 132's own commit range failed: {result.stderr}"
+    )
     changed = {line.strip() for line in result.stdout.splitlines() if line.strip()}
     assert "docs/aide/golden-decision-table.md" not in changed, (
-        "docs/aide/golden-decision-table.md appears in this item's diff, but "
-        "AC30 requires it stay untouched"
+        "docs/aide/golden-decision-table.md appears in item 132's own commit "
+        "range, but AC30 requires it stay untouched by item 132's change"
     )
 
 
