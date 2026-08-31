@@ -28,10 +28,9 @@ from dataclasses import dataclass
 from typing import List, Sequence, Tuple
 
 import numpy as np
-from scipy.optimize import minimize_scalar
 
 from segfacet.features.centroids import LabelCentroid
-from segfacet.features.spline import SplineFit, evaluate_spline
+from segfacet.features.spline import SplineFit, find_closest_point
 
 __all__ = [
     "SpacingConsistency",
@@ -39,10 +38,6 @@ __all__ = [
     "compute_spacing_consistency",
     "compute_monotonic_consistency",
 ]
-
-# Number of u samples in the coarse scan.  500 gives sub-mm resolution for
-# typical whole-spine extents (~400 mm total arc length).
-_N_SCAN: int = 500
 
 
 # --------------------------------------------------------------------------- #
@@ -116,47 +111,6 @@ def _euclidean_mm(a: LabelCentroid, b: LabelCentroid) -> float:
     ax, ay, az = float(a.centroid_mm[0]), float(a.centroid_mm[1]), float(a.centroid_mm[2])
     bx, by, bz = float(b.centroid_mm[0]), float(b.centroid_mm[1]), float(b.centroid_mm[2])
     return math.sqrt((bx - ax) ** 2 + (by - ay) ** 2 + (bz - az) ** 2)
-
-
-def _sq_distance_u(u_scalar: float, pt: np.ndarray, fit: SplineFit) -> float:
-    """Squared Euclidean distance from pt to the spline point at parameter u."""
-    spline_pt = evaluate_spline(fit, [float(u_scalar)])  # shape (1, 3)
-    diff = pt - spline_pt[0]
-    return float(np.dot(diff, diff))
-
-
-def _find_closest_u(pt: np.ndarray, fit: SplineFit) -> float:
-    """Return the spline parameter u* in [0, 1] closest to point pt (mm coords).
-
-    Strategy:
-    1. Coarse scan over _N_SCAN equally-spaced u values.
-    2. Refine with ``minimize_scalar`` in a bracket centred on the coarse best.
-    """
-    u_scan = np.linspace(0.0, 1.0, _N_SCAN)
-    spline_pts = evaluate_spline(fit, u_scan)  # (_N_SCAN, 3)
-    diffs = spline_pts - pt  # (_N_SCAN, 3)
-    sq_dists = np.einsum("ij,ij->i", diffs, diffs)  # (_N_SCAN,)
-    best_idx = int(np.argmin(sq_dists))
-    u_coarse = float(u_scan[best_idx])
-
-    # Bracket for refinement: one step each side (clamped to [0, 1]).
-    step = 1.0 / (_N_SCAN - 1)
-    lo = max(0.0, u_coarse - step)
-    hi = min(1.0, u_coarse + step)
-
-    if lo >= hi:
-        # Degenerate bracket (e.g. only 2-point spline at boundary) — skip refinement.
-        return u_coarse
-
-    result = minimize_scalar(
-        _sq_distance_u,
-        bounds=(lo, hi),
-        args=(pt, fit),
-        method="bounded",
-        options={"xatol": 1e-6},
-    )
-    u_refined = float(np.clip(result.x, 0.0, 1.0))
-    return u_refined
 
 
 # --------------------------------------------------------------------------- #
@@ -240,9 +194,10 @@ def compute_monotonic_consistency(
     """Assess whether the anatomical order is consistent with monotonically
     increasing spline parameter values.
 
-    For each centroid, finds its closest point on the spline (coarse scan +
-    scalar refinement, same approach as item 018) and records the spline
-    parameter *u*.  The anatomical order is consistent with the spline when
+    For each centroid, finds its closest point on the spline via
+    :func:`segfacet.features.spline.find_closest_point` (item 130's shared
+    coarse-scan-then-refine search) and records the spline parameter *u*.
+    The anatomical order is consistent with the spline when
     ``u[i] < u[i+1]`` for every consecutive pair.
 
     Parameters
@@ -277,7 +232,7 @@ def compute_monotonic_consistency(
             [float(c.centroid_mm[0]), float(c.centroid_mm[1]), float(c.centroid_mm[2])],
             dtype=np.float64,
         )
-        u_star = _find_closest_u(pt, fit)
+        u_star = find_closest_point(pt, fit).closest_u
         u_values.append(u_star)
 
     # Identify non-monotonic consecutive pairs: u[i] >= u[i+1].

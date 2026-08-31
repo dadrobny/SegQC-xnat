@@ -562,9 +562,39 @@ rather than adding a fourth copy. Item 135 replays Stage 29's acceptance.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+**Confirmed at implementation time (2026-08-31):**
 
-Recorded at spec time, for the builder to confirm or correct:
+- **`find_closest_point` normalises `curve` internally, no new public
+  entry point.** A `SplineFit` is wrapped in a closure over `evaluate_spline`
+  the moment it is recognised (`isinstance(curve, SplineFit)`); a bare
+  callable is used as-is. Matches the Assumptions section exactly.
+- **`compute_spline_offsets` takes `closest_u` and `point_mm` straight off
+  the `ClosestPointOnCurve` record and derives `dx_mm`/`dy_mm`/`dz_mm` from
+  `pt - point_mm`, keeping its own `offset_mm = sqrt(dx**2+dy**2+dz**2)`
+  computation rather than reusing `distance_mm`** — the same arithmetic the
+  prior `_find_closest_u` + separate `evaluate_spline` call performed, so no
+  rounding path changes. Verified: `docs/aide/feature_catalogue.generated.json`
+  and `.md` regenerate byte-identical to the committed pair (AC22), and
+  `test_017`-`test_023`, `test_119`-`test_122`, `test_125`, `test_129` were
+  read in full and require no edits under this diff.
+- **The CLI validation command in this spec's "Validation" section is
+  slightly stale against the shipped CLI**: `segfacet run` now requires both
+  `--scan` and `--seg` (a prior stage added that constraint after this spec
+  was written); `--seg` alone errors with "provide --scan and --seg". Ran the
+  check with `--scan` pointed at the same fixture as `--seg` instead — the
+  scan's pixel content is irrelevant to confirming the `stage3` block shape
+  the Validation step asks for. Not a defect in this item's scope; logged to
+  `docs/aide/insights.md` for the spec/CLI drift.
+- **VerSe-sourced rows in `docs/spinal-curve-model.md`'s measurements table
+  are ❓ Unverified**, exactly per the Validation section's documented
+  fallback: `SEGFACET_VERSE_COHORT` is unset in this environment and no
+  `--verse-cohort` root is available. All 11 non-VerSe rows were confirmed to
+  reproduce within the stated 0.001 mm tolerance by running
+  `tests/test_118_curve_formulation_decision.py`'s reproduction helpers
+  directly against a fresh `scripts/compare_curve_candidates.py` run (the
+  same check `test_130`'s AC25 test performs).
+
+Recorded at spec time, confirmed unchanged during implementation:
 
 - **The degenerate-bracket branch is dead code and is kept anyway.** With
   `step = 1/(n_scan - 1) > 0` and `u_coarse ∈ [0, 1]`, `lo = max(0, u_c -

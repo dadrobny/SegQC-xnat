@@ -186,15 +186,19 @@ def extract_feature_record(seg_img: "nib.Nifti1Image", config: "HeuristicConfig"
         )
 
         spacing_mm = tuple(float(z) for z in seg_img.header.get_zooms()[:3])
-        # fit is still needed below for curvature/monotonic_consistency; the
-        # per-label offsets themselves are evaluated held-out (item 120) --
-        # a level's offset_mm is its closest-approach distance to a curve
-        # that level did not shape, so a displacement separates at roughly
-        # its true magnitude instead of being absorbed by the in-sample fit.
+        # This one in-sample fit (item 130) now serves every Stage 3
+        # consumer: curvature, tangent orientations and monotonic
+        # consistency read it directly, and it is handed to the held-out
+        # offset layer as its reference fit (fit=fit below) so that layer
+        # makes no second, redundant fit of its own. The per-label offsets
+        # themselves are still evaluated held-out (item 120) -- a level's
+        # offset_mm is its closest-approach distance to a curve that level
+        # did not shape, so a displacement separates at roughly its true
+        # magnitude instead of being absorbed by the in-sample fit.
         fit = fit_centroid_spline(ordered_centroids)
 
         spline_offsets = compute_leave_one_out_spline_offsets(
-            ordered_centroids, spacing_mm=spacing_mm
+            ordered_centroids, spacing_mm=spacing_mm, fit=fit
         )
 
         stage3_kwargs = {

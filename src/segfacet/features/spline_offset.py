@@ -3,11 +3,12 @@
 For each vertebra centroid in the ordered sequence, compute its closest-approach
 distance to the parametric spline produced by :func:`segfacet.features.spline.fit_centroid_spline`.
 
-The closest point on the spline is found by:
-1. Coarse scan over N_SCAN=500 uniformly-spaced u values to locate the
-   approximate minimum.
-2. Refinement with ``scipy.optimize.minimize_scalar`` bracketed around the
-   coarse minimum for sub-mm accuracy.
+The closest point on the spline is found by
+:func:`segfacet.features.spline.find_closest_point` (item 130) -- the one
+shared coarse-scan-then-refine search this module used to write out for
+itself: a coarse scan over uniformly-spaced ``u`` values locates the
+approximate minimum, then ``scipy.optimize.minimize_scalar`` refines it,
+bracketed around the coarse minimum, for sub-mm accuracy.
 
 The result is a :class:`VertebralSplineOffset` per centroid capturing the
 Euclidean distance in mm and in voxel units (anisotropic-aware), the raw
@@ -152,22 +153,17 @@ from dataclasses import dataclass, replace
 from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
-from scipy.optimize import minimize_scalar
 
 import segfacet.backend as _backend_mod
 from segfacet.backend import Backend
 from segfacet.features.centroids import LabelCentroid
-from segfacet.features.spline import SplineFit, evaluate_spline, fit_centroid_spline
+from segfacet.features.spline import SplineFit, find_closest_point, fit_centroid_spline
 
 __all__ = [
     "VertebralSplineOffset",
     "compute_spline_offsets",
     "compute_leave_one_out_spline_offsets",
 ]
-
-# Number of u samples in the coarse scan.  500 gives sub-mm resolution for
-# typical whole-spine extents (~400 mm total arc length).
-_N_SCAN: int = 500
 
 # Weight assigned to a withheld level's own point (and the case's dominant
 # outlier) in a leave-one-out refit (item 120). Small enough to be
@@ -243,49 +239,6 @@ class VertebralSplineOffset:
 # --------------------------------------------------------------------------- #
 
 
-def _sq_distance(
-    u_scalar: float, pt: np.ndarray, fit: SplineFit, backend: Optional[Backend]
-) -> float:
-    """Squared Euclidean distance from pt to the spline point at parameter u."""
-    spline_pt = evaluate_spline(fit, [float(u_scalar)], backend=backend)  # shape (1, 3)
-    diff = pt - spline_pt[0]
-    return float(np.dot(diff, diff))
-
-
-def _find_closest_u(pt: np.ndarray, fit: SplineFit, backend: Optional[Backend]) -> float:
-    """Return the spline parameter u* in [0, 1] closest to point pt (mm coords).
-
-    Strategy:
-    1. Coarse scan over _N_SCAN equally-spaced u values.
-    2. Refine with ``minimize_scalar`` in a bracket centred on the coarse best.
-    """
-    u_scan = np.linspace(0.0, 1.0, _N_SCAN)
-    spline_pts = evaluate_spline(fit, u_scan, backend=backend)  # (N_SCAN, 3)
-    diffs = spline_pts - pt  # (N_SCAN, 3)
-    sq_dists = np.einsum("ij,ij->i", diffs, diffs)  # (N_SCAN,)
-    best_idx = int(np.argmin(sq_dists))
-    u_coarse = float(u_scan[best_idx])
-
-    # Bracket for refinement: one step each side (clamped to [0, 1]).
-    step = 1.0 / (_N_SCAN - 1)
-    lo = max(0.0, u_coarse - step)
-    hi = min(1.0, u_coarse + step)
-
-    if lo >= hi:
-        # Degenerate bracket (e.g. only 2-point spline at boundary) — skip refinement.
-        return u_coarse
-
-    result = minimize_scalar(
-        _sq_distance,
-        bounds=(lo, hi),
-        args=(pt, fit, backend),
-        method="bounded",
-        options={"xatol": 1e-6},
-    )
-    u_refined = float(np.clip(result.x, 0.0, 1.0))
-    return u_refined
-
-
 # --------------------------------------------------------------------------- #
 # Public compute function
 # --------------------------------------------------------------------------- #
@@ -313,8 +266,8 @@ def compute_spline_offsets(
         offset_voxel == offset_mm).
     backend:
         Optional :class:`~segfacet.backend.Backend` handle, forwarded to
-        :func:`~segfacet.features.spline.evaluate_spline`. When ``None`` (the
-        default), resolved via :func:`segfacet.backend.get_backend`; the
+        :func:`~segfacet.features.spline.find_closest_point`. When ``None``
+        (the default), resolved via :func:`segfacet.backend.get_backend`; the
         optimisation itself always runs on host NumPy/SciPy regardless (see
         the module docstring's "Deliberate CPU fallback" section).
 
@@ -354,10 +307,11 @@ def compute_spline_offsets(
             dtype=np.float64,
         )
 
-        u_star = _find_closest_u(pt, fit, backend)
+        closest = find_closest_point(pt, fit, backend=backend)
+        u_star = closest.closest_u
 
         # Displacement vector: centroid - closest spline point.
-        spline_pt = evaluate_spline(fit, [u_star], backend=backend)[0]  # shape (3,)
+        spline_pt = np.asarray(closest.point_mm, dtype=np.float64)  # shape (3,)
         diff = pt - spline_pt  # (dx_mm, dy_mm, dz_mm)
 
         dx_mm = float(diff[0])
@@ -398,6 +352,7 @@ def compute_leave_one_out_spline_offsets(
     centroids: Sequence[LabelCentroid],
     spacing_mm: Optional[Tuple[float, float, float]] = None,
     *,
+    fit: Optional[SplineFit] = None,
     backend: Optional[Backend] = None,
 ) -> List[VertebralSplineOffset]:
     """Compute each centroid's offset from a spline it did not shape.
@@ -419,6 +374,21 @@ def compute_leave_one_out_spline_offsets(
     spacing_mm:
         Voxel spacings (sx, sy, sz) in mm, forwarded to
         :func:`compute_spline_offsets` for the ``offset_voxel`` conversion.
+    fit:
+        Optional externally-supplied in-sample :class:`SplineFit` to use as
+        the reference fit (item 130), sparing a caller that already fit the
+        same curve (``pipeline.extract_feature_record``, for curvature /
+        tangent orientations / monotonic consistency) a second, redundant
+        fit. When supplied, this function makes **no** ``fit_centroid_spline``
+        call of its own for the reference fit -- the per-level held-out
+        refits are unaffected and still happen here. The caller is
+        responsible for supplying the in-sample fit through *these exact*
+        centroids, fit at this module's own defaults (chord-length ``u``,
+        uniform weights, default degree/smoothing) -- ``fit`` is validated
+        only on centroid count (below), not on geometry: re-deriving it to
+        verify would reinstate the second fit this parameter exists to
+        remove. ``None`` (the default) reproduces today's behaviour: fit
+        internally.
     backend:
         Optional :class:`~segfacet.backend.Backend` handle, forwarded to the
         fit/evaluate calls this function makes. The refits themselves always
@@ -436,11 +406,22 @@ def compute_leave_one_out_spline_offsets(
     ValueError
         Propagated from :func:`~segfacet.features.spline.fit_centroid_spline`
         or :func:`compute_spline_offsets` (e.g. fewer than 2 centroids, or
-        two centroids sharing an exactly-coincident mm-coordinate).
+        two centroids sharing an exactly-coincident mm-coordinate). Also
+        raised when *fit* is supplied and its ``n_points`` does not equal
+        ``len(centroids)``, naming both counts -- checked before any other
+        validation, including the single-centroid early return below.
     """
     backend = backend or _backend_mod.get_backend()
 
     n_points = len(centroids)
+
+    if fit is not None and fit.n_points != n_points:
+        raise ValueError(
+            f"compute_leave_one_out_spline_offsets received a fit with "
+            f"n_points={fit.n_points}, but centroids has length {n_points}. "
+            f"The supplied fit must be the in-sample fit through exactly "
+            f"these centroids."
+        )
 
     if n_points == 1:
         # No curve can be fit through a single point (fit_centroid_spline
@@ -465,7 +446,7 @@ def compute_leave_one_out_spline_offsets(
             )
         ]
 
-    reference_fit = fit_centroid_spline(centroids, backend=backend)
+    reference_fit = fit if fit is not None else fit_centroid_spline(centroids, backend=backend)
 
     if n_points < _MIN_LEVELS_FOR_HELD_OUT:
         return compute_spline_offsets(
