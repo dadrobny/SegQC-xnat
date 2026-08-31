@@ -18,18 +18,20 @@ Two public surfaces:
   (:func:`main`), regenerating the committed corpus under
   ``tests/corpus/`` by default.
 
-Two of the nine cases (modes 4, 8 -- ``relabel_swap``, ``force_overlap``) are
-documented by items 038/039 as **structurally invisible** to the plain
-``run_qc`` pipeline (a single-integer label map cannot encode an overlap; the
-pipeline reorders by ascending label before refitting, so a swapped-identity
-pair's monotonic-progression signal is always empty). This module faithfully
-represents that fact: each such case's manifest entry carries
+One of the nine cases (mode 8 -- ``force_overlap``) is documented by item 038
+as **structurally invisible** to the plain ``run_qc`` pipeline (a
+single-integer label map cannot encode an overlap). This module faithfully
+represents that fact: its manifest entry carries
 ``detection == "reconstructed_record"`` and a ``reconstruction`` technique
 key, rather than pretending ``run_qc`` would catch it. Mode 1 (``displace``)
 was reconstructed_record before item 120 promoted a held-out per-label
-spline offset into the pipeline itself; it is now ``detection == "pipeline"``
-like the remaining five modes. See the item 040 spec's Assumptions for the
-full rationale.
+spline offset into the pipeline itself; it is now ``detection == "pipeline"``.
+Mode 4 (``relabel_swap``) was reconstructed_record before item 132 (2026-08-31)
+made ``compute_monotonic_consistency`` judge against a curve fitted in
+geometric traversal order rather than the ordering under test, so the swap
+now reads out of order through plain ``run_qc``; it is now
+``detection == "pipeline"`` like the other seven modes. See the item 040
+spec's Assumptions for the full rationale.
 """
 
 from __future__ import annotations
@@ -144,8 +146,7 @@ CASE_RECIPE: List[_RecipeEntry] = [
         case_id="mode4_relabel_swap",
         perturbation="relabel_swap",
         perturbation_params={"target_label": 21, "neighbour_label": 22},
-        detection="reconstructed_record",
-        reconstruction="monotonic_true_spatial_order",
+        detection="pipeline",
     ),
     _RecipeEntry(
         case_id="mode5_remove_level",

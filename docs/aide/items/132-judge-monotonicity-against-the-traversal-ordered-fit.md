@@ -751,6 +751,45 @@ box; neither tick happens here.
   `aide scope`/the validator check structurally; a unit test cannot usefully
   restate "my own diff touches nothing here" without reading the git diff,
   which is out of scope for a deterministic, environment-independent test.
+- **Implementation landed as specced, unmodified.** `_traversal_order` and
+  the reference-curve selection in `compute_monotonic_consistency` are
+  exactly the construction in Implementation Steps 1-3; no deviation was
+  needed. Measured post-implementation (2026-08-31, same fixtures/config as
+  the Description): `mode4_relabel_swap` reads `is_monotonic False`,
+  `non_monotonic_pairs [["L2", "L3"]]`, `run_qc` fires one `mislabel`
+  finding on `{21, 22}` with verdict `flagged-for-review`; `clean_control`
+  and the seven other corpus fixtures are untouched (`is_monotonic True`,
+  `u_values` bit-identical); a spot check of the first eight
+  `dataset-verse19training` subjects (2-16 levels each) through
+  `segfacet.io.load_volume` shows zero reference refits and
+  `is_monotonic True` on every one, net S advance `-26.36` to `-364.35` mm
+  (caudal-first), confirming the direction rule and the Description's
+  cohort-wide claim.
+- **Manifest and catalogue regeneration diffs are confined exactly to the
+  authorised cells.** `write_corpus(CORPUS_DIR)` changed only
+  `tests/corpus/manifest.json`'s `mode4_relabel_swap` `detail`,
+  `detection` and `reconstruction` fields (no `.nii.gz` fixture moved);
+  `segfacet.catalogue.main` regenerating
+  `docs/aide/feature_catalogue.generated.{json,md}` changed only the three
+  `stage3.monotonic_consistency.*` `computation` strings named in AC28.
+- **The six reconciliation edits (test_125/039/129/098/123/040/057) were
+  already present on the branch** when this item's production-code work
+  began, made per the item's own authorised-paths list; no additional test
+  edits were made here.
+- **`aide scope` flags `docs/aide/progress.md` as an out-of-scope change,
+  because this item's own "Asserts against" list pins it as unchanged.**
+  AC32 and the "What this item is NOT" section both describe this item's
+  *content* scope — no Stage 28/29 acceptance box ticked or hand-edited —
+  and that claim holds: `git diff` of `docs/aide/progress.md` on this
+  item's own commit is empty. The `FAIL` `aide scope` reports comes from the
+  separate, mandatory `python .aide/scripts/aide.py progress set 132
+  in-progress` step every item runs (status-tracking, committed on its own),
+  which the spec's "Asserts against" entry did not anticipate and does not
+  exempt. Item 126 hit and recorded the identical drafting artifact
+  (`docs/aide/items/126-execute-the-golden-retirement.md`'s Decisions log,
+  2026-08-30) — no other item spec in the tree pins `progress.md` this way.
+  Captured here rather than edited into the spec's own "Asserts against"
+  list, which is outside this section's edit scope.
 - **`tests/test_125_stage28_validation.py`'s AC15 count tests
   (`test_ac15_manifest_pipeline_detected_mode_count_is_six` and its `== 6`
   / `== {1, 2, 3, 5, 6, 7}` pins) are collateral casualties of this item

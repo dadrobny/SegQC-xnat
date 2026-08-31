@@ -328,11 +328,11 @@ class RelabelSwapPerturbation(Perturbation):
             expected_verdict="flagged-for-review",
             detail=(
                 f"relabel_swap: exchanged the voxel identities of adjacent "
-                f"labels {target} and {neighbour}. Not surfaced by plain "
-                "run_qc (the ascending-label refit yields a monotonic "
-                "spline parameter) -- asserted via a reconstructed "
-                "monotonic-consistency record fed to MislabelRule directly "
-                "(see item 039 Assumptions)."
+                f"labels {target} and {neighbour}. Caught by plain run_qc: "
+                "the monotonicity check judges against a curve fitted in "
+                "geometric traversal order rather than the ordering under "
+                "test, so the swap reads out of order and MislabelRule's "
+                "ordering detector fires directly (item 132)."
             ),
         )
         return PerturbationResult(labelmap=out_img, expectation=expectation)

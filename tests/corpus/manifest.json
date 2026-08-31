@@ -159,8 +159,8 @@
         ]
       },
       "case_id": "mode4_relabel_swap",
-      "detail": "relabel_swap: exchanged the voxel identities of adjacent labels 21 and 22. Not surfaced by plain run_qc (the ascending-label refit yields a monotonic spline parameter) -- asserted via a reconstructed monotonic-consistency record fed to MislabelRule directly (see item 039 Assumptions).",
-      "detection": "reconstructed_record",
+      "detail": "relabel_swap: exchanged the voxel identities of adjacent labels 21 and 22. Caught by plain run_qc: the monotonicity check judges against a curve fitted in geometric traversal order rather than the ordering under test, so the swap reads out of order and MislabelRule's ordering detector fires directly (item 132).",
+      "detection": "pipeline",
       "expected_labels": [
         21,
         22
@@ -176,7 +176,7 @@
         "neighbour_label": 22,
         "target_label": 21
       },
-      "reconstruction": "monotonic_true_spatial_order",
+      "reconstruction": null,
       "scan_fixture": "fixtures/base_scan.nii.gz",
       "seed": 0,
       "seg_fixture": "fixtures/mode4_relabel_swap_seg.nii.gz"
