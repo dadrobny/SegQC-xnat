@@ -620,4 +620,216 @@ here.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+**Replay evidence, recorded 2026-08-31.** All items 126-134 confirmed ✅ before
+starting (Assumptions precondition held). `aide check` baseline: `OK (3
+warning(s))`, matching the spec.
+
+**AC1-AC4 — retirement audit (working checkout).** All eleven retired paths
+absent: `tests/corpus/golden/{clean_control,mode1_displace,mode2_fragment,
+mode3_inject_islands,mode4_relabel_swap,mode5_remove_level,
+mode6_crop_at_border,mode7_sequence_break,mode8_force_overlap}.json`,
+`tests/golden/016_features_report.json`, `tests/golden/022_stage3_report.json`.
+`git log --follow --name-status` over `69e5cf5..HEAD` for each path shows
+exactly one status line, `D`, at commit `cafd4cc`, with nothing after it. The
+four replacements resolve to live code (see `progress.md`'s Stage 29 box 1
+note for the full module::function list); `tests/golden/` contains exactly
+`report_format_contract.json`.
+
+**AC22 — fresh-clone suite (throwaway clone).** Cloned
+`/mnt/data/spine/codes/SegFACET` into the scratchpad's `segfacet-135-clone`,
+checked out `aide/135-validate-stage-29-golden-retirement` (HEAD `6bf0f20`,
+identical to the working checkout's HEAD at replay time), bootstrapped with
+`python .aide/scripts/aide.py env --bootstrap` (succeeded). Full-suite result:
+**4 failed, 6011 passed, 58 skipped** in 871.97s. Two failures are the
+expected pre-edit state `tests/test_135_stage29_validation.py`'s own module
+docstring documents (`test_ac24_every_stage29_box_ticked_implies_evidence_or_unticked_implies_reason`,
+`test_ac12_stage28_mode4_box_is_ticked_and_annotated`) — both pass once this
+item's `progress.md` edits land (confirmed: re-running
+`tests/test_135_stage29_validation.py` alone in the working checkout after the
+edits gives 67 passed, 1 failed). The remaining two are **not** explained by
+the progress.md edit and do **not** resolve by it — both are genuine,
+pre-existing defects in the *committed test tree* at `6bf0f20`, independent of
+this item's own edits, reproduced identically in the working checkout and in
+the clone:
+
+1. `test_126_golden_retirement.py::test_ac17_no_live_reference_outside_allowlist[tests/corpus/golden]`
+   fails because item 135's own `tests/test_135_stage29_validation.py`
+   legitimately references the string `"tests/corpus/golden"` (in prose and in
+   its own AC2 "no other module references the retired path" assertion), and
+   `test_126`'s `_AC17_ALLOWLISTED_FILES` was never extended to include it.
+   Fixing this requires editing `tests/test_126_golden_retirement.py`, which
+   this item's Authorised paths list read-only. Logged to `insights.md`.
+2. `test_135_stage29_validation.py::test_adv_synthetic_deliverable_bullet_status_line_is_flagged`
+   has a literal test string missing the leading `"- "` bullet marker its own
+   regex requires, so it fails unconditionally regardless of `progress.md`
+   content or environment. This item may not edit its own committed test
+   module. Logged to `insights.md`.
+
+Per the spec's Validation section ("Honest downgrade if a replay cannot be
+performed"): AC22 is recorded honestly as **not fully green** — 2 of 4
+failures are the expected pre-edit state (now resolved by this item's
+`progress.md` edits, confirmed in-suite), and 2 are pre-existing test-file
+defects this item is not authorised to fix. Neither defect touches production
+code, neither contradicts any substantive Acceptance Criterion this item
+verifies (mode 4's reading, the four-level degeneracy, the fails-before-the-fix
+replays, the tptbox pin — all independently confirmed by direct measurement
+below), and both are out-of-scope findings per the item's own "Not in scope"
+section, not a licence to edit test files this item does not own.
+
+**AC5-AC7 — guard replay (throwaway clone, scratch branch
+`scratch-ac5-ac7-guard-replay`).** Added
+`tests/test_zz_synthetic_135_scratch.py` containing
+`dest.read_bytes() == Path("src/segfacet/reference/reference_default.json").read_bytes()`.
+Running `test_127_committed_artifact_tolerance.py::test_ac15_classifier_reports_zero_violations_on_tests_tree`
+**failed**, message: `"byte-exact comparison(s) against a committed artifact
+outside the allowlist -- use segfacet.synth.golden.assert_matches_committed_artifact
+instead ... committed artifact 'src/segfacet/reference/reference_default.json'"` —
+names `assert_matches_committed_artifact` verbatim. The scratch file was
+removed and the scratch branch deleted (`git branch -D
+scratch-ac5-ac7-guard-replay`); the clone returned to
+`aide/135-validate-stage-29-golden-retirement` with `git status --short`
+empty. The working checkout was never touched (only `insights.md` and
+`docs/aide/items/135-validate-stage29.md` show uncommitted changes throughout
+this replay).
+
+**AC3 — format-fixture deletion (same scratch branch, clone).** Deleted
+`tests/golden/report_format_contract.json`; running
+`test_016_features_json.py::test_ac5_golden_snapshot` **failed** with
+`FileNotFoundError: [Errno 2] No such file or directory:
+'.../tests/golden/report_format_contract.json'` — names the missing file,
+does not skip. Restored with `git checkout --
+tests/golden/report_format_contract.json`; clone confirmed clean before the
+branch was discarded.
+
+**AC8-AC11 — mode 4 and clean control (working checkout).**
+`extract_feature_record` on `mode4_relabel_swap`:
+`is_monotonic == False`, `non_monotonic_pairs == [["L2", "L3"]]`. A real
+`segfacet run --scan tests/corpus/fixtures/base_scan.nii.gz --seg
+tests/corpus/fixtures/mode4_relabel_swap_seg.nii.gz --out <scratch>
+--no-reference` exited `0`; its `segfacet_report.json` carries the same
+`is_monotonic`/`non_monotonic_pairs` plus one `mislabel` finding: `"Vertebra
+ordering inconsistent with label: labels 21 (L2) and 22 (L3) are out of
+expected order along the spine (spline parameter does not advance)."`
+`extract_feature_record` on `clean_control`: `is_monotonic == True`,
+`non_monotonic_pairs == []`. The same `--no-reference` CLI invocation on
+`clean_control_seg.nii.gz` exited `0` with `is_monotonic == True`, empty
+`non_monotonic_pairs`, and `findings == []`.
+
+**AC14 — four-level held-out offsets (working checkout, in-memory).** Using
+`t129._straight_spine`/`_displace_index` (interior index 1, 15 mm, axis 0) and
+`compute_leave_one_out_spline_offsets`:
+- n=4: `[7.348609152784843e-05, 5.330684370393181e-06, 5.740531122353952e-06,
+  3.782179445898854e-05]` mm — exactly item 129's recorded array, all
+  `< 0.001` mm.
+- n=5: `[0.4481337843493273, 1.854146142634933, 2.5665939787324734,
+  5.57968192970584, 0.7429458688645586]` mm — displaced index reads
+  `1.854` mm, well above the floor.
+- n=6: `[15.310979796619236, 14.999999999515072, 7.126211588536627,
+  4.054899843166418, 3.4911796553924166, 5.445490561457531]` mm.
+
+**AC15 — nested-label map (working checkout, in-memory + CLI).**
+`extract_feature_record` on `t129._coincident_label_map()` (labels 21/22
+coincident at `(9.5, 9.5, 19.5)` mm): `stage3_unavailable ==
+{"reason": "coincident_centroids", "detail": "Levels 'L2' and 'L3' (labels 21,
+22) share the exact centroid mm-coordinate (9.5, 9.5, 19.5); the Stage 3
+spline fit was not attempted.", "levels": ["L2", "L3"], "labels": [21, 22],
+"coordinate_mm": [9.5, 9.5, 19.5]}`. A real `segfacet run --no-reference` on a
+synthesised scan/seg pair carrying the same coincidence exited `0`, stderr
+contained no `Traceback`, the emitted `segfacet_report.json` carried the same
+`stage3_unavailable.reason`/`levels`, and `segfacet_report.txt` named both
+`L2` and `L3`.
+
+**AC16 — tptbox pin (project venv).** `.venv/bin/python -m pip show tptbox`:
+`Version: 0.7.6`, `License: Apache License Version 2.0, January 2004` (no
+`agpl`/`affero`, case-insensitive). `pyproject.toml` and `constraints.txt`
+both pin `tptbox==0.7.6`, matching the installed version.
+
+**AC18-AC21 — fails-before-the-fix (throwaway clone, `git switch --detach`).**
+All eight designated nodes fail at the immediate parent of their item's
+implementation commit — every failure is the designated pre-fix *behaviour*
+observed by execution, none attributable to a separately-fixed test defect
+(AC19: no attribution needed, all eight are genuine):
+
+| Item | Impl. commit | Parent (checked out) | Node | Observed failure |
+|---|---|---|---|---|
+| 129 | `021f0bc` | `1466b8b` | `test_ac21_floor_is_five` | `assert 4 == 5` (`_MIN_LEVELS_FOR_HELD_OUT` still 4) |
+| 129 | `021f0bc` | `1466b8b` | `test_ac5_extract_feature_record_returns_dict_not_raise` | raw `ValueError` from `fit_centroid_spline` (coincident centroids), not a degraded record |
+| 131 | `5efd27d` | `8b94e62` | `test_ac1_cranial_first_straight_spine_reads_zero_not_180` | `tangent_angles_deg` entry `180.0`, not `~0.0` |
+| 131 | `5efd27d` | `8b94e62` | `test_ac2_straight_spine_reversal_equivariant` | forward/reversed angles `(0.0,...)` vs `(180.0,...)`, not equivariant |
+| 132 | `cc22bfd` | `628f673` | `test_ac1_mode4_relabel_swap_is_non_monotonic_through_shipped_record_builder` | `is_monotonic` reads `True`, not `False` |
+| 132 | `cc22bfd` | `628f673` | `test_ac2_mode4_relabel_swap_non_monotonic_pairs_names_l2_l3` | `non_monotonic_pairs == []`, not `[["L2","L3"]]` |
+| 133 | `8586772` | `26b5cf5` | `test_ac1_tptbox_pin_is_exactly_0_7_6` | `pyproject.toml` still pins `tptbox==0.7.5` |
+| 133 | `8586772` | `26b5cf5` | `test_ac2_constraints_tptbox_pin_moved` | `constraints.txt` still pins `0.7.5` |
+
+Every implementation/parent pair matched the spec's cited hashes exactly on
+fresh resolution (`git log --oneline` between each item's `-> in-progress` and
+`-> in-review` progress commits), so the Assumptions' "parent already carries
+the test module" premise held for all four without a fallback to AC20's
+cited-not-executed treatment.
+
+**AC20 — structural items (stated, not executed as behaviour replays).**
+Items **128** (relocated an integrity pin/renamed a fence header — no
+behaviour to fail against, its own AC23 verification is
+`tests/test_128_relocation_checks.py`'s committed suite), **130** (consolidated
+spline plumbing; its evidence is that every existing value-level assertion
+still passes, per its own Decisions log), and **134** (a new generated
+companion artifact, `docs/aide/golden_evidence.generated.json`, with no prior
+state to regress from) have no pre-fix *behaviour* their designated tests
+could fail against — a parent-commit run would fail only because a module,
+name or file does not yet exist, which is not the same claim as a behaviour
+regression. Cited from each item's own Decisions log, not executed here.
+
+**AC21 — predate-the-convention items (stated).** Items **126** and **127**
+carry no fails-before-the-fix obligation. 126's verification is the
+retirement audit (AC1-AC4 above); 127's is the guard replay (AC5-AC7 above).
+
+**AC23 — environment (working checkout).** `python .aide/scripts/aide.py env`:
+`aide env: OK (venv present, import succeeds)`. `aide.toml`'s three
+`[validation]` profiles (`pyradiomics`, `docker`, `gpu`) are textually
+untouched by any Stage 29 item's diff, and no Stage 29 acceptance clause reads
+the real VerSe19 cohort (item 129 deliberately left `reference_verse_v1.json`
+unrebuilt; item 133's check is a venv metadata read). Conclusion: **no**
+Environment-Gated Capability Verification row is affected by this stage; the
+table is left unchanged and the "Real VerSe GT" row is not re-evidenced, per
+the spec's expected outcome.
+
+**AC27 — `aide check` before/after.** Before: `OK (3 warning(s))`. After this
+item's `progress.md`/`insights.md` edits: `OK (3 warning(s))` — identical
+warning classes (32-spec Assumptions audit, 2 Stage-16 gates). No new warning
+class introduced.
+
+**`aide check --queue 018` (informational, per Assumptions).** Reports the
+expected shape only: dozens of pin-vs-edit errors/warnings naming items
+126-135 pinning each other's already-shipped, already-✅ paths under `Asserts
+against` — the structural collision items 106/115/125/126/132 already
+recorded, inert because every named item is merged. No entry outside that
+shape was found, so nothing new to log. AC27 covers `aide check`, not `aide
+check --queue`, per the spec.
+
+**Tooling note: acceptance-box ticks were hand-edited, not via `aide progress
+accept`.** The framework's `aide progress accept STAGE --criterion N
+--evidence "..."` verb exists in this checkout and is the framework's
+preferred mechanism per `.aide/AGENT-CONTEXT.md` ("Mechanical actions go
+through the CLI") and the `aide-living-documents` skill. It was not used here
+for two reasons: (1) it can only *tick* a box with a flat single-line
+`--evidence` string appended after the checkbox text; Stage 29's box 3 must
+stay **unticked** with a multi-sentence reason, which the verb cannot express
+at all; (2) the rich, multi-sentence, code-span-laden evidence style already
+established by items 106/115/125 (all predating this verb) would be flattened
+by shell-argument passing. This item's own Authorised paths list
+`docs/aide/progress.md`'s acceptance boxes as directly editable, and the
+resulting shape was verified against `tests/test_135_stage29_validation.py`'s
+own biconditional parser (AC24/AC12/AC13, all passing) — a defect if the hand
+edit produced an unparseable shape. Logged here rather than acted on further;
+worth a framework note that `accept` doesn't cover the unticked-with-reason
+case a stage-validation item routinely needs.
+
+**Findings logged to `insights.md` (AC28), not remediated here:** the two
+test-file defects above (AC17 allowlist gap; the AC26-shadow literal string
+bug in item 135's own adversarial test).
+
+**Divergence from the spec's starting numbers:** none found — every value
+this item re-measured (the eleven retired paths, the four replacements, the
+guard replay, mode 4/clean control, the four/five/six-level offset arrays, the
+nested-label-map reading, the tptbox version/license, all eight
+fails-before-the-fix nodes) matched the spec's cited starting values exactly.
