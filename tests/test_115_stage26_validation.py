@@ -257,23 +257,23 @@ def _all_sha256_findings() -> list:
 def test_ac8_no_hardcoded_literal_fence_remains():
     """AC8: zero `==` comparisons of a sha256 digest against a hardcoded
     literal survive under tests/ -- the two known-remaining cases at spec
-    time (test_098's reference_verse_v1 pin, test_102's path-to-digest dict)
-    resolve to fence / intra-run respectively; only the former should still
-    be an open fence if untouched, so this pins the *exact* expected count
-    rather than a bare `== 0`, in case the builder retires it during this
-    item."""
+    time (reference_verse_v1.json's integrity pin, test_102's path-to-digest
+    dict) resolve to fence / intra-run respectively; only the former should
+    still be an open fence if untouched, so this pins the *exact* expected
+    count rather than a bare `== 0`, in case the builder retires it during
+    this item."""
     findings = _all_sha256_findings()
     fences = [f for f in findings if f.kind == "fence"]
     locations = [f"{f.path.name}:{f.lineno}" for f in fences]
     # At the time this item's spec was written, exactly one fence remained:
-    # test_098_stray_components.py's pinned pre-098 digest of
-    # reference_verse_v1.json. This item's job is to retire it or record why
-    # it stays -- either way there must be at most that one, never more, and
-    # a scan that finds any *other* fence is a genuine new regression this
-    # test must catch.
+    # reference_verse_v1.json's integrity pin, relocated by item 128 from
+    # test_098_stray_components.py to test_128_reference_verse_v1_integrity.py.
+    # This item's job is to retire it or record why it stays -- either way
+    # there must be at most that one, never more, and a scan that finds any
+    # *other* fence is a genuine new regression this test must catch.
     assert len(fences) <= 1, f"unexpected fence(s) found: {locations}"
     if fences:
-        assert fences[0].path.name == "test_098_stray_components.py", locations
+        assert fences[0].path.name == "test_128_reference_verse_v1_integrity.py", locations
 
 
 def test_ac8_intra_run_digest_assertions_still_exist():

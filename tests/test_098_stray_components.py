@@ -35,8 +35,9 @@ Covers Acceptance Criteria AC1-AC19:
         ``reports_close`` against the committed goldens still hold.
 - AC17: the reference vocabulary (``INGESTED_MORPHOLOGY_FEATURES``) is
         unaffected; no ``stray_*`` key appears in a morphology-delta output.
-- AC18: ``reference_verse_v1.json`` is byte-untouched (pinned sha256) and
-        still loads/scores a case.
+- AC18: the ``reference_verse_v1.json`` integrity pin and its load-and-score
+        companion have relocated to
+        ``tests/test_128_reference_verse_v1_integrity.py``.
 - AC19: (docstring corrections -- not independently unit-tested; verified by
         code review per the item's Testing Strategy.)
 
@@ -1068,51 +1069,6 @@ def test_ac17_morphology_delta_output_has_no_stray_keys():
                 f"unexpected stray_* feature in morphology delta output: {fd.feature!r}"
             )
             assert fd.feature in INGESTED_MORPHOLOGY_FEATURES
-
-
-# =========================================================================== #
-# AC18: reference_verse_v1.json is untouched
-# =========================================================================== #
-
-# sha256 of the committed reference_verse_v1.json artifact. Originally pinned
-# pre-098; item 123 (docs/aide/items/123-recalibrate-and-regenerate-
-# downstream-artifacts.md, AC33) rebuilds this artifact from the real VerSe19
-# cohort under the item-120 held-out estimator, so this literal now pins the
-# item-123 rebuilt state -- golden-decision-table.md's signed row for this
-# file is "keep" (not CI-regenerable), so the fence stays; only the digest
-# moves, updated by whoever runs the actual rebuild against the real cohort
-# (this literal cannot be computed without it). tests/test_115_stage26_
-# validation.py::test_ac8_no_hardcoded_literal_fence_remains caps the corpus
-# at exactly one such fence, which is this one.
-_PRE_098_REFERENCE_VERSE_V1_SHA256 = (
-    "2048804f60208a4dea0cbe8d0980e1e6228c68b52b6331375f768254fc73b5da"
-)
-
-
-def test_ac18_reference_verse_v1_bytes_unchanged():
-    """AC18: reference_verse_v1.json is byte-identical to its pre-098
-    state (pinned sha256)."""
-    import hashlib
-
-    path = bundled_production_reference_path()
-    assert path.name == "reference_verse_v1.json"
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    assert digest == _PRE_098_REFERENCE_VERSE_V1_SHA256
-
-
-def test_ac18_reference_verse_v1_still_loads_and_scores_a_case():
-    """AC18: the artifact still loads and scores a case without change."""
-    from segfacet.pipeline import run_qc_with_reference
-
-    manifest = load_manifest()
-    case = next(c for c in manifest["cases"] if c["case_id"] == "mode6_crop_at_border")
-    seg_img = loaded_seg_image(case)
-    reference = bundled_production_reference()
-    case_result, _block, _delta = run_qc_with_reference(
-        seg_img, bundled_default_config(), reference
-    )
-    bounds_findings = [f for f in case_result.findings if f.rule_id == "bounds" and 22 in f.labels]
-    assert len(bounds_findings) >= 1
 
 
 # =========================================================================== #

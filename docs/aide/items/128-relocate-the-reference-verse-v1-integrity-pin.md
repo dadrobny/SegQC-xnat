@@ -440,4 +440,80 @@ profile is required — all three run on any machine with the repo and its venv.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Implementation landed as specified (AC1–AC22).** Created
+  `tests/test_128_reference_verse_v1_integrity.py` carrying
+  `_ARTIFACT`/`_RELEASED_REFERENCE_VERSE_V1_SHA256` and both the byte pin and
+  the load-and-score companion, moved verbatim from `test_098`'s AC18 block
+  (function names/docstrings updated per AC1/AC2/AC8, digest literal carried
+  across unchanged per AC3). Stripped the old home in
+  `tests/test_098_stray_components.py` (constant, both tests, section header,
+  docstring bullet repointed). Reconciled the three downstream consumers:
+  `tests/test_123_recalibrate_and_regenerate.py`'s AC33 test now imports
+  `_RELEASED_REFERENCE_VERSE_V1_SHA256` from the new module (and was renamed
+  to `test_ac33_reference_verse_v1_digest_fence_matches_committed_file`, since
+  it no longer names `test_098`); `tests/test_115_stage26_validation.py`'s
+  fence-cap expectation and explanatory comment now name
+  `test_128_reference_verse_v1_integrity.py`; `docs/aide/golden-decision-
+  table.md` Section 2's `asserted by` cell for `reference_verse_v1.json` now
+  names `tests/test_128_reference_verse_v1_integrity.py::
+  test_reference_verse_v1_bytes_unchanged`, with the other four signed cells
+  left character-identical. `tests/test_102_stage18_validation.py`'s AC24
+  banner, the comment above `_SRC_TREE_HASH_AT_COLLECTION`, and the target
+  test's docstring were reworded to name intra-run non-mutation of
+  `src/segfacet/**` instead of "the scope fence"/"no production code changed
+  by this item" and the false "pre-102" claim; the assertion body and the
+  module-scope constant are byte-for-byte unchanged (AC18). `.gitattributes`
+  was not touched — `git check-attr text eol --
+  src/segfacet/reference/reference_verse_v1.json` already reports `text: set`
+  / `eol: lf` via the pre-existing `src/segfacet/reference/reference_verse_
+  *.json text eol=lf` line (AC14/AC15 confirmed against the live file, not
+  assumed). `tests/committed_artifact_guard.py` was not touched, per AC22.
+
+- **`aide check` reports 4 warnings, not the assumed 3 — a pre-existing
+  divergence, not one this item introduced.** Measured both before and after
+  this item's edits (via `git stash`): the base commit for this branch
+  (`2e9c20e`, which already carries the committed
+  `tests/test_128_relocation_checks.py`) reports **4** warnings, not 3. The
+  4th is `tests/test_128_relocation_checks.py:762: shells out to aide.py —
+  call the function instead` — engine 1.21.0's `cli_subprocess_test_
+  warnings` lint (materialised into this repo at `e7f8621`, an ancestor of
+  both `fd8f31c` (this item's spec commit) and `2e9c20e` (this item's test
+  commit) on this branch), firing against `test_128_relocation_checks.py`'s
+  own AC23 test, `test_ac23_aide_check_reports_the_same_three_baseline_
+  warnings`, which shells out to `python .aide/scripts/aide.py check` via
+  `subprocess.run` — exactly the shape Validation item 1 and the checking
+  test's own AC23 assertion require, and exactly the shape the 1.21.0 lint
+  flags with no exemption (`cli_subprocess_test_warnings` scans every file
+  under `tests/` unconditionally; there is no allowlist or suppression
+  comment). No other test file under `tests/` trips this rule (confirmed by
+  grep: `test_117_scope_verb_swap.py` shells out to `git`, not `aide.py`).
+  So `tests/test_128_relocation_checks.py::
+  test_ac23_aide_check_reports_the_same_three_baseline_warnings`'s own
+  hardcoded `"OK (3 warning(s))" in combined` cannot pass while that test
+  module exists in its committed form — the module's own AC23-verifying
+  subprocess call is what pushes the count from 3 to 4. This item's
+  Assumptions block records the 3-warning baseline as "measured 2026-08-31 on
+  the base commit"; that measurement predates (or omitted) the interaction
+  between engine 1.21.0's lint and this item's own checking-test file. This
+  builder made no change that affects this count (confirmed identical before
+  and after this item's edits) and has no authorised path to fix it:
+  `tests/test_128_relocation_checks.py` is explicitly off-limits to the
+  builder by this item's own instructions ("if it asserts something you
+  believe wrong, stop and report"), and `.aide/scripts/aide.py` is a
+  framework file outside this item's Authorised paths. Reported here rather
+  than worked around; see `docs/aide/insights.md` for the queue-boundary
+  capture.
+
+- **`aide scope 128` reports one out-of-scope file:
+  `tests/test_128_relocation_checks.py`** — flagged as "not authorised by
+  docs/aide/items/128-....md" because the spec's `## Authorised paths` lists
+  only `tests/test_128_reference_verse_v1_integrity.py` among the `tests/`
+  entries, never the checking module itself. That module was committed by
+  the test-writer before this builder started (`2e9c20e`, ancestor of this
+  builder's work) and is off-limits to edit per this item's instructions.
+  All 7 files this builder actually touched (the 6 listed under `## May
+  change` plus the new `tests/test_128_reference_verse_v1_integrity.py`)
+  passed the scope check cleanly — `aide scope 128` reports exactly one
+  violation, and it predates this builder's commit. Recorded here rather
+  than silently widening `## Authorised paths` to cover a file this item's
+  instructions forbid editing.

@@ -1105,11 +1105,13 @@ def test_ac32_reference_build_doc_records_the_rebuild():
 # =========================================================================== #
 
 
-def test_ac33_test098_digest_fence_matches_committed_file():
-    from test_098_stray_components import _PRE_098_REFERENCE_VERSE_V1_SHA256
+def test_ac33_reference_verse_v1_digest_fence_matches_committed_file():
+    from test_128_reference_verse_v1_integrity import (
+        _RELEASED_REFERENCE_VERSE_V1_SHA256,
+    )
 
     digest = hashlib.sha256(bundled_production_reference_path().read_bytes()).hexdigest()
-    assert digest == _PRE_098_REFERENCE_VERSE_V1_SHA256
+    assert digest == _RELEASED_REFERENCE_VERSE_V1_SHA256
 
 
 def test_ac34_retired_test_names_absent_from_test_120_source():
