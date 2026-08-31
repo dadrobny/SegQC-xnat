@@ -492,7 +492,9 @@ below was resolved with the most defensible default and recorded here.
   test module.
 - `tests/test_125_stage28_validation.py` — flip the AC7 mode-4 pin and its
   module-docstring line (AC23); this item is the authorised flipper, as the
-  pin's own docstring instructs.
+  pin's own docstring instructs. Also flip the AC15 hardcoded
+  pipeline-detected mode count pin (`test_ac15_manifest_pipeline_detected_mode_count_is_six`,
+  renamed to `..._is_seven`) — added 2026-08-31, see Decisions log.
 - `tests/test_039_identity_ordering_alignment_perturbations.py` — flip the
   AC11 "run_qc does not surface the swap" test and its docstring (AC24).
 - `tests/test_129_coincident_centroids_and_held_out_floor.py` —
@@ -802,3 +804,11 @@ box; neither tick happens here.
   (which this item does reconcile) and so self-heal; only the two hardcoded
   tests do not. Captured in `docs/aide/insights.md` rather than fixed here,
   since fixing it means editing an unauthorised path.
+- **2026-08-31: the AC15 count pins named above were missed from the
+  original authorised edit list and are now added to it.** Per the
+  item-127/128 precedent for a spec that under-scoped its own reconciliation
+  set, `test_ac15_manifest_pipeline_detected_mode_count_is_six` (renamed
+  `test_ac15_manifest_pipeline_detected_mode_count_is_seven`, `== 6` → `== 7`,
+  `== {1, 2, 3, 5, 6, 7}` → `== {1, 2, 3, 4, 5, 6, 7}`) is flipped in this
+  same reconciliation pass, and `tests/test_125_stage28_validation.py`'s
+  Authorised-paths entry above is widened to cover it.

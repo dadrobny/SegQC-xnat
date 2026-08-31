@@ -424,7 +424,7 @@ def test_ac12_reference_default_spline_offset_mm_clears_non_degeneracy_floor():
 
 
 # =========================================================================== #
-# AC15: the before/after detection count -- 6 of 8 modes pipeline-detected
+# AC15: the before/after detection count -- 7 of 8 modes pipeline-detected
 # excluding the mode-0 clean control -- agrees with test_040/test_057.
 # =========================================================================== #
 
@@ -438,10 +438,17 @@ def _pipeline_detected_modes_excluding_clean_control() -> set:
     }
 
 
-def test_ac15_manifest_pipeline_detected_mode_count_is_six():
+def test_ac15_manifest_pipeline_detected_mode_count_is_seven():
+    """Pin FLIPPED 2026-08-31 (item 132): mode 4 moved from
+    ``reconstructed_record`` to ``pipeline`` detection, so the pipeline-
+    detected count (excluding the mode-0 clean control) rises from 6 to 7
+    and mode 4 joins the set. This hardcoded pin was a collateral casualty
+    outside item 132's authorised edit list for this module (only the AC7
+    pin and its module-docstring line were authorised there) -- see that
+    item's Decisions log, 2026-08-31."""
     modes = _pipeline_detected_modes_excluding_clean_control()
-    assert len(modes) == 6, modes
-    assert modes == {1, 2, 3, 5, 6, 7}
+    assert len(modes) == 7, modes
+    assert modes == {1, 2, 3, 4, 5, 6, 7}
 
 
 def test_ac15_agrees_with_test_040_mode_sets():
