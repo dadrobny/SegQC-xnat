@@ -535,4 +535,68 @@ retirement audit).
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **The consumer re-pointing and fixture-building work (nominally the
+  test-writer's, per Implementation Steps) was done by the builder.** Only
+  `tests/test_126_golden_retirement.py` had been committed when this item's
+  builder pass started; `tests/report_format_fixture.py`,
+  `tests/golden/report_format_contract.json`, and the ~34 consumer
+  re-points/14 fence deletions the disposition table names were still
+  outstanding. The orchestrator scoped this explicitly to the builder for
+  this item (re-pointing/deleting *existing* consumer tests is "the
+  implementation of the retirement", not new test authorship), so it was
+  done here rather than handed back. No new test was written for item 126 —
+  `tests/report_format_fixture.py` is a fixture-builder module (no `test_`
+  functions) and `tests/golden/report_format_contract.json` is a data
+  fixture, not a test.
+
+- **Five additional consumers beyond the disposition table's 14+25 were
+  discharged**: `test_119_curve_formulation.py::test_ac19_stage3_report_golden_matches_test_022_output`,
+  `test_120_leave_one_out_offset.py::test_ac27_stage3_report_golden_matches_test_022_output`
+  and `::test_ac27_stage3_report_golden_offset_entries_carry_is_terminal`, and
+  `test_123_recalibrate_and_regenerate.py`'s identically-named pair. Each
+  compared its own real-feature content against `test_022_stage3_serialisation.py`'s
+  `GOLDEN_PATH` module attribute, which now names the shared
+  `report_format_contract.json` fixture rather than a per-module snapshot —
+  content unrelated to any of these five tests' inputs, so they would fail
+  regardless of anything else in this item. None used the `GOLDEN_DIR`/
+  `load_golden`/`read_golden_text`/`check_case_golden` markers the item's own
+  AST sweep searched for, so the sweep never found them — they surfaced only
+  because re-pointing `test_022`'s `GOLDEN_PATH` broke their assumption.
+  Discharged as duplicates of `test_022`'s own (already re-pointed)
+  comparison, the same reasoning the signed disposition table applies to
+  every other discharged fence. Logged as a gap in `insights.md`
+  (2026-08-31) so a future fixture-retirement sweep also greps for
+  shared-attribute idioms, not just the producing module's own markers.
+
+- **`check_case_golden`'s `golden_dir` became a required keyword-only
+  argument (not just required-positional).** Every surviving call site
+  already passes it as `golden_dir=...`, so this is behaviour-neutral for
+  every caller in the tree and makes a future positional-argument mistake
+  (passing a directory where `config` is expected) impossible.
+
+- **The consumer re-pointing, the `src/` harness hardening, the eleven-file
+  deletion, and the docs reconciliation landed as four separate commits.**
+  Per Implementation Step 7's "single commit that changes nothing else" for
+  the deletion specifically — `git log --follow` for each of the eleven
+  retired paths shows exactly one commit, a pure `D`, with nothing else in
+  it.
+
+- **The corpus-golden rows' "asserted by" cells were reconciled to drop the
+  two deleted AC9/AC13 references, without naming this item by number inside
+  any Section-1 cell.** AC18's row check forbids the item's own citation in
+  *any* Section-1 cell (not only the eleven retired rows'), so the
+  reconciliation note reads "AC6-AC8 now compare fresh/regenerated output;
+  the fresh-vs-committed AC9/AC13 pair was retired" rather than attributing
+  the change to this item by number. The four AC18-protected cells (`what it
+  asserts today` / `evidence` / `disposition` / `replacement guarantee`) for
+  all eleven retired rows are verified byte-unchanged against their pre-item
+  sha256 digests. A full "asserted by" reconciliation across the ~12
+  consumer modules the item's own AST sweep found (versus the 6 the table
+  names) was judged out of scope for this item — no AC requires it, and it
+  is already logged as a gap in `insights.md` (2026-08-30).
+
+- **`src/segfacet/heuristics/mislabel.py`'s prose citation was re-worded, as
+  Implementation Step 6 and the Authorised-paths list both name.** The diff
+  is prose-only (re-cites the corpus manifest plus a freshly built report
+  instead of the retired corpus-golden snapshots); no threshold, margin
+  value, or rule behaviour changed.
