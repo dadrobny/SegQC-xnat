@@ -10,10 +10,11 @@ Covers Acceptance Criteria AC1-AC18:
   shared FAILURE_MODE_NAMES taxonomy; expected_verdict is a valid Severity
   label.
 - AC7-AC9 (Group B, detection classification): detection is one of
-  {"pipeline", "reconstructed_record"}; modes 1/4/8 are classified
-  reconstructed_record with the matching reconstruction technique, the rest
-  are pipeline with no reconstruction; the three reconstructed-record
-  fixtures genuinely hide their mode from plain run_qc.
+  {"pipeline", "reconstructed_record"}; mode 8 is classified
+  reconstructed_record with the matching reconstruction technique (mode 4
+  moved to pipeline in item 132, 2026-08-31, and mode 1 moved to pipeline in
+  item 120), the rest are pipeline with no reconstruction; the
+  reconstructed-record fixture genuinely hides its mode from plain run_qc.
 - AC10-AC12 (Group C, fixtures load via the Stage 0 loader): every
   referenced fixture file exists; every case loads via load_case with a
   non-empty label inventory and matching scan/seg shapes; the clean_control
@@ -80,8 +81,11 @@ _VALID_RECONSTRUCTIONS = {
     "monotonic_true_spatial_order",
     "overlap_mask_stack",
 }
-_RECONSTRUCTED_MODES = {4, 8}
-_PIPELINE_ONLY_MODES = {0, 1, 2, 3, 5, 6, 7}
+# 2026-08-31 (item 132): mode 4 moved from _RECONSTRUCTED_MODES to
+# _PIPELINE_ONLY_MODES -- the traversal-ordered reference fit surfaces the
+# swap through plain run_qc.
+_RECONSTRUCTED_MODES = {8}
+_PIPELINE_ONLY_MODES = {0, 1, 2, 3, 4, 5, 6, 7}
 
 _CASE_ID_RE = re.compile(r"^[a-z0-9_]+$")
 
@@ -220,11 +224,14 @@ def test_ac7_detection_is_one_of_the_two_kinds():
 
 
 def test_ac8_modes_4_8_reconstructed_record_rest_pipeline():
-    """AC8: every case with failure_mode in {4, 8} is reconstructed_record
-    with a valid reconstruction technique; every case with failure_mode in
-    {0, 1, 2, 3, 5, 6, 7} is pipeline with no reconstruction. Mode 1 moved
-    into the pipeline set in item 120, which promoted a held-out per-label
-    spline offset into the pipeline itself."""
+    """AC8: every case with failure_mode in ``_RECONSTRUCTED_MODES`` is
+    reconstructed_record with a valid reconstruction technique; every case
+    with failure_mode in ``_PIPELINE_ONLY_MODES`` is pipeline with no
+    reconstruction. Mode 1 moved into the pipeline set in item 120, which
+    promoted a held-out per-label spline offset into the pipeline itself;
+    mode 4 moved into the pipeline set in item 132 (2026-08-31), which
+    judges monotonicity against a traversal-ordered reference fit. Only
+    mode 8 (overlap) remains reconstructed_record."""
     for case in _cases():
         mode = case["failure_mode"]
         if mode in _RECONSTRUCTED_MODES:

@@ -771,10 +771,18 @@ def test_ac15_clean_control_fires_nothing_verdict_pass():
     assert pipeline_verdict_label(case) == "pass"
 
 
-def test_ac15_mode4_relabel_swap_fires_no_mislabel_finding():
+def test_ac15_mode4_relabel_swap_fires_no_offset_misalignment_finding():
+    """Narrowed 2026-08-31 (item 132): mode 4's swap now fires MislabelRule's
+    ORDERING detector (Detector B, "Vertebra ordering inconsistent with
+    label:") through plain run_qc, so the finding list is no longer empty --
+    but Detector A's offset-MISALIGNMENT reason never fires on this case,
+    which is what this recalibration test preserves."""
     case = _corpus_case("mode4_relabel_swap")
     findings = [f for f in pipeline_findings(case) if f.rule_id == "mislabel"]
-    assert findings == []
+    assert not any(
+        f.reason.startswith("Vertebra misaligned from spinal curve:")
+        for f in findings
+    )
 
 
 # =========================================================================== #

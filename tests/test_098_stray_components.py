@@ -893,7 +893,24 @@ _PRE_098_GOLDEN_VERDICT_AND_FINDINGS = {
             }
         ],
     },
-    "mode4_relabel_swap": {"verdict": "pass", "findings": []},
+    # 2026-08-31 (item 132): the traversal-ordered monotonicity fit now
+    # surfaces the swap through plain run_qc's mislabel Detector B, so this
+    # entry moved from {"verdict": "pass", "findings": []}.
+    "mode4_relabel_swap": {
+        "verdict": "flagged-for-review",
+        "findings": [
+            {
+                "rule_id": "mislabel",
+                "severity": "flagged-for-review",
+                "labels": [21, 22],
+                "reason": (
+                    "Vertebra ordering inconsistent with label: labels 21 "
+                    "(L2) and 22 (L3) are out of expected order along the "
+                    "spine (spline parameter does not advance)."
+                ),
+            }
+        ],
+    },
     "mode5_remove_level": {
         "verdict": "flagged-for-review",
         "findings": [

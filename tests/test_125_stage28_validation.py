@@ -14,9 +14,10 @@ in-suite:
         of point count, not a literal mm^2 constant) and its default
         parameterisation is chord-length, not the cranio-caudal coordinate.
 - AC7:  ``mode4_relabel_swap``'s ``is_monotonic``/``non_monotonic_pairs`` are
-        pinned to the value MEASURED on this checkout -- ``True`` / ``()`` --
-        not the ``False`` the stage's own acceptance criterion wanted. Its
-        manifest ``detection`` is confirmed still ``reconstructed_record``.
+        pinned to ``False`` / ``[["L2", "L3"]]`` -- item 132's traversal-
+        ordered reference fit -- flipped 2026-08-31 from the ``True`` / ``()``
+        measured before that item. Its manifest ``detection`` is now
+        ``pipeline``, flipped from ``reconstructed_record``.
 - AC9:  ``mode1_displace``'s maximum offset exceeds, and ``clean_control``'s
         stays below, the shipped ``mislabel.max_offset_mm`` threshold, by a
         floor margin (not an equality) so float noise cannot fail it.
@@ -24,7 +25,8 @@ in-suite:
         generous non-degeneracy floor, and ``reference_verse_v1.json``
         records the 80-subject cohort.
 - AC15: the manifest's pipeline-detected mode count (excluding the mode-0
-        clean control) is 6, agreeing with ``test_040``'s
+        clean control) is 7 (item 132 moved mode 4 across, 2026-08-31),
+        agreeing with ``test_040``'s
         ``_PIPELINE_ONLY_MODES``/``_RECONSTRUCTED_MODES`` and ``test_057``'s
         ``_PIPELINE_DETECTABLE_MODES``.
 - AC16: ``mode6_crop_at_border`` fires both ``border`` and ``mislabel``
@@ -318,25 +320,27 @@ def test_adv_synthetic_bare_s_zero_default_fails_the_scale_free_check():
 
 
 def test_ac7_mode4_relabel_swap_is_monotonic_pinned_true():
-    """Pin on the OBSERVATION, not the wish: the stage's own acceptance
-    criterion wanted ``is_monotonic is False`` on this case (a smoothed fit
-    detecting the swap). Measured 2026-08-30 through plain run_qc it is
-    ``True`` with zero non-monotonic pairs -- this test records that reality
-    so a later, silent change to it is visible rather than swallowed. If this
-    ever starts failing because ``is_monotonic`` became ``False``, that is
-    GOOD news for Stage 28's acceptance -- update the pin, don't just widen
-    it."""
+    """Pin FLIPPED 2026-08-31 (item 132): the stage's own acceptance
+    criterion wanted ``is_monotonic is False`` on this case, and item 132's
+    traversal-ordered reference fit now measures exactly that -- update the
+    pin, don't just widen it (this test's own prior instruction). Pre-item
+    132 this read ``True`` with zero non-monotonic pairs; now it reads
+    ``False`` with the swapped pair named."""
     _case_result, block = _run_qc("mode4_relabel_swap")
     mono = block["stage3"]["monotonic_consistency"]
-    assert mono["is_monotonic"] is True
+    assert mono["is_monotonic"] is False
     # non_monotonic_pairs is serialised as a list of two-element lists
     # (feature_report.monotonic_consistency_to_dict), not a tuple.
-    assert mono["non_monotonic_pairs"] == []
+    assert mono["non_monotonic_pairs"] == [["L2", "L3"]]
 
 
 def test_ac7_mode4_manifest_detection_still_reconstructed_record():
+    """Pin FLIPPED 2026-08-31 (item 132): the manifest's mode-4 case moved
+    from ``detection == "reconstructed_record"`` to ``"pipeline"`` -- see
+    docs/aide/items/132-judge-monotonicity-against-the-traversal-ordered-fit.md
+    AC15/AC16."""
     case = _manifest_case("mode4_relabel_swap")
-    assert case["detection"] == "reconstructed_record"
+    assert case["detection"] == "pipeline"
 
 
 def test_ac7_mode4_run_qc_is_deterministic_across_two_calls():

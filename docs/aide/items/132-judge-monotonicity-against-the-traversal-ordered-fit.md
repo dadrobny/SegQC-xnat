@@ -734,4 +734,32 @@ box; neither tick happens here.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **AC12 uses the source-level AST fallback, not a geometric fixture.**
+  Constructing two centroids that resolve to *exactly* equal `closest_u`
+  (not merely close) requires either hand-solving the spline's arc-length
+  parameterisation or executing the fit and reading back a value — neither
+  is available to a test-writer pass that must not run code. Per the spec's
+  own Testing Strategy note, `tests/test_132_monotonicity_against_traversal_order.py`'s
+  `test_ac12_pair_loop_still_uses_gte_not_strict_gt` asserts the criterion
+  directly from `compute_monotonic_consistency`'s source via `ast`: a `>=`
+  comparison is present and no strict `>` comparison is. This is weaker than
+  an executed equal-`u` fixture but is exact about the one thing AC12
+  actually guards (no tolerance band), and needs no float-precision
+  construction.
+- **AC32 (`docs/aide/progress.md` unchanged) is not asserted by a pytest
+  test.** It is a diff-shape claim about this item's own change, which
+  `aide scope`/the validator check structurally; a unit test cannot usefully
+  restate "my own diff touches nothing here" without reading the git diff,
+  which is out of scope for a deterministic, environment-independent test.
+- **`tests/test_125_stage28_validation.py`'s AC15 count tests
+  (`test_ac15_manifest_pipeline_detected_mode_count_is_six` and its `== 6`
+  / `== {1, 2, 3, 5, 6, 7}` pins) are collateral casualties of this item
+  outside the spec's authorised edit list** (only the AC7 pin and its
+  module-docstring line are authorised there) — they hardcode the pre-132
+  six-mode count and will fail once mode 4 moves to `detection ==
+  "pipeline"`. `test_ac15_agrees_with_test_040_mode_sets` and
+  `test_ac15_agrees_with_test_057_pipeline_detectable_modes` in the same
+  module compare *dynamically* against `test_040`/`test_057`'s constants
+  (which this item does reconcile) and so self-heal; only the two hardcoded
+  tests do not. Captured in `docs/aide/insights.md` rather than fixed here,
+  since fixing it means editing an unauthorised path.

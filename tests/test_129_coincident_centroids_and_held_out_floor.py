@@ -715,7 +715,9 @@ _PRE_129_FINDINGS = {
     "mode1_displace": {("mislabel", (22,))},
     "mode2_fragment": {("fragmentation", (22,))},
     "mode3_inject_islands": {("fragmentation", (22,))},
-    "mode4_relabel_swap": set(),
+    # 2026-08-31 (item 132): traversal-ordered monotonicity now surfaces the
+    # swap through plain run_qc, moved from set().
+    "mode4_relabel_swap": {("mislabel", (21, 22))},
     "mode5_remove_level": {("coverage", ())},
     "mode6_crop_at_border": {("border", (22,)), ("mislabel", (22,))},
     "mode7_sequence_break": {("sequence", (28,))},
