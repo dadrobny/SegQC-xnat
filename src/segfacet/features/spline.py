@@ -23,6 +23,12 @@ Public API
 ``evaluate_spline_derivative(fit, u_values, nu=1) -> np.ndarray``
     Evaluate the spline's ``nu``-th derivative at the supplied parameter
     values; returns ``(N, 3)`` float64 array.
+``find_coincident_centroid_pair(centroids) -> CoincidentCentroidPair | None``
+    Return the first pair of exactly-coincident centroid mm-coordinates, or
+    ``None`` when every coordinate is pairwise distinct (item 129). Used by
+    ``fit_centroid_spline`` to build its coincidence ``ValueError``, and by
+    ``pipeline.extract_feature_record`` to pre-check and degrade gracefully
+    instead of letting that error propagate.
 
 Deliberate CPU fallback (item 072)
 -----------------------------------
@@ -76,6 +82,8 @@ from segfacet.features.centroids import LabelCentroid
 
 __all__ = [
     "SplineFit",
+    "CoincidentCentroidPair",
+    "find_coincident_centroid_pair",
     "fit_centroid_spline",
     "evaluate_spline",
     "evaluate_spline_derivative",
@@ -122,15 +130,66 @@ class SplineFit:
 # --------------------------------------------------------------------------- #
 
 
-def _find_coincident_pair(centroids: Sequence[LabelCentroid]):
-    """Return ``(coord, level_a, level_b)`` for the first pair of exactly
-    coincident mm-coordinates in *centroids*, or ``None`` if none exist."""
-    seen = {}
+@dataclass(frozen=True)
+class CoincidentCentroidPair:
+    """The first pair of exactly-coincident centroid mm-coordinates found by
+    :func:`find_coincident_centroid_pair` (item 129).
+
+    Attributes
+    ----------
+    coordinate_mm:
+        The shared mm-coordinate, as a 3-tuple of floats.
+    level_a, level_b:
+        The two coincident levels' names, in the order the input sequence
+        presented them.
+    label_a, label_b:
+        The two coincident levels' integer labels, in the same order.
+    """
+
+    coordinate_mm: tuple
+    level_a: str
+    level_b: str
+    label_a: int
+    label_b: int
+
+
+def find_coincident_centroid_pair(
+    centroids: Sequence[LabelCentroid],
+) -> Optional[CoincidentCentroidPair]:
+    """Return the first pair of exactly-coincident centroids in *centroids*.
+
+    Two centroids are "coincident" when their ``centroid_mm`` values compare
+    exactly equal as a 3-tuple of floats -- no tolerance, so two centroids
+    that differ by even ``1e-9`` mm are reported as distinct (item 129, AC3).
+
+    Parameters
+    ----------
+    centroids:
+        Sequence of :class:`~segfacet.features.centroids.LabelCentroid`
+        objects, in the order to search. The input is never mutated.
+
+    Returns
+    -------
+    CoincidentCentroidPair or None
+        The **first** coincident pair, in the order *centroids* was given
+        (item 129, AC2) -- i.e. the first centroid whose coordinate has
+        already been seen, paired with the earlier centroid that shares it.
+        ``None`` when every mm-coordinate is pairwise distinct (AC3).
+        Deterministic: two calls on the same input return equal results.
+    """
+    seen: dict = {}
     for c in centroids:
         coord = tuple(float(v) for v in c.centroid_mm)
         if coord in seen:
-            return coord, seen[coord], c.level_name
-        seen[coord] = c.level_name
+            earlier = seen[coord]
+            return CoincidentCentroidPair(
+                coordinate_mm=coord,
+                level_a=earlier.level_name,
+                level_b=c.level_name,
+                label_a=earlier.label,
+                label_b=c.label,
+            )
+        seen[coord] = c
     return None
 
 
@@ -243,12 +302,12 @@ def fit_centroid_spline(
             f"Supply at least 2 LabelCentroid objects."
         )
 
-    coincident = _find_coincident_pair(centroids)
+    coincident = find_coincident_centroid_pair(centroids)
     if coincident is not None:
-        coord, level_a, level_b = coincident
         raise ValueError(
             f"fit_centroid_spline received two centroids with exactly the "
-            f"same mm-coordinate {coord}: levels {level_a!r} and {level_b!r}. "
+            f"same mm-coordinate {coincident.coordinate_mm}: levels "
+            f"{coincident.level_a!r} and {coincident.level_b!r}. "
             f"A spline fit requires distinct centroid positions; check the "
             f"input segmentation for duplicated/collapsed labels."
         )

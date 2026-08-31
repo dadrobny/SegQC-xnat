@@ -59,9 +59,29 @@ measuring each level against a curve it did not shape:
    itself. Withholding the case's dominant outlier too prevents one broken
    vertebra from bending its neighbours' held-out curves (outlier
    cross-talk).
-3. Below four levels the held-out path falls back to the in-sample
-   measurement: withholding two of four-or-fewer points leaves too few
-   effective points for a refit to mean anything.
+3. Below **five** levels the held-out path falls back to the in-sample
+   measurement (item 129, D5). The floor is five, not four, for a reason
+   specific to this fit: at exactly four points the spline is a **cubic**
+   (``k=3``) with exactly four coefficients, so it **interpolates** all four
+   points **regardless of the weights** -- down-weighting a level to
+   ``_WITHHELD_WEIGHT`` still leaves it, and every other point, exactly on
+   the curve. The "held-out" curve at four points is therefore numerically
+   the in-sample curve (the two agree to ~1e-13 mm on the corpus's one
+   four-level case), and a floor of four silently claimed a held-out
+   measurement it never made.
+
+**Documented limitation: the four-level blind spot.** At exactly four
+levels, an interior level displaced by a full **15 mm** still reads a
+held-out ``offset_mm`` below **0.001 mm** -- both the held-out and in-sample
+paths read essentially zero, so a four-level field of view cannot raise a
+``mislabel`` offset finding under any threshold. Measured 2026-08-31 (item
+129); asserted, not only documented, by
+``tests/test_129_coincident_centroids_and_held_out_floor.py``'s
+four-level-blind-spot tests. Closing this gap needs a change to the fit's
+**degree** at small ``n`` (clamping it below ``n - 1`` so a cubic cannot
+interpolate four points) -- a change to the curve formulation the
+2026-08-27 "Spinal curve model -- the deformity envelope" **human gate**
+approved, and therefore not this module's (or any agent's) call to make.
 
 **Documented limitation.** A displaced *terminal* level on a short spine is
 not reliably separable: withholding a terminal level and the dominant outlier
@@ -155,10 +175,14 @@ _N_SCAN: int = 500
 # strictly positive -- make_splprep rejects a zero weight.
 _WITHHELD_WEIGHT: float = 1e-6
 
-# Below this many levels, withholding two of them (the level under test plus
-# the dominant outlier) leaves too few effective points for a refit to mean
-# anything -- fall back to the in-sample measurement (item 120, AC7).
-_MIN_LEVELS_FOR_HELD_OUT: int = 4
+# Below this many levels, the held-out refit cannot mean anything -- fall
+# back to the in-sample measurement (item 120, AC7). Five, not four (item
+# 129, D5): at four points the fit is a cubic (k=3) with exactly four
+# coefficients, so it interpolates all four points regardless of the
+# weights -- the "held-out" curve is numerically the in-sample curve. See
+# the module docstring's "Held-out evaluation" step 3 for the full argument
+# and the measured four-level blind spot.
+_MIN_LEVELS_FOR_HELD_OUT: int = 5
 
 
 # --------------------------------------------------------------------------- #

@@ -557,4 +557,44 @@ unmet with its measurement.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **`find_coincident_centroid_pair` returns a frozen `CoincidentCentroidPair`
+  dataclass, not a bare tuple.** `fit_centroid_spline`'s existing private
+  `_find_coincident_pair` returned a `(coord, level_a, level_b)` tuple with no
+  labels; AC2 requires both level names *and* both integer labels, and a named
+  dataclass keeps the pipeline's degradation-mapping construction
+  (`coincident.level_a`, `.label_a`, `.coordinate_mm`, …) readable rather than
+  indexing into a 5-tuple. `fit_centroid_spline`'s `ValueError` message is
+  built from the same result object so it cannot drift from the helper (AC4).
+  The old private name was not kept as an alias -- nothing in `src/` or
+  `tests/` referenced it (confirmed via `grep -rn _find_coincident_pair`), so
+  a thin-alias shim would only be dead code.
+- **`extract_feature_record` restructures its `len(labels) >= 2` branch into
+  three cases** (fewer than 2 labels; 2+ labels with a coincident pair; 2+
+  labels with none) rather than wrapping the existing Stage 3 block in a
+  `try`/`except`. This is the spec's "pre-check, not catch" decision (see
+  Assumptions): only the coincidence cause is pre-detected and degrades
+  gracefully, so any other `ValueError` the fit might raise still propagates
+  unchanged.
+- **Measured (Validation step 3, 2026-08-31):** at `n = 4` with an interior
+  level (`_LEVELS[1]`, offset 15 mm) displaced,
+  `compute_leave_one_out_spline_offsets` returns offsets
+  `[7.35e-05, 5.33e-06, 5.74e-06, 3.78e-05]` mm -- all `< 0.001` mm and equal
+  to the in-sample fallback, confirming the four-level blind spot AC26/AC27
+  describe. At `n = 6` with the analogous interior level displaced 15 mm, the
+  held-out estimator separates the displacement (measured on the spec's own
+  Description table: `15.31` mm at the displaced index vs `< 15.5` mm noise
+  elsewhere) -- confirming the floor move has no numeric consequence at `n=4`
+  and a real one at `n>=5`/`n=6`, exactly as the spec's Assumptions record.
+  This is the evidence item 135 needs to record Stage 29's four-level
+  acceptance line honestly rather than tick it.
+- **`report_schema_v0.json`'s new `stage3Unavailable` definition uses its own
+  `additionalProperties: false`**, mirroring every other nested definition in
+  this schema (`bbox`, `geometry`, `centroid`, …) rather than inlining the five
+  properties directly under `features.properties.stage3_unavailable` --
+  consistent with how `stage3` itself is a named, reusable definition.
+- **The `Degraded features:` section in `human_report.py` renders only the
+  `detail` string**, not the full `levels`/`labels`/`coordinate_mm`
+  structure -- `detail` is already required (schema) to name both levels and
+  the coordinate in one line (AC8), so re-deriving a second rendering from the
+  structured fields would duplicate that sentence for no benefit and risk the
+  two drifting apart.

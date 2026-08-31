@@ -163,6 +163,47 @@
         "stage3": {
           "description": "Optional Stage 3 deviation features (spline offset, orientation/curvature, neighbour-consistency). Absent for Stage-2-only reports.",
           "$ref": "#/definitions/stage3"
+        },
+        "stage3_unavailable": {
+          "description": "Optional diagnostic recording why the Stage 3 spline fit was not attempted (item 129) -- present only when at least two labels are present but Stage 3 was skipped, e.g. two centroids sharing an exact mm-coordinate. Deliberately outside the feature catalogue.",
+          "$ref": "#/definitions/stage3Unavailable"
+        }
+      }
+    },
+    "stage3Unavailable": {
+      "type": "object",
+      "description": "Records why the Stage 3 spline fit was skipped (item 129).",
+      "additionalProperties": false,
+      "required": ["reason", "detail", "levels", "labels", "coordinate_mm"],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "description": "The cause, e.g. 'coincident_centroids'."
+        },
+        "detail": {
+          "type": "string",
+          "description": "Single-line human-readable explanation naming the offending levels and coordinate."
+        },
+        "levels": {
+          "type": "array",
+          "description": "The two coincident level names, in the order the coincidence helper reported them.",
+          "items": {"type": "string"},
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "labels": {
+          "type": "array",
+          "description": "The two coincident integer labels, in the same order as 'levels'.",
+          "items": {"type": "integer"},
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "coordinate_mm": {
+          "type": "array",
+          "description": "The shared (x, y, z) mm-coordinate.",
+          "items": {"type": "number"},
+          "minItems": 3,
+          "maxItems": 3
         }
       }
     },

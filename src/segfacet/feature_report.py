@@ -376,6 +376,7 @@ def build_features_block(
     monotonic_consistency: "Optional[MonotonicConsistency]" = None,
     neighbourhood: "Optional[Sequence[VertebralNeighbourhood]]" = None,
     features_version: str = FEATURES_VERSION,
+    stage3_unavailable: "Optional[Mapping[str, object]]" = None,
 ) -> dict:
     """Assemble the ``features`` block from pre-computed Stage 2 (and optional
     Stage 3) dataclasses.
@@ -441,6 +442,16 @@ def build_features_block(
         Version discriminator embedded in the block; defaults to
         :data:`FEATURES_VERSION`. Overridden to :data:`FEATURES_VERSION_STAGE3`
         when any Stage 3 argument is non-``None``.
+    stage3_unavailable:
+        Optional mapping recording *why* Stage 3 was not attempted (item 129),
+        e.g. ``{"reason": "coincident_centroids", "detail": ..., "levels": [...],
+        "labels": [...], "coordinate_mm": [...]}``. When non-``None``, attached
+        to the returned block as ``block["stage3_unavailable"]`` (a fresh dict,
+        keys emitted in the fixed order ``reason, detail, levels, labels,
+        coordinate_mm`` -- never the caller's object). It does **not** affect
+        ``has_stage3``, so ``features_version`` stays unpromoted -- it is a
+        diagnostic status, deliberately outside the feature catalogue, not a
+        Stage 3 feature.
 
     Returns
     -------
@@ -547,6 +558,15 @@ def build_features_block(
             ]
 
         block["stage3"] = stage3
+
+    if stage3_unavailable is not None:
+        block["stage3_unavailable"] = {
+            "reason": stage3_unavailable["reason"],
+            "detail": stage3_unavailable["detail"],
+            "levels": list(stage3_unavailable["levels"]),
+            "labels": list(stage3_unavailable["labels"]),
+            "coordinate_mm": list(stage3_unavailable["coordinate_mm"]),
+        }
 
     return block
 

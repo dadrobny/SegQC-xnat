@@ -38,6 +38,17 @@ Design decisions (item 035)
    submodules) are deferred inside the functions**, consistent with the CLI's
    existing deferred-import style, so ``import segfacet.pipeline`` alone stays
    cheap.
+5. **Coincident centroids degrade the Stage 3 block, not the whole record
+   (item 129).** ``fit_centroid_spline`` raises ``ValueError`` when two
+   centroids share an exact mm-coordinate (item 119, AC16). Rather than let
+   that propagate out of ``extract_feature_record`` and lose every Stage 1/2
+   feature, the >= 2-label branch pre-checks with
+   ``features.spline.find_coincident_centroid_pair`` before attempting the
+   fit: on a coincidence, ``stage3_kwargs`` stays empty (so no ``stage3`` key
+   is emitted and ``features_version`` stays ``"0.1"``) and the cause is
+   recorded as a ``stage3_unavailable`` mapping instead. Pre-checking rather
+   than catching the broad ``ValueError`` means only this named cause
+   degrades gracefully; any other fit failure still propagates.
 5. **Read-only, deterministic, non-mutating.** Neither function mutates
    ``seg_img``, ``config``, ``base_reasons``, or ``base_per_label``; two calls
    on the same inputs return equal results (``aggregate_verdict`` /
@@ -126,7 +137,34 @@ def extract_feature_record(seg_img: "nib.Nifti1Image", config: "HeuristicConfig"
         overlaps = []
 
     stage3_kwargs: dict = {}
+    stage3_unavailable: Optional[dict] = None
     if len(labels) >= 2:
+        from segfacet.features.spline import find_coincident_centroid_pair
+
+        coincident = find_coincident_centroid_pair(ordered_centroids)
+    else:
+        coincident = None
+
+    if len(labels) >= 2 and coincident is not None:
+        # item 129 (D4): a pre-check rather than catching fit_centroid_spline's
+        # ValueError -- so we degrade only for the cause we can name, and any
+        # other ValueError from the Stage 3 fit still propagates. Stage 1/2
+        # features (already computed above) are unaffected; only stage3_kwargs
+        # stays empty.
+        detail = (
+            f"Levels {coincident.level_a!r} and {coincident.level_b!r} "
+            f"(labels {coincident.label_a}, {coincident.label_b}) share the "
+            f"exact centroid mm-coordinate {coincident.coordinate_mm}; the "
+            f"Stage 3 spline fit was not attempted."
+        )
+        stage3_unavailable = {
+            "reason": "coincident_centroids",
+            "detail": detail,
+            "levels": [coincident.level_a, coincident.level_b],
+            "labels": [coincident.label_a, coincident.label_b],
+            "coordinate_mm": list(coincident.coordinate_mm),
+        }
+    elif len(labels) >= 2:
         import math
 
         from segfacet.features.consistency import (
@@ -215,6 +253,7 @@ def extract_feature_record(seg_img: "nib.Nifti1Image", config: "HeuristicConfig"
         centroids=centroids,
         relationships=relationships,
         overlaps=overlaps,
+        stage3_unavailable=stage3_unavailable,
         **stage3_kwargs,
     )
 
