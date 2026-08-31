@@ -798,7 +798,10 @@ def test_adv_spine_curvature_still_frozen_with_new_fields():
 
 
 # =========================================================================== #
-# Adversarial: the retained unsigned arrays are unchanged by normalisation
+# Adversarial: inter_tangent_angles_deg is unchanged by direction
+# normalisation (tangent_angles_deg is no longer in this category as of item
+# 131, which derives it from the same normalised_tangents the signed arrays
+# use -- see tests/test_131_tangent_direction_normalisation.py)
 # =========================================================================== #
 
 
@@ -811,7 +814,8 @@ def test_adv_retained_arrays_invariant_to_direction_normalisation():
     inter_tangent_angles_deg array is the reverse of the original's -- proving
     the array is unaffected by whatever direction normalisation the new
     signed arrays apply internally, rather than merely re-asserting the
-    code's own output.
+    code's own output. (tangent_angles_deg is deliberately not claimed here
+    -- as of item 131 it is itself direction-normalised, unlike this array.)
     """
     forward = _curvature_for(_coronal_c_curve(7))
     cranial_first = _curvature_for(_cranial_first_c_curve(7))
@@ -825,10 +829,12 @@ def test_adv_retained_arrays_invariant_to_direction_normalisation():
 
 
 def test_adv_tangent_angles_deg_length_and_finiteness_on_cranial_first_input():
-    """tangent_angles_deg keeps its present (unsigned, un-normalised) meaning
-    on a cranial-first input too: it is not the new descriptor's concern to
-    correct it (that is item 121's territory per the Decisions log), only to
-    leave it finite and correctly shaped."""
+    """tangent_angles_deg stays correctly shaped and finite on a cranial-first
+    input. As of item 131 it is itself direction-normalised (derived from the
+    same normalised_tangents the signed arrays use), so this test no longer
+    demonstrates un-normalised behaviour -- see
+    tests/test_131_tangent_direction_normalisation.py for the normalisation
+    tests themselves; this test only pins shape and finiteness."""
     result = _curvature_for(_cranial_first_c_curve(7))
     assert len(result.tangent_angles_deg) == 7
     for v in result.tangent_angles_deg:
