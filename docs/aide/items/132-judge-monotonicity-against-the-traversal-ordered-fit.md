@@ -510,6 +510,16 @@ below was resolved with the most defensible default and recorded here.
 - `tests/test_057_acceptance_stage7.py` — `_PIPELINE_DETECTABLE_MODES`,
   `_RECONSTRUCTED_RECORD_MODES`, the 6/8 sensitivity test (value, name and
   docstring) and the module-docstring line quoting `6/8` (AC21, AC22).
+- `tests/test_120_leave_one_out_offset.py` —
+  `test_ac24_corpus_pipeline_detection_is_six_of_eight`: flip the corpus
+  sensitivity 6/8 → 7/8, mode 4's expected sensitivity 0.0 → 1.0, and rename
+  to `..._is_seven_of_eight` — missed consumer, added 2026-08-31, see
+  Decisions log.
+- `tests/test_116_ras_native_corpus.py` — AC7's
+  `test_ac7_case_identity_preserved_vs_merge_base[mode4_relabel_swap]`:
+  add an item-132 carve-out constant for the deliberate
+  `("mislabel", (21, 22))` finding, following `_ITEM_120_NEW_MISLABEL_CASES`'s
+  existing pattern — missed consumer, added 2026-08-31, see Decisions log.
 - `docs/aide/items/132-judge-monotonicity-against-the-traversal-ordered-fit.md`
   — this spec's Decisions log.
 - `docs/aide/insights.md` — append-only capture of out-of-scope findings.
@@ -812,3 +822,25 @@ box; neither tick happens here.
   `== {1, 2, 3, 5, 6, 7}` → `== {1, 2, 3, 4, 5, 6, 7}`) is flipped in this
   same reconciliation pass, and `tests/test_125_stage28_validation.py`'s
   Authorised-paths entry above is widened to cover it.
+- **2026-08-31: three further defects missed from the original authorised
+  edit list are now added to it, per the same precedent.** (1)
+  `tests/test_132_monotonicity_against_traversal_order.py`'s own
+  `test_ac30_golden_decision_table_byte_identical` used a raw hardcoded-sha256
+  fresh-vs-committed comparison that item 127's `committed_artifact_guard.py`
+  flags (`docs/aide/golden-decision-table.md` is deliberately absent from its
+  allowlist — read-only prose, never regenerated); rewritten as
+  `test_ac30_golden_decision_table_untouched_vs_base`, comparing via `git
+  diff` against the recorded base, following `test_126`'s
+  `test_ac22_guard_module_absent_from_this_items_diff` idiom. (2)
+  `tests/test_116_ras_native_corpus.py`'s AC7 case-identity test was not in
+  the original authorised list at all: `mode4_relabel_swap`'s new deliberate
+  `("mislabel", (21, 22))` finding is now carved out via an
+  `_ITEM_132_ADDED_MISLABEL_PAIR` constant, following the existing
+  `_ITEM_120_NEW_MISLABEL_CASES` pattern. (3)
+  `tests/test_120_leave_one_out_offset.py`'s
+  `test_ac24_corpus_pipeline_detection_is_six_of_eight` was checked and
+  declared no-edit-needed in the Testing Strategy's table (only its unused
+  `_PRE_120_VERDICTS_AND_FINDINGS` constant was checked) but the module also
+  carries a live corpus-sensitivity assertion pinning 6/8; flipped to 7/8 and
+  renamed `..._is_seven_of_eight`, mode 4's expected per-mode sensitivity
+  0.0 → 1.0.

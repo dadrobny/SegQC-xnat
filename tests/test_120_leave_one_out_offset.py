@@ -745,11 +745,14 @@ def _corpus_cohort_metrics():
     return compute_cohort_metrics(evaluation, failure_modes=FAILURE_MODE_NAMES)
 
 
-def test_ac24_corpus_pipeline_detection_is_six_of_eight():
+def test_ac24_corpus_pipeline_detection_is_seven_of_eight():
+    """Item 132 judges monotonicity against a traversal-ordered reference
+    fit, which newly detects mode 4 (the pure-ordering-defect case) -- corpus
+    sensitivity rises from 6/8 to 7/8."""
     metrics = _corpus_cohort_metrics()
-    assert metrics.sensitivity == pytest.approx(6.0 / 8.0)
+    assert metrics.sensitivity == pytest.approx(7.0 / 8.0)
 
-    expected_sensitivity = {1: 1.0, 2: 1.0, 3: 1.0, 4: 0.0, 5: 1.0, 6: 1.0, 7: 1.0, 8: 0.0}
+    expected_sensitivity = {1: 1.0, 2: 1.0, 3: 1.0, 4: 1.0, 5: 1.0, 6: 1.0, 7: 1.0, 8: 0.0}
     for mode, expected in expected_sensitivity.items():
         entry = next(m for m in metrics.per_mode if m.failure_mode == mode)
         assert entry.sensitivity == pytest.approx(expected), f"mode {mode}"

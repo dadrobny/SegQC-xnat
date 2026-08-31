@@ -372,6 +372,14 @@ _REFERENCE_SHA = _reference_sha()
 _ITEM_120_ADDED_MISLABEL_PAIR = ("mislabel", (22,))
 _ITEM_120_NEW_MISLABEL_CASES = frozenset({"mode1_displace", "mode6_crop_at_border"})
 
+#: Item 132 judges monotonicity against a traversal-ordered reference fit,
+#: which deliberately adds a ``mislabel`` finding on labels (21, 22) to
+#: ``mode4_relabel_swap`` (the pure-ordering-defect case this item's
+#: detector is built to catch) that the pre-migration committed golden
+#: (``_REFERENCE_GOLDEN_SHA``) does not carry.
+_ITEM_132_ADDED_MISLABEL_PAIR = ("mislabel", (21, 22))
+_ITEM_132_NEW_MISLABEL_CASES = frozenset({"mode4_relabel_swap"})
+
 
 @pytest.mark.skipif(
     _REFERENCE_SHA is None,
@@ -388,9 +396,11 @@ def test_ac7_case_identity_preserved_vs_merge_base(case):
     kept because other artefacts reference the test by name.
 
     Except for ``mode1_displace`` and ``mode6_crop_at_border``, where item
-    120 deliberately adds a ``mislabel`` finding on label 22 (AC18/AC23):
-    that one added pair is stripped from the fresh side before comparing so
-    the rest of each case's rule/label identity is still pinned exactly."""
+    120 deliberately adds a ``mislabel`` finding on label 22 (AC18/AC23),
+    and ``mode4_relabel_swap``, where item 132 deliberately adds a
+    ``mislabel`` finding on labels (21, 22): those added pairs are stripped
+    from the fresh side before comparing so the rest of each case's
+    rule/label identity is still pinned exactly."""
     fresh = build_report_for_case(case)
     committed = _reference_golden(case["case_id"], _REFERENCE_SHA)
     fresh_pairs = _rule_label_pairs(fresh["findings"])
@@ -400,6 +410,12 @@ def test_ac7_case_identity_preserved_vs_merge_base(case):
             "mislabel finding on label 22, but it did not fire"
         )
         fresh_pairs = [p for p in fresh_pairs if p != _ITEM_120_ADDED_MISLABEL_PAIR]
+    if case["case_id"] in _ITEM_132_NEW_MISLABEL_CASES:
+        assert _ITEM_132_ADDED_MISLABEL_PAIR in fresh_pairs, (
+            f"case {case['case_id']!r}: expected item 132's deliberate "
+            "mislabel finding on labels (21, 22), but it did not fire"
+        )
+        fresh_pairs = [p for p in fresh_pairs if p != _ITEM_132_ADDED_MISLABEL_PAIR]
     assert fresh_pairs == _rule_label_pairs(committed["findings"]), (
         f"case {case['case_id']!r}: designated rule/labels changed relative "
         "to the pre-migration reference golden (aeb2f55)"

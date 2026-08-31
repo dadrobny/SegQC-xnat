@@ -55,9 +55,9 @@ touches introduces one (Assumptions), so it is not invoked here.
 from __future__ import annotations
 
 import ast
-import hashlib
 import inspect
 import json
+import subprocess
 from pathlib import Path
 from typing import List, Tuple
 
@@ -77,13 +77,6 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _CATALOGUE_JSON = _REPO_ROOT / "docs" / "aide" / "feature_catalogue.generated.json"
 _CATALOGUE_MD = _REPO_ROOT / "docs" / "aide" / "feature_catalogue.generated.md"
 _GOLDEN_DECISION_TABLE = _REPO_ROOT / "docs" / "aide" / "golden-decision-table.md"
-
-# sha256 of docs/aide/golden-decision-table.md as committed on this item's
-# parent commit (2026-08-31) -- AC30 pins it byte-identical; item 132's
-# Description explicitly leaves this document untouched.
-_PRE_ITEM_GOLDEN_DECISION_TABLE_SHA256 = (
-    "6a6d4a3be822d168607207562749450ae40855fa22a77396bb0a0567bd99a21f"
-)
 
 
 # =========================================================================== #
@@ -661,9 +654,39 @@ def test_ac30_status_overrides_byte_identical():
         )
 
 
-def test_ac30_golden_decision_table_byte_identical():
-    digest = hashlib.sha256(_GOLDEN_DECISION_TABLE.read_bytes()).hexdigest()
-    assert digest == _PRE_ITEM_GOLDEN_DECISION_TABLE_SHA256
+def test_ac30_golden_decision_table_untouched_vs_base():
+    """AC30: item 132's diff against its recorded base carries no change to
+    ``docs/aide/golden-decision-table.md`` -- the item's Description
+    explicitly leaves this document untouched. Uses ``git diff`` against the
+    recorded base rather than a hardcoded sha256 fence: the committed-artifact
+    guard (item 127) flags a raw fresh-vs-committed byte/hash comparison, and
+    this document is deliberately excluded from its allowlist (it is
+    read-only prose, never regenerated) -- see
+    ``tests/committed_artifact_guard.py``'s module docstring and
+    ``test_126``'s ``test_ac22_guard_module_absent_from_this_items_diff`` for
+    the same idiom.
+    """
+    result = None
+    for base_ref in ("origin/aide/queue-018", "aide/queue-018"):
+        result = subprocess.run(
+            ["git", "diff", "--name-only", f"{base_ref}...HEAD", "--"],
+            cwd=_REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode == 0:
+            break
+    if result is None or result.returncode != 0:
+        pytest.skip(
+            f"git diff against the recorded base is unavailable: "
+            f"{result.stderr if result else 'no ref resolved'}"
+        )
+    changed = {line.strip() for line in result.stdout.splitlines() if line.strip()}
+    assert "docs/aide/golden-decision-table.md" not in changed, (
+        "docs/aide/golden-decision-table.md appears in this item's diff, but "
+        "AC30 requires it stay untouched"
+    )
 
 
 # =========================================================================== #
