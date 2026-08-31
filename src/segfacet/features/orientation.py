@@ -13,11 +13,13 @@ Two related descriptors contribute to spinal geometry:
     and signed, plane-stated curvature sweeps (item 122): a coronal (R-S plane)
     and a sagittal (A-S plane) unwrapped signed tangent-angle array, each
     reduced to a per-plane ``max - min`` sweep, with ``total_curvature_deg``
-    the larger of the two and ``curvature_plane`` naming which one.  Both
-    signed arrays are computed against tangents normalised to a consistent
-    cranial-to-caudal traversal direction, so the sweep is invariant to
-    whether the caller supplied centroids cranial-first or caudal-first.  The
-    plane statement holds only when centroids are RAS-ordered mm coordinates
+    the larger of the two and ``curvature_plane`` naming which one.  Both the
+    signed per-plane arrays and the unsigned ``tangent_angles_deg`` (item 131)
+    are computed against tangents normalised so the sequence advances
+    superiorly, so each is invariant to whether the caller supplied centroids
+    cranial-first or caudal-first (see
+    :data:`TANGENT_DIRECTION_CONVENTION`).  The plane statement holds only
+    when centroids are RAS-ordered mm coordinates
     (axis 0 = Right, 1 = Anterior, 2 = Superior), which is guaranteed for any
     volume loaded via :func:`segfacet.io.load_volume`.  Tangents come from
     :func:`~segfacet.features.spline.evaluate_spline_derivative` (item 119) —
@@ -77,7 +79,23 @@ __all__ = [
     "compute_vertebra_orientations",
     "compute_spine_curvature",
     "compute_vertebra_tangent_orientations",
+    "TANGENT_DIRECTION_CONVENTION",
 ]
+
+#: Canonical statement of the tangent direction-normalisation convention
+#: (item 122's rule, applied repo-wide by item 131). Every consumer of this
+#: convention -- docstrings, FEATURE_DOCS, report_schema_v0.json -- restates
+#: the same key phrase this constant carries, so there is exactly one place
+#: to change the wording.
+TANGENT_DIRECTION_CONVENTION = (
+    "When the ordered centroids' net advance in +S (the last centroid's S "
+    "coordinate minus the first's) is negative, every unit tangent is "
+    "negated once, globally -- never per-element -- so the sequence is read "
+    "as if it were normalised so the sequence advances superiorly, "
+    "regardless of whether the caller supplied it cranial-first or "
+    "caudal-first. At exactly zero net advance (a tie), no negation is "
+    "applied, and the un-negated tangents are used as-is."
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -130,11 +148,18 @@ class SpineCurvature:
     ----------
     tangent_angles_deg : Tuple[float, ...]
         Angle (degrees) of the spline tangent at each input centroid's u value,
-        relative to the z-axis (superior-inferior axis).  Length matches the
-        number of centroids.
+        relative to the z-axis (superior-inferior axis), computed from tangents
+        normalised so the sequence advances superiorly (item 131; see
+        :data:`TANGENT_DIRECTION_CONVENTION`) -- invariant to whether the
+        caller supplied centroids cranial-first or caudal-first.  Length
+        matches the number of centroids.
     inter_tangent_angles_deg : Tuple[float, ...]
         Angle (degrees) between consecutive tangent vectors.  Length is
-        ``n_centroids - 1``.  Always non-negative.
+        ``n_centroids - 1``.  Always non-negative.  Already invariant to
+        traversal direction with no normalisation needed
+        (``angle_between(-a, -b) == angle_between(a, b)``); read as if the
+        tangents were normalised so the sequence advances superiorly, the same
+        convention ``tangent_angles_deg`` uses (item 131).
     total_curvature_deg : float
         The larger of ``coronal_curvature_deg`` and ``sagittal_curvature_deg``
         — the sweep in the anatomical plane the spine turns in most.  ``0.0``
@@ -143,8 +168,8 @@ class SpineCurvature:
     coronal_tangent_angles_deg : Tuple[float, ...]
         Signed tangent angle in the coronal (R-S) plane at each centroid:
         ``degrees(atan2(t_R, t_S))``, unwrapped along the ordered centroid
-        sequence and computed from tangents normalised to a cranial-to-caudal
-        traversal direction (item 122). Positive means the tangent tilts
+        sequence and computed from tangents normalised so the sequence
+        advances superiorly (item 122). Positive means the tangent tilts
         toward the patient's right as the spine advances cranially. Requires
         RAS-ordered mm centroids (axis 0 = Right, 1 = Anterior, 2 = Superior),
         guaranteed by :func:`segfacet.io.load_volume`. Length matches the
@@ -455,30 +480,37 @@ def compute_spine_curvature(
     norms = np.where(norms < 1e-12, 1.0, norms)
     unit_tangents = tangents / norms  # (n, 3)
 
-    # Angle of each tangent relative to the z-axis.
-    tangent_angles_deg: Tuple[float, ...] = tuple(
-        _angle_to_z_axis_deg(unit_tangents[i]) for i in range(n)
-    )
-
-    # Inter-tangent angles between consecutive tangent vectors.
-    inter_tangent_angles_deg: Tuple[float, ...] = tuple(
-        _angle_between_unit_vectors_deg(unit_tangents[i], unit_tangents[i + 1])
-        for i in range(n - 1)
-    )
-
-    # Direction normalisation (item 122): the signed angles below are measured
-    # against +S, so a cranial-first (caudally-advancing) sequence would read
-    # every tangent near +/-180 degrees. Negate tangents when the net advance
-    # (last centroid's S minus first's) is caudal, so the descriptor measures
-    # tilt relative to the cranio-caudal axis regardless of traversal order.
-    # This normalised copy feeds only the new signed arrays below;
-    # tangent_angles_deg and inter_tangent_angles_deg above are unaffected
-    # (both are already invariant to a global tangent sign flip).
+    # Direction normalisation (item 122; see TANGENT_DIRECTION_CONVENTION,
+    # AC8): a cranial-first (caudally-advancing) sequence would otherwise read
+    # every tangent near +/-180 degrees relative to +S. Negate every tangent
+    # once, globally -- never per-element -- when the net advance (last
+    # centroid's S minus first's) is negative, so the whole sequence reads as
+    # advancing superiorly regardless of the caller's traversal order. At
+    # exactly zero net advance (item 122's strict '< 0'), no negation is
+    # applied. This normalised array feeds tangent_angles_deg (item 131) and
+    # the signed per-plane arrays below (item 122).
     net_advance_s = float(centroids[-1].centroid_mm[2]) - float(centroids[0].centroid_mm[2])
     if net_advance_s < 0:
         normalised_tangents = -unit_tangents
     else:
         normalised_tangents = unit_tangents
+
+    # Angle of each direction-normalised tangent relative to the z-axis
+    # (item 131 -- previously derived from the raw, un-normalised tangents).
+    tangent_angles_deg: Tuple[float, ...] = tuple(
+        _angle_to_z_axis_deg(normalised_tangents[i]) for i in range(n)
+    )
+
+    # Inter-tangent angles between consecutive tangent vectors. Computed from
+    # the raw unit_tangents rather than normalised_tangents -- the two give a
+    # bit-identical result here because angle_between(-a, -b) ==
+    # angle_between(a, b) (negation is a sign-bit flip; the dot product and
+    # both norms sum in the same order either way), so this array needs no
+    # direction normalisation and is already invariant to traversal order.
+    inter_tangent_angles_deg: Tuple[float, ...] = tuple(
+        _angle_between_unit_vectors_deg(unit_tangents[i], unit_tangents[i + 1])
+        for i in range(n - 1)
+    )
 
     coronal_tangent_angles = _signed_plane_angles_deg(normalised_tangents, axis=0)
     sagittal_tangent_angles = _signed_plane_angles_deg(normalised_tangents, axis=1)
@@ -545,7 +577,7 @@ class VertebralTangentOrientation:
     tangent : Tuple[float, float, float]
         Unit-normalised curve tangent at ``closest_u``
         (:func:`~segfacet.features.spline.evaluate_spline_derivative`,
-        ``nu=1``), direction-normalised to a cranial-to-caudal traversal
+        ``nu=1``), normalised so the sequence advances superiorly
         (negated when the input sequence's net advance is caudal), so the
         estimate is invariant to the caller's traversal direction.
     coronal_deg : float

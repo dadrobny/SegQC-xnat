@@ -501,12 +501,12 @@
       "properties": {
         "tangent_angles_deg": {
           "type": "array",
-          "description": "Spline tangent angle (degrees) at each centroid's u value, relative to the z-axis.",
+          "description": "Spline tangent angle (degrees) at each centroid's u value, relative to the z-axis, computed from tangents normalised so the sequence advances superiorly (item 131), invariant to whether the caller supplied centroids cranial-first or caudal-first.",
           "items": {"type": "number"}
         },
         "inter_tangent_angles_deg": {
           "type": "array",
-          "description": "Angle (degrees) between consecutive tangent vectors. Length is n_centroids - 1.",
+          "description": "Angle (degrees) between consecutive tangent vectors. Length is n_centroids - 1. Read as if the tangents were normalised so the sequence advances superiorly; already invariant to traversal direction, so no negation is needed to produce that reading.",
           "items": {"type": "number"}
         },
         "total_curvature_deg": {
@@ -516,7 +516,7 @@
         },
         "coronal_tangent_angles_deg": {
           "type": "array",
-          "description": "Signed tangent angle (degrees) in the coronal (R-S) plane at each centroid: degrees(atan2(t_R, t_S)), unwrapped along the spine and computed from tangents normalised to a cranial-to-caudal traversal direction. Positive tilts toward the patient's right as the spine advances cranially. Requires RAS-ordered mm centroids (io.load_volume reorients every volume to R, A, S).",
+          "description": "Signed tangent angle (degrees) in the coronal (R-S) plane at each centroid: degrees(atan2(t_R, t_S)), unwrapped along the spine and computed from tangents normalised so the sequence advances superiorly. Positive tilts toward the patient's right as the spine advances cranially. Requires RAS-ordered mm centroids (io.load_volume reorients every volume to R, A, S).",
           "items": {"type": "number"}
         },
         "sagittal_tangent_angles_deg": {

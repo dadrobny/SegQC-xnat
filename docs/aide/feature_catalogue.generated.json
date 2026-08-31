@@ -3416,7 +3416,7 @@
           "units": "degrees"
         },
         {
-          "computation": "degrees(atan2(t_R, t_S)) per centroid, unwrapped along the ordered sequence, computed from tangents normalised to a cranial-to-caudal traversal direction. Requires RAS-ordered mm centroids (axis 0 = Right, 1 = Anterior, 2 = Superior), guaranteed by io.load_volume.",
+          "computation": "degrees(atan2(t_R, t_S)) per centroid, unwrapped along the ordered sequence, computed from tangents normalised so the sequence advances superiorly. Requires RAS-ordered mm centroids (axis 0 = Right, 1 = Anterior, 2 = Superior), guaranteed by io.load_volume.",
           "consumers": [],
           "consuming_rules": [],
           "documented": true,
@@ -3510,7 +3510,7 @@
           "units": ""
         },
         {
-          "computation": "Angle between each pair of adjacent unit tangent vectors along the spine.",
+          "computation": "Angle between each pair of adjacent unit tangent vectors along the spine, read as if the tangents were normalised so the sequence advances superiorly (item 122); already invariant to traversal direction so no negation is needed to produce that reading.",
           "consumers": [],
           "consuming_rules": [],
           "documented": true,
@@ -3604,7 +3604,7 @@
           "units": "degrees"
         },
         {
-          "computation": "degrees(atan2(t_A, t_S)) per centroid, unwrapped along the ordered sequence, computed from tangents normalised to a cranial-to-caudal traversal direction. Requires RAS-ordered mm centroids (axis 0 = Right, 1 = Anterior, 2 = Superior), guaranteed by io.load_volume.",
+          "computation": "degrees(atan2(t_A, t_S)) per centroid, unwrapped along the ordered sequence, computed from tangents normalised so the sequence advances superiorly. Requires RAS-ordered mm centroids (axis 0 = Right, 1 = Anterior, 2 = Superior), guaranteed by io.load_volume.",
           "consumers": [],
           "consuming_rules": [],
           "documented": true,
@@ -3651,7 +3651,7 @@
           "units": "degrees"
         },
         {
-          "computation": "Evaluated at each vertebra's stored u via the spline's first derivative (evaluate_spline_derivative, nu=1).",
+          "computation": "Evaluated at each vertebra's stored u via the spline's first derivative (evaluate_spline_derivative, nu=1), from tangents normalised so the sequence advances superiorly (item 131), invariant to whether the caller supplied centroids cranial-first or caudal-first.",
           "consumers": [],
           "consuming_rules": [],
           "documented": true,

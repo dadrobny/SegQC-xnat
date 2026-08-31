@@ -561,4 +561,59 @@ fails-before-the-fix check as part of the Stage 29 validation.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Implementation followed the spec's step 1-8 shape exactly.** In
+  `compute_spine_curvature`, the `net_advance_s` / `normalised_tangents`
+  block was moved above the angle computations; `tangent_angles_deg` is now
+  `_angle_to_z_axis_deg(normalised_tangents[i])`; `inter_tangent_angles_deg`
+  stays on `unit_tangents` (bit-identical to `normalised_tangents` per the
+  proven `angle_between(-a, -b) == angle_between(a, b)` identity), with a
+  one-line comment naming that identity so a later reader does not "fix" an
+  apparent inconsistency.
+
+- **The AC8 canonical constant is `TANGENT_DIRECTION_CONVENTION`**, a
+  module-level string in `features/orientation.py`, added to `__all__`. Its
+  text states the trigger (net `+S` advance negative), the result (every
+  tangent negated once, globally, so the sequence is read as advancing
+  superiorly), the "global, never per-element" rule, and the zero-net-advance
+  tie-break (no negation applied), and it embeds the exact canonical key
+  phrase `normalised so the sequence advances superiorly` (the Assumptions
+  section's chosen wording) — one string, one place to change the wording,
+  satisfying `test_ac8_*`/`test_ac24_canonical_constant_names_the_tie_break`.
+
+- **`cranial-to-caudal traversal` replaced at all five pinned sites** —
+  `features/orientation.py:18` (module docstring Part B) and the
+  `VertebralTangentOrientation.tangent` attribute doc (item 121, prose-only,
+  values unmoved per AC22), `feature_docs.py`'s coronal/sagittal
+  `computation` texts, and `report_schema_v0.json`'s coronal `description` —
+  each replaced with the canonical phrasing while preserving its plane word
+  and RAS marker (AC14). Two other `orientation.py` sites use the
+  differently-worded "cranial-to-caudal direction" (no "traversal"), which is
+  not the retired phrase AC12 targets, so those were left as-is; the
+  `coronal_tangent_angles_deg`/`sagittal_tangent_angles_deg` docstring block
+  and `SpineCurvature` module docstring were also reworded for consistency
+  even though they weren't literal AC12 hits.
+
+- **`report_schema_v0.json` edits stayed inside the three keys the spec
+  authorises** (`tangent_angles_deg`, `inter_tangent_angles_deg`,
+  `coronal_tangent_angles_deg`) — `sagittal_tangent_angles_deg`'s
+  description never carried the retired phrase, so it was left untouched
+  rather than widening the authorised-paths list.
+
+- **Catalogue regenerated in the same commit** via
+  `python -m segfacet.catalogue --json docs/aide/feature_catalogue.generated.json
+  --md docs/aide/feature_catalogue.generated.md`. Diff confirmed limited to
+  the four `stage3.curvature.*` `computation` cells; leaf-path count stayed
+  at 138, the eight `stage3.curvature.*` paths unchanged, and the two
+  observed-range cells (`0–8.1652`, `3.83716–7.59031`) with `varies`/`retune`
+  verdicts unchanged — matching AC15-AC17.
+
+- **Verified by direct (non-pytest) replay**, per the spec's Validation
+  section: `clean_control`'s ordered and reversed centroid sequences through
+  `fit_centroid_spline` + `compute_spine_curvature` now both read
+  `[8.1652, 4.0730, 0.0, 4.0730, 8.1652]` (pre-fix the reversed reading was
+  `[171.8348, 175.9270, 180.0, 175.9270, 171.8348]`); `mode4_relabel_swap`'s
+  `tangent_angles_deg` through `extract_feature_record` reads
+  `[3.2953, 177.649, 175.2184, 1.4658, 22.0118]`, matching AC4/AC5's pinned
+  tables; the `segfacet run --no-reference` CLI replay on
+  `clean_control_seg.nii.gz` emits `features.stage3.curvature.tangent_angles_deg
+  == [8.1652..., 4.0730..., 0.0, 4.0730..., 8.1652...]`, matching AC5's row.
