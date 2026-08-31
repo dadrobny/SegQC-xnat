@@ -448,8 +448,6 @@ of them added during this queue) is the **queue boundary's** job
   `violation_message` over the real `tests/` tree. Read, never edited.
 - `tests/test_127_committed_artifact_tolerance.py` — AC5 runs its AC15 sweep
   test. Read, never edited.
-- `tests/test_126_golden_retirement.py` — AC2/AC4 read its replacement and
-  retired-path constants. Read, never edited.
 - `tests/report_format_fixture.py`, `tests/golden/report_format_contract.json` —
   AC2/AC3 exercise the surviving format fixture; the deletion replay happens in
   the clone, and both files are unchanged in this item's diff.
@@ -843,3 +841,13 @@ which legitimately references the retired `tests/corpus/golden` path while
 checking the retirement — the same missed-consumer shape items 106/115/125/126/132
 already hit for their own paths. Added to the allowlist and to this item's own
 Authorised paths above.
+
+**Documentation reconciliation, recorded 2026-08-31.** Removed the stale
+`tests/test_126_golden_retirement.py` bullet from Authorised paths' Asserts-against
+list (it duplicated the May-change entry the AC17 fix above added, and read-only
+no longer described the file once commit `a496cae` started editing it); `aide
+scope 135` now reports OK. `insights.md` entries 37 (the AC17 allowlist gap) and
+38 (the bullet-status literal bug) were both already resolved by commit `a496cae`
+within this item, so both were ticked via `aide insights tick` rather than left
+open — the entry text is unchanged, only the checkbox and a pointer note were
+added, per the immutability rule.
