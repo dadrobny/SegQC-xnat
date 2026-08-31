@@ -1296,7 +1296,7 @@ per-deliverable provenance.
 - ✅ **D1** The golden retirement executed: nine `tests/corpus/golden/*.json` and two
   `tests/golden/` snapshots gone, the four per-row replacements in place, nothing
   regenerated on the way out. *(Item 126)*
-- 📋 **D2** Tolerance by construction: shared committed-artifact comparison helper plus an
+- 🚧 **D2** Tolerance by construction: shared committed-artifact comparison helper plus an
   enforcing guard extending `tests/test_111_golden_guard.py`'s byte-exact allowlist.
   *(Item 127)*
 - 📋 **D3** The `reference_verse_v1` integrity pin relocated to a test named for the
