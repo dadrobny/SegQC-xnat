@@ -19,7 +19,8 @@ Covers Acceptance Criteria AC1-AC13:
 - AC6: cropping toward each of the six named anatomical faces sets that
   face's ``touches_*`` flag on the real generator's output.
 - AC7: every corpus case still trips the same ``(rule_id, labels)`` pairs as
-  the pre-migration corpus, sourced from the merge-base goldens.
+  the pre-migration corpus, sourced from the goldens at a pinned reference
+  commit (``aeb2f55``, read from git history).
 - AC8: the ``mode6_crop_at_border`` per-mode sensitivity is restored to 1.0.
 - AC9: a ``(0.0, 1.0, 1.0)`` spacing through the eval harness does not raise.
 - AC10/AC11: regenerating fixtures, the manifest, and goldens twice is
@@ -30,10 +31,10 @@ level removed; anisotropic spacing; a fixture whose affine is deliberately
 made untruthful (AC2 must fail for it).
 
 All fixtures are built in-memory or under pytest's ``tmp_path`` -- no
-absolute filesystem paths, no network. The AC7 merge-base lookup shells out
-to ``git`` read-only against the local repository and skips (rather than
-errors) if that is unavailable, since it is a robustness aid, not this
-item's core contract.
+absolute filesystem paths, no network. The AC7 reference-golden lookup shells
+out to ``git`` read-only against the local repository and skips (rather than
+errors) if ``git`` or the pinned commit is unavailable, since it is a
+robustness aid, not this item's core contract.
 """
 
 from __future__ import annotations
@@ -298,61 +299,48 @@ def test_ac6_crop_at_border_sets_the_matching_touches_flag(face):
 # =========================================================================== #
 
 
-#: Candidate refs (checked in order) to compute the merge-base against --
-#: whichever resolves first in this checkout. "main" is preferred (stays
-#: stable across every future commit on this branch); the remotes and the
-#: item's declared dependency branch are fallbacks for a checkout that only
-#: fetched a subset of branches.
-_MERGE_BASE_CANDIDATE_REFS = (
-    "main",
-    "origin/main",
-    "aide/108-ras-correct-touches-face-mapping",
-    "origin/aide/108-ras-correct-touches-face-mapping",
-)
+#: The commit whose committed goldens are the AC7 identity reference:
+#: ``aeb2f55`` -- "Merge pull request #55 from dadrobny/chore/framework-1.21.0",
+#: the last ``main`` commit before queue-017 landed (PR #56, 2026-08-30).
+#:
+#: This used to be ``git merge-base HEAD main``. That was correct only while
+#: queue-017 was an open PR: the strip logic below assumes the reference
+#: golden predates item 120, and once PR #56 merged, every branch's merge base
+#: became current ``main``, whose goldens already carry item 120's added pair.
+#: Measured 2026-08-31 --
+#: ``git show aeb2f55:tests/corpus/golden/mode1_displace.json | grep -c '"mislabel"'``
+#: gives 0, while the same probe at ``fda97b0`` (``main`` after PR #56) gives 1
+#: -- so ``mode1_displace`` and ``mode6_crop_at_border`` failed by
+#: construction against a moving merge base. ``aeb2f55`` is the exact snapshot
+#: every queue-017 branch was validated against, so identity vs. that commit
+#: is what the strip logic always meant.
+#:
+#: The goldens are read from git history (``git show <sha>:<path>``), never
+#: from the working tree, so item 126's deletion of
+#: ``tests/corpus/golden/*.json`` does not affect this test.
+_REFERENCE_GOLDEN_SHA = "aeb2f5581878b76336de5716ed118dcea37dfb61"
 
 
-def _merge_base_sha():
-    for ref in _MERGE_BASE_CANDIDATE_REFS:
-        try:
-            verify = subprocess.run(
-                ["git", "rev-parse", "--verify", "--quiet", ref],
-                cwd=str(_REPO_ROOT),
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return None
-        if verify.returncode != 0:
-            continue
-        try:
-            result = subprocess.run(
-                ["git", "merge-base", "HEAD", ref],
-                cwd=str(_REPO_ROOT),
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return None
-        if result.returncode != 0:
-            continue
-        sha = result.stdout.strip()
-        if not sha:
-            continue
+def _reference_sha():
+    """Return ``_REFERENCE_GOLDEN_SHA`` if it is reachable in this clone, else
+    ``None`` (no ``git``, or a shallow checkout that does not carry the
+    commit). CI checks out with ``fetch-depth: 0``, so it is reachable there."""
+    try:
         probe = subprocess.run(
-            ["git", "show", f"{sha}:tests/corpus/golden/clean_control.json"],
+            ["git", "cat-file", "-e", f"{_REFERENCE_GOLDEN_SHA}^{{commit}}"],
             cwd=str(_REPO_ROOT),
             capture_output=True,
             text=True,
             timeout=30,
         )
-        if probe.returncode == 0:
-            return sha
-    return None
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if probe.returncode != 0:
+        return None
+    return _REFERENCE_GOLDEN_SHA
 
 
-def _merge_base_golden(case_id: str, sha: str) -> dict:
+def _reference_golden(case_id: str, sha: str) -> dict:
     result = subprocess.run(
         ["git", "show", f"{sha}:tests/corpus/golden/{case_id}.json"],
         cwd=str(_REPO_ROOT),
@@ -372,32 +360,39 @@ def _rule_label_pairs(findings) -> list:
 
 
 _MANIFEST_CASES = load_manifest()["cases"]
-_MERGE_BASE_SHA = _merge_base_sha()
+_REFERENCE_SHA = _reference_sha()
 
 
 #: Item 120 makes the per-vertebra spline offset a held-out measurement,
 #: which deliberately adds a ``mislabel`` finding on label 22 to these two
-#: cases (AC18/AC23) that the merge-base (pre-120) committed golden does not
-#: carry. Widened by human decision, 2026-08-28 -- see
+#: cases (AC18/AC23) that the pre-120 reference snapshot's committed golden
+#: (``_REFERENCE_GOLDEN_SHA``) does not carry. Widened by human decision, 2026-08-28 -- see
 #: docs/aide/items/120-per-vertebra-offset-that-separates.md's Authorised
 #: paths entry for this test.
 _ITEM_120_ADDED_MISLABEL_PAIR = ("mislabel", (22,))
 _ITEM_120_NEW_MISLABEL_CASES = frozenset({"mode1_displace", "mode6_crop_at_border"})
 
 
-@pytest.mark.skipif(_MERGE_BASE_SHA is None, reason="git merge-base unavailable in this environment")
+@pytest.mark.skipif(
+    _REFERENCE_SHA is None,
+    reason="reference commit aeb2f55 not present in this clone",
+)
 @pytest.mark.parametrize("case", _MANIFEST_CASES, ids=lambda c: c["case_id"])
 def test_ac7_case_identity_preserved_vs_merge_base(case):
     """AC7: the freshly-built report's (rule_id, sorted labels) pairs match
-    the merge-base (pre-migration) committed golden's exactly -- numeric
-    feature values may move, but which rule fires on which labels must not.
+    the pre-migration committed golden's exactly -- numeric feature values may
+    move, but which rule fires on which labels must not. The reference golden
+    is the one committed at ``_REFERENCE_GOLDEN_SHA`` (``aeb2f55``), read from
+    git history. The ``_vs_merge_base`` in this test's name is historical --
+    it was a moving ``git merge-base HEAD main`` until 2026-08-31 -- and is
+    kept because other artefacts reference the test by name.
 
     Except for ``mode1_displace`` and ``mode6_crop_at_border``, where item
     120 deliberately adds a ``mislabel`` finding on label 22 (AC18/AC23):
     that one added pair is stripped from the fresh side before comparing so
     the rest of each case's rule/label identity is still pinned exactly."""
     fresh = build_report_for_case(case)
-    committed = _merge_base_golden(case["case_id"], _MERGE_BASE_SHA)
+    committed = _reference_golden(case["case_id"], _REFERENCE_SHA)
     fresh_pairs = _rule_label_pairs(fresh["findings"])
     if case["case_id"] in _ITEM_120_NEW_MISLABEL_CASES:
         assert _ITEM_120_ADDED_MISLABEL_PAIR in fresh_pairs, (
@@ -407,7 +402,7 @@ def test_ac7_case_identity_preserved_vs_merge_base(case):
         fresh_pairs = [p for p in fresh_pairs if p != _ITEM_120_ADDED_MISLABEL_PAIR]
     assert fresh_pairs == _rule_label_pairs(committed["findings"]), (
         f"case {case['case_id']!r}: designated rule/labels changed relative "
-        "to the pre-migration (merge-base) golden"
+        "to the pre-migration reference golden (aeb2f55)"
     )
 
 
