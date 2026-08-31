@@ -4,7 +4,10 @@
 .gitattributes text eol=lf
 
 tests/corpus/manifest.json text eol=lf
-tests/corpus/golden/*.json text eol=lf
+# The committed corpus-golden snapshot family's eol=lf pin was removed here
+# by item 126, which retired the family (docs/aide/golden-decision-table.md's
+# "## Retirement execution log"); tests/corpus/fixtures/*.nii.gz below is
+# untouched -- the corpus itself survives.
 tests/corpus/fixtures/*.nii.gz binary
 src/segfacet/reference/reference_default.json text eol=lf
 src/segfacet/reference/reference_verse_*.json text eol=lf
