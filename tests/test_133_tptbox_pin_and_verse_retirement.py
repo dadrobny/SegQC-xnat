@@ -317,10 +317,16 @@ def test_ac5_install_doc_names_expected_wheel_digest():
 
 
 def test_ac6_no_stale_pin_literal_anywhere_under_tests():
+    # The needle itself must still be the exact stale-pin string this AC
+    # guards against -- built at runtime so this module (which discusses the
+    # retired pin in its own docstring/messages) carries no matching literal
+    # for its own sweep to trip over.
+    stale_pin = "tptbox==" + "0.7.5"
+    assert stale_pin == "tptbox==0.7.5"
     offending = sorted(
-        str(path.relative_to(REPO_ROOT))
+        path.relative_to(REPO_ROOT).as_posix()
         for path in TESTS_DIR.rglob("*.py")
-        if "tptbox==0.7.5" in path.read_text(encoding="utf-8")
+        if path.name != Path(__file__).name and stale_pin in path.read_text(encoding="utf-8")
     )
     assert offending == [], f"stale tptbox==0.7.5 literal(s) in: {offending}"
 
