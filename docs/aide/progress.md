@@ -1299,7 +1299,7 @@ per-deliverable provenance.
 - ✅ **D2** Tolerance by construction: shared committed-artifact comparison helper plus an
   enforcing guard extending `tests/test_111_golden_guard.py`'s byte-exact allowlist.
   *(Item 127)*
-- 📋 **D3** The `reference_verse_v1` integrity pin relocated to a test named for the
+- 🚧 **D3** The `reference_verse_v1` integrity pin relocated to a test named for the
   artifact (its `.gitattributes` pin carried across) and the `test_102` fence header
   renamed to say what it checks. *(Item 128)*
 - 📋 **D4 + D5** Coincident centroids degrade to a report instead of a traceback at the
