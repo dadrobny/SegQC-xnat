@@ -6,11 +6,11 @@ something item 098 has nothing to do with.
 ``reference_verse_v1.json`` is a **released production artifact**: the
 VerSe-derived reference-distribution artifact built from mounted VerSe19
 ground truth ([`docs/aide/golden-decision-table.md`](../docs/aide/golden-
-decision-table.md) Section 2, disposition ``keep``). It is **not regenerable
-in CI** -- nothing in the test suite can rebuild it from the real cohort --
-so the sha256 pin below is the only thing standing between it and silent
-corruption. Item 123 rebuilt the artifact from the real VerSe19 cohort under
-the item-120 held-out estimator and moved the digest; the literal below pins
+decision-table.md) Section 2, disposition ``keep``). It is
+**not regenerable in CI** -- nothing in the test suite can rebuild it from
+the real cohort -- so the sha256 pin below is the only thing standing between
+it and silent corruption. Item 123 rebuilt the artifact from the real VerSe19
+cohort under the item-120 held-out estimator and moved the digest; the literal below pins
 that item-123-rebuilt state, and only whoever reruns the rebuild against the
 real cohort may move it again.
 """
