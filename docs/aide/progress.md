@@ -1308,7 +1308,7 @@ per-deliverable provenance.
   distributions rebuilt. *(Item 129)*
 - ✅ **D6** Spline plumbing consolidation: one closest-point search, one in-sample fit per
   case. *(Item 130)*
-- 📋 **D7** `tangent_angles_deg[]` traversal-direction normalisation to item 122's
+- 🚧 **D7** `tangent_angles_deg[]` traversal-direction normalisation to item 122's
   convention. *(Item 131)*
 - 📋 **D8** `consistency.py` monotonicity judged against the smoothed fit so mode 4 fires.
   *(Item 132)*
