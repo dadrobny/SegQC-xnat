@@ -203,6 +203,8 @@ def _collect_node_ids(extra_args: list[str]) -> set[str]:
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=180,
     )
     node_ids: set[str] = set()

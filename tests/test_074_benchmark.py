@@ -278,6 +278,8 @@ def test_ac11_no_new_binary_fixture_added_by_this_item():
         ["git", "diff", "--name-only", "--diff-filter=A", "main...HEAD"],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=REPO_ROOT,
     )
     if result.returncode != 0:

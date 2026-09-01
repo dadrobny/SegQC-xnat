@@ -122,6 +122,8 @@ def test_ac2_check_attr_reports_lf_pin_for_both_files():
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=30,
     )
     assert result.returncode == 0, result.stderr

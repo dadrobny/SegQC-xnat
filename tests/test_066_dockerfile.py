@@ -350,6 +350,8 @@ def _docker_run(tag, *args, timeout=120):
         capture_output=True,
         timeout=timeout,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
 
 
