@@ -164,6 +164,123 @@ def test_missing_assumptions_is_aggregated_into_one_warning(tmp_path: Path):
     assert "12 item spec(s)" in assumption_warnings[0] and "+4 more" in assumption_warnings[0]
 
 
+def _with_paths(asserts: str, may: str = "src/a.py") -> str:
+    return (GOOD_SPEC + "\n## Authorised paths\n\n**May change:**\n\n"
+            f"- `{may}` — work\n\n**Asserts against:**\n\n"
+            f"- `{asserts}` — pinned\n")
+
+
+def test_pinning_an_always_authorised_path_is_reported(tmp_path: Path):
+    """The recorded shape: a spec pinned progress.md to protect a gate row, and
+    `aide scope` then failed the item on the mandatory status flip — the one
+    edit the loop itself makes on every item. The pin can never hold, so the
+    warning belongs at spec time, where the author can still act on it."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md", _with_paths("docs/aide/progress.md"))
+    w = aide.item_spec_warnings(repo / "docs" / "aide")
+    assert len(w) == 1 and "can never hold" in w[0] and "progress.md" in w[0]
+
+
+def test_pinning_an_insight_archive_matches_through_the_glob(tmp_path: Path):
+    """`_ALWAYS_AUTHORISED` carries a glob for the archives; a literal archive
+    path must be caught through it, not only the exact spellings."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md",
+               _with_paths("docs/aide/insights/archive-2026-Q3.md"))
+    w = aide.item_spec_warnings(repo / "docs" / "aide")
+    assert len(w) == 1 and "can never hold" in w[0]
+
+
+def test_an_ordinary_pin_is_silent(tmp_path: Path):
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md", _with_paths("src/untouched.py"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide") == []
+
+
+def test_bookkeeping_under_may_change_is_not_flagged(tmp_path: Path):
+    """Listing progress.md under May change is merely redundant — `aide scope`
+    authorises it anyway. Only the pin is a contradiction-in-waiting."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md",
+               _with_paths("src/untouched.py", may="docs/aide/progress.md"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide") == []
+
+
+def test_the_lint_follows_a_configured_docs_dir(tmp_path: Path):
+    """The always-authorised names are docs_dir-relative; a consumer that
+    configured `d/` writes `d/progress.md` in its specs."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md", _with_paths("d/progress.md"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide", "d") != []
+    assert aide.item_spec_warnings(repo / "docs" / "aide", "docs/aide") == []
+
+
+def test_double_listing_a_path_is_reported(tmp_path: Path):
+    """The recorded shape (issue #94): a spec authored pyproject.toml under May
+    change, then re-listed it under Asserts against to say the tests pin the
+    file's FINAL state. Asserts against means pinned-not-changed, so the
+    moment the item used its own authorisation `aide scope` failed it, with no
+    spec-side fix visible. The warning fires at spec time instead."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md", _with_paths("src/a.py", may="src/a.py"))
+    w = aide.item_spec_warnings(repo / "docs" / "aide")
+    assert len(w) == 1 and "both May change and Asserts against" in w[0]
+    assert "src/a.py" in w[0]
+
+
+def test_double_listing_matches_through_dot_slash_spelling(tmp_path: Path):
+    """`./src/a.py` and `src/a.py` are one path; the exact-listing rule uses
+    the same normalisation `patterns_overlap` does."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md", _with_paths("src/a.py", may="./src/a.py"))
+    w = aide.item_spec_warnings(repo / "docs" / "aide")
+    assert len(w) == 1 and "both May change and Asserts against" in w[0]
+
+
+def test_a_literal_pin_under_a_may_change_glob_is_silent(tmp_path: Path):
+    """`May change: docs/**` with `Asserts against: docs/api.md` is the
+    deliberate carve-out — "I may edit the tree but not this file" — and only
+    a diff can say whether it held. `aide scope` stays the judge; flagging
+    mere overlap would make the carve-out shape unwritable."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md", _with_paths("docs/api.md", may="docs/**"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide") == []
+
+
+# --------------------------------------------------------------------------- #
+# unattributed item references on a deliverable bullet
+# --------------------------------------------------------------------------- #
+def test_a_bullet_whose_references_all_sit_midprose_is_reported():
+    """Only the trailing *(Item NNN)* marker attributes (issue #99), so a
+    bullet with mid-prose references only tracks nothing — its items stay
+    planned and `aide progress set` cannot find it. That gap must be loud."""
+    w = aide.unattributed_reference_warnings(
+        _stage("- 📋 Fold *(Item 095)*'s parser into the shared module"))
+    assert len(w) == 1 and "ends with no *(Item NNN)* marker" in w[0]
+    assert "095" in w[0]
+
+
+def test_a_trailing_marker_keeps_prose_references_free():
+    """The motivating bullet: a trailing marker owns the bullet, and the
+    mid-prose mention of a sibling is free text by design — not a warning."""
+    assert aide.unattributed_reference_warnings(
+        _stage("- ✅ Consolidate parsers, absorbing *(Item 095)*'s scope. "
+               "*(Item 094)*")) == []
+
+
+def test_a_bullet_naming_no_item_is_not_flagged_here():
+    """A bullet with no reference at all is a different (untracked) shape;
+    this lint speaks only when references exist and attribute nothing."""
+    assert aide.unattributed_reference_warnings(
+        _stage("- 📋 Write the migration notes")) == []
+
+
+def test_a_wrapped_bullet_with_the_marker_on_its_last_line_is_silent():
+    assert aide.unattributed_reference_warnings(
+        _stage("- 📋 A long deliverable that wraps onto a\n"
+               "  second line. *(Item 042)*")) == []
+
+
 # --------------------------------------------------------------------------- #
 # test hygiene lints
 # --------------------------------------------------------------------------- #
@@ -369,3 +486,116 @@ def test_all_three_dash_styles_are_accepted(tmp_path: Path):
         _spec_file(repo, f"{n:03d}-x.md",
                    GOOD_SPEC.replace("# Item 027 — Bounds", f"# Item {n:03d} {dash} X"))
     assert aide.item_spec_warnings(repo / "docs" / "aide") == []
+
+
+# --------------------------------------------------------------------------- #
+# root documents — the sections their templates mark MANDATORY (issue #86)
+# --------------------------------------------------------------------------- #
+GOOD_VISION = """\
+# D — Project Vision
+
+> **Status:** Draft v1
+
+## 2. Guiding principles  <!-- MANDATORY: validator checks implementation against these -->
+
+- **Determinism.** Same input, same output.
+
+## 3. Goals & objectives
+
+| # | Objective | Measurable outcome |
+|---|-----------|--------------------|
+| G1 | Ship it | It shipped |
+
+## 9. Out of scope  <!-- MANDATORY -->
+
+- A GUI — out of reach.
+
+## 10. Success criteria  <!-- MANDATORY -->
+
+1. The suite passes.
+"""
+
+GOOD_ROADMAP = """\
+# D — Development Roadmap
+
+> **Status:** Draft v1
+
+### Objective → stage coverage
+
+| Objective | Delivered by |
+|-----------|--------------|
+| G1 Ship it | Stage 0 |
+
+## Stage 0 — Foundations
+
+**Goal.** A walking skeleton.
+"""
+
+
+def test_a_complete_vision_and_roadmap_are_silent(tmp_path: Path):
+    repo = _repo(tmp_path)
+    d = repo / "docs" / "aide"
+    (d / "vision.md").write_text(GOOD_VISION, encoding="utf-8")
+    (d / "roadmap.md").write_text(GOOD_ROADMAP, encoding="utf-8")
+    assert aide.root_document_warnings(d) == []
+
+
+def test_a_vision_missing_every_mandatory_section_gets_four_warnings(tmp_path: Path):
+    """The observed failure (issue #86): a hand-written vision, structurally
+    plausible, missing what the template promises a validator checks — and
+    `aide check` said OK. One warning per dropped piece: the three sections
+    plus the G-code table."""
+    repo = _repo(tmp_path)
+    d = repo / "docs" / "aide"
+    (d / "vision.md").write_text(
+        "# D — Project Vision\n\n> **Status:** Draft\n\n## Overview\n\nProse.\n",
+        encoding="utf-8")
+    w = aide.root_document_warnings(d)
+    assert len(w) == 4
+    assert all(x.startswith("vision.md:") and "MANDATORY" in x for x in w)
+
+
+def test_unnumbered_and_differently_cased_headings_still_count(tmp_path: Path):
+    """The lint is for a DROPPED section; a renumbered or re-cased heading is
+    not a dropped section."""
+    repo = _repo(tmp_path)
+    d = repo / "docs" / "aide"
+    (d / "vision.md").write_text(
+        GOOD_VISION.replace("## 2. Guiding principles", "## Guiding Principles")
+                   .replace("## 9. Out of scope", "### Out Of Scope")
+                   .replace("## 10. Success criteria", "## Success criteria"),
+        encoding="utf-8")
+    assert aide.root_document_warnings(d) == []
+
+
+def test_a_roadmap_missing_coverage_and_stages_gets_both_warnings(tmp_path: Path):
+    repo = _repo(tmp_path)
+    d = repo / "docs" / "aide"
+    (d / "roadmap.md").write_text(
+        "# D — Development Roadmap\n\n> **Status:** Draft\n\n## Strategy\n\nProse.\n",
+        encoding="utf-8")
+    w = aide.root_document_warnings(d)
+    assert len(w) == 2
+    assert all(x.startswith("roadmap.md:") for x in w)
+    assert any("coverage" in x for x in w)
+    assert any("Stage N" in x for x in w)
+
+
+def test_absent_root_documents_are_silent(tmp_path: Path):
+    """Partial adoption (issue #57): a repo may run the CLI with no root
+    documents at all; that is a choice, not a defect."""
+    repo = _repo(tmp_path)
+    assert aide.root_document_warnings(repo / "docs" / "aide") == []
+
+
+def test_a_g_code_in_prose_does_not_satisfy_the_table(tmp_path: Path):
+    """The mandatory thing is the TABLE — rows opening with the G-code. A
+    sentence mentioning G1 gives roadmap and progress nothing to trace."""
+    repo = _repo(tmp_path)
+    d = repo / "docs" / "aide"
+    (d / "vision.md").write_text(
+        GOOD_VISION.replace("| G1 | Ship it | It shipped |",
+                            "G1 is shipping it."),
+        encoding="utf-8")
+    w = aide.root_document_warnings(d)
+    assert len(w) == 1 and "G-code" in w[0]

@@ -61,6 +61,8 @@ Target log: **$ARGUMENTS** (if empty, the default
    ```
    python .claude/scripts/review_permissions.py --rotate
    ```
+   (add the same `--log <path>` as in step 1 if an argument was given — rotating
+   a different log than the one reviewed truncates records nobody read).
    This archives every current record into `docs/aide/permissions/log.reviewed.jsonl`
    and truncates `docs/aide/permissions/log.jsonl` (both stay gitignored). Do this
    **after** you've captured the allow-rule decisions in step 2–4 — once rotated,

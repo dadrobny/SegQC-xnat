@@ -44,11 +44,10 @@ Opus escalation on round 3) live in **`/aide-run-item`** — this command does n
 restate them. Keeping a single source of truth for the item loop is the point of
 the split.
 
-**Command hygiene** applies to any git command you issue from this thread too. See
-`.aide/conventions.md` §3 (no `cd`, one command per Bash call, no `2>&1`, no
-command substitution in commits, recon via the Bash tool with `grep`). A
-`PreToolUse` hook (`.claude/hooks/command_hygiene_guard.py`) enforces the
-mechanical rules — a violating shape is blocked and bounced back with the fix.
+**Command hygiene** applies to any git command you issue from this thread too.
+The shapes are delivered by `.claude/rules/aide-command-hygiene.md` and stated
+canonically in `.aide/conventions.md` §3; a `PreToolUse` hook
+(`.claude/hooks/command_hygiene_guard.py`) enforces the mechanical ones.
 
 ## Pre-loop: resume in-flight branches
 
@@ -118,7 +117,9 @@ the next move (do **not** generate the next queue yourself):
 
 Permission prompts hit during the batch are auto-logged (`docs/aide/permissions/`);
 suggest the user run **`/aide-review-permissions`** to promote recurring safe
-prompts (it also **rotates** the log).
+prompts (it also **rotates** the log). Instruction loads are logged the same way
+(`docs/aide/instructions/`); **`/aide-review-instructions`** says which rules
+reached the batch's sessions, and rotates that log.
 
 ## When the orchestrator must stop and ask the user
 

@@ -22,6 +22,17 @@ Before creating, check if `docs/aide/vision.md` already exists.
 - If the user wants to update rather than replace, incorporate their input as
   amendments to the existing document.
 
+### Asking posture
+
+Vision authoring is **interactive regardless of `loop.clarify`** — that setting
+governs `spec-author` on queued items, nothing else (`.aide/conventions.md` §5).
+This is the one step of the loop where a human is present by construction; its
+whole purpose is to capture what only they know. Ask until the mandatory
+sections are grounded in the human's answers — never fill **Guiding
+principles**, **Out of scope**, or **Success criteria** from assumption. A
+wrong assumption here has no Assumptions block to be audited in and propagates
+into the roadmap and every queue derived from it.
+
 ### Creating the vision
 
 Write `docs/aide/vision.md` from the template **`.aide/templates/vision.md`** —
@@ -52,8 +63,8 @@ a reviewed PR, never a direct merge.
 
 Close your turn by telling the user, in chat:
 
-> Review `docs/aide/vision.md`, then start a **fresh chat session** and run
-> `/aide-create-roadmap`.
+> Review `docs/aide/vision.md` — it is a draft until you have read it — then
+> start a **fresh chat session** and run `/aide-create-roadmap`.
 
 A fresh session matters here: the roadmap should be derived from the written
 vision, not from this conversation's memory of drafting it.

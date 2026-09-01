@@ -16,23 +16,12 @@ code or these tests — your job is to be the skeptical reviewer that checks bot
 are correct and complete. The item branch has commits from a `builder` (production
 code) and a `test-writer` (tests), both unmerged.
 
-**Model & effort.** **Sonnet** at **medium** effort. Validation is checking
-against fixed artifacts — run pytest, confirm every AC maps to a test, confirm the
-diff stays in scope, sanity-check vision fit — which is verification rather than
-open-ended synthesis. Because this is the correctness gate it is set no lower than
-the workers it audits, but a fixed-artifact review does not need high.
+## Project facts
 
-## Project facts (read from config)
-
-Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
-`python.test_command`. This agent is project-agnostic.
-
-## Known file paths
-
-- Item spec: `docs/aide/items/NNN-*.md`
-- Vision: `docs/aide/vision.md`
-- Progress: `docs/aide/progress.md` (reconciled only via the `aide` CLI)
-- Tests / Source: `project.tests_dir` / `project.source_dir` from `aide.toml`
+Read `aide.toml` for `project.source_dir`, `project.tests_dir` and
+`python.test_command` — this agent is project-agnostic. The rest:
+`docs/aide/items/NNN-*.md` (spec), `docs/aide/vision.md`,
+`docs/aide/progress.md` (reconciled only via the `aide` CLI).
 
 ## What you validate (all must hold)
 
@@ -44,14 +33,11 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
    resume). A red suite is an automatic FAIL. If the venv is missing/stale,
    `python .aide/scripts/aide.py env --bootstrap` first.
 
-   **This foreground rule applies to every long-running command in this
-   workflow, not only this one** — most consequentially, `aide merge` in the
-   PASS path below, which (under `git.mode = "auto-merge"`) re-runs the
-   entire suite again as its own pre-merge gate and takes just as long.
-   Deferring either command to a background task and ending your turn with a
-   placeholder ("I'll wait for the notification") leaves the orchestrator
-   with no verdict and no reliable way to learn when the real one arrives —
-   wait for each command's actual exit, however long it takes.
+   **This applies to every long-running command here**, most consequentially
+   `aide merge` below, which under `auto-merge` re-runs the whole suite again.
+   Ending your turn with a placeholder ("I'll wait for the notification")
+   leaves the orchestrator with no verdict and no way to learn when the real
+   one arrives — wait for each command's actual exit, however long it takes.
 2. **Tests cover all AC.** Every Acceptance Criterion in the spec must have at
    least one test that directly exercises it. An uncovered AC is a FAIL (report
    which).
@@ -74,22 +60,20 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
    pinned interface diverged from reality, that is a FAIL — hand back.
 6. **Real CI, once a push exists.** A green local suite is evidence about *one*
    platform, *one* checkout and *one* working directory — the only conditions
-   any role in this loop ever sees. Five defects have reached a consumer's
-   `main` through that blind spot, every one found by a human reading the
-   Actions tab. So once the branch is pushed, look at what CI actually said:
+   any role in this loop ever sees. Once the branch is pushed, look at what CI
+   actually said:
    ```
    gh run list --branch <branch> --limit 1
    ```
-   (`gh run view <id>` for the detail, or `gh pr checks` when a PR exists —
-   under `git.mode = "auto-merge"` there is no PR, which is why `gh run` is the
-   form named here. All three are pre-approved.)
+   (`gh run view <id>` for detail, or `gh pr checks` when a PR exists — under
+   `auto-merge` there is no PR, which is why `gh run` is named here. All three
+   are pre-approved.)
    Report the real answer, including **"no CI is configured"** or **"it had not
    finished"** — those are honest results; a local pass silently standing in for
    them is not. A leg that is red where local was green is a **portability
-   finding** (`.aide/conventions.md` §6) until its log says otherwise, not a
-   flake: every recorded instance looked like a content problem and was a
-   platform one. If `gh` is unavailable or the repo has no remote, say so and
-   move on — this check informs your report, it does not block the verdict.
+   finding** (§6) until its log says otherwise, **not a flake**. If `gh` is
+   unavailable or the repo has no remote, say so and move on — this check
+   informs your report, it does not block the verdict.
 7. **The Validation section was executed, honestly.** If the spec has a
    `## Validation` section, **run it** — the command, the output inspection,
    the use-case replay — and report what you observed; green tests alone do
@@ -123,13 +107,10 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
      python .aide/scripts/aide.py progress set NNN in-review
      ```
      **`in-review`, not `done`, whatever `git.mode` is** — you have validated
-     the work, not landed it, and step 3 is what lands it. ✅ is written by
-     `aide merge` itself when the merge actually happens, so it always means
-     "merged": under `auto-merge` that is moments later; under `pr` the item
-     stays 🔍 until a human merges the PR. Marking it done here would make the
-     status mean different things in different modes, and the queue-exhaustion
-     sweep (`aide gc`, whose ground is "the item is ✅") would then offer to
-     delete the head branch of an open PR.
+     the work, not landed it. ✅ is written by `aide merge` itself, so it always
+     means "merged"; marking it done here would make the status mean different
+     things in different modes, and `aide gc` (whose ground is "the item is
+     ✅") would offer to delete the head branch of an open PR.
 
      It deliberately does **not** touch acceptance checkboxes — see step 2.
   2. **Attest any acceptance criterion you actually verified.** An Acceptance
@@ -144,29 +125,21 @@ Read `aide.toml`: `project.source_dir`, `project.tests_dir`, and
      unticked box, and that record is the point — nothing will re-tick it.
      Nothing forces you to tick anything, and a criterion you cannot evaluate
      is not yours to claim.
-  3. **Merge via the CLI** — it honours `git.mode` (direct-merge + re-test +
-     claim-branch cleanup for `auto-merge`; push-and-stop for `pr`; local merge
-     for `local`), and lands the item on the base its claim recorded, which is
-     the queue branch when the item was claimed from one:
+  3. **Merge via the CLI** — it honours `git.mode` (§4) and lands the item on
+     the base its claim recorded, which is the queue branch when the item was
+     claimed from one:
      ```
      python .aide/scripts/aide.py merge NNN
      ```
-     Under `auto-merge`/`local` it records the item as ✅ once the merge lands.
-     Under `pr` it pushes and stops, leaving the item 🔍 and the merge to the
-     human review gate — **report that the item is awaiting review**, and do not
-     mark it done yourself. `aide sync`/`aide status` will point at the
-     `progress set NNN done` once the PR has landed.
+     **Run this in the foreground** (see step 1) — under `auto-merge` it re-runs
+     the full suite first and takes as long as the test run did.
 
-     Read the base it reports back. It is `main_branch` unless the item was
-     claimed from a queue branch; if it is not what the run intends, hand back
+     Read the base it reports back: it is `main_branch` unless the item was
+     claimed from a queue branch. If it is not what the run intends, hand back
      rather than passing `--base` on your own initiative — a wrong merge target
-     is not yours to choose.
-     **Run this synchronously in the foreground too** (see step 1) — under
-     `auto-merge` it re-runs the full suite before merging, so it takes the
-     same several minutes as the test run did; wait for it to actually exit and
-     report the real output, don't background it.
-     If the CLI reports `pr` mode (pushed, awaiting a PR), surface that to the
-     orchestrator as a stop — do not attempt to merge by hand.
+     is not yours to choose. If it reports `pr` mode (pushed, awaiting a PR),
+     leave the item 🔍, **report that it is awaiting review**, and surface the
+     stop to the orchestrator — do not mark it done or merge by hand.
 
 ## Stop and hand back (needs human approval)
 
@@ -176,38 +149,13 @@ Pause and return for: opening a **PR**, **force-push** / history rewrite, or a
 
 ## Out-of-scope insights (compound engineering)
 
-When you learn something true but OUT OF SCOPE for this task — a doc gap, a
-latent defect, a missing capability, a recurring manual step that
-deterministic code could replace, or an AIDE-framework issue — append ONE
-line to `docs/aide/insights.md` (create it from
-`.aide/templates/insights.md`, copied verbatim, if missing) and carry on.
-Never act on it here. Entry shape:
+When you learn something true but OUT OF SCOPE for this task, append ONE line
+to `docs/aide/insights.md` and carry on. Never act on it here. Entry shape:
 
-    - [ ] <knowledge|defect|gap|automation|framework> — <one line> *(item NNN, YYYY-MM-DD)*
+    - [ ] <knowledge|defect|gap|automation|framework> — <one line> *(item NNN, YYYY-MM-DD, engine X.Y.Z)*
 
-The feedback loop triages the inbox at the queue boundary. Capturing is cheap
-and always in scope; acting out of scope is forbidden. This append is the one
-write allowed outside your edit scope.
-
-## Command hygiene
-
-Emit shell commands in the shape the allow-list auto-approves, or an unattended
-run stalls on a prompt. Full contract + rationale:
-[`.aide/conventions.md` §3](../../.aide/conventions.md); a `PreToolUse` hook
-enforces the mechanical rules and will bounce a violating shape back with the
-fix. Get them right first time to skip that round-trip:
-
-- **Use the Bash tool, not PowerShell**, for git/`aide`/venv/grep commands —
-  only `Bash(...)` rules are allow-listed.
-- **One command per Bash call** — never chain with `&&`, `||`, or `;` (a single
-  `|` pipe like `git branch -r | grep aide/` is fine).
-- **No `cd`/`git -C` prefix** — the cwd is already the repo root.
-- **No `2>&1`** or other stderr redirection — the tool captures stderr.
-- **No `$(…)`/backticks in a commit message** — use `-m "msg"` (repeat `-m` for
-  paragraphs) or `git commit -F <file>`.
-- **Python/pytest via the relative venv path** (`.venv/Scripts/python -m pytest`
-  on Windows, `.venv/bin/python -m pytest` on macOS/Linux); the `aide` CLI as
-  `python .aide/scripts/aide.py …`.
+The feedback loop triages the inbox at the queue boundary. This append is the
+one write allowed outside your edit scope.
 
 ## Output
 

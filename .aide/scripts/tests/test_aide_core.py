@@ -298,6 +298,61 @@ def test_parse_item_status_wrapped_bullet_still_attributes():
     assert status[42] == "planned"
 
 
+def test_parse_item_status_prose_reference_never_overrides_own_bullet():
+    """The issue #99 shape: a ✅ bullet whose prose mentions a live sibling
+    ("absorbing *(Item 095)*'s scope") marked that sibling complete, and the
+    spent-item discount then silently dropped it out of every cross-spec
+    check. Only the trailing marker attributes; the prose mention is free."""
+    lines = (
+        "## Stage 5 — X — 🚧\n"
+        "**Deliverables.**\n"
+        "- ✅ Consolidate parsers, absorbing *(Item 095)*'s scope. *(Item 094)*\n"
+        "- 📋 Extract the shared lexer. *(Item 095)*\n"
+    ).splitlines()
+    _, _, status = aide._parse_item_status(lines)
+    assert status[94] == "complete"
+    assert status[95] == "planned"
+
+
+def test_parse_item_status_midprose_reference_alone_attributes_nothing():
+    """With no bullet of its own, an item referenced only mid-prose is
+    untracked — reported by `aide check`, never silently attributed."""
+    lines = (
+        "## Stage 5 — X — 🚧\n"
+        "**Deliverables.**\n"
+        "- ✅ Consolidate parsers, absorbing *(Item 095)*'s scope. *(Item 094)*\n"
+    ).splitlines()
+    _, _, status = aide._parse_item_status(lines)
+    assert status == {94: "complete"}
+
+
+def test_parse_item_status_adjacent_trailing_markers_all_attribute():
+    """Several markers closing one bullet all own it, and a trailing period
+    after the last is tolerated — both shapes appear in hand-edited files."""
+    lines = (
+        "## Stage 5 — X — 🚧\n"
+        "**Deliverables.**\n"
+        "- 🚧 One deliverable, two specs. *(Item 006)* *(Item 007)*.\n"
+    ).splitlines()
+    _, _, status = aide._parse_item_status(lines)
+    assert status == {6: "in-progress", 7: "in-progress"}
+
+
+def test_set_item_status_leaves_a_prose_mention_untouched():
+    """`aide progress set` flips only the bullet whose trailing marker names
+    the item — the write-side half of the issue #99 rule. A foreign bullet
+    that mentions the item mid-prose keeps its own icon."""
+    text = (
+        "## Stage 5 — X — 🚧\n"
+        "**Deliverables.**\n"
+        "- 📋 Consolidate parsers, absorbing *(Item 095)*'s work. *(Item 094)*\n"
+        "- 📋 Extract the shared lexer. *(Item 095)*\n"
+    )
+    out = aide.set_item_status(text, 95, "in-progress")
+    assert "- 📋 Consolidate parsers, absorbing *(Item 095)*'s work. *(Item 094)*" in out
+    assert "- 🚧 Extract the shared lexer. *(Item 095)*" in out
+
+
 def test_parse_item_status_reads_every_number_in_a_multi_item_reference():
     """``*(Items A, B)*`` must credit B as well as A.
 
@@ -862,14 +917,21 @@ def test_insight_trail_does_not_swallow_a_malformed_entry(tmp_path: Path):
 
 
 def test_the_documented_trail_example_validates(tmp_path: Path):
-    """The example in `conventions.md` must be one the checker accepts.
+    """The example in the conventions must be one the checker accepts.
 
     A worked example that would warn if pasted is worse than none — it teaches
     a shape the tool rejects. Reads the shipped conventions rather than a copy,
     so the two cannot drift apart silently.
+
+    Sweeps the whole `conventions/` tree rather than naming one file: the
+    sections move between files as the contract is reorganised, and a hardcoded
+    path would fail with "no such file" instead of telling anyone the example
+    itself regressed.
     """
-    conventions = Path(__file__).resolve().parents[2] / "conventions.md"
-    blocks = [b for b in conventions.read_text(encoding="utf-8").split("```")
+    tree = Path(__file__).resolve().parents[2] / "conventions"
+    assert tree.is_dir(), f"{tree} missing — the conventions layout moved"
+    blocks = [b for f in sorted(tree.rglob("*.md"))
+              for b in f.read_text(encoding="utf-8").split("```")
               if "→ aide-loop issue" in b]
     assert len(blocks) == 1, "expected exactly one status-trail example to check"
 
@@ -983,6 +1045,70 @@ def test_cli_progress_set_backfills_reference_from_spec(tmp_path: Path, capsys):
     # Existing deliverables untouched; stage still in progress.
     assert "- 📋 Bounds. *(Item 003)*" in text
     assert "## Stage 1 — Rule Engine — 🚧" in text
+
+
+def test_insert_item_reference_lands_after_a_wrapped_bullets_last_line():
+    """The back-fill used to insert at icon line + 1, splitting a wrapped
+    bullet in two — cosmetic while any line's reference attributed, but under
+    the trailing-marker rule (issue #99) the split stranded the healed marker
+    mid-span and handed the wrapped bullet's marker to the wrong owner, so
+    `progress set` printed success while recording nothing (PR #100 review)."""
+    text = (
+        "## Stage 1 — Rule Engine — 🚧\n"
+        "**Deliverables.**\n"
+        "- 📋 A long deliverable that wraps onto a\n"
+        "  second line. *(Item 042)*\n"
+    )
+    healed = aide.insert_item_reference(text, 50, "1", "The new thing")
+    assert ("  second line. *(Item 042)*\n"
+            "- 📋 The new thing. *(Item 050)*\n") in healed
+    _, _, status = aide._parse_item_status(healed.splitlines())
+    assert status == {42: "planned", 50: "planned"}
+
+
+def test_cli_progress_set_backfill_survives_a_wrapped_last_bullet(
+        tmp_path: Path, capsys):
+    """The verb-level half of the case above: healing into a stage whose last
+    deliverable bullet wraps must record the status, not mangle the file."""
+    wrapped = PROGRESS.replace(
+        "- 📋 Bounds. *(Item 003)*",
+        "- 📋 Bounds checking that wraps onto a\n  second line. *(Item 003)*")
+    root = _docs(tmp_path, progress=wrapped)
+    (root / "docs" / "aide" / "items" / "004-extra-thing.md").write_text(
+        "# Item 004 — Extra thing\n\n"
+        "> **Created:** 2026-07-18 · status tracked in progress.md\n"
+        "> **Stage:** 1 — Rule Engine\n",
+        encoding="utf-8",
+    )
+    rc = aide.main(["--repo", str(root), "progress", "set", "4", "in-progress",
+                    "--no-commit"])
+    assert rc == 0
+    text = (root / "docs" / "aide" / "progress.md").read_text(encoding="utf-8")
+    assert ("  second line. *(Item 003)*\n"
+            "- 🚧 Extra thing. *(Item 004)*\n") in text
+    _, _, status = aide._parse_item_status(text.splitlines())
+    assert status[3] == "planned" and status[4] == "in-progress"
+
+
+def test_cli_progress_set_errors_when_the_backfill_recorded_nothing(
+        tmp_path: Path, capsys, monkeypatch):
+    """If a heal claims success but leaves the item unattributed, the verb must
+    error and write nothing — never print 'set to …' over a silent no-op."""
+    root = _docs(tmp_path)
+    (root / "docs" / "aide" / "items" / "777-ghost.md").write_text(
+        "# Item 777 — Ghost\n\n"
+        "> **Created:** 2026-07-18 · status tracked in progress.md\n"
+        "> **Stage:** 1 — Rule Engine\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(aide, "insert_item_reference",
+                        lambda text, *a, **k: text)  # a heal that adds nothing
+    rc = aide.main(["--repo", str(root), "progress", "set", "777", "done",
+                    "--no-commit"])
+    assert rc == 1
+    assert "could not be recorded" in capsys.readouterr().err
+    assert (root / "docs" / "aide" / "progress.md").read_text(
+        encoding="utf-8") == PROGRESS
 
 
 def test_cli_status_reports_queues_and_claims(tmp_path: Path, capsys):

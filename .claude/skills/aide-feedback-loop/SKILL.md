@@ -45,8 +45,16 @@ For each **unchecked** entry, by type:
 - **framework** → belongs to AIDE itself, not this project. If
   `[framework] repo` is set in `aide.toml` and `gh` is available, hand it
   over: `gh issue create --repo <owner/repo>` with a body naming the project,
-  the observation, and a proposal (this stays `ask`-gated — a human confirms).
+  the observation, a proposal, and **the engine version the observation was
+  made under** (this stays `ask`-gated — a human confirms).
   Otherwise leave the entry unchecked with a `(pending handover)` note.
+
+  The version comes from the entry's own marker (`*(item 042, 2026-08-29,
+  engine 1.22.0)*`, `.aide/conventions.md` §1). If the entry carries none, read
+  `.aide/VERSION` and write it as *the version at triage time, not at capture* —
+  say so in the body. The framework repo cannot see this one, so an unmarked
+  guess reads there as an observed fact, and every claim about an older engine
+  is then re-verified by hand.
 
 Tick each routed entry with the verb, naming where it landed — never by
 editing the line by hand, which is how a claim gets silently reworded:
@@ -105,7 +113,7 @@ The framework surface is: `.aide/` (conventions, templates, `aide.py`, loop),
 
 Framework/process changes land via a **reviewed PR**, never a direct merge.
 
-### 4. Consistency & permission bottlenecks
+### 4. Consistency, permission bottlenecks & instruction delivery
 
 - Run `python .aide/scripts/aide.py check` — fix any format-contract errors it
   reports (they break the scripts the loop depends on).
@@ -114,6 +122,14 @@ Framework/process changes land via a **reviewed PR**, never a direct merge.
   `python .claude/scripts/review_permissions.py`) for a ranked table, promote the
   safe recurring ones into `permissions.allow` in `.claude/settings.json` (via
   PR), and rotate the log.
+- Which rules reached which sessions this queue is a queue-boundary question
+  too. Every instruction file the runtime loads is auto-logged (see
+  `docs/aide/instructions/`): run `/aide-review-instructions` (or
+  `python .claude/scripts/review_instructions.py`), act on a rule that never
+  loaded — a framework rule silent over a non-empty log means the hook or the
+  trust flag; a project rule means its globs — and rotate that log too. It
+  measures delivery, not reading, and a preloaded section skill never appears
+  in it by design.
 
 ### 5. Recommendations
 

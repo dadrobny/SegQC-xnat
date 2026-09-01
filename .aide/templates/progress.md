@@ -26,7 +26,7 @@
   stage's ✅ still only requires its fallback/skip-clean path to pass; this
   table is a separate, additive visibility mechanism so a green suite is never
   mistaken for "the optional dependency was actually exercised." See
-  conventions.md's Environment-Gated Capability Verification rule; omit this
+  conventions.md §1 → Environment-gated capabilities; omit this
   whole section if the project has no such capability.
 
   Fill-in conventions: `{{slot}}` = literal value; _italic line_ = guidance to
@@ -133,7 +133,7 @@ _Resolved only by a person, only via `aide gate approve <n> --evidence "…"`
 **Deliverables.**
 
 _Flat bullets only — one per deliverable, each with its item reference. See
-`.aide/conventions.md` § format contract for the exact shape._
+`.aide/conventions.md` §1 for the exact shape._
 
 - 📋 {{deliverable}}. *(Item {{nnn}})*
 

@@ -463,33 +463,72 @@ def test_adv_missing_acceptance_box_raises_assertion():
 # item range, which `_INSIGHT_RE` rejects and `archive` cannot move, since it
 # selects on a date they do not parse into -- aide-loop issue #76). The `assert
 # warnings` guard below is what keeps "zero warnings" from passing vacuously.
+#
+# Re-pinned 2026-09-01 on the engine update 1.21.0 -> 1.28.1. The earlier
+# baseline (four "status icon outside a structural status position" warnings
+# and three `insights.md` entry-shape warnings) is gone because the engine
+# retired both classes: 1.24.0 replaced the loose icon scan with the
+# trailing-marker ownership rule, and 1.25.3 widened the insight-entry grammar
+# so the queue/item-range provenances those three entries carry now parse
+# (aide-loop issue #76). What the new engine reports instead is below; every
+# one is an advisory about a pre-existing document state, not a regression:
+#   - items 126 and 132 pin `docs/aide/progress.md` under Asserts against
+#     (engine 1.23.0's always-authorised-path warning; both specs are merged
+#     history, and `insights.md`'s open framework entries dated 2026-08-31
+#     record the defect it names),
+#   - three `progress.md` deliverable bullets reference items only mid-prose,
+#     so under the marker rule they track nothing (engine 1.24.0),
+#   - queues 002 and 004 are marked completed while `progress.md` still holds
+#     open items for them.
+# The first and third shapes carry a path but no line number
+# (`items/NNN-x.md: text`), which `_FILE_SCOPED_WARNING_RE` keys the same way.
 _PINNED_BASELINE_WARNINGS = Counter(
     {
         (
-            "progress.md",
-            "status icon ✅ outside a structural status position (parsers treat it "
-            "as plain text; move or remove it if status was intended)",
+            "items/126-execute-the-golden-retirement.md",
+            "'docs/aide/progress.md' is pinned under Asserts against, but every item "
+            "is authorised to edit it — the status flip and the insight append are "
+            "loop bookkeeping — so the pin can never hold and `aide scope` will "
+            "report a contradiction on every run; put the read-only content check "
+            "in an acceptance criterion's test instead",
+        ): 1,
+        (
+            "items/132-judge-monotonicity-against-the-traversal-ordered-fit.md",
+            "'docs/aide/progress.md' is pinned under Asserts against, but every item "
+            "is authorised to edit it — the status flip and the insight append are "
+            "loop bookkeeping — so the pin can never hold and `aide scope` will "
+            "report a contradiction on every run; put the read-only content check "
+            "in an acceptance criterion's test instead",
         ): 1,
         (
             "progress.md",
-            "status icon ⏸️ outside a structural status position (parsers treat it "
-            "as plain text; move or remove it if status was intended)",
+            "deliverable bullet references item(s) 024, 103, 110 but ends with no "
+            "*(Item NNN)* marker — only the trailing marker ties an item to a "
+            "bullet, so this bullet tracks nothing and those items read as "
+            "untracked. End it with the marker (e.g. '. *(Item 024)*').",
         ): 1,
         (
             "progress.md",
-            "status icon ❌ outside a structural status position (parsers treat it "
-            "as plain text; move or remove it if status was intended)",
+            "deliverable bullet references item(s) 100 but ends with no "
+            "*(Item NNN)* marker — only the trailing marker ties an item to a "
+            "bullet, so this bullet tracks nothing and those items read as "
+            "untracked. End it with the marker (e.g. '. *(Item 100)*').",
         ): 1,
         (
-            "queue/queue-002.md",
-            "status icon ✅ outside a structural status position (parsers treat it "
-            "as plain text; move or remove it if status was intended)",
+            "progress.md",
+            "deliverable bullet references item(s) 103, 104 but ends with no "
+            "*(Item NNN)* marker — only the trailing marker ties an item to a "
+            "bullet, so this bullet tracks nothing and those items read as "
+            "untracked. End it with the marker (e.g. '. *(Item 103)*').",
         ): 1,
         (
-            "insights.md",
-            "entry does not match '- [ ] <knowledge|defect|gap|automation|framework> "
-            "— <one line> *(item NNN, YYYY-MM-DD)*'",
-        ): 3,
+            "queue-002.md",
+            "marked completed but still has open items in progress.md",
+        ): 1,
+        (
+            "queue-004.md",
+            "marked completed but still has open items in progress.md",
+        ): 1,
     }
 )
 
@@ -498,6 +537,12 @@ _PINNED_BASELINE_WARNINGS = Counter(
 #: POSIX relative path rendered by the engine with `.as_posix()`), and the text
 #: may contain any number of them, so only the first two fields are bounded.
 _LOCATION_WARNING_RE = re.compile(r"^([^:]+):(\d+): (.*)$", re.DOTALL)
+
+#: The engine's file-scoped shape, `path.md: text`, for a warning about a whole
+#: document rather than one line of it (engine 1.23.0's spec-time advisories
+#: and the queue-completion warning). Keyed identically to the located shape;
+#: there is no line number to discard.
+_FILE_SCOPED_WARNING_RE = re.compile(r"^([^:\s]+\.md): (.*)$", re.DOTALL)
 
 # Whole-corpus warnings that name no single location, so they cannot be pinned
 # by one. Engine 1.14.0 added the first of them: the mandatory `## Assumptions`
@@ -571,11 +616,14 @@ def _baseline_key(warning: str):
     if any(pattern.match(warning) for pattern in _GATE_DECISION_WARNING_RES):
         return None
     match = _LOCATION_WARNING_RE.match(warning)
+    if match is not None:
+        return (match.group(1), match.group(3))
+    match = _FILE_SCOPED_WARNING_RE.match(warning)
     assert match is not None, (
-        f"unrecognised aide check warning shape (not location-based, "
-        f"not a branch-state warning): {warning!r}"
+        f"unrecognised aide check warning shape (not location-based, not "
+        f"file-scoped, not a branch-state warning): {warning!r}"
     )
-    return (match.group(1), match.group(3))
+    return (match.group(1), match.group(2))
 
 
 def test_ac8_no_new_aide_check_warning_beyond_pinned_baseline():
@@ -616,20 +664,35 @@ def test_ac8_baseline_key_discards_only_the_line_number():
 
 
 def test_ac8_baseline_counts_catch_one_more_of_an_already_known_warning():
-    """Text alone would collapse the three identical `insights.md` warnings.
+    """A set-keyed baseline would accept a repeat of a tolerated warning forever.
 
-    The regression this guards is silent: a fourth malformed inbox entry
-    produces a warning byte-identical to three that are already tolerated, so a
-    set-keyed baseline would accept it forever.
+    The regression this guards is silent: a second document falling into an
+    already-tolerated state produces a warning byte-identical to one that is
+    already pinned, so only the multiset count can see it. Checked against
+    every pinned key rather than one historical example (the three identical
+    `insights.md` warnings that first motivated it no longer exist -- engine
+    1.25.3 made those entries parse).
     """
-    known = (
-        "insights.md",
-        "entry does not match '- [ ] <knowledge|defect|gap|automation|framework> "
-        "— <one line> *(item NNN, YYYY-MM-DD)*'",
+    assert _PINNED_BASELINE_WARNINGS, "the baseline must pin something"
+    for known, count in _PINNED_BASELINE_WARNINGS.items():
+        assert not (Counter({known: count}) - _PINNED_BASELINE_WARNINGS)
+        assert Counter({known: count + 1}) - _PINNED_BASELINE_WARNINGS == Counter(
+            {known: 1}
+        )
+
+
+def test_ac8_file_scoped_warning_keys_on_path_and_text():
+    """The engine's `path.md: text` shape (no line number) keys like the
+    located shape, so a whole-document advisory can be pinned -- and an
+    unknown one still fails the multiset rather than the shape assertion."""
+    text = "'docs/aide/progress.md' is pinned under Asserts against, but ..."
+    assert _baseline_key(f"items/126-x.md: {text}") == ("items/126-x.md", text)
+    assert _baseline_key("queue-002.md: marked completed but still has open items") == (
+        "queue-002.md",
+        "marked completed but still has open items",
     )
-    assert _PINNED_BASELINE_WARNINGS[known] == 3
-    assert not (Counter({known: 3}) - _PINNED_BASELINE_WARNINGS)
-    assert Counter({known: 4}) - _PINNED_BASELINE_WARNINGS == Counter({known: 1})
+    # A located warning is never mistaken for a file-scoped one.
+    assert _baseline_key("progress.md:12: some text") == ("progress.md", "some text")
 
 
 def test_ac8_baseline_excludes_the_three_documented_categories():

@@ -194,6 +194,42 @@ def test_gate_naming_nothing_is_called_out():
     assert "nothing named" in aide.gate_warnings(_lines(rows))[0]
 
 
+def test_stage_warning_resolves_how_much_the_gate_holds():
+    """The reach is computed at check time either way; throwing it away made a
+    mis-scoped `stage N` gate invisible until a runner stalled on it — the
+    observed case held the very item meant to produce the gate's evidence."""
+    w = aide.gate_warnings(_lines(STAGE))[0]
+    assert "holding 2 item(s): 027, 028" in w
+
+
+def test_declined_stage_warning_also_resolves_the_reach():
+    rows = "| G | stage 1 | ❌ Declined (2026-08-18) | keep v0 |"
+    w = aide.gate_warnings(_lines(rows))[0]
+    assert "still blocks" in w and "holding 2 item(s): 027, 028" in w
+
+
+def test_item_list_warning_needs_no_resolution():
+    """An item-list reach already names its items; no breadth suffix is added."""
+    w = aide.gate_warnings(_lines(AWAITING))[0]
+    assert "items 028" in w and "holding" not in w
+
+
+def test_breadth_counts_only_items_the_gate_still_holds():
+    """A ✅ item has merged and a ❌ one is out — 'holding' either would
+    overstate the reach against the enforcement the message mirrors (claim
+    blocks neither)."""
+    lines = _progress(STAGE).replace("- 📋 A. *(Item 027)*",
+                                     "- ✅ A. *(Item 027)*").splitlines()
+    w = aide.gate_warnings(lines)[0]
+    assert "holding 1 item(s): 028" in w and "027" not in w
+
+
+def test_breadth_of_an_all_merged_stage_falls_back_to_the_bare_reach():
+    lines = _progress(STAGE).replace("📋", "✅").splitlines()
+    w = next(x for x in aide.gate_warnings(lines) if "awaiting" in x)
+    assert "stage 1" in w and "holding" not in w
+
+
 # --------------------------------------------------------------------------- #
 # set_gate_status
 # --------------------------------------------------------------------------- #

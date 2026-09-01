@@ -74,7 +74,9 @@ with its downstream consumer):
   test that hashes another file's bytes against a hardcoded literal instead —
   see `.aide/conventions.md` §1.
 - **Testing Strategy** — one test per AC plus adversarial/edge cases.
-- **Dependencies** — item numbers this relies on (must be ✅/🚧).
+- **Dependencies** — item numbers this relies on, a queue-mate still 📋
+  included; declaring one is how an item that pins what a sibling produces
+  records that order.
 - **Decisions & Trade-offs** — initialise with "To be updated during
   implementation."
 

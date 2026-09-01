@@ -23,11 +23,10 @@ session** (which in turn loads `/aide-run-item` inline), and delegates only the
 loop pauses at the queue PR, and the human re-invokes for the next queue, giving a
 fresh session per batch.
 
-**Command hygiene** applies to any git you issue — see `.aide/conventions.md` §3
-(no `cd` prefix, one command per Bash call, no `2>&1`, no command substitution in
-commit messages, recon via Bash + `grep`). A `PreToolUse` hook
-(`.claude/hooks/command_hygiene_guard.py`) enforces the mechanical rules — a
-violating shape is blocked and bounced back with the fix.
+**Command hygiene** applies to any git you issue — the shapes are delivered by
+`.claude/rules/aide-command-hygiene.md` and stated canonically in
+`.aide/conventions.md` §3. A `PreToolUse` hook
+(`.claude/hooks/command_hygiene_guard.py`) enforces the mechanical ones.
 
 ## Orchestration model & session scope
 

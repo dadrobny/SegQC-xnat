@@ -36,7 +36,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, NamedTuple, Optional, Tuple
+from typing import Dict, List, NamedTuple, Optional, Set, Tuple
 
 # --------------------------------------------------------------------------- #
 # Status icons (the format contract — see .aide/conventions.md)
@@ -59,6 +59,14 @@ ICON_TO_STATUS = {v: k for k, v in STATUS_TO_ICON.items()}
 #: every mode**, and is set by `aide merge` when the merge actually happens.
 RANK = {"planned": 0, "excluded": 1, "deferred": 2, "in-progress": 3,
         "in-review": 4, "complete": 5}
+#: The statuses that still hold a dependent back. A dependency leaves the way
+#: only by being merged (✅) or by leaving the queue's path (❌ excluded,
+#: ⏸️ deferred) — 🚧 and 🔍 both block, because work in progress and work whose
+#: PR is still open are alike missing from the base a dependent would branch
+#: from. Named once because two separate decisions turn on it being the same
+#: set: which item `aide claim` may offer, and whether a declared dependency
+#: actually orders two specs (`queue_spec_findings`).
+BLOCKING_STATUSES = ("planned", "in-progress", "in-review")
 
 # Icons may be multi-codepoint (⏸️ = U+23F8 U+FE0F), so match by alternation
 # (longest first), never a character class.
@@ -132,6 +140,46 @@ def _referenced_item_numbers(text: str) -> List[int]:
 def _references_item(text: str, num: int) -> bool:
     """Does ``text`` reference item ``num`` in any accepted form?"""
     return num in _referenced_item_numbers(text)
+
+
+#: The item-reference MARKER that closes a deliverable bullet —
+#: `- 📋 <text>. *(Item 006)*` — the `*(…)*` suffix the templates prescribe
+#: (§1 → progress.md calls it "the *(Item NNN)* suffix"). Only this trailing
+#: marker ties items to the bullet: a reference elsewhere in the bullet's prose
+#: ("absorbing *(Item 095)*'s scope") is free text and attributes nothing
+#: (issue #99). Several adjacent markers at the end all count, and a trailing
+#: period after the last one is tolerated.
+_BULLET_MARKER_RE = re.compile(
+    r"(?:\*\(\s*[Ii]tems?\s+[^)\n]*\)\*[ \t.]*)+$")
+
+
+def _bullet_marker_item_numbers(last_line: str) -> List[int]:
+    """Item numbers in the trailing marker of a bullet's final line, if any."""
+    m = _BULLET_MARKER_RE.search(last_line)
+    return _referenced_item_numbers(m.group(0)) if m else []
+
+
+def _deliverable_bullet_spans(lines: List[str]) -> List[Tuple[int, int]]:
+    """``(first, last)`` line indices of each deliverable bullet.
+
+    A deliverable bullet is a ``_BULLET_RE`` line plus its wrapped continuation
+    lines — indented text carrying no bullet marker of its own. A blank line, a
+    non-deliverable bullet, or an unindented new block ends the span. This is
+    the ONE definition of a bullet's extent; ``_parse_item_status`` (read) and
+    ``set_item_status`` (write) both build on it, so "which bullet owns item
+    NNN" cannot differ between the two directions.
+    """
+    spans: List[Tuple[int, int]] = []
+    open_span = False
+    for i, line in enumerate(lines):
+        if _BULLET_RE.match(line):
+            spans.append((i, i))
+            open_span = True
+        elif not line.strip() or re.match(r"^\s*[-*]\s", line) or not re.match(r"^\s+\S", line):
+            open_span = False
+        elif open_span:
+            spans[-1] = (spans[-1][0], i)
+    return spans
 
 
 # --------------------------------------------------------------------------- #
@@ -800,12 +848,16 @@ def insert_item_reference(text: str, number: int, stage: str, title: str) -> Opt
     for start, end, snum in stage_sections(lines):
         if snum != str(stage):
             continue
-        insert_at = None
-        for i in range(start, end):
-            if _BULLET_RE.match(lines[i]):
-                insert_at = i + 1
-            elif insert_at is None and lines[i].strip().startswith("**Deliverables"):
-                insert_at = i + 1
+        insert_at = next((i + 1 for i in range(start, end)
+                          if lines[i].strip().startswith("**Deliverables")), None)
+        # After the last bullet's WHOLE span, continuations included. Icon
+        # line + 1 used to split a wrapped bullet in two — cosmetic while any
+        # reference on any line attributed, but under the trailing-marker rule
+        # (issue #99) the split strands the new bullet's marker mid-span and
+        # hands the wrapped bullet's marker to the wrong owner.
+        spans = _deliverable_bullet_spans(lines[start:end])
+        if spans:
+            insert_at = start + spans[-1][1] + 1
         if insert_at is None:
             return None
         lines.insert(insert_at, f"- 📋 {title}. *(Item {number:03d})*")
@@ -822,19 +874,15 @@ def set_item_status(text: str, num: int, status: str) -> str:
     those are human attestations, ticked only by ``aide progress accept``.
     """
     lines = text.splitlines()
-    # Flip the owning bullet's icon for every line that references this item.
-    bullet_line: Optional[int] = None
-    for i, line in enumerate(lines):
-        if _BULLET_RE.match(line) or re.match(r"^\s*[-*]\s", line):
-            if _BULLET_RE.match(line):
-                bullet_line = i
-        if _references_item(line, num):
-            target = bullet_line if bullet_line is not None and _BULLET_RE.match(lines[bullet_line]) else i
-            tm = _BULLET_RE.match(lines[target])
-            if tm:
-                current = ICON_TO_STATUS[tm.group("icon")]
-                if current and RANK[status] > RANK[current]:
-                    lines[target] = _replace_first_icon(lines[target], status)
+    # Flip the icon of every bullet whose trailing marker names this item —
+    # the same ownership rule `_parse_item_status` reads by (issue #99), so a
+    # bullet that merely mentions the item in prose is never flipped.
+    for start, last in _deliverable_bullet_spans(lines):
+        if num not in _bullet_marker_item_numbers(lines[last]):
+            continue
+        current = ICON_TO_STATUS[_BULLET_RE.match(lines[start]).group("icon")]
+        if current and RANK[status] > RANK[current]:
+            lines[start] = _replace_first_icon(lines[start], status)
 
     # Recompute rollups for every stage (never downgrading).
     stage_status: Dict[str, str] = {}
@@ -1065,15 +1113,37 @@ _INSIGHT_TYPES = ("knowledge", "defect", "gap", "automation", "framework")
 #: 2026-01-01)*`` — is a shape warning rather than a silently accepted
 #: provenance that says nothing. Free-form is not the same as empty.
 _INSIGHT_SOURCE = r"[^)\n]*[^\s)\n]"
+#: What may stand **after** the date, in the same marker: the conditions the
+#: observation was made under, conventionally ``engine X.Y.Z`` — one read of
+#: ``.aide/VERSION`` at capture time (conventions.md §1).
+#:
+#: The date cannot proxy for it: a project runs an engine for as long as it
+#: likes after a release, so two entries captured the same week may sit either
+#: side of a restructure. It matters most on a ``framework`` entry, which is
+#: triaged in another repo, months later, by someone with no other way to know.
+#:
+#: Free-form for the same reason the provenance is, and the reason is sharper
+#: here: this component arrived after entries already existed, so a grammar
+#: (``engine`` plus a SemVer triple, say) would reject a consumer's own honest
+#: spelling permanently — the claim line is immutable, and the warning could
+#: never be cleared. Conventional, not grammatical.
+#:
+#: Free-form everywhere except one character: ``)`` closes the marker, so a note
+#: containing one — ``engine 1.2.3 (rc1)`` — does not parse, drawing a permanent
+#: shape warning and losing the date that ``archive`` and ``tick`` read. Write
+#: the note without parentheses.
+_INSIGHT_NOTE = r"[^)\n]*[^\s)\n]"
 #: A provenance naming exactly one item — the only form that yields an item
 #: *number*. A range, a queue, or anything else leaves ``item`` ``None``, as a
 #: bare date always has.
 _INSIGHT_ONE_ITEM_RE = re.compile(r"^[Ii]tems? (\d+)$")
-# "- [ ] <type> — <one line> *(item NNN, YYYY-MM-DD)*"; the provenance is
-# free-form and optional, and ticked entries append " → <where it landed>".
+# "- [ ] <type> — <one line> *(item NNN, YYYY-MM-DD, engine X.Y.Z)*"; the
+# provenance and the trailing note are both free-form and optional, and ticked
+# entries append " → <where it landed>".
 _INSIGHT_RE = re.compile(
     r"^- \[[ xX]\] (?:" + "|".join(_INSIGHT_TYPES) + r") [—–-] .+"
-    r"\*\((?:" + _INSIGHT_SOURCE + r", )?\d{4}-\d{2}-\d{2}\)\*"
+    r"\*\((?:" + _INSIGHT_SOURCE + r", )?\d{4}-\d{2}-\d{2}"
+    r"(?:, " + _INSIGHT_NOTE + r")?\)\*"
 )
 
 
@@ -1102,8 +1172,9 @@ def insight_warnings(ddir: Path) -> List[str]:
             out.append(
                 f"insights.md:{lineno}: entry does not match "
                 f"'- [ ] <{'|'.join(_INSIGHT_TYPES)}> — <one line> "
-                f"*(<where it came from>, YYYY-MM-DD)*' — the provenance is "
-                f"free-form and may be omitted; the ISO date may not"
+                f"*(<where it came from>, YYYY-MM-DD, engine X.Y.Z)*' — the "
+                f"provenance and the trailing engine version are free-form "
+                f"and may be omitted; the ISO date may not"
             )
     return out
 
@@ -1119,7 +1190,7 @@ _INSIGHT_POINTER = " → "
 _INSIGHT_ENTRY_HEAD = (
     r"^- \[(?P<mark>[ xX])\] (?P<type>" + "|".join(_INSIGHT_TYPES) + r") [—–-] "
     r"(?P<text>.+?)\*\((?:(?P<source>" + _INSIGHT_SOURCE + r"), )?"
-    r"(?P<date>\d{4}-\d{2}-\d{2})\)\*"
+    r"(?P<date>\d{4}-\d{2}-\d{2})(?:, (?P<note>" + _INSIGHT_NOTE + r"))?\)\*"
 )
 #: Which marker is the provenance, when a line carries more than one.
 #:
@@ -1174,6 +1245,8 @@ class InsightEntry(NamedTuple):
     text: str                   # the claim, without provenance or pointer
     date: Optional[str]
     source: Optional[str]       # the provenance verbatim; None for a bare date
+    note: Optional[str]         # what follows the date, verbatim — by
+                                # convention "engine X.Y.Z"; None when absent
     item: Optional[int]         # only when `source` names exactly one item
     pointer: Optional[str]      # what follows " → ", when ticked in place
     trail: List[str]            # raw status-trail lines, in file order
@@ -1203,7 +1276,8 @@ def parse_insights(text: str) -> List[InsightEntry]:
                 ordinal=len(entries) + 1, lineno=lineno, raw=line,
                 ticked=line.startswith("- [x]") or line.startswith("- [X]"),
                 type=None, text=line[2:].strip(), date=None, source=None,
-                item=None, pointer=None, trail=[], end_lineno=lineno))
+                note=None, item=None, pointer=None, trail=[],
+                end_lineno=lineno))
             continue
         tail = m.group("tail")
         pointer = (tail.split(_INSIGHT_POINTER, 1)[1].strip()
@@ -1214,7 +1288,7 @@ def parse_insights(text: str) -> List[InsightEntry]:
             ordinal=len(entries) + 1, lineno=lineno, raw=line,
             ticked=m.group("mark") in ("x", "X"),
             type=m.group("type"), text=m.group("text").strip(),
-            date=m.group("date"), source=source,
+            date=m.group("date"), source=source, note=m.group("note"),
             item=int(one_item.group(1)) if one_item else None,
             pointer=pointer, trail=[], end_lineno=lineno))
     return entries
@@ -1448,6 +1522,36 @@ def _malformed_gate_row_warnings(lines: List[str]) -> List[str]:
     return out
 
 
+def _reach_with_breadth(lines: List[str], g: HumanGate) -> str:
+    """*g*'s reach with the held items resolved and counted.
+
+    A ``stage N`` reach reads plausibly right while holding items its author
+    never meant to hold — the observed case gated the very deliberation that
+    was to produce the gate's evidence. ``aide claim`` already names what it
+    holds, but that surfaces only when a runner stalls; the check computes the
+    same breadth (``stage_item_numbers``) and used to throw it away, so the
+    contradiction was invisible at authoring time. Only the stage form needs
+    resolving: an item-list reach already names its items, and ``all`` is its
+    own answer.
+
+    The count covers the items the gate still sits in front of: a ✅ item has
+    merged and a ❌ one is out, so "holding" either would overstate the reach
+    against the very enforcement this message mirrors. (``claim``'s stall
+    report narrows further, to the claimable subset of one queue — that is
+    the runtime view; this is the authoring-time view of the same fact, and a
+    stage whose every item merged falls back to the bare reach.)
+    """
+    if g.stage is None:
+        return g.reach
+    _, _, item_status = _parse_item_status(lines)
+    items = [i for i in stage_item_numbers(lines, g.stage)
+             if item_status.get(i, "planned") not in ("complete", "excluded")]
+    if not items:
+        return g.reach
+    return (f"stage {g.stage} — holding {len(items)} item(s): "
+            + ", ".join(f"{i:03d}" for i in items))
+
+
 def gate_warnings(lines: List[str]) -> List[str]:
     """One warning per unresolved human gate, plus one per unreadable row.
 
@@ -1469,7 +1573,7 @@ def gate_warnings(lines: List[str]) -> List[str]:
         if g.kind == "declined":
             out.append(
                 f"progress.md:{g.lineno}: human gate {n} ({g.text}) was DECLINED "
-                f"and still blocks {g.reach} — a refusal does not release the "
+                f"and still blocks {_reach_with_breadth(lines, g)} — a refusal does not release the "
                 f"work it guards; drop those items or change what the gate asks")
             continue
         if g.stage is not None and not stage_item_numbers(lines, g.stage):
@@ -1491,7 +1595,7 @@ def gate_warnings(lines: List[str]) -> List[str]:
                          f"it holds nothing today and will block that stage's "
                          f"items as they are created")
         elif g.blocks or g.stage or g.blocks_all:
-            reach = g.reach
+            reach = _reach_with_breadth(lines, g)
         else:
             reach = ("nothing named — the Blocks cell names no item, no "
                      "'stage N', and is not 'all', so this gate holds nothing")
@@ -1963,6 +2067,34 @@ def nested_deliverable_warnings(lines: List[str]) -> List[str]:
     return out
 
 
+def unattributed_reference_warnings(lines: List[str]) -> List[str]:
+    """Deliverable bullets that reference items but attribute none of them.
+
+    Only a bullet's trailing ``*(Item NNN)*`` marker ties items to it (§1,
+    issue #99). A bullet whose references all sit mid-prose therefore tracks
+    nothing: the items it names stay planned, hold their queue open, and
+    `aide progress set` cannot find the bullet — a silent gap unless it is
+    reported where the author can fix it. A bullet that has a trailing marker
+    is fine, whatever else its prose mentions: the prose is free text by
+    design, not a mistake.
+    """
+    out: List[str] = []
+    for start, last in _deliverable_bullet_spans(lines):
+        if _bullet_marker_item_numbers(lines[last]):
+            continue
+        span_text = "\n".join(lines[start:last + 1])
+        nums = sorted(set(_referenced_item_numbers(span_text)))
+        if nums:
+            listed = ", ".join(f"{n:03d}" for n in nums)
+            out.append(
+                f"progress.md:{start + 1}: deliverable bullet references "
+                f"item(s) {listed} but ends with no *(Item NNN)* marker — only "
+                f"the trailing marker ties an item to a bullet, so this bullet "
+                f"tracks nothing and those items read as untracked. End it "
+                f"with the marker (e.g. '. *(Item {nums[0]:03d})*').")
+    return out
+
+
 def _line_after_title(lines: List[str]) -> str:
     """The first content line after the `#` title, or "" if there is none.
 
@@ -2018,14 +2150,102 @@ def header_blockquote_warnings(ddir: Path) -> List[str]:
     return out
 
 
-def item_spec_warnings(ddir: Path) -> List[str]:
+#: The vision sections `templates/vision.md` marks `MANDATORY`, minus Goals &
+#: objectives, whose mandatory substance is the G-code table checked separately
+#: — a heading over an empty section would satisfy a heading check while giving
+#: the roadmap nothing to trace. Each entry: (heading text, why it is needed).
+_VISION_MANDATORY_SECTIONS = (
+    ("Guiding principles", "the validator checks implementation against these"),
+    ("Out of scope", "the validator flags work that contradicts this"),
+    ("Success criteria", "they define when the project is done"),
+)
+
+
+def _has_g_code_row(lines: List[str]) -> bool:
+    """True when any table row's first cell names a vision G-code (`G1 …`).
+
+    The shape both mandatory tables share: vision's objectives table and the
+    roadmap's objective → stage coverage table each open every row with the
+    G-code. Cell counts differ (3 and 2), so the first cell is the invariant.
+    """
+    for line in lines:
+        if not line.strip().startswith("|"):
+            continue
+        cells = _split_row(line)
+        if cells and re.match(r"G\d+\b", cells[0]):
+            return True
+    return False
+
+
+def root_document_warnings(ddir: Path) -> List[str]:
+    """Root documents missing the sections their templates mark MANDATORY.
+
+    `templates/vision.md` annotates four sections `MANDATORY: validator
+    checks…` and `templates/roadmap.md` two, and until issue #86 nothing
+    verified any of them: a hand-written vision with none of the sections
+    passed `aide check`, so the promise the annotations make was kept by no
+    code. The observed failure is exactly that — a vision authored free-hand
+    in a consumer, structurally plausible, checked by nobody.
+
+    Headings are matched tolerantly (any level, the template's `2.` numbering
+    optional, case-insensitive): the lint is for a *dropped* section, and a
+    renumbered heading is not a dropped section.
+
+    Warnings, not errors, matching the item specs' mandatory-Assumptions lint:
+    root documents predating this check exist in real consumers, and an
+    unattended run must not start failing over a document none of its items
+    touch — the queue-boundary human reads warnings. A missing file is silent:
+    a repo may adopt the CLI without the root documents (issue #57), and
+    `create-progress` onward is where `progress.md` becomes a hard error.
+    """
+    out: List[str] = []
+    vpath = ddir / "vision.md"
+    if vpath.is_file():
+        vtext = vpath.read_text(encoding=_ENCODING)
+        for title, why in _VISION_MANDATORY_SECTIONS:
+            if not re.search(rf"^#{{1,6}}\s*(?:\d+\.\s*)?{title}\b", vtext,
+                             re.MULTILINE | re.IGNORECASE):
+                out.append(f"vision.md: no '{title}' section — the template "
+                           f"marks it MANDATORY: {why}")
+        if not _has_g_code_row(vtext.splitlines()):
+            out.append("vision.md: no G-code objectives table (rows opening "
+                       "'| G1 |…') — the template marks it MANDATORY: the "
+                       "roadmap and progress.md trace every stage back to "
+                       "these codes")
+    rpath = ddir / "roadmap.md"
+    if rpath.is_file():
+        rtext = rpath.read_text(encoding=_ENCODING)
+        if not _has_g_code_row(rtext.splitlines()):
+            out.append("roadmap.md: no objective → stage coverage rows "
+                       "(opening '| G1 …|') — the template marks the table "
+                       "MANDATORY: it is what shows every vision G-code "
+                       "mapped to a stage")
+        if not re.search(r"^#{1,6}\s*Stage\s+\d+", rtext,
+                         re.MULTILINE | re.IGNORECASE):
+            out.append("roadmap.md: no '## Stage N — Title' sections — the "
+                       "template marks the shape MANDATORY: queues are scoped "
+                       "to a stage and progress.md is generated from these "
+                       "sections")
+    return out
+
+
+def item_spec_warnings(ddir: Path, ddir_rel: str = "docs/aide") -> List[str]:
     """Item specs that break the shapes §1 and §5 fix.
 
-    Three rules, none previously checked: the `# Item NNN — Title` heading must
-    agree with the filename (the status report parses the title from it); the
-    header must carry NO status field (status lives only in progress.md, and a
-    duplicate has no owner and only drifts); and the **Assumptions** block is
-    mandatory, since it is what the validator surfaces for audit.
+    Four rules: the `# Item NNN — Title` heading must agree with the filename
+    (the status report parses the title from it); the header must carry NO
+    status field (status lives only in progress.md, and a duplicate has no
+    owner and only drifts); the **Assumptions** block is mandatory, since it
+    is what the validator surfaces for audit; and no always-authorised path
+    may sit under **Asserts against** — the loop itself edits those on every
+    item (the mandatory status flip alone touches progress.md), so the pin can
+    never hold and `aide scope` would fail the item on its routine
+    bookkeeping. Pinning progress.md is the natural way to write an AC that
+    reads a gate row, which is exactly why it needs a spec-time warning.
+
+    *ddir_rel* is the docs dir as specs spell it in their repo-relative paths;
+    `run_checks` passes the configured value, and the default matches the
+    scaffolded `aide.toml`.
 
     The missing-Assumptions finding is reported as ONE aggregated line. Specs
     predating the rule are common — 32 of 112 in the consumer this was measured
@@ -2035,6 +2255,7 @@ def item_spec_warnings(ddir: Path) -> List[str]:
     idir = ddir / "items"
     if not idir.is_dir():
         return []
+    always = _always_authorised_paths(ddir_rel)
     out: List[str] = []
     missing_assumptions: List[str] = []
     for path in sorted(idir.glob("*.md")):
@@ -2060,6 +2281,34 @@ def item_spec_warnings(ddir: Path) -> List[str]:
                        f"and only drifts")
         if not re.search(r"^##\s+Assumptions", text, re.MULTILINE):
             missing_assumptions.append(f"{num:03d}")
+        parsed = parse_authorised_paths(text)
+        for pin in (parsed.asserts_against if parsed else []):
+            if any(patterns_overlap(pin, a) for a in always):
+                out.append(
+                    f"items/{path.name}: '{pin}' is pinned under Asserts "
+                    f"against, but every item is authorised to edit it — the "
+                    f"status flip and the insight append are loop bookkeeping "
+                    f"— so the pin can never hold and `aide scope` will report "
+                    f"a contradiction on every run; put the read-only content "
+                    f"check in an acceptance criterion's test instead")
+        # Asserts against means pinned-NOT-changed — `aide scope` prints
+        # exactly that — so a path the spec also authorises itself to change
+        # is a contradiction authored into the spec: the moment the item uses
+        # the authorisation, scope fails it with no spec-side fix visible
+        # (issue #94). Exact double-listing only: a literal pin under a May
+        # change glob is the legitimate carve-out shape ("I may edit docs/**
+        # but not docs/api.md") and scope stays the judge of whether it held.
+        may_normalised = {_strip_dot_slash(p.strip())
+                         for p in (parsed.may_change if parsed else [])}
+        for pin in (parsed.asserts_against if parsed else []):
+            if _strip_dot_slash(pin.strip()) in may_normalised:
+                out.append(
+                    f"items/{path.name}: '{pin}' is listed under both May "
+                    f"change and Asserts against — Asserts against means "
+                    f"pinned-not-changed, so `aide scope` will report every "
+                    f"change to it as a contradiction. If the item writes the "
+                    f"file and its tests assert against the final state, list "
+                    f"it only under May change and say so in prose")
     if missing_assumptions:
         shown = ", ".join(missing_assumptions[:8])
         more = (f" (+{len(missing_assumptions) - 8} more)"
@@ -2132,12 +2381,12 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
                branches: Optional[List[str]] = None) -> Tuple[List[str], List[str]]:
     """Return ``(errors, warnings)``. Empty errors == pass.
 
-    The first nine checks all run before, and survive, the two early returns
+    The first ten checks all run before, and survive, the two early returns
     below, but for two different reasons. Four of them —
     `absolute_path_test_warnings`, `separator_dependent_test_warnings`,
     `cli_subprocess_test_warnings`, `gitattributes_eol_pin_warnings` — read
     `tests_dir` and never touch `docs_dir`, so they are the ones that make this
-    function worth calling in a repo with no document set. The other five *are* document checks; they
+    function worth calling in a repo with no document set. The other six *are* document checks; they
     simply find nothing to say when `docs_dir` is absent, so keeping them costs
     nothing and they still report on a `docs_dir` that exists but has no
     `progress.md`.
@@ -2161,7 +2410,12 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
     warnings.extend(cli_subprocess_test_warnings(repo_root, config))
     warnings.extend(gitattributes_eol_pin_warnings(repo_root, config))
     warnings.extend(header_blockquote_warnings(ddir))
-    warnings.extend(item_spec_warnings(ddir))
+    warnings.extend(root_document_warnings(ddir))
+    # A docs_dir outside the repo falls back to its absolute spelling, which
+    # cannot appear in a spec's repo-relative paths — the always-authorised
+    # pin lint then has nothing to match; the other spec-shape lints still
+    # apply.
+    warnings.extend(item_spec_warnings(ddir, _rel_display(ddir, repo_root)))
     if ddir.exists() and not ddir.is_dir():
         # `docs_dir` pointing at something that is not a directory is a
         # misconfiguration, and a third case again: it is neither "no document
@@ -2191,6 +2445,7 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
     lines = text.splitlines()
     warnings.extend(gate_warnings(lines))
     warnings.extend(nested_deliverable_warnings(lines))
+    warnings.extend(unattributed_reference_warnings(lines))
 
     # Mandatory sections.
     has_stage_table = any(
@@ -2343,18 +2598,20 @@ def _parse_item_status(lines: List[str]) -> Tuple[List[str], List[str], Dict[int
     table's Notes column narrating what went wrong with several items, or a
     checkbox that merely cites the item that satisfies it, must not pull that
     item's tracked status backwards.
+
+    Within a bullet, only the trailing ``*(Item NNN)*`` marker attributes — §1
+    already calls it "the suffix [that] ties an item to the bullet". A
+    reference form elsewhere in the bullet's prose is as free as one in a
+    table cell: a ✅ bullet whose text mentions a live sibling ("absorbing
+    *(Item 095)*'s scope") used to mark that sibling complete, overriding its
+    own 📋 bullet — and once spent items were discounted from the cross-spec
+    checks, the mis-attribution silenced exactly the pre-build errors the
+    checks exist to raise (issue #99).
     """
     item_status: Dict[int, str] = {}
-    bullet_status: Optional[str] = None
-    for line in lines:
-        m = _BULLET_RE.match(line)
-        if m:
-            bullet_status = ICON_TO_STATUS[m.group("icon")]
-        elif not line.strip() or re.match(r"^\s*[-*]\s", line) or not re.match(r"^\s+\S", line):
-            bullet_status = None  # blank line, a non-deliverable bullet, or an unindented new block
-        if bullet_status is None:
-            continue
-        for num in _referenced_item_numbers(line):
+    for start, last in _deliverable_bullet_spans(lines):
+        bullet_status = ICON_TO_STATUS[_BULLET_RE.match(lines[start]).group("icon")]
+        for num in _bullet_marker_item_numbers(lines[last]):
             if num not in item_status or RANK[bullet_status] > RANK[item_status[num]]:
                 item_status[num] = bullet_status
     return [], [], item_status
@@ -2428,6 +2685,34 @@ def patterns_overlap(a: str, b: str) -> bool:
     return False
 
 
+def _built_after(graph: Dict[int, List[int]]) -> Dict[int, Set[int]]:
+    """For each item, every item it is built *after* — its declared
+    dependencies and theirs, transitively.
+
+    The ordering `## Dependencies` actually promises. Direct listing is not
+    enough on its own: an item that names one sibling which in turn names
+    another is built after both, and the pair the caller is about to judge may
+    be the far end of that chain.
+
+    Cycle-safe by the `in out` guard rather than by trusting the graph — a
+    mutual pair is a real shape here (`_dependency_cycles` reports it as the
+    error it is) and must not hang the check that discovers it.
+    """
+    closure: Dict[int, Set[int]] = {}
+    for node in graph:
+        out: Set[int] = set()
+        stack = list(graph.get(node, []))
+        while stack:
+            dep = stack.pop()
+            if dep in out:
+                continue
+            out.add(dep)
+            stack.extend(graph.get(dep, []))
+        out.discard(node)
+        closure[node] = out
+    return closure
+
+
 def _dependency_cycles(graph: Dict[int, List[int]]) -> List[List[int]]:
     """Every dependency cycle in *graph*, each reported once.
 
@@ -2477,7 +2762,7 @@ def queue_spec_findings(repo_root: Path, config: Dict[str, Dict[str, object]],
     if qpath is None:
         return ([SpecFinding("error", "missing-queue", (),
                              f"no {queue_name(number)} file under "
-                             f"{qdir.relative_to(repo_root).as_posix()}")],
+                             f"{_rel_display(qdir, repo_root)}")],
                 [])
 
     numbers = queue_item_numbers(qpath.read_text(encoding=_ENCODING))
@@ -2485,6 +2770,19 @@ def queue_spec_findings(repo_root: Path, config: Dict[str, Dict[str, object]],
     findings: List[SpecFinding] = []
     unspecced: List[int] = []
     declared: Dict[int, AuthorisedPaths] = {}
+
+    # A finding against a SPENT item — merged (✅) or excluded (❌) — is an
+    # error no later item can clear: the spec is a record nobody may edit, a
+    # merged May-change claim can neither be harmed by a later writer nor harm
+    # one, and an excluded item is never offered. Such findings are reported
+    # for the rest of the queue's life, which teaches a reader to skim the run
+    # where one is real — so spent items are discounted below, on both sides
+    # of every comparison. Deferred (⏸️) items are NOT spent: their claims are
+    # dormant, not dead, and a conflict with one is worth surfacing while
+    # re-planning is still cheap.
+    item_status = _progress_item_status(repo_root, config)
+    spent = {n for n in numbers
+             if item_status.get(n, "planned") in ("complete", "excluded")}
 
     for num in numbers:
         specs = item_spec_paths(idir, num)
@@ -2494,26 +2792,48 @@ def queue_spec_findings(repo_root: Path, config: Dict[str, Dict[str, object]],
             unspecced.append(num)
             continue
         parsed = parse_authorised_paths(specs[0].read_text(encoding=_ENCODING))
-        rel = specs[0].relative_to(repo_root).as_posix()
+        rel = _rel_display(specs[0], repo_root)
         if declares_nothing(parsed):
-            findings.append(SpecFinding(
-                "warning", "undeclared-scope", (num,),
-                f"item {num:03d} ({rel}) declares no '## Authorised paths' — its "
-                f"scope cannot be compared with its siblings'. Add the section "
-                f"(conventions.md §1); until then this item needs a human scope "
-                f"review, and `aide scope` cannot check it either"))
+            if num not in spent:
+                # A spent spec with no scope section merged (or was dropped)
+                # regardless; the remedy the message names is no longer
+                # available, so the warning would be pure unclearable noise.
+                findings.append(SpecFinding(
+                    "warning", "undeclared-scope", (num,),
+                    f"item {num:03d} ({rel}) declares no '## Authorised paths' — its "
+                    f"scope cannot be compared with its siblings'. Add the section "
+                    f"(conventions.md §1); until then this item needs a human scope "
+                    f"review, and `aide scope` cannot check it either"))
             continue
         declared[num] = parsed
+
+    # Read once, used twice: the declared ordering exempts pinned-state pairs
+    # below, and the same edges are the cycle graph further down. Reading each
+    # spec's Dependencies section twice would be the only alternative.
+    deps_by_item = {num: _item_dependencies(repo_root, config, num)
+                    for num in numbers if num not in unspecced}
+    # An item is built after everything it declares a dependency on, and after
+    # what those declare in turn — but only along edges that still ORDER the
+    # two items. A dependency `aide claim` no longer waits for does not hold
+    # its dependent back: a ⏸️ deferred blocker is skipped by `_pick_item`, so
+    # the dependent is claimable today and would pin a tree the deferred item
+    # has not touched yet. Filtering the edges rather than the pairs also
+    # settles the transitive case, where the link that fails to hold is an
+    # intermediate: `b → c (⏸️) → a` leaves b free to build before a.
+    ordering_edges = {num: [d for d in deps
+                            if item_status.get(d, "planned") in BLOCKING_STATUSES]
+                      for num, deps in deps_by_item.items()}
+    built_after = _built_after(ordering_edges)
 
     # The loop bookkeeping every item writes anyway (`aide scope` authorises
     # these without them being listed). Specs often list them redundantly, and
     # two items "conflicting" over progress.md is not a conflict — it is the
     # claim protocol working. Excluded from the overlap check, never from the
     # pinned-state check: pinning progress.md would be a real assertion.
-    ddir_rel = ddir.relative_to(repo_root).as_posix()
-    bookkeeping = {f"{ddir_rel}/{name}" for name in _ALWAYS_AUTHORISED}
+    ddir_rel = _rel_display(ddir, repo_root)
+    bookkeeping = set(_always_authorised_paths(ddir_rel))
 
-    ordered = sorted(declared)
+    ordered = sorted(n for n in declared if n not in spent)
     for i, a in enumerate(ordered):
         for b in ordered[i + 1:]:
             # Row 1 — two items claim edit rights on the same file.
@@ -2536,6 +2856,21 @@ def queue_spec_findings(repo_root: Path, config: Dict[str, Dict[str, object]],
         for b in ordered:
             if a == b:
                 continue
+            if a in built_after.get(b, ()):
+                # Item a still holds item b back — b declares a dependency on
+                # it, directly or through a chain, along links that all still
+                # order (`ordering_edges`). So b is authored and built against
+                # a tree that already holds a's edit: a landing cannot break a
+                # pin b writes afterwards, by construction. This is the whole shape
+                # of a `Validate stage N` item — it exists to pin the artifacts
+                # its stage's items produce, and it names them as dependencies
+                # — which made the error fire against every such item, with
+                # neither remedy the message offers available: widening the pin
+                # drops what the item exists to observe, and narrowing the
+                # earlier edits removes the stage's whole point. A pair with no
+                # declared dependency keeps the error: an undeclared ordering
+                # is exactly what this check exists to find.
+                continue
             for pa in declared[a].may_change:
                 for pb in declared[b].asserts_against:
                     if patterns_overlap(pa, pb):
@@ -2544,13 +2879,24 @@ def queue_spec_findings(repo_root: Path, config: Dict[str, Dict[str, object]],
                             f"item {a:03d} may change '{pa}', which item {b:03d} "
                             f"pins as '{pb}' under Asserts against — item {b:03d}'s "
                             f"assertion breaks when item {a:03d} lands. Decide now "
-                            f"which side is wrong: widen the pin, or narrow the edit"))
+                            f"which side is wrong: widen the pin, narrow the edit, "
+                            f"or — if item {b:03d} is meant to be built after item "
+                            f"{a:03d} and to pin what it produced — say so under "
+                            f"item {b:03d}'s '## Dependencies', which both orders "
+                            f"the queue and retires this finding"))
 
     # Row 5 — the dependency graph. A cycle deadlocks `aide claim`: every item
     # in it is blocked by another in it, so the queue silently stops producing
-    # work rather than failing.
-    graph = {num: _item_dependencies(repo_root, config, num)
-             for num in numbers if num not in unspecced}
+    # work rather than failing. The graph holds only items that can still
+    # block a claim — the same status set `_pick_item` treats as blocking: a
+    # complete, excluded or deferred dependency does not block, and such an
+    # item is never offered, so no cycle through one can deadlock (a cycle
+    # whose members all merged has PROVED its order was satisfiable). The typo
+    # pass below shares the filter: a mistyped dependency in a spent or
+    # deferred item's spec blocks nothing today, and the warning about it
+    # would be unclearable.
+    graph = {num: deps for num, deps in deps_by_item.items()
+             if item_status.get(num, "planned") in BLOCKING_STATUSES}
     for cycle in _dependency_cycles(graph):
         chain = " → ".join(f"{n:03d}" for n in cycle + [cycle[0]])
         findings.append(SpecFinding(
@@ -2600,6 +2946,19 @@ def _write_findings_report(path: Path, number: int,
 
 
 def cmd_check(args: argparse.Namespace) -> int:
+    """The consistency gate over the document set — and two writes.
+
+    One is asked for by flag: ``--report PATH`` writes the cross-spec findings
+    file for `spec-reviewer`. The other is ``ensure_insights_inbox``: a
+    ``docs_dir`` that exists but has no ``insights.md`` gets one, byte-exact
+    from the template, committed where git allows, and the run says so in a
+    ``notice:``. It is the engine keeping §1's promise that capture is a plain
+    append to a file that exists, placed in the verb every consumer is told to
+    run before its first unattended run. The exit code never depends on it:
+    the creation cannot fail a run — a commit that git refuses, or a ``git``
+    that cannot be run, is a sentence in the notice, not an error — and a
+    document set whose inbox already exists is reported exactly as before.
+    """
     queue = getattr(args, "queue", None)
     if getattr(args, "report", None) and queue is None:
         # Silently ignoring it would be worse than refusing: the caller asked
@@ -2612,6 +2971,10 @@ def cmd_check(args: argparse.Namespace) -> int:
     repo_root = find_repo_root(args.repo)
     config = load_config(repo_root)
     ddir = docs_dir(repo_root, config)
+    # Before the checks, so the file they then shape-check is the one that
+    # exists — a run that created the inbox and warned about its absence in
+    # the same breath would be reporting on two different repositories.
+    ensure_insights_inbox(repo_root, config, verb="check")
     errors, warnings = run_checks(repo_root, config)
 
     if not ddir.exists() and queue is None:
@@ -2763,12 +3126,15 @@ def cmd_progress(args: argparse.Namespace) -> int:
         return 1
     text = progress_path.read_text(encoding=_ENCODING)
     original = text
-    # An item is only trackable if some deliverable bullet references it (a
-    # missing "*(Item NNN)*" would make set_item_status a silent no-op). When
-    # the queue back-fill was missed, self-heal deterministically from the item
-    # spec's own Stage/title header; only when that context is missing too does
-    # this stay a loud, blocking error.
-    if not _references_item(text, args.number):
+    # An item is only trackable if some deliverable bullet's trailing marker
+    # names it — the ownership rule set_item_status flips by — otherwise the
+    # set would be a silent no-op. A prose mention on someone else's bullet
+    # does not count (issue #99). When the queue back-fill was missed,
+    # self-heal deterministically from the item spec's own Stage/title header;
+    # only when that context is missing too does this stay a loud, blocking
+    # error.
+    healed_note: Optional[str] = None
+    if args.number not in _parse_item_status(text.splitlines())[2]:
         stage, title = _spec_stage_and_title(repo_root, config, args.number)
         healed = insert_item_reference(text, args.number, stage, title) if stage and title else None
         if healed is None:
@@ -2783,9 +3149,29 @@ def cmd_progress(args: argparse.Namespace) -> int:
             )
             return 1
         text = healed
-        print(f"item {args.number:03d}: back-filled missing deliverable reference "
-              f"under Stage {stage} (from the item spec)")
+        # Announced only after the guard below confirms the back-fill took —
+        # a success-flavoured line right before "NOT changed" reads as a
+        # contradiction in an unattended log.
+        healed_note = (f"item {args.number:03d}: back-filled missing "
+                       f"deliverable reference under Stage {stage} "
+                       f"(from the item spec)")
     updated = set_item_status(text, args.number, status_map[args.status])
+    if args.number not in _parse_item_status(updated.splitlines())[2]:
+        # Belt to the heal's braces: if the back-fill (or anything else) left
+        # no bullet whose trailing marker names this item, the set recorded
+        # nothing — say so and write nothing, instead of printing success over
+        # a silent no-op (the failure shape a review of issue #99 found).
+        print(
+            f"item {args.number:03d}: ERROR — after the back-fill, no "
+            f"deliverable bullet's trailing *(Item {args.number:03d})* marker "
+            f"names this item, so the status could not be recorded; progress.md "
+            f"NOT changed. Add the marker to the owning bullet's last line, "
+            f"then re-run.",
+            file=sys.stderr,
+        )
+        return 1
+    if healed_note:
+        print(healed_note)
     if updated == original:
         print(f"item {args.number:03d}: no change (already >= {args.status})")
     else:
@@ -2847,24 +3233,154 @@ def _commit_progress_file(repo_root: Path, config, message: str) -> None:
 
 
 def _commit_docs_files(repo_root: Path, config, message: str,
-                       rels: List[str]) -> None:
+                       rels: List[str], pull: bool = True) -> Optional[str]:
     """Commit exactly *rels* — repo-relative paths — with *message*.
 
-    Named paths, never ``git add -A``: these verbs run mid-item, alongside a
-    builder's uncommitted work, and a broad add would sweep that into a
-    bookkeeping commit.
+    Returns ``None`` when every named path is in the new commit, otherwise a
+    one-line reason it is not — so a caller that announces a commit announces
+    what happened, not what it intended. "Exactly" is enforced by pathspec:
+    ``git commit -- <rels>`` commits the named paths and nothing else, so a
+    builder's staged work sitting in the index stays staged and out of the
+    bookkeeping commit; a bare ``git commit`` would have swept it in, which is
+    why ``git add <rel>`` alone was never enough.
+
+    A commit that fails — no ``user.name`` on a fresh clone, a hook, a path
+    ``.gitignore`` reaches — leaves *rels* unstaged again, so the tree degrades
+    to "modified" or "untracked" rather than "staged": ``aide sync`` refuses
+    either, but a caller can say which and why. A ``git`` that cannot be run
+    at all is a reason, not a traceback; ``check`` in particular must keep
+    passing in a repo whose ``git`` is off PATH, as it did before 1.26.0.
+
+    *pull* rebases onto the upstream first, which is right for an edit to a
+    file other machines also edit (a tick, an archive) and wrong for a file
+    that did not exist a moment ago — ``ensure_insights_inbox`` passes
+    ``False`` so that ``check``, a gate, never fetches on the caller's behalf.
     """
-    git(["pull", "--rebase"], repo_root, check=False)
-    for rel in rels:
-        git(["add", rel], repo_root, check=False)
-    res = git(["commit", "-m", message], repo_root, check=False)
-    if res.returncode != 0 and "nothing to commit" not in (res.stdout + res.stderr):
-        print(res.stderr.strip(), file=sys.stderr)
+    try:
+        if pull:
+            git(["pull", "--rebase"], repo_root, check=False)
+        for rel in rels:
+            git(["add", "--", rel], repo_root, check=False)
+        res = git(["commit", "-m", message, "--", *rels], repo_root, check=False)
+        if res.returncode != 0:
+            git(["reset", "-q", "--", *rels], repo_root, check=False)
+            text = (res.stdout + res.stderr).strip()
+            if "nothing to commit" in text or "no changes added" in text:
+                return "nothing to commit"
+            first = next((l.strip() for l in text.splitlines() if l.strip()),
+                         "git commit failed")
+            print(f"aide: could not commit {', '.join(rels)} — {first}",
+                  file=sys.stderr)
+            return first
+        # One path per line, never whitespace-split: a `docs_dir` with a space
+        # in it must match its own entry. `core.quotepath=false` keeps a
+        # non-ASCII path literal rather than octal-escaped and quoted.
+        out = git(["-c", "core.quotepath=false", "show", "--name-only",
+                   "--format=", "HEAD"], repo_root, check=False).stdout
+        shown = [line.strip() for line in out.splitlines() if line.strip()]
+    except (OSError, subprocess.SubprocessError) as exc:
+        # Loud here, not only in the return: three callers (`progress set`,
+        # `tick`, `archive`) discard the reason, and a verb that prints its
+        # success line over an uncommitted edit is the failure this names.
+        why = f"git could not be run ({exc.__class__.__name__}: {exc})"
+        print(f"aide: could not commit {', '.join(rels)} — {why}", file=sys.stderr)
+        return why
+    missing = [r for r in rels if r not in shown]
+    if missing:
+        # `add` was refused (an ignored path, say) and `commit -- <path>` then
+        # committed the rest of the list: a commit happened, the file is not in
+        # it, and "committed" would be a lie about the one path that matters.
+        return f"{', '.join(missing)} is not in the commit (ignored by .gitignore?)"
+    return None
 
 
 def insights_path(ddir: Path) -> Path:
     """The live inbox. One name, one place — see ``queue_name``/``item_spec_paths``."""
     return ddir / "insights.md"
+
+
+#: The engine's own templates — installed as ``.aide/templates/`` beside
+#: ``.aide/scripts/``, and laid out the same way in the framework's source tree,
+#: so one relative step serves both. Module-level so a test can point it at a
+#: directory with no template in it.
+_TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "templates"
+
+
+def ensure_insights_inbox(repo_root: Path, config: Dict[str, Dict[str, object]],
+                          verb: str, commit: bool = True) -> Optional[Path]:
+    """Create ``insights.md`` from the template when the document set has none.
+
+    Returns the path when a file was created, ``None`` otherwise. Idempotent
+    and deliberately narrow: an existing file is never touched (not even a
+    malformed one — the immutability rule, conventions.md §1), and a repo with
+    no ``docs_dir`` gets nothing, since a project may adopt the CLI without
+    the loop and the directory itself is project-owned.
+
+    This is the engine's side of the §1 guarantee that capture is a plain
+    append to a file that exists. Before it, every agent spec told the role to
+    copy the template by hand the first time an insight needed a home — six
+    restatements of one step, and the one that made every spec name
+    ``templates/`` (issue #85). The copy is byte-exact: ``read_bytes`` /
+    ``write_bytes`` carries a BOM or CRLF the installer may have written
+    through unchanged.
+
+    The file is committed (named path, no pull) when *commit* is set and the
+    repo is one: ``aide sync`` refuses a dirty tree, so a creation left
+    untracked would stall the next preflight of the very loop it serves.
+    Two cases decline the commit and say so in the notice rather than
+    pretend: a detached ``HEAD``, where the commit would dangle and the file
+    vanish on the next checkout; and a commit git refuses or cannot run (no
+    identity on a fresh clone, ``git`` off PATH) — the file then stays
+    untracked and the reason is printed, for the next write verb to carry.
+    In a repository with no commits yet the inbox becomes the root commit;
+    that is the scaffold-time ``check`` the quickstart mandates, and a root
+    commit is a fine place for a file the loop owns.
+    """
+    ddir = docs_dir(repo_root, config)
+    if not ddir.is_dir():
+        return None
+    path = insights_path(ddir)
+    if path.exists():
+        return None
+    template = _TEMPLATES_DIR / "insights.md"
+    rel = _rel_display(path, repo_root)
+    if not template.is_file():
+        print(f"aide {verb}: {rel} is missing and could not be created — "
+              f"{_rel_display(template, repo_root)} is not there, so the install "
+              f"is incomplete (`python install.py --into . --check` from a "
+              f"framework checkout says how)", file=sys.stderr)
+        return None
+    path.write_bytes(template.read_bytes())
+    fate = ""
+    if not commit:
+        fate = ", left uncommitted (--no-commit)"
+    elif (repo_root / ".git").exists():
+        why = _commit_created_file(repo_root, config, rel)
+        fate = (" and committed it" if why is None
+                else f" but NOT committed — {why}; commit it with the next work")
+    print(f"notice: created {rel} from .aide/templates/insights.md{fate} — the "
+          f"insight inbox, so a capture is a plain append (conventions.md §1)")
+    return path
+
+
+def _commit_created_file(repo_root: Path, config, rel: str) -> Optional[str]:
+    """Commit the inbox `ensure_insights_inbox` just wrote — or say why not.
+
+    ``None`` on success, else the reason, in the same shape
+    ``_commit_docs_files`` returns. The detached-``HEAD`` check lives here and
+    not in the shared committer because it is a policy for a *new* file: a
+    commit would succeed, dangle, and take the file with it on the next
+    checkout while every message reported success.
+    """
+    try:
+        on_branch = git(["symbolic-ref", "-q", "HEAD"], repo_root,
+                        check=False).returncode == 0
+    except (OSError, subprocess.SubprocessError) as exc:
+        return f"git could not be run ({exc.__class__.__name__}: {exc})"
+    if not on_branch:
+        return "HEAD is detached, so the commit would dangle"
+    return _commit_docs_files(repo_root, config, "docs(aide): create the insight inbox",
+                              [rel], pull=False)
 
 
 def insight_archive_path(ddir: Path, quarter: str) -> Path:
@@ -2900,9 +3416,22 @@ def cmd_insights(args: argparse.Namespace) -> int:
     config = load_config(repo_root)
     ddir = docs_dir(repo_root, config)
     path = insights_path(ddir)
+    if args.action == "list":
+        # An empty backlog is an answer, not an error: `list` on a repo whose
+        # document set has no inbox yet creates the inbox — the same way
+        # `check` does — and reports it empty. The other two verbs edit an
+        # entry, and there is no entry to edit in a file that does not exist.
+        if not ddir.is_dir():
+            print(f"aide insights: no {_rel_display(ddir, repo_root)}/ — this "
+                  f"repo has no AIDE document set, so there is no inbox to list",
+                  file=sys.stderr)
+            return 2
+        ensure_insights_inbox(repo_root, config, verb="insights",
+                              commit=not args.no_commit)
     if not path.is_file():
-        print(f"aide insights: no {path} — capture creates it from "
-              ".aide/templates/insights.md (conventions.md §1)", file=sys.stderr)
+        print(f"aide insights {args.action}: no {_rel_display(path, repo_root)} "
+              f"— nothing to {args.action}; `aide check` creates the inbox "
+              f"(conventions.md §1)", file=sys.stderr)
         return 2
     text = path.read_text(encoding=_ENCODING)
     ddir_rel = ddir.relative_to(repo_root).as_posix()
@@ -2929,11 +3458,15 @@ def _cmd_insights_list(entries: List[InsightEntry], args: argparse.Namespace) ->
             # dressing it in fields this listing only guessed at.
             print(f"  {e.ordinal:>3}. ?? {e.raw}")
             continue
-        # The provenance is reprinted whole and verbatim: "where did this come
-        # from" is half of what triage routes on, and a listing that drops it —
-        # or re-derives it from the item number, which can only print back the
+        # The whole marker is reprinted verbatim: "where did this come from"
+        # is half of what triage routes on, and a listing that drops it — or
+        # re-derives it from the item number, which can only print back the
         # single-item form — sends the reader to the file it exists to replace.
-        prov = f" *({e.source + ', ' if e.source else ''}{e.date})*" if e.date else ""
+        # The trailing note is reprinted for the same reason: it carries the
+        # engine version a `framework` entry is triaged against, and triage
+        # reads this listing rather than the file.
+        prov = (f" *({e.source + ', ' if e.source else ''}{e.date}"
+                f"{', ' + e.note if e.note else ''})*") if e.date else ""
         mark = "x" if e.ticked else " "
         print(f"  {e.ordinal:>3}. [{mark}] {e.type:<10} — {e.text}{prov}"
               f"{_INSIGHT_POINTER + e.pointer if e.pointer else ''}")
@@ -3109,6 +3642,10 @@ def _queue_start(args: argparse.Namespace) -> int:
     # disagree with the base it records.
     git(["switch", "-c", branch, base], repo_root)
     _record_branch_base(repo_root, branch, base)
+    # `/aide-run-roadmap` (queue-planner) and `/aide-spec-queue` (spec-author,
+    # spec-reviewer) start here and reach a role before any `check` runs, so
+    # the inbox is guaranteed at the same point `claim` guarantees it.
+    ensure_insights_inbox(repo_root, config, verb="queue start")
     if mode != "local":
         git(["push", "-u", "origin", branch], repo_root)
     note = "" if base == str(config["git"].get("main_branch", "main")) else f" (base {base})"
@@ -3219,6 +3756,21 @@ def _queue_titles(text: str) -> Dict[int, str]:
 #: parser (and a human skimming the section) can tell the two apart.
 _DEPENDENCIES_DOWNSTREAM_MARKER_RE = re.compile(r"\*\*Downstream\b", re.IGNORECASE)
 
+#: Marks a quoted human-gate reach ("waits on Gate 3 — `Blocks: items 119,
+#: 120, 121`"). Transcribing the gate row's cell is the natural way to say
+#: which gate holds this item, and the numbers in the quote are the GATE's
+#: reach, not items this one depends on — read as blockers they grew edges
+#: (and cycles) nobody authored. Like ``**Downstream``, the marker must be
+#: DELIBERATE markup — a backticked or bold ``Blocks:`` label, the forms a
+#: quoted table cell actually takes — never bare prose: "hard blocks: Items
+#: 027 and 028 must land first" states real blockers, and an exclusion plain
+#: English could trip would silently drop them. The pattern consumes to the
+#: end of the line and no further: the quote opens no subsection, so a
+#: dependency bullet on the next line must still be read (which also means a
+#: reach quote must not wrap — keep it on one line, as the template says).
+_DEPENDENCIES_BLOCKS_QUOTE_RE = re.compile(
+    r"(?:`|\*\*)blocks\*{0,2}\s*:[^\n]*", re.IGNORECASE)
+
 
 def _item_dependencies(repo_root: Path, config, number: int) -> List[int]:
     """Item numbers named in the spec's Dependencies section (best effort).
@@ -3229,7 +3781,9 @@ def _item_dependencies(repo_root: Path, config, number: int) -> List[int]:
     the first in "Items 093, 094, 095" unrecognised as a blocker. Text at or
     after a "**Downstream" marker is excluded (see
     `_DEPENDENCIES_DOWNSTREAM_MARKER_RE`), so a forward-looking "item 099
-    depends on this" aside does not register as a backward blocker.
+    depends on this" aside does not register as a backward blocker; likewise
+    the rest of any line from a backticked or bold "Blocks:" marker on (see
+    `_DEPENDENCIES_BLOCKS_QUOTE_RE`), so a quoted gate reach does not either.
     """
     idir = docs_dir(repo_root, config) / "items"
     specs = item_spec_paths(idir, number)
@@ -3241,6 +3795,7 @@ def _item_dependencies(repo_root: Path, config, number: int) -> List[int]:
     downstream = _DEPENDENCIES_DOWNSTREAM_MARKER_RE.search(section)
     if downstream is not None:
         section = section[: downstream.start()]
+    section = _DEPENDENCIES_BLOCKS_QUOTE_RE.sub("", section)
     deps = set(_referenced_item_numbers(section))
     deps.discard(number)
     return sorted(deps)
@@ -3285,8 +3840,7 @@ def _pick_item(repo_root: Path, config, queue_text: str,
         # from a tree missing the very thing the dependency provides. Under
         # `auto-merge` this window is milliseconds; under `pr` it is however
         # long the human takes, which is exactly when it matters.
-        if any(item_status.get(d, "planned") in ("planned", "in-progress", "in-review")
-               for d in deps):
+        if any(item_status.get(d, "planned") in BLOCKING_STATUSES for d in deps):
             continue
         return num, titles.get(num, f"item {num}")
     return None
@@ -3417,6 +3971,11 @@ def cmd_claim(args: argparse.Namespace) -> int:
     # it into main. Naming the start point makes the two agree by construction.
     git(["switch", "-c", branch, base], repo_root)
     _record_branch_base(repo_root, branch, base)
+    # `/aide-run-queue` reaches its roles through `sync` and this verb, never
+    # through `check`, so the §1 guarantee is kept here too: on the new branch,
+    # before the push, so the inbox lands with the item and the claim's own
+    # base is left exactly as it was.
+    ensure_insights_inbox(repo_root, config, verb="claim")
     if mode != "local":
         git(["push", "-u", "origin", branch], repo_root)
     note = "" if base == str(config["git"].get("main_branch", "main")) else f" (base {base})"
@@ -3738,6 +4297,15 @@ _ASSERTS_LABEL = "asserts against"
 _ALWAYS_AUTHORISED = ("progress.md", "insights.md", "insights/archive-*.md")
 
 
+def _always_authorised_paths(ddir_rel: str) -> Tuple[str, ...]:
+    """The always-authorised names as repo-relative patterns, the spelling item
+    specs use. One joiner for the three enforcement sites — the pin lint in
+    `item_spec_warnings`, the overlap exclusion in `queue_spec_findings`, and
+    `cmd_scope` — so what counts as loop bookkeeping cannot drift between
+    them."""
+    return tuple(f"{ddir_rel}/{name}" for name in _ALWAYS_AUTHORISED)
+
+
 class AuthorisedPaths(NamedTuple):
     """The two lists of an item spec's ``## Authorised paths`` section."""
 
@@ -3979,7 +4547,7 @@ def cmd_scope(args: argparse.Namespace) -> int:
 
     changed = [ln.strip() for ln in diff.stdout.splitlines() if ln.strip()]
     ddir_rel = docs_dir(repo_root, config).relative_to(repo_root).as_posix()
-    always = tuple(f"{ddir_rel}/{name}" for name in _ALWAYS_AUTHORISED) + (rel_spec,)
+    always = _always_authorised_paths(ddir_rel) + (rel_spec,)
     unauthorised, contradictions = scope_findings(changed, authorised, always)
 
     for path in contradictions:
@@ -4522,7 +5090,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repo", type=Path, default=None, help="repo root (default: search up for aide.toml)")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_check = sub.add_parser("check", help="consistency gate over docs/aide")
+    p_check = sub.add_parser("check", help="consistency gate over docs/aide "
+                             "(writes only a missing insights.md, from the "
+                             "template, and the file --report names)")
     p_check.add_argument("--queue", type=int, default=None,
                          help="also check this queue's specs against each other "
                               "(scope overlaps, pinned state, dependency graph)")

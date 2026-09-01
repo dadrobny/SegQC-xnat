@@ -92,17 +92,21 @@ segfacet evaluate --cohort manifest.json --out out/ [--calibrate] # Stage 7 harn
 
 CI (`.github/workflows/ci.yml`) installs with `pip install -e .[dev] -c
 constraints.txt` (the Stage-9 Docker lockfile) rather than `pyproject.toml`'s
-loose bounds. **Note what the golden tests actually assert** (items 042/045/063):
-every `read_bytes()` comparison is *run-to-run within one session* (`dest1` vs
-`dest2`) — a **determinism** check, independent of dependency versions.
-Comparison against the **committed** artifacts goes through `reports_close`, a
-**numeric-tolerance** comparison, deliberately relaxed by item 078 because
-full-precision floats differ by ~1 ULP across platforms. So `constraints.txt` is
-not load-bearing for golden byte-identity, and a numpy-major change is tolerated
-(verified 2026-07-25: green on numpy 1.26.4, previously pinned 2.0.2). Structure,
-keys, strings, bools and ordering are still compared exactly, so a genuine change
-— a changed verdict, a new or removed finding, a meaningfully different feature
-value — is still caught. Two **environment-gated** capabilities (PyRadiomics, Docker) skip
+loose bounds. **Note what the golden tests actually assert** (post item 126's
+golden retirement): the committed whole-record report snapshots are gone; the
+report *format* (key order, key set, float rendering) is pinned by the
+hand-written, feature-value-free `tests/golden/report_format_contract.json`
+(sole source: `tests/report_format_fixture.py`; regenerate with
+`.venv/bin/python -m tests.report_format_fixture`, never from a test). Byte
+(`read_bytes()`) comparisons are *run-to-run within one session* — a
+**determinism** check, independent of dependency versions. Fresh-vs-committed
+comparisons go through `segfacet.synth.golden.assert_matches_committed_artifact`
+(numeric-tolerance leaves per item 078, everything else exact), statically
+enforced by `tests/committed_artifact_guard.py` (item 127). So
+`constraints.txt` is not load-bearing for byte-identity, and a numpy-major
+change is tolerated (verified 2026-07-25: green on numpy 1.26.4, previously
+pinned 2.0.2); a genuine change — a changed verdict, a new or removed finding,
+a meaningfully different feature value — is still caught. Two **environment-gated** capabilities (PyRadiomics, Docker) skip
 cleanly when their dependency is absent; a second CI job
 (`verify-environment-gated`) installs both and fails if any gated test merely
 skipped instead of running — see `.aide/conventions.md` "Environment-gated
@@ -185,27 +189,18 @@ already written down there rather than in `docs/aide/`.
 ## The framework, in one line each
 
 - **Loop & agents** — see [`.aide/README.md`](.aide/README.md).
-- **Format contract, claim protocol, command hygiene, git/clarify modes** — see
-  [`.aide/conventions.md`](.aide/conventions.md). Follow the command-hygiene rules
-  there or unattended runs stall on permission prompts.
+- **The contract** — [`.aide/conventions.md`](.aide/conventions.md), an index:
+  `§N` resolves to a file under [`.aide/conventions/`](.aide/conventions/). The
+  CLI verbs, command hygiene, and the insight-inbox protocol are delivered into
+  every session by `.aide/AGENT-CONTEXT.md` (imported below) and
+  `.claude/rules/aide-command-hygiene.md` — this file does not restate them.
 - **Document templates** — [`.aide/templates/`](.aide/templates/).
-- **CLI** — `python .aide/scripts/aide.py
-  {check,progress,gate,queue,claim,merge,env,sync,gc,status,scope,insights}`. If
-  a verb covers it, the raw git form is wrong: session preflight is `sync`, branch
-  clean-up is `gc`, the state report is `status`, the item's diff-vs-scope
-  check is `scope` — the CI job's `scope-check` step (`.github/workflows/ci.yml`)
-  invokes it directly — and a queue branch is created by `queue start NNN`, never
-  by a hand-typed `git switch -c`. `check --queue NNN` adds the cross-spec checks;
-  `gate` resolves human gates, and only a person may run it.
-- **Insight inbox** — [`docs/aide/insights.md`](docs/aide/insights.md): append a
-  one-line `- [ ] <type> — …` when you learn something out of scope, then return
-  to your task. Triaged at the queue boundary by `/aide-feedback-loop`, which
-  reads the backlog with `aide insights list --open` and closes an entry with
-  `aide insights tick N --pointer "<where it landed>"` rather than hand-editing
-  the file; `aide insights archive --before YYYY-MM-DD` moves closed entries out
-  to `docs/aide/insights/archive-YYYY-QN.md`.
-- **Skills / commands** — `/aide-*` (create-vision … feedback-loop, spec-queue)
-  and the `/aide-run-{item,queue,roadmap}` orchestrators.
+- **One project-specific note on `aide scope`:** the CI `scope-check` job in
+  [`.github/workflows/ci.yml`](.github/workflows/ci.yml) invokes it directly —
+  see "Branching" below for why it is currently no signal.
+- **Skills / commands** — `/aide-*` (create-vision … feedback-loop, spec-queue),
+  the `/aide-run-{item,queue,roadmap}` orchestrators, and the
+  `/aide-review-{permissions,instructions}` boundary reviews.
 
 ## Updating the framework (the `aide-loop` repo)
 
@@ -245,17 +240,9 @@ paths like `.aide/…` and `python .aide/scripts/aide.py …` appearing inside
 `core/` and `adapters/` are **consumer** paths and are correct — never "fix" them
 to that repo's own layout.
 
-The same applies to any sibling repo in this workspace — it is
-[`.aide/conventions.md`](.aide/conventions.md) §8: a repository's own
-instructions bind for work inside it, and where two repos disagree about a file,
-the repo that owns the file wins. Engine 1.18.0 added a reminder, not a
-substitute: `.claude/hooks/sibling_instructions.py` points a session at a
-declared sibling's instruction file the first time it touches a path inside that
-repo. It delivers a *pointer*, once per repo per session, and never gates a tool
-call — reading the file is still on you. The repos it knows about are the ones
-named in the gitignored `.aide/loop/loop.local.toml` (`[framework] local_path`
-and `[hygiene] extra_repos`); a sibling missing from that file gets no reminder
-at all.
+The same applies to any sibling repo in this workspace — the rule, the approved
+command shapes, and the `sibling_instructions.py` reminder hook are all §8
+(`.aide/conventions/8-sibling-repos.md`).
 
 Clean workflow to change the framework (no push required — the installer copies
 from the local working tree):
@@ -284,7 +271,7 @@ from the local working tree):
 - **Byte-reproducible committed fixtures need a `.gitattributes` LF pin.** This
   repo commits generated data whose tests assert byte-identity between a
   regenerated file and its committed copy (`tests/corpus/manifest.json`,
-  `tests/corpus/golden/*.json`; items 040/042). On Windows, `core.autocrlf=true`
+  `tests/golden/report_format_contract.json`; items 040/126). On Windows, `core.autocrlf=true`
   rewrites committed LF text to CRLF **on checkout**, so a file that was byte-clean
   when committed fails its own determinism test after a fresh checkout (e.g. during
   `aide merge`'s branch switch). Any new committed byte-reproducible text fixture
@@ -315,36 +302,12 @@ from the local working tree):
   CLI, pass `--no-reference` (measured 2026-08-30, item 125). Not a
   regression; it is the documented default operating out of its calibration.
 
-## Durable artifacts must read cold
+## What is committed vs. per-machine
 
-Anything that outlives the session it was written in — item specs, commit
-messages, `insights.md` entries, `aide-loop` issues, code comments — has to make
-sense to someone who never saw the conversation that produced it. Its context is
-this repo and its tracker, not a chat log.
-
-- **No chat-local identifiers.** Labels coined for conversational convenience
-  ("A1–A4", "Wave 1", "the D-series") are scaffolding, not names. A reader sees
-  "A1" and cannot tell what the A-series was or what happened to B. Name a thing
-  by what it *is*, and title by the change, not the batch it was scheduled in.
-- **Cross-reference by resolvable identity** — `#25`, a file path, a dated
-  `insights.md` entry. Never "the conventions issue" or "the companion PR",
-  which resolve only inside the conversation.
-- **Record the decision and why it holds, not the route to it.** "My earlier
-  lean was wrong", "agreed direction", "settled while drafting" narrate process
-  and age badly.
-
-Reread anything before publishing as a person who has never seen the session:
-every identifier must be defined in the document or resolvable in the repo.
-
-## Shared vs. personal
-
-- **Shared (committed):** `.aide/` (minus `loop/loop.local.toml`), `aide.toml`,
-  `CLAUDE.md`, `docs/aide/` living documents, and under `.claude/`: `agents/`,
-  `commands/`, `skills/`, `hooks/`, `scripts/`, `settings.json`,
-  `settings.overlay.json` and `default-context.json`.
-- **Personal (git-ignored):** `.aide/loop/loop.local.toml`,
-  `.claude/settings.local.json`, `docs/aide/permissions/*.jsonl`,
-  `docs/aide/status/*`, credentials. Never commit credentials.
+The ownership split is the framework's — see "Shared vs. personal" in
+[`.aide/README.md`](.aide/README.md) and the managed AIDE block at the end of
+[`.gitignore`](.gitignore). One rule worth restating anywhere: never commit
+credentials.
 
 ## Branching, and what it means for the scope check
 
@@ -371,25 +334,9 @@ Inference is narrow by design: only a recognised `aide/queue-NNN` /
 checked-out branch.
 
 **2. Whether a PR is opened per item (`[git] mode` in `aide.toml`).** Currently
-`auto-merge`. Per [`.aide/conventions.md`](.aide/conventions.md) §4:
-
-| mode | on validator PASS | item status after | item branch becomes a PR? |
-|---|---|---|---|
-| `auto-merge` *(current)* | direct-merges to the recorded base, deletes the branch | ✅ | no |
-| `pr` | pushes and stops for a human to open the PR | 🔍 until the PR lands | **yes** |
-| `local` | local merge, no pushes at all | ✅ | no |
-
-Engine 1.20.0 split those two outcomes apart. The validator now marks every item
-`in-review` (🔍) regardless of mode, and **`aide merge` writes ✅ only when the
-merge actually happens** — so ✅ means *merged* everywhere, and a 🔍 item holds
-its stage at 🚧 and its queue open. That matters most for `aide gc`, whose ✅
-ground deletes a branch locally *and* on the remote; before 1.20.0 a `pr`-mode
-item read ✅ the moment it was pushed, so the exhaustion sweep offered to delete
-the head branch of an open PR. Nothing under `auto-merge` — this repo's current
-mode — changes behaviour. Since nothing inside the loop observes a merge that
-happens on the forge, `aide sync`/`aide status` name any 🔍 item whose work has
-since landed in its base and print the `aide progress set NNN done` that closes
-it.
+**`auto-merge`**. What each mode does — and what ✅ versus 🔍 mean — is §4
+(`.aide/conventions/4-git-modes.md`) and §1 → status-icons; this file only
+records which mode this repo runs.
 
 **The consequence for CI.** The `scope-check` job in
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) fires only on a
