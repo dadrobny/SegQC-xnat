@@ -124,7 +124,14 @@ def _run_container(tag, *mount_args, entry_args, timeout=RUN_TIMEOUT):
     import subprocess
 
     cmd = ["docker", "run", "--rm", *mount_args, tag, *ENTRYPOINT_ARGV_PREFIX, *entry_args]
-    return subprocess.run(cmd, capture_output=True, timeout=timeout, text=True)
+    return subprocess.run(
+        cmd,
+        capture_output=True,
+        timeout=timeout,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
 
 
 @pytest.fixture(scope="module")

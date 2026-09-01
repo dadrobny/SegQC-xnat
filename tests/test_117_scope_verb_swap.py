@@ -311,7 +311,14 @@ Something, with no Authorised paths section at all.
 
 def _git(cwd: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        ["git", *args], cwd=str(cwd), capture_output=True, text=True, check=True, timeout=30,
+        ["git", *args],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
+        timeout=30,
     )
 
 

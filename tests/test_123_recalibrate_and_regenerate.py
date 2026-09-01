@@ -278,7 +278,12 @@ def _pre_123_base_rev():
     try:
         result = subprocess.run(
             ["git", "cat-file", "-e", f"{_PRE_123_BASE_SHA}^{{commit}}"],
-            cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=10,
+            cwd=str(_REPO_ROOT),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
         )
     except Exception as exc:  # pragma: no cover - defensive
         pytest.skip(f"git unavailable to resolve the pinned pre-123 commit: {exc}")
@@ -294,7 +299,12 @@ def _git_show_json(rev: str, relpath: str):
     try:
         result = subprocess.run(
             ["git", "show", f"{rev}:{relpath}"],
-            cwd=str(_REPO_ROOT), capture_output=True, text=True, timeout=10,
+            cwd=str(_REPO_ROOT),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
         )
     except Exception:
         return None
