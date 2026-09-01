@@ -105,22 +105,63 @@ class _Finding:
         return f"_Finding({self.path.name}:{self.lineno}, {self.kind!r}, {self.detail!r})"
 
 
-def _source_segment(source: str, node: ast.AST) -> str:
-    return ast.get_source_segment(source, node) or ""
+# `ast.get_source_segment` re-splits the *whole* file source on every call,
+# and this scan calls it hundreds of times per file (once or twice per
+# comparison side, again per finding) -- 94% of a 49 s sweep was that split.
+# `_split_source_lines` + `_source_segment` are the same computation with the
+# split hoisted to once per file.
+#
+# The split must be CPython's parser rule (what `ast._splitlines_no_ff` does),
+# NOT `str.splitlines`: the latter also breaks on \x0b, \x0c, \x1c-\x1e, \x85,
+# U+2028 and U+2029, so a file containing any of those would yield different
+# segments and could silently reclassify a comparison. The regex below breaks
+# only on \n, \r\n and \r, keeps the terminator, and keeps \r\n together --
+# pinned against a transcription of the parser rule by
+# `test_source_line_split_matches_the_parser_rule`.
+_LINE_SPLIT_RE = re.compile(r"[^\r\n]*(?:\r\n|[\r\n])")
 
 
-def _computes_sha256(node: ast.AST, source: str, funcdefs: dict) -> bool:
+def _split_source_lines(source: str) -> list:
+    """`source` split into terminator-keeping lines by the parser's rule."""
+    lines = _LINE_SPLIT_RE.findall(source)
+    consumed = sum(len(line) for line in lines)
+    if consumed < len(source):
+        lines.append(source[consumed:])  # trailing line with no terminator
+    return lines
+
+
+def _source_segment(lines: list, node: ast.AST) -> str:
+    """`ast.get_source_segment(source, node) or ""`, against pre-split lines."""
+    try:
+        if node.end_lineno is None or node.end_col_offset is None:
+            return ""
+        lineno = node.lineno - 1
+        end_lineno = node.end_lineno - 1
+        col_offset = node.col_offset
+        end_col_offset = node.end_col_offset
+    except AttributeError:
+        return ""
+
+    # col offsets are utf-8 byte offsets, hence the encode/decode round trip.
+    if end_lineno == lineno:
+        return lines[lineno].encode()[col_offset:end_col_offset].decode()
+    first = lines[lineno].encode()[col_offset:].decode()
+    last = lines[end_lineno].encode()[:end_col_offset].decode()
+    return first + "".join(lines[lineno + 1 : end_lineno]) + last
+
+
+def _computes_sha256(node: ast.AST, lines: list, funcdefs: dict) -> bool:
     """True iff evaluating `node` necessarily runs `hashlib.sha256(...)` in
     this same run -- directly (inline call, or nested inside a
     comprehension), or by calling a module-level helper whose own body does.
     """
-    text = _source_segment(source, node)
+    text = _source_segment(lines, node)
     if "hashlib.sha256(" in text:
         return True
     if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
         fn = funcdefs.get(node.func.id)
         if fn is not None:
-            return "hashlib.sha256(" in _source_segment(source, fn)
+            return "hashlib.sha256(" in _source_segment(lines, fn)
     return False
 
 
@@ -148,7 +189,7 @@ def _find_binding(name_id: str, scope_node: ast.AST):
     return binding
 
 
-def _resolve(name_id: str, funcnode, modnode, source: str, funcdefs: dict, depth: int = 0):
+def _resolve(name_id: str, funcnode, modnode, lines: list, funcdefs: dict, depth: int = 0):
     """Classify what `name_id` resolves to: ``"computed"``, ``"literal"``,
     ``"external"``, or ``None`` (unresolved). Searches the enclosing function
     scope first, then module scope; follows at most 3 hops of indirection.
@@ -165,22 +206,22 @@ def _resolve(name_id: str, funcnode, modnode, source: str, funcdefs: dict, depth
 
     kind, value = binding
     if kind == "assign":
-        if _computes_sha256(value, source, funcdefs):
+        if _computes_sha256(value, lines, funcdefs):
             return "computed"
         if isinstance(value, ast.Constant) and isinstance(value.value, str):
             return "literal"
         if isinstance(value, ast.Name):
-            return _resolve(value.id, funcnode, modnode, source, funcdefs, depth + 1)
+            return _resolve(value.id, funcnode, modnode, lines, funcdefs, depth + 1)
         return "external"
 
     # kind == "for": value is the loop's iterable, e.g. `before.items()`.
-    if _computes_sha256(value, source, funcdefs):
+    if _computes_sha256(value, lines, funcdefs):
         return "computed"
     base = value
     if isinstance(base, ast.Call) and isinstance(base.func, ast.Attribute):
         base = base.func.value
     if isinstance(base, ast.Name):
-        return _resolve(base.id, funcnode, modnode, source, funcdefs, depth + 1)
+        return _resolve(base.id, funcnode, modnode, lines, funcdefs, depth + 1)
     return "external"
 
 
@@ -197,6 +238,7 @@ def _classify_sha256_compares(path: Path) -> list:
     """Every `==` comparison in `path` where either side is/derives from a
     `hashlib.sha256(...)` digest, classified per the shape rule above."""
     source = path.read_text(encoding="utf-8")
+    lines = _split_source_lines(source)  # split once, reused by every lookup
     tree = ast.parse(source, filename=str(path))
 
     parents: dict = {}
@@ -218,10 +260,10 @@ def _classify_sha256_compares(path: Path) -> list:
         funcnode = _enclosing_function(node, parents)
 
         def _side_kind(side):
-            if _computes_sha256(side, source, funcdefs):
+            if _computes_sha256(side, lines, funcdefs):
                 return "computed"
             if isinstance(side, ast.Name):
-                return _resolve(side.id, funcnode, tree, source, funcdefs)
+                return _resolve(side.id, funcnode, tree, lines, funcdefs)
             if isinstance(side, ast.Constant) and isinstance(side.value, str):
                 return "literal"
             return "external"
@@ -240,7 +282,7 @@ def _classify_sha256_compares(path: Path) -> list:
         else:
             kind = "external"
         findings.append(
-            _Finding(path, node.lineno, kind, _source_segment(source, node))
+            _Finding(path, node.lineno, kind, _source_segment(lines, node))
         )
     return findings
 
@@ -252,6 +294,62 @@ def _all_sha256_findings() -> list:
             continue  # this module's own docstring/comments mention the rule
         findings.extend(_classify_sha256_compares(path))
     return findings
+
+
+def _splitlines_parser_rule(source: str) -> list:
+    """Transcription of CPython's `ast._splitlines_no_ff` -- the rule the
+    parser's column offsets are measured against. Deliberately the slow,
+    obvious form: it is the reference `_split_source_lines` is pinned to,
+    never the implementation."""
+    idx = 0
+    lines = []
+    next_line = ""
+    while idx < len(source):
+        c = source[idx]
+        next_line += c
+        idx += 1
+        if c == "\r" and idx < len(source) and source[idx] == "\n":
+            next_line += "\n"
+            idx += 1
+        if c in "\r\n":
+            lines.append(next_line)
+            next_line = ""
+    if next_line:
+        lines.append(next_line)
+    return lines
+
+
+def test_source_line_split_matches_the_parser_rule():
+    """`_split_source_lines` replaces the whole-file re-split inside
+    `ast.get_source_segment`, so it must break lines exactly where the parser
+    does. `str.splitlines` does NOT -- it also breaks on \\x0b, \\x0c,
+    \\x1c-\\x1e, \\x85, \\u2028 and \\u2029 -- and a source file carrying any
+    of those (inside a string literal, say) would then yield shifted segments
+    and could silently reclassify a sha256 comparison."""
+    exotic = "\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029"
+    cases = [
+        "",
+        "a",
+        "a\n",
+        "a\nb",
+        "a\r\nb\rc\n",
+        "\n\n\n",
+        "a\r",
+        "a\r\n",
+        "x = '" + exotic + "'\ny = 1\n",
+        exotic,
+        "a" + exotic + "b\nc",
+        "sha = hashlib.sha256(b'\x0c').hexdigest()\nassert sha == other\n",
+    ]
+    # The cases must actually discriminate, or this test cannot fail: at least
+    # one of them has to be a string the two rules disagree about.
+    disagreements = [c for c in cases if _splitlines_parser_rule(c) != c.splitlines(True)]
+    assert disagreements, "no case exercises the str.splitlines divergence"
+
+    for case in cases:
+        assert _split_source_lines(case) == _splitlines_parser_rule(case), repr(case)
+        # Whatever the rule, the split must be lossless.
+        assert "".join(_split_source_lines(case)) == case, repr(case)
 
 
 def test_ac8_no_hardcoded_literal_fence_remains():
