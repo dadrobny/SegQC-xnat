@@ -71,6 +71,8 @@ import json
 import re
 import socket
 import subprocess
+
+from run_process import run_utf8
 import importlib.util
 from pathlib import Path
 
@@ -273,11 +275,9 @@ def test_ac5_committed_companion_bytes_have_no_cr_and_one_trailing_lf():
 
 
 def test_ac6_gitattributes_effectively_pins_companion_to_lf():
-    result = subprocess.run(
+    result = run_utf8(
         ["git", "check-attr", "text", "eol", "--", "docs/aide/golden_evidence.generated.json"],
         cwd=_REPO_ROOT,
-        capture_output=True,
-        text=True,
         timeout=30,
     )
     assert result.returncode == 0, result.stderr
@@ -362,11 +362,9 @@ def test_adv_pointer_cell_with_digit_is_rejected_even_if_it_mentions_companion()
 
 def _pre_134_base_rev() -> str:
     try:
-        result = subprocess.run(
+        result = run_utf8(
             ["git", "cat-file", "-e", f"{_PRE_134_BASE_SHA}^{{commit}}"],
             cwd=_REPO_ROOT,
-            capture_output=True,
-            text=True,
             timeout=10,
         )
     except Exception as exc:  # pragma: no cover - defensive
@@ -380,11 +378,9 @@ def _pre_134_base_rev() -> str:
 
 
 def _git_show_text(rev: str, relpath: str) -> str:
-    result = subprocess.run(
+    result = run_utf8(
         ["git", "show", f"{rev}:{relpath}"],
         cwd=_REPO_ROOT,
-        capture_output=True,
-        text=True,
         timeout=15,
     )
     assert result.returncode == 0, result.stderr

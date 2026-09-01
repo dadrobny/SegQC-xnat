@@ -47,6 +47,8 @@ import ast
 import importlib.util
 import re
 import subprocess
+
+from run_process import run_utf8
 from pathlib import Path
 
 import pytest
@@ -439,11 +441,9 @@ def test_ac13_new_module_itself_classifies_as_the_one_fence():
 
 
 def test_ac14_git_check_attr_reports_text_set_and_eol_lf():
-    result = subprocess.run(
+    result = run_utf8(
         ["git", "check-attr", "text", "eol", "--", _ARTIFACT_REL_POSIX],
         cwd=_REPO_ROOT,
-        capture_output=True,
-        text=True,
         timeout=30,
     )
     assert result.returncode == 0, result.stderr
@@ -737,11 +737,9 @@ def test_ac22_allowlist_still_carries_the_integrity_pin_entry():
 def test_ac22_guard_module_absent_from_this_items_diff():
     result = None
     for base_ref in ("origin/aide/queue-018", "aide/queue-018"):
-        result = subprocess.run(
+        result = run_utf8(
             ["git", "diff", "--name-only", f"{base_ref}...HEAD", "--"],
             cwd=_REPO_ROOT,
-            capture_output=True,
-            text=True,
             timeout=30,
         )
         if result.returncode == 0:

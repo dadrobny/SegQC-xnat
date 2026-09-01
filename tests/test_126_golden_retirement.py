@@ -41,6 +41,8 @@ import hashlib
 import json
 import re
 import subprocess
+
+from run_process import run_utf8
 from pathlib import Path
 
 import pytest
@@ -171,11 +173,9 @@ _RETIRED_PATHS = tuple(
 @pytest.mark.parametrize("rel_path", _RETIRED_PATHS)
 def test_ac4_most_recent_history_entry_for_each_retired_path_is_a_deletion(rel_path):
     try:
-        result = subprocess.run(
+        result = run_utf8(
             ["git", "log", "--follow", "--name-status", "--format=%H", "--", rel_path],
             cwd=_REPO_ROOT,
-            capture_output=True,
-            text=True,
             timeout=60,
         )
     except FileNotFoundError:
@@ -1029,11 +1029,9 @@ def test_ac23_gitattributes_still_pins_tests_golden_star():
 
 
 def test_ac23_check_attr_reports_lf_for_format_fixture():
-    result = subprocess.run(
+    result = run_utf8(
         ["git", "check-attr", "text", "eol", "--", "tests/golden/report_format_contract.json"],
         cwd=_REPO_ROOT,
-        capture_output=True,
-        text=True,
         timeout=30,
     )
     assert result.returncode == 0, result.stderr

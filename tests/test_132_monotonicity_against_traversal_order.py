@@ -58,6 +58,8 @@ import ast
 import inspect
 import json
 import subprocess
+
+from run_process import run_utf8
 from pathlib import Path
 from typing import List, Tuple
 
@@ -674,11 +676,9 @@ _AC30_ITEM_132_RANGE_END = "57b8bf1"
 def _ac30_item_132_range_reachable() -> bool:
     for sha in (_AC30_ITEM_132_RANGE_START, _AC30_ITEM_132_RANGE_END):
         try:
-            probe = subprocess.run(
+            probe = run_utf8(
                 ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
                 cwd=_REPO_ROOT,
-                capture_output=True,
-                text=True,
                 timeout=30,
             )
         except (OSError, subprocess.SubprocessError):
@@ -718,7 +718,7 @@ def test_ac30_golden_decision_table_untouched_vs_base():
     ``test_ac22_guard_module_absent_from_this_items_diff`` for the same
     idiom.
     """
-    result = subprocess.run(
+    result = run_utf8(
         [
             "git",
             "diff",
@@ -727,8 +727,6 @@ def test_ac30_golden_decision_table_untouched_vs_base():
             "--",
         ],
         cwd=_REPO_ROOT,
-        capture_output=True,
-        text=True,
         timeout=30,
     )
     assert result.returncode == 0, (

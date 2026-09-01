@@ -41,6 +41,8 @@ from __future__ import annotations
 
 import json
 import subprocess
+
+from run_process import run_utf8
 from pathlib import Path
 
 import nibabel as nib
@@ -326,11 +328,9 @@ def _reference_sha():
     ``None`` (no ``git``, or a shallow checkout that does not carry the
     commit). CI checks out with ``fetch-depth: 0``, so it is reachable there."""
     try:
-        probe = subprocess.run(
+        probe = run_utf8(
             ["git", "cat-file", "-e", f"{_REFERENCE_GOLDEN_SHA}^{{commit}}"],
             cwd=str(_REPO_ROOT),
-            capture_output=True,
-            text=True,
             timeout=30,
         )
     except (OSError, subprocess.SubprocessError):
@@ -341,11 +341,9 @@ def _reference_sha():
 
 
 def _reference_golden(case_id: str, sha: str) -> dict:
-    result = subprocess.run(
+    result = run_utf8(
         ["git", "show", f"{sha}:tests/corpus/golden/{case_id}.json"],
         cwd=str(_REPO_ROOT),
-        capture_output=True,
-        text=True,
         timeout=30,
     )
     if result.returncode != 0:

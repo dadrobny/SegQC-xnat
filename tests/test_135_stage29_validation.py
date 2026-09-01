@@ -104,6 +104,8 @@ import importlib.metadata
 import importlib.util
 import re
 import subprocess
+
+from run_process import run_utf8
 from pathlib import Path
 
 import pytest
@@ -313,11 +315,9 @@ def test_ac3_missing_format_fixture_fails_loudly_names_filename(monkeypatch, tmp
 
 def _git_available_and_range_reachable() -> bool:
     try:
-        probe = subprocess.run(
+        probe = run_utf8(
             ["git", "cat-file", "-e", f"{_QUEUE018_FIRST_COMMIT}^{{commit}}"],
             cwd=_REPO_ROOT,
-            capture_output=True,
-            text=True,
             timeout=30,
         )
     except (OSError, subprocess.SubprocessError):
@@ -337,14 +337,12 @@ requires_full_history_from_queue018 = pytest.mark.skipif(
 @requires_full_history_from_queue018
 @pytest.mark.parametrize("rel_path", t126._RETIRED_PATHS)
 def test_ac4_most_recent_history_entry_since_queue018_is_a_deletion(rel_path):
-    result = subprocess.run(
+    result = run_utf8(
         [
             "git", "log", "--follow", "--name-status", "--format=%H",
             f"{_QUEUE018_FIRST_COMMIT}..HEAD", "--", rel_path,
         ],
         cwd=_REPO_ROOT,
-        capture_output=True,
-        text=True,
         timeout=60,
     )
     if result.returncode != 0:
@@ -821,11 +819,9 @@ _DELIVERABLE_BULLET_STATUS_RE = re.compile(r"^-\s+[✅🚧📋⏸️❌⏳]\s*\*
 
 def _resolve_base_ref():
     for base_ref in _BASE_REF_CANDIDATES:
-        result = subprocess.run(
+        result = run_utf8(
             ["git", "cat-file", "-e", f"{base_ref}^{{commit}}"],
             cwd=_REPO_ROOT,
-            capture_output=True,
-            text=True,
             timeout=30,
         )
         if result.returncode == 0:
@@ -834,11 +830,9 @@ def _resolve_base_ref():
 
 
 def _diff_changed_content_lines(rel_path: str, base_ref: str) -> list:
-    result = subprocess.run(
+    result = run_utf8(
         ["git", "diff", "--unified=0", f"{base_ref}...HEAD", "--", rel_path],
         cwd=_REPO_ROOT,
-        capture_output=True,
-        text=True,
         timeout=30,
     )
     if result.returncode != 0:
@@ -973,11 +967,9 @@ def test_ac28_insights_diff_is_append_only():
     if base_ref is None:
         pytest.skip("recorded queue-018 base ref is unavailable in this clone")
     changed = _diff_changed_content_lines("docs/aide/insights.md", base_ref)
-    result = subprocess.run(
+    result = run_utf8(
         ["git", "diff", "--unified=0", f"{base_ref}...HEAD", "--", "docs/aide/insights.md"],
         cwd=_REPO_ROOT,
-        capture_output=True,
-        text=True,
         timeout=30,
     )
     if result.returncode != 0:

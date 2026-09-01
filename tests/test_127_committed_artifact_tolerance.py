@@ -32,6 +32,8 @@ import json
 import math
 import re
 import subprocess
+
+from run_process import run_utf8
 from pathlib import Path
 
 import pytest
@@ -503,11 +505,9 @@ def test_ac14_every_allowlisted_path_is_line_ending_pinned():
         assert matches, f"allowlist entry {entry.path!r} matches no file"
         rel_paths = [match.relative_to(REPO_ROOT).as_posix() for match in matches]
 
-        result = subprocess.run(
+        result = run_utf8(
             ["git", "check-attr", "text", "eol", "binary", "--", *rel_paths],
             cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
             timeout=30,
         )
         assert result.returncode == 0, result.stderr
