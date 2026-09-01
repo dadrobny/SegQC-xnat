@@ -270,6 +270,16 @@ acceptance half itself is ticked by item 135's replay, not here. *Testable:*
 every real VerSe19 subject stay `True`; the regression test fails before the
 fix; `manifest.json` regenerates byte-identically run-to-run.
 
+*Correction (2026-09-01, from insights.md's item-132 entry of 2026-08-31):* the
+mode-4 finding does not reach `run_qc` "through the `sequence` rule" —
+`heuristics/sequence.py::SequenceRule` reads `relationships.out_of_order_labels`
+and never touches `monotonic_consistency`. The consumer of
+`stage3.monotonic_consistency.non_monotonic_pairs` is
+`heuristics/mislabel.py::MislabelRule`'s Detector B (`rule_id == "mislabel"`),
+which is what `tests/corpus/manifest.json` has always recorded as mode 4's
+`expected_rule_ids`; item 132's spec carries the same correction, and roadmap
+Stage 29 D8 names no rule.
+
 ### Item 133: `tptbox` ≥ 0.7.6 and `refresh_reference.py --verse-cohort`
 
 Two maintenance items with no feature semantics. **The dependency (D9).**

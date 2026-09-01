@@ -27,12 +27,38 @@
       "stalled an unattended builder on a prompt per file (insights.md,",
       "item 118, 2026-08-27; approved at the 2026-08-30 triage). Single-star",
       "globs match direct children only, so docs/aide/** living documents and",
-      "vision/roadmap stay PR-gated by their own entries."
+      "vision/roadmap stay PR-gated by their own entries.",
+      "",
+      "Promoted at the 2026-09-01 feedback-loop review of 41,407 logged prompts",
+      "(engine 1.28.1): the read-only inspection utilities agents reach for",
+      "beside the already-allowed cat/head/grep — `sed -n` (1,559 grants; the",
+      "-n prefix keeps `sed -i` prompting), ps, sleep, awk, nl, true, sha256sum,",
+      "diff, cmp, printf — and two read-only git verbs (merge-base, check-attr)",
+      "the loop's own claim/merge checks use. Edit(scripts/*.py) and",
+      "Edit(docs/*.md) pair with the Write rules above: a builder that may",
+      "create a file there stalled on the prompt to edit it (37 and 12 grants,",
+      "0 denies). Machine-specific shapes seen in the same review — an",
+      "absolute-path gh or .venv python, a scratchpad Write — belong in the",
+      "personal .claude/settings.local.json, never here."
     ],
     "allow": {
       "add": [
         "Write(scripts/*.py)",
-        "Write(docs/*.md)"
+        "Write(docs/*.md)",
+        "Edit(scripts/*.py)",
+        "Edit(docs/*.md)",
+        "Bash(sed -n:*)",
+        "Bash(ps:*)",
+        "Bash(sleep:*)",
+        "Bash(awk:*)",
+        "Bash(nl:*)",
+        "Bash(true:*)",
+        "Bash(sha256sum:*)",
+        "Bash(diff:*)",
+        "Bash(cmp:*)",
+        "Bash(printf:*)",
+        "Bash(git merge-base:*)",
+        "Bash(git check-attr:*)"
       ]
     }
   }

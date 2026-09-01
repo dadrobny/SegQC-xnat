@@ -100,8 +100,6 @@ lowest-numbered one with open items).
 
 ## Command hygiene
 
-Follow `.aide/conventions.md` §3 (no `cd`, one command per Bash call, no `2>&1`,
-no command substitution in commits, recon via the Bash tool with `grep`, the
-`aide` CLI as `python .aide/scripts/aide.py …`). A `PreToolUse` hook
-(`.claude/hooks/command_hygiene_guard.py`) enforces the mechanical rules — a
-violating shape is blocked and bounced back with the fix.
+The shapes are delivered by `.claude/rules/aide-command-hygiene.md` and stated
+canonically in `.aide/conventions.md` §3. A `PreToolUse` hook
+(`.claude/hooks/command_hygiene_guard.py`) enforces the mechanical ones.

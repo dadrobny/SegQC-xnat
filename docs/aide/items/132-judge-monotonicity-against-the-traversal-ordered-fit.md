@@ -544,7 +544,6 @@ below was resolved with the most defensible default and recorded here.
 - `tests/test_111_golden_guard.py` — the Assumptions' claim that no
   allowlist entry is needed is proved by that module passing unedited.
 - `docs/aide/golden-decision-table.md` — AC30 pins it byte-identical.
-- `docs/aide/progress.md` — AC32 pins it unchanged by this item.
 
 ## Testing Strategy
 
@@ -844,3 +843,10 @@ box; neither tick happens here.
   carries a live corpus-sensitivity assertion pinning 6/8; flipped to 7/8 and
   renamed `..._is_seven_of_eight`, mode 4's expected per-mode sensitivity
   0.0 → 1.0.
+- **Asserts-against list corrected, 2026-09-01.** The `docs/aide/progress.md`
+  pin that AC32 stood on is removed from the list, for the reason recorded
+  above and now stated by engine 1.23.0's `aide check` warning: every item
+  writes that file through `aide progress set`, so the pin can never hold.
+  AC32's content claim (no acceptance box ticked or hand-edited) is unchanged
+  and stays asserted by its test. Done at the 2026-09-01 feedback loop, on the
+  reviewed framework-update PR #59.

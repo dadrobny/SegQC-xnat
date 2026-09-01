@@ -95,6 +95,9 @@ def _init_repo(path: Path) -> Path:
     (d / "progress.md").write_text(PROGRESS, encoding="utf-8")
     (d / "queue" / "queue-003.md").write_text(QUEUE, encoding="utf-8")
     (d / "items" / "027-bounds-rules.md").write_text(SPEC_027, encoding="utf-8")
+    # A loop repo has an inbox (1.26.0 guarantees it), so `claim` creates
+    # nothing here and a scope count below is the test's own diff.
+    (d / "insights.md").write_text("# Insight Inbox\n", encoding="utf-8")
     (path / "src" / "demo").mkdir(parents=True)
     (path / "src" / "demo" / "bounds.py").write_text("x = 1\n", encoding="utf-8")
     _run(["git", "add", "-A"], path)

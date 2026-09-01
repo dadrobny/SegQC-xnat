@@ -50,6 +50,10 @@ def _repo(tmp_path: Path, inbox: str = INBOX) -> Path:
     _run(["git", "init", "-b", "main"], repo)
     _run(["git", "config", "user.email", "t@e.com"], repo)
     _run(["git", "config", "user.name", "T"], repo)
+    # Local, before the first commit: the index holds the bytes the files
+    # have, whatever the runner's global `core.autocrlf` says (§6 — a test
+    # that lost the global config mid-run saw every tracked file "modified").
+    _run(["git", "config", "core.autocrlf", "false"], repo)
     _run(["git", "add", "-A"], repo)
     _run(["git", "commit", "-m", "init"], repo)
     return repo
@@ -412,7 +416,8 @@ def test_archive_requires_a_well_formed_date(tmp_path: Path):
 def test_a_missing_inbox_is_reported_not_crashed(tmp_path: Path):
     repo = _repo(tmp_path)
     (repo / "docs" / "aide" / "insights.md").unlink()
-    assert aide.main(["--repo", str(repo), "insights", "list"]) == 2
+    assert aide.main(["--repo", str(repo), "insights", "tick", "1",
+                      "--pointer", "x"]) == 2
 
 
 # --------------------------------------------------------------------------- #
@@ -656,3 +661,391 @@ def test_the_patterns_do_not_backtrack_catastrophically():
     start = time.time()
     aide.parse_insights(evil)
     assert time.time() - start < 1.0
+
+
+# --------------------------------------------------------------------------- #
+# the engine version an insight was observed under (issue #97)
+#
+# The reported failure: an entry records where a finding came from and when,
+# never *which engine it was seen on* — and the value is sitting on disk as
+# `.aide/VERSION` at capture time. The date cannot proxy for it, so eight
+# framework issues that landed upstream across an engine restructure could not
+# be placed on either side of it, and every older-engine claim was re-verified
+# by hand. The version is conventional, not grammatical: what the CLI must do
+# is accept it, parse it, and print it back — never warn about it.
+# --------------------------------------------------------------------------- #
+VERSIONED = """\
+# Insight Inbox
+
+_Entries below, newest last._
+
+- [ ] framework — the reach check has no engine version *(item 042, 2026-08-29, engine 1.22.0)*
+- [x] defect — captured before the convention existed *(item 041, 2026-08-01)*
+- [ ] knowledge — a bare date takes one too *(2026-08-29, engine 1.22.0)*
+"""
+
+
+def test_a_versioned_entry_passes_the_shape_check_clean(tmp_path: Path):
+    """A warning on a captured line can never be cleared, so this is the
+    load-bearing assertion of the pair: the new component must not produce
+    permanent noise on a well-formed entry."""
+    d = tmp_path / "docs" / "aide"
+    d.mkdir(parents=True)
+    (d / "insights.md").write_text(VERSIONED, encoding="utf-8")
+    assert aide.insight_warnings(d) == []
+
+
+def test_the_version_is_parsed_out_and_does_not_disturb_the_other_fields():
+    """`note` is a field of its own; the date, provenance and item number are
+    read exactly as they were before it existed."""
+    entries = aide.parse_insights(VERSIONED)
+    assert [e.note for e in entries] == ["engine 1.22.0", None, "engine 1.22.0"]
+    assert [e.date for e in entries] == ["2026-08-29", "2026-08-01", "2026-08-29"]
+    assert [e.source for e in entries] == ["item 042", "item 041", None]
+    assert [e.item for e in entries] == [42, 41, None]
+    assert entries[0].text == "the reach check has no engine version"
+
+
+def test_the_version_is_free_form_not_a_grammar():
+    """Enumerating the accepted spelling would reject an honest capture
+    permanently — the claim line is immutable. Same argument as the provenance
+    (issue #76), and sharper here, since entries predate the convention."""
+    e = aide.parse_insights(
+        "- [ ] gap — a *(item 1, 2026-01-01, engine 1.22.0-rc1 on windows)*\n")[0]
+    assert (e.date, e.note) == ("2026-01-01", "engine 1.22.0-rc1 on windows")
+
+
+def test_an_entry_captured_without_a_version_is_untouched():
+    """The convention is never retrofitted, so the un-versioned entry must keep
+    parsing exactly as it did — `note` is None, not an invented value."""
+    entries = aide.parse_insights(INBOX)
+    assert [e.note for e in entries] == [None, None, None, None]
+
+
+def test_list_reprints_the_engine_version(tmp_path: Path, capsys):
+    """Triage reads the listing, not the file (the feedback-loop skill says so),
+    so a version the listing drops is a version triage cannot carry into the
+    issue it files."""
+    repo = _repo(tmp_path, VERSIONED)
+    assert aide.main(["--repo", str(repo), "insights", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "*(item 042, 2026-08-29, engine 1.22.0)*" in out
+    assert "*(2026-08-29, engine 1.22.0)*" in out
+    assert "*(item 041, 2026-08-01)*" in out
+
+
+def test_tick_and_archive_reach_a_versioned_entry(tmp_path: Path):
+    """The date is still what `archive` cuts on, and `tick` still refuses only
+    what does not parse — widening the marker must cost neither verb its entry."""
+    repo = _repo(tmp_path, VERSIONED)
+    assert aide.main(["--repo", str(repo), "insights", "tick", "1",
+                      "--pointer", "aide-loop #97"]) == 0
+    assert ("*(item 042, 2026-08-29, engine 1.22.0)* → aide-loop #97"
+            in _inbox(repo))
+    _, moved, undatable = aide.archive_insight_text(VERSIONED, "2026-08-15")
+    assert list(moved) == ["2026-Q3"] and undatable == []
+
+
+def test_the_date_stays_strict_with_a_version_after_it(tmp_path: Path):
+    """The one field every verb depends on did not relax on its right either."""
+    d = tmp_path / "docs" / "aide"
+    d.mkdir(parents=True)
+    (d / "insights.md").write_text(
+        "# I\n\n"
+        "- [ ] gap — no date, only a version *(item 1, engine 1.22.0)*\n"
+        "- [ ] gap — not ISO *(item 1, 26-08-29, engine 1.22.0)*\n"
+        "- [ ] gap — an empty trailer says nothing *(item 1, 2026-08-29,  )*\n",
+        encoding="utf-8")
+    assert len(aide.insight_warnings(d)) == 3
+
+
+# --------------------------------------------------------------------------- #
+# the engine guarantees the inbox exists (issue #85)
+# --------------------------------------------------------------------------- #
+_TEMPLATE = Path(__file__).resolve().parents[2] / "templates" / "insights.md"
+
+#: The least progress.md `check` passes on, so the verb reaches its exit code
+#: for the document set's own reasons and not for a fixture's.
+_PROGRESS = "# P\n\n| 1 | S | G | 📋 |\n\n| G1 | O | 📋 |\n\n## Stage 1 — S — 📋\n"
+
+
+def _loop_repo_without_inbox(tmp_path: Path) -> Path:
+    repo = _repo(tmp_path)
+    (repo / "docs" / "aide" / "progress.md").write_text(_PROGRESS, encoding="utf-8")
+    (repo / "docs" / "aide" / "insights.md").unlink()
+    _run(["git", "add", "-A"], repo)
+    _run(["git", "commit", "-m", "a document set with no inbox yet"], repo)
+    return repo
+
+
+def _cli_only_repo(tmp_path: Path) -> Path:
+    """A repo that adopted the CLI and not the loop: aide.toml, no docs_dir."""
+    repo = tmp_path / "repo"
+    repo.mkdir(parents=True)
+    (repo / "aide.toml").write_text(AIDE_TOML, encoding="utf-8")
+    return repo
+
+
+def _clean(repo: Path) -> bool:
+    return _run(["git", "status", "--porcelain"], repo).stdout.strip() == ""
+
+
+def _status(repo: Path) -> list:
+    return _run(["git", "status", "--porcelain"], repo).stdout.splitlines()
+
+
+def _staged(repo: Path) -> list:
+    return _run(["git", "diff", "--cached", "--name-only"], repo).stdout.split()
+
+
+def _assert_untracked_only(repo: Path, rel: str = "docs/aide/insights.md") -> None:
+    """*rel* is untracked and nothing at all is staged — asserted on the file's
+    own status line, not on the whole porcelain list, which may carry lines
+    that are the runner's business (line endings) and not this test's."""
+    status = _status(repo)
+    assert f"?? {rel}" in status, status
+    assert _staged(repo) == [], _staged(repo)
+
+
+def _files_in_head(repo: Path) -> list:
+    """What HEAD's commit touches — posix paths, one per line as git prints
+    them (never whitespace-split: a path may carry a space)."""
+    out = _run(["git", "-c", "core.quotepath=false", "show", "--name-only",
+                "--format=", "HEAD"], repo).stdout
+    return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def _head(repo: Path) -> str:
+    return _run(["git", "rev-parse", "HEAD"], repo).stdout.strip()
+
+
+def _without_git_identity(repo: Path, monkeypatch, tmp_path: Path) -> None:
+    """A fresh clone before `git config user.name`: the commit is refused."""
+    for key in ("user.name", "user.email"):
+        _run(["git", "config", "--unset", key], repo)
+    nowhere = tmp_path / "no-such-gitconfig"
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(nowhere))
+    monkeypatch.setenv("GIT_CONFIG_SYSTEM", str(nowhere))
+    monkeypatch.setenv("HOME", str(tmp_path / "no-such-home"))
+    for var in ("GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME",
+                "GIT_COMMITTER_EMAIL", "EMAIL"):
+        monkeypatch.delenv(var, raising=False)
+
+
+def test_the_template_is_where_the_engine_looks_for_it():
+    """Every test below compares against this file; if the layout moves, this
+    is the one that fails with a reason instead of the rest with a mystery."""
+    assert _TEMPLATE.is_file()
+    assert aide._TEMPLATES_DIR == _TEMPLATE.parent
+    assert b"insight" in _TEMPLATE.read_bytes().lower()
+
+
+def test_check_creates_a_missing_inbox_byte_for_byte(tmp_path: Path):
+    repo = _loop_repo_without_inbox(tmp_path)
+    assert aide.main(["--repo", str(repo), "check"]) == 0
+    assert (repo / "docs" / "aide" / "insights.md").read_bytes() == _TEMPLATE.read_bytes()
+
+
+def test_check_commits_the_inbox_it_created_and_nothing_else(tmp_path: Path):
+    """`aide sync` refuses a dirty tree; a creation left untracked would stall
+    the next preflight of the loop it exists to serve. The commit's CONTENTS
+    are the assertion — "a commit happened" and "tree clean" were both true
+    of a commit that had swept a builder's staged work in with the inbox."""
+    repo = _loop_repo_without_inbox(tmp_path)
+    assert aide.main(["--repo", str(repo), "check"]) == 0
+    assert _clean(repo)
+    subject = _run(["git", "log", "-1", "--format=%s"], repo).stdout.strip()
+    assert subject.startswith("docs(aide):")
+    assert _files_in_head(repo) == ["docs/aide/insights.md"]
+
+
+def test_the_inbox_commit_leaves_staged_work_staged_and_out_of_it(tmp_path: Path):
+    repo = _loop_repo_without_inbox(tmp_path)
+    (repo / "feature.py").write_text("x = 1\n", encoding="utf-8")
+    _run(["git", "add", "feature.py"], repo)
+    assert aide.main(["--repo", str(repo), "check"]) == 0
+    assert _files_in_head(repo) == ["docs/aide/insights.md"]
+    assert _staged(repo) == ["feature.py"]
+    assert not any("insights.md" in line for line in _status(repo))
+
+
+def test_a_commit_git_refuses_leaves_the_inbox_untracked_not_staged(
+        tmp_path: Path, monkeypatch, capsys):
+    """A staged-but-uncommitted inbox stalls `aide sync` exactly as an
+    untracked one does, with no message saying why. Untracked, plus a notice
+    that names the refusal, is the honest degradation."""
+    repo = _loop_repo_without_inbox(tmp_path)
+    before = _head(repo)
+    _without_git_identity(repo, monkeypatch, tmp_path)
+    assert aide.main(["--repo", str(repo), "check"]) == 0
+    assert _head(repo) == before
+    _assert_untracked_only(repo)
+    out = capsys.readouterr().out
+    notice = [l for l in out.splitlines() if l.startswith("notice:")]
+    assert len(notice) == 1 and "NOT committed" in notice[0]
+
+
+def test_git_off_path_degrades_to_created_not_committed(
+        tmp_path: Path, monkeypatch, capsys):
+    """`check` ran in a repo with no usable `git` before 1.26.0 and must still:
+    the creation happens, the commit is a reason in the notice, no traceback."""
+    repo = _loop_repo_without_inbox(tmp_path)
+    empty = tmp_path / "empty-path"
+    empty.mkdir()
+    monkeypatch.setenv("PATH", str(empty))
+    assert aide.main(["--repo", str(repo), "check"]) == 0
+    assert (repo / "docs" / "aide" / "insights.md").read_bytes() == _TEMPLATE.read_bytes()
+    notice = [l for l in capsys.readouterr().out.splitlines() if l.startswith("notice:")]
+    assert len(notice) == 1 and "NOT committed" in notice[0]
+    monkeypatch.undo()
+    _assert_untracked_only(repo)
+
+
+def test_a_detached_head_gets_the_file_and_no_dangling_commit(
+        tmp_path: Path, monkeypatch, capsys):
+    repo = _loop_repo_without_inbox(tmp_path)
+    before = _head(repo)
+    _run(["git", "checkout", "--quiet", "--detach"], repo)
+    assert aide.main(["--repo", str(repo), "check"]) == 0
+    assert _head(repo) == before
+    _assert_untracked_only(repo)
+    notice = [l for l in capsys.readouterr().out.splitlines() if l.startswith("notice:")]
+    assert len(notice) == 1 and "detached" in notice[0]
+
+
+def test_check_says_it_created_the_inbox(tmp_path: Path, capsys):
+    repo = _loop_repo_without_inbox(tmp_path)
+    assert aide.main(["--repo", str(repo), "check"]) == 0
+    out = capsys.readouterr().out
+    notice = [l for l in out.splitlines() if l.startswith("notice:")]
+    assert len(notice) == 1 and "docs/aide/insights.md" in notice[0]
+    assert "aide check: OK" in out
+
+
+def test_check_is_silent_about_the_inbox_once_it_exists(tmp_path: Path, capsys):
+    repo = _loop_repo_without_inbox(tmp_path)
+    assert aide.main(["--repo", str(repo), "check"]) == 0
+    capsys.readouterr()
+    assert aide.main(["--repo", str(repo), "check"]) == 0
+    assert "notice:" not in capsys.readouterr().out
+
+
+def test_check_never_overwrites_an_existing_inbox_even_a_malformed_one(tmp_path: Path):
+    repo = _loop_repo_without_inbox(tmp_path)
+    inbox = repo / "docs" / "aide" / "insights.md"
+    inbox.write_bytes(b"- [ ] not a shape the parser knows\n")
+    assert aide.main(["--repo", str(repo), "check"]) == 0  # a shape *warning*
+    assert inbox.read_bytes() == b"- [ ] not a shape the parser knows\n"
+
+
+def test_check_creates_nothing_in_a_repo_with_no_document_set(tmp_path: Path):
+    repo = _cli_only_repo(tmp_path)
+    assert aide.main(["--repo", str(repo), "check"]) == 0
+    assert not (repo / "docs").exists()
+
+
+def test_the_helper_reports_what_it_did(tmp_path: Path):
+    repo = _loop_repo_without_inbox(tmp_path)
+    config = aide.load_config(repo)
+    created = aide.ensure_insights_inbox(repo, config, verb="test")
+    assert created == repo / "docs" / "aide" / "insights.md"
+    assert aide.ensure_insights_inbox(repo, config, verb="test") is None
+    assert aide.ensure_insights_inbox(_cli_only_repo(tmp_path / "other"),
+                                      config, verb="test") is None
+
+
+def test_a_missing_template_is_reported_not_crashed(tmp_path: Path, monkeypatch, capsys):
+    """An install that lost `.aide/templates/` is incomplete, not broken here:
+    the gate still runs, still exits on the document set's merits, and says
+    which file it could not create and why."""
+    repo = _loop_repo_without_inbox(tmp_path)
+    monkeypatch.setattr(aide, "_TEMPLATES_DIR", tmp_path / "nowhere")
+    assert aide.main(["--repo", str(repo), "check"]) == 0
+    assert not (repo / "docs" / "aide" / "insights.md").exists()
+    err = capsys.readouterr().err
+    assert "insights.md" in err and "install" in err
+
+
+def test_list_on_a_missing_inbox_creates_it_and_reports_an_empty_backlog(
+        tmp_path: Path, capsys):
+    repo = _repo(tmp_path)
+    inbox = repo / "docs" / "aide" / "insights.md"
+    inbox.unlink()
+    _run(["git", "commit", "-am", "drop the inbox"], repo)
+    assert aide.main(["--repo", str(repo), "insights", "list"]) == 0
+    assert inbox.read_bytes() == _TEMPLATE.read_bytes()
+    assert _clean(repo)
+    out = capsys.readouterr().out
+    assert "notice:" in out and "0 entries, 0 open" in out
+
+
+def test_list_no_commit_leaves_the_created_inbox_uncommitted(tmp_path: Path):
+    repo = _repo(tmp_path)
+    inbox = repo / "docs" / "aide" / "insights.md"
+    inbox.unlink()
+    _run(["git", "commit", "-am", "drop the inbox"], repo)
+    assert aide.main(["--repo", str(repo), "insights", "list", "--no-commit"]) == 0
+    assert inbox.is_file() and not _clean(repo)
+
+
+def test_list_with_no_document_set_creates_nothing(tmp_path: Path):
+    repo = _cli_only_repo(tmp_path)
+    assert aide.main(["--repo", str(repo), "insights", "list"]) == 2
+    assert not (repo / "docs").exists()
+
+
+def test_tick_and_archive_on_a_missing_inbox_point_at_check(tmp_path: Path, capsys):
+    """Neither can act on a file that is not there, and the way to get one is
+    a verb now — not the hand copy the old message prescribed."""
+    repo = _repo(tmp_path)
+    (repo / "docs" / "aide" / "insights.md").unlink()
+    for verb in (["tick", "1", "--pointer", "x"], ["archive", "--before", "2026-01-01"]):
+        assert aide.main(["--repo", str(repo), "insights", *verb]) == 2
+        err = capsys.readouterr().err
+        assert "aide check" in err and "templates" not in err
+    assert not (repo / "docs" / "aide" / "insights.md").exists()
+
+
+def test_a_docs_dir_with_a_space_is_recognised_in_its_own_commit(
+        tmp_path: Path, capsys):
+    """The committed-path check tokenised `git show` output on whitespace, so
+    `my docs/aide/insights.md` never matched itself and the notice said "NOT
+    committed" about a file that was in the commit."""
+    repo = _repo(tmp_path)
+    ddir = repo / "my docs" / "aide"
+    ddir.mkdir(parents=True)
+    (ddir / "progress.md").write_text(_PROGRESS, encoding="utf-8")
+    toml = AIDE_TOML.replace('docs_dir = "docs/aide"', 'docs_dir = "my docs/aide"')
+    assert "my docs" in toml  # the substitution took
+    (repo / "aide.toml").write_text(toml, encoding="utf-8")
+    _run(["git", "add", "-A"], repo)
+    _run(["git", "commit", "-m", "a docs_dir with a space"], repo)
+    assert aide.main(["--repo", str(repo), "check"]) == 0
+    inbox = ddir / "insights.md"
+    assert inbox.read_bytes() == _TEMPLATE.read_bytes()
+    assert _files_in_head(repo) == [inbox.relative_to(repo).as_posix()]
+    notice = [l for l in capsys.readouterr().out.splitlines() if l.startswith("notice:")]
+    assert len(notice) == 1 and "and committed it" in notice[0]
+
+
+def test_the_shared_committer_is_loud_when_git_cannot_run(
+        tmp_path: Path, monkeypatch, capsys):
+    """`progress set`, `tick` and `archive` discard the committer's return, so
+    the reason must reach stderr from the committer itself — or `tick` prints
+    its success line over an edit that was never committed."""
+    repo = _repo(tmp_path)
+    empty = tmp_path / "empty-path"
+    empty.mkdir()
+    monkeypatch.setenv("PATH", str(empty))
+    why = aide._commit_docs_files(repo, aide.load_config(repo), "m",
+                                  ["docs/aide/insights.md"])
+    assert why and "git could not be run" in why
+    assert "could not commit docs/aide/insights.md" in capsys.readouterr().err
+    assert aide.main(["--repo", str(repo), "insights", "tick", "2",
+                      "--pointer", "item 003"]) == 0
+    err = capsys.readouterr().err
+    assert "could not commit docs/aide/insights.md" in err and "Traceback" not in err
+    monkeypatch.undo()
+    assert "- [x] defect" in _inbox(repo)  # the edit landed ...
+    assert " M docs/aide/insights.md" in _status(repo)  # ... and is uncommitted
+    assert _staged(repo) == []

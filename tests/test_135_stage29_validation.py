@@ -904,12 +904,29 @@ def test_adv_acceptance_checkbox_line_is_not_flagged_by_bullet_pattern():
 # other warning class exactly as strict as before.
 _BRANCH_STATE_WARNING_PREFIXES = ("stale claim branch", "unrecognised branch")
 
+# Engine 1.28.1 (installed 2026-09-01, up from 1.21.0) added three advisory
+# warning classes that fired on pre-existing document states rather than on
+# anything this item changed: a spec pinning an always-authorised path under
+# Asserts against (engine 1.23.0; merged items 126 and 132), a deliverable
+# bullet whose item references all sat mid-prose with no trailing *(Item NNN)*
+# marker (engine 1.24.0), and a queue marked completed while progress.md still
+# held an untracked item for it. All three states were repaired at the
+# 2026-09-01 feedback loop (framework-update PR #59), so the classifier names
+# them -- a recurrence reads as its class, not as 'unclassified' -- but none is
+# a tolerated baseline class: the baseline is the assumptions backlog, the two
+# human gates, and transient branch state, exactly as before the update.
 _BASELINE_WARNING_CLASSES = ("assumptions-block", "awaiting-a-decision", "branch-state")
 
 
 def _classify_warning(message: str) -> str:
     if message.startswith(_BRANCH_STATE_WARNING_PREFIXES):
         return "branch-state"
+    if "pinned under Asserts against" in message:
+        return "always-authorised-pin"
+    if "ends with no *(Item NNN)* marker" in message:
+        return "untracked-bullet-marker"
+    if "marked completed but still has open items" in message:
+        return "queue-completed-open-items"
     if "assumptions" in message.lower():
         return "assumptions-block"
     if "awaiting a decision" in message.lower():

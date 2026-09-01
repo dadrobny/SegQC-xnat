@@ -22,8 +22,9 @@ Design rules:
   exception exits 0 (allow). A guard bug must never wedge the loop; the worst
   case is falling back to the ordinary permission prompt.
 - **Narrow and conservative.** Only the unambiguous, high-frequency offenders
-  are flagged, and string literals are blanked first so operators *inside* a
-  commit message or quoted argument never trigger a false positive. Positive-
+  are flagged, and string literals and heredoc bodies are blanked first so
+  operators *inside* a commit message — quoted, or piped via
+  ``git commit -F - <<'EOF'`` — never trigger a false positive. Positive-
   form guidance (use the venv-relative path, the ``aide`` CLI form) is left to
   the agent prose in ``.aide/conventions.md`` §3 — a hook can reject a wrong
   shape but cannot supply the right one.
@@ -53,6 +54,145 @@ def _blank_quoted(cmd):
             out.append(" ")
         else:
             out.append(ch)
+    return "".join(out)
+
+
+#: A heredoc opener CANDIDATE: `<<` or `<<-`, then the delimiter word, whose
+#: quoting decides whether the body interpolates. `(?<!<)` / `(?!<)` keep a
+#: `<<<` here-string (which has no body) from matching at either offset. The
+#: delimiter must sit on the opener's own line (`[ \t]*`, never a newline).
+#: A match is only a candidate — `_heredoc_body_spans` still rejects one that
+#: is not in redirection position, or sits inside quotes or `((…))`
+#: arithmetic, where `<<` is prose or a shift, not a redirection.
+_HEREDOC_OPEN_RE = re.compile(
+    r"(?<!<)<<(?!<)(?P<dash>-?)[ \t]*"
+    r"(?:'(?P<sq>[^'\n]+)'|\"(?P<dq>[^\"\n]+)\"|\\(?P<bs>\S+)"
+    r"|(?P<bare>[A-Za-z0-9_][A-Za-z0-9_.-]*))"
+)
+
+
+def _heredoc_body_spans(cmd):
+    """Every heredoc body in *cmd*, as ``(start, end, interpolates)`` character
+    spans over the raw command.
+
+    A heredoc body is data on stdin, not commands — ``;``, ``&&``, ``2>&1`` in
+    its prose are never shell syntax, so the body must be invisible to the
+    operator lints exactly as a quoted string is (issue #88: the guard blocked
+    the multi-paragraph commit messages the framework itself asks for, via
+    ``git commit -F - <<'EOF'``). The one thing that IS live in a body is
+    ``$(…)``/backtick substitution, and only under an unquoted delimiter
+    (``<<EOF``) — a quoted one (``<<'EOF'``, ``<<"EOF"``, ``<<\\EOF``) keeps
+    the body fully literal — hence the ``interpolates`` flag, which lets rule 4
+    keep watching the bodies where substitution really runs.
+
+    The body runs from the line after its opener to the terminator line (bare
+    delimiter; ``<<-`` also strips leading tabs; a trailing ``\\r`` is
+    tolerated so a CRLF command does not read as unterminated). Several
+    openers on one line stack their bodies in order. An unterminated body
+    extends to the end — which is what the shell does with it too.
+
+    A candidate that is not actually a redirection is REJECTED, because a
+    phantom opener's "body" runs to the end of the input and would blank —
+    i.e. exempt from every rule — everything after it. Rejected: an opener
+    inside an already-collected body (prose quoting a heredoc); one not in
+    redirection position (must follow start-of-line, whitespace, ``|``,
+    ``&``, ``;`` or ``(`` — so ``a<<b`` never fires, which forgoes bash's
+    mid-word redirection — including the spaceless ``-<<'EOF'`` spelling of
+    ``git commit -F -`` — and the ``3<<EOF`` fd form, in exchange for never
+    misreading a shift or prose, the pre-existing posture for those); one
+    under an unclosed ``((`` seen outside quotes, where ``<<`` shifts; and
+    one inside quotes, where it is a string. A rejected candidate's body
+    text stays visible to the lints, which is exactly the pre-#88 behaviour
+    for that command. Known residual: `#` comments are not parsed, so a
+    ``<<WORD`` in a trailing comment still passes the gauntlet and blanks
+    the rest of the call.
+
+    Quote and arithmetic state come from ONE forward scan shared by every
+    candidate (``_advance``), never a per-candidate rescan from the start —
+    the hook runs on every Bash call, and rescanning made it quadratic in
+    the candidate count. The scan skips collected bodies (a body is data: an
+    apostrophe or ``((`` in its prose opens nothing), and only a ``((`` seen
+    outside quotes counts as arithmetic, so a quoted ``"(("`` — a grep
+    pattern, say — suppresses no later heredoc.
+    """
+    spans = []
+    # (quote char | None, unclosed-(( depth, scan position, spans consumed)
+    state = [None, 0, 0, 0]
+
+    def _advance(pos):
+        """Fold cmd[state-position:pos) into the quote/arithmetic state."""
+        quote, arith, i, skip = state
+        while i < pos:
+            if skip < len(spans) and i >= spans[skip][0]:
+                i = max(i, spans[skip][1])
+                skip += 1
+                continue
+            ch = cmd[i]
+            if quote:
+                if quote == '"' and ch == "\\":
+                    i += 2
+                    continue
+                if ch == quote:
+                    quote = None
+            elif ch == "\\":
+                i += 2
+                continue
+            elif ch in "'\"":
+                quote = ch
+            elif ch == "(" and cmd[i:i + 2] == "((":
+                arith += 1
+                i += 2
+                continue
+            elif ch == ")" and cmd[i:i + 2] == "))" and arith:
+                arith -= 1
+                i += 2
+                continue
+            i += 1
+        state[:] = [quote, arith, i, skip]
+
+    mem = 0  # membership pointer — spans and candidates both ascend
+    for m in _HEREDOC_OPEN_RE.finditer(cmd):
+        while mem < len(spans) and spans[mem][1] <= m.start():
+            mem += 1
+        if mem < len(spans) and spans[mem][0] <= m.start():
+            continue
+        prev = cmd[m.start() - 1] if m.start() else ""
+        if prev and prev not in " \t\n|&;(":
+            continue
+        _advance(m.start())
+        if state[0] is not None or state[1]:
+            continue
+        delim = m.group("sq") or m.group("dq") or m.group("bs") or m.group("bare")
+        interpolates = m.group("bare") is not None
+        prev_end = spans[-1][1] if spans else 0
+        nl = cmd.find("\n", max(m.end(), prev_end))
+        if nl == -1:
+            continue  # single-line call: the body isn't in this command at all
+        start = nl + 1
+        end = len(cmd)  # unterminated → the rest of the input is the body
+        i = start
+        while i < len(cmd):
+            j = cmd.find("\n", i)
+            line = cmd[i:j] if j != -1 else cmd[i:]
+            line = line.rstrip("\r")
+            if (line.lstrip("\t") if m.group("dash") else line) == delim:
+                end = i  # up to, not including, the terminator line
+                break
+            if j == -1:
+                break
+            i = j + 1
+        spans.append((start, end, interpolates))
+    return spans
+
+
+def _blank_spans(cmd, spans):
+    """Space out the given ``(start, end)`` spans, newlines kept so every
+    offset and line boundary outside them survives."""
+    out = list(cmd)
+    for start, end in spans:
+        for i in range(start, end):
+            if out[i] != "\n":
+                out[i] = " "
     return "".join(out)
 
 
@@ -209,10 +349,12 @@ def _declared_repo_paths():
 #: Presence (this regex, no captured value — matched against the
 #: quote-blanked ``bare`` text, same as every other rule here, so an operator
 #: *inside* a commit message never false-positives) is checked separately
-#: from the actual path VALUE (`_git_repo_override_paths`, matched against
-#: the raw, unblanked ``cmd`` — a legitimately quoted path containing a space
+#: from the actual path VALUE (`_git_repo_override_paths`, matched with
+#: quotes left visible — a legitimately quoted path containing a space
 #: would itself be blanked to nothing in ``bare`` and silently vanish from a
-#: value-capturing match, wrongly suppressing the trigger).
+#: value-capturing match, wrongly suppressing the trigger — though with
+#: heredoc bodies removed, since a flag named in a commit message's prose is
+#: not a path the command operates on).
 _GIT_REPO_OVERRIDE_TRIGGER_RE = re.compile(
     r"\bgit\s+-C\b|--git-dir\b|--work-tree\b|\bGIT_DIR=|\bGIT_WORK_TREE="
 )
@@ -241,8 +383,9 @@ _GIT_DIR_FLAVOURED_GROUPS = frozenset({"gitdir", "envdir"})
 
 def _git_repo_override_paths(cmd):
     """Every ``(group_name, path)`` argument to `-C`/`--git-dir`/`--work-tree`/
-    `GIT_DIR=`/`GIT_WORK_TREE=` in *cmd* (the raw, unblanked command — see
-    `_GIT_REPO_OVERRIDE_TRIGGER_RE`'s docstring for why), in order. Empty if
+    `GIT_DIR=`/`GIT_WORK_TREE=` in *cmd* (quotes visible, heredoc bodies
+    blanked — see `_GIT_REPO_OVERRIDE_TRIGGER_RE`'s docstring for why), in
+    order. Empty if
     *cmd* uses none of them, or a flag is present with no parseable value."""
     paths = []
     for m in _GIT_REPO_OVERRIDE_VALUE_RE.finditer(cmd):
@@ -295,7 +438,12 @@ def _git_repo_override_all_declared(cmd):
 
 def violations(cmd):
     """Return a list of (title, fix) for each hygiene rule ``cmd`` breaks."""
-    bare = _blank_quoted(cmd)
+    heredocs = _heredoc_body_spans(cmd)
+    # Bodies are blanked BEFORE quote-blanking: a prose apostrophe ("it's")
+    # inside a body would otherwise open a phantom quote and swallow real
+    # syntax after the heredoc.
+    data = _blank_spans(cmd, [(s, e) for s, e, _ in heredocs])
+    bare = _blank_quoted(data)
     found = []
 
     # 1. No `cd` prefix, and no `-C`/`--git-dir`/`--work-tree`/`GIT_DIR=`/
@@ -309,9 +457,15 @@ def violations(cmd):
     #    the personal .aide/loop/loop.local.toml, never aide.toml. Two
     #    different repos in one command stay blocked even when both are
     #    declared — see `_git_repo_override_all_declared`.
+    #    The path VALUES are scanned on `data`, not the raw `cmd`: quotes must
+    #    stay visible there (see _GIT_REPO_OVERRIDE_TRIGGER_RE's docstring) but
+    #    heredoc bodies must not — `--git-dir=/junk` in a commit message's
+    #    prose is not a second repo, and reading it as one re-blocks the exact
+    #    `git -C <declared> commit -F - <<'EOF'` shape the body-blanking above
+    #    exists to allow.
     has_override = bool(_GIT_REPO_OVERRIDE_TRIGGER_RE.search(bare))
     if re.match(r"\s*cd\s", cmd) or (
-        has_override and not _git_repo_override_all_declared(cmd)
+        has_override and not _git_repo_override_all_declared(data)
     ):
         found.append(
             "Drop the `cd` prefix, and drop `-C`/`--git-dir`/`--work-tree`/"
@@ -323,7 +477,9 @@ def violations(cmd):
             "[hygiene] extra_repos, in .aide/loop/loop.local.toml, a personal, "
             "gitignored file; copy .aide/loop/loop.local.toml.example to set "
             "it up. Two different repos in one command stay blocked even when "
-            "both are declared.)"
+            "both are declared.) For the aide CLI against a declared repo, no "
+            "cd is needed either: run that repo's own install with an explicit "
+            "root, `python <repo>/.aide/scripts/aide.py --repo <repo> <verb>`."
         )
 
     # 2. One command per Bash call — `&&`, `||`, `;` sequencing isn't
@@ -347,7 +503,12 @@ def violations(cmd):
     #    Checked on a blanked command like the other rules, but blanking only
     #    single-quoted spans: there bash keeps "$(...)"/backticks literal
     #    (prose), while inside double quotes they still substitute for real.
-    no_single = _blank_single_quoted(cmd)
+    #    Heredoc bodies split the same way: literal under a quoted delimiter
+    #    (<<'EOF'), live under an unquoted one (<<EOF) — so only the literal
+    #    bodies are blanked here and rule 4 still sees real substitution.
+    no_single = _blank_single_quoted(
+        _blank_spans(cmd, [(s, e) for s, e, interp in heredocs if not interp])
+    )
     if re.search(r"\bgit\s+commit\b", bare) and ("$(" in no_single or "`" in no_single):
         found.append(
             "No `$(...)`/backtick command substitution in a commit: it's never "

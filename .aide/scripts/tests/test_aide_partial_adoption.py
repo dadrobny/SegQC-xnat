@@ -116,14 +116,16 @@ def test_check_fails_when_a_loop_repo_lost_its_progress(tmp_path: Path, capsys):
     assert aide.main(["--repo", str(repo), "check"]) == 1
     out = capsys.readouterr().out
     assert "FAIL" in out
-    assert "notice:" not in out  # the document set exists; nothing was skipped
+    # The document set exists; nothing was skipped. Pinned on the sentence,
+    # since `check` may print a different notice here — the inbox it created.
+    assert "only the repo-agnostic checks ran" not in out
 
 
 def test_a_present_document_set_still_gets_its_document_checks(tmp_path: Path, capsys):
     """Guard against the fix over-reaching: a real loop repo must be unaffected."""
     repo = _repo(tmp_path, docs=True, progress=True)
     assert aide.main(["--repo", str(repo), "check"]) == 0
-    assert "notice:" not in capsys.readouterr().out
+    assert "only the repo-agnostic checks ran" not in capsys.readouterr().out
 
 
 # --------------------------------------------------------------------------- #
@@ -190,4 +192,4 @@ def test_the_notice_still_appears_on_a_queue_run_that_has_a_document_set(
     a document set never got the notice, and still must not."""
     repo = _repo(tmp_path, docs=True, progress=True)
     assert aide.main(["--repo", str(repo), "check", "--queue", "3"]) == 1
-    assert "notice:" not in capsys.readouterr().out
+    assert "only the repo-agnostic checks ran" not in capsys.readouterr().out

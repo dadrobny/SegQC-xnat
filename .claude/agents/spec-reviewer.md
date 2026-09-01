@@ -141,10 +141,9 @@ edit to a **framework/process** file (`CLAUDE.md`, `aide.toml`, `.aide/**`,
 When you learn something true but OUT OF SCOPE for this review — a doc gap, a
 latent defect, a missing capability, a recurring manual step that deterministic
 code could replace, or an AIDE-framework issue — append ONE line to
-`docs/aide/insights.md` (create it from `.aide/templates/insights.md`, copied
-verbatim, if missing) and carry on. Never act on it here. Entry shape:
+`docs/aide/insights.md` and carry on. Never act on it here. Entry shape:
 
-    - [ ] <knowledge|defect|gap|automation|framework> — <one line> *(queue-NNN, YYYY-MM-DD)*
+    - [ ] <knowledge|defect|gap|automation|framework> — <one line> *(queue-NNN, YYYY-MM-DD, engine X.Y.Z)*
 
 The provenance names where the insight came from; `queue-NNN` is yours,
 because you work a queue and there may be no item to name yet.
@@ -152,21 +151,3 @@ because you work a queue and there may be no item to name yet.
 The feedback loop triages the inbox at the queue boundary. Capturing is cheap
 and always in scope; acting out of scope is forbidden. This append is the one
 write allowed outside your (otherwise read-only) scope.
-
-## Command hygiene
-
-Emit shell commands in the shape the allow-list auto-approves, or an unattended
-run stalls on a prompt. Full contract + rationale:
-[`.aide/conventions.md` §3](../../.aide/conventions.md); a `PreToolUse` hook
-enforces the mechanical rules and will bounce a violating shape back with the
-fix. Get them right first time to skip that round-trip:
-
-- **Use the Bash tool, not PowerShell**, for git/`aide`/venv/grep commands —
-  only `Bash(...)` rules are allow-listed.
-- **One command per Bash call** — never chain with `&&`, `||`, or `;` (a single
-  `|` pipe like `grep -rn foo src | head` is fine).
-- **No `cd`/`git -C` prefix** — the cwd is already the repo root.
-- **No `2>&1`** or other stderr redirection — the tool captures stderr.
-- **Python via the relative venv path** (`.venv/Scripts/python …` on Windows,
-  `.venv/bin/python …` on macOS/Linux); the `aide` CLI as
-  `python .aide/scripts/aide.py …`.

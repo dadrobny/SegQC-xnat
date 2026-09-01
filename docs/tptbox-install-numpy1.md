@@ -11,6 +11,14 @@
 > `numpy>=2.0` marker cleanly (there is nothing else present to conflict
 > with it), exactly as this item's own `constraints.txt` regeneration did.
 
+> **Licence metadata in 0.7.6.** The bump closes the AGPL claim only in the
+> free-text `License:` field (upstream PR #119: `Apache License Version 2.0,
+> January 2004`); the wheel still ships `Classifier: License :: Other/Proprietary
+> License`, unchanged from 0.7.5 (both wheels' METADATA read 2026-08-31, item
+> 133). A licence scanner or SBOM tool that keys on trove classifiers rather
+> than the `License:` field will therefore still report FACET's core dependency
+> as proprietary; that residue is upstream's to fix.
+
 ## Why the bypass is needed
 
 TPTBox 0.7.6 declares `numpy>=2.0` for `python>=3.11` in its own packaging

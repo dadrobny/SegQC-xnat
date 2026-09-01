@@ -217,31 +217,12 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Claude Code / AIDE framework
-#   Share the framework (.aide/, .claude/skills, .claude/commands,
-#   .claude/settings.overlay.json and the settings.json generated from it) but
-#   keep per-machine settings and credentials out of git.
+# Claude Code (per-machine settings and credentials; the AIDE framework's own
+# ignores live in the managed block at the end of this file).
 .claude/settings.local.json
 .claude/*.local.json
 .claude/.credentials.json
 .claude/credentials.json
-#   Personal loop supervisor config (caps, deadlines, credentials path).
-.aide/loop/loop.local.toml
-#   Transient settings.json reconciliation diff emitted by aide-loop install.py --update.
-.aide-merge
-#   Per-machine permission-prompt logs (the committed README stays tracked).
-docs/aide/permissions/*.jsonl
-#   Generated project-status report (regenerable; the committed README stays tracked).
-docs/aide/status/*.html
-docs/aide/status/*.png
-docs/aide/status/*.svg
-docs/aide/status/*.jpg
-docs/aide/status/*.jpeg
-docs/aide/status/*.xml
-docs/aide/status/results.xml
-#   Derived reports written into the same directory by `aide check --queue
-#   --report` and consumed by the spec-reviewer agent (engine 1.9.0/1.10.0).
-docs/aide/status/*.json
 
 # Editor workspace files (per-machine, not shared)
 *.code-workspace
@@ -256,3 +237,12 @@ dataset-verse19training
 # own docs give (docs/spinal-curve-model.md, docs/reference-build.md) write
 # here; untracked leftovers otherwise fail `aide sync`'s clean-tree preflight.
 out/
+
+# --- AIDE framework (managed by aide-loop install.py) ---
+.aide/**/__pycache__/
+.aide/loop/loop.local.toml
+.aide-merge
+docs/aide/status/
+docs/aide/permissions/*.jsonl
+docs/aide/instructions/*.jsonl
+# --- end AIDE ---

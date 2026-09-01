@@ -123,6 +123,18 @@ An unreachable cohort (no root resolvable, or a root with no matching masks)
 is a structured skip recorded in the summary's `cohort` block, never a
 traceback: `main` still returns `0`.
 
+**Read VerSe masks through `segfacet.io.load_volume(path, integer_labels=True)`,
+never a bare `nibabel.load`.** VerSe19's committed masks are not stored
+RAS-resolving; `load_volume` reorients them (item 094's contract) and every
+in-pipeline consumer sits downstream of it, but an ad-hoc measurement script
+that loads raw silently measures the wrong axes — `centroid_mm[2]` is then not
+the superior-inferior axis. Measured 2026-08-31 on the first eight training
+subjects: through `load_volume` the ascending-label net S advance runs −26 to
+−364 mm (caudal-first, as real anatomy demands); through `nibabel.load` the
+same eight read −6.5 to +2.1 mm, and a traversal-order monotonicity check that
+trusted the raw axes called seven of the eight non-monotonic. This bites
+exactly the code that never runs in CI — cohort sweeps and one-off scripts.
+
 ## Build invocation (manual alternative)
 
 The staging tool above is the reproducible path for a real VerSe cohort; the
