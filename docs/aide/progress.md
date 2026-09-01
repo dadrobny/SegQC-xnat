@@ -294,7 +294,7 @@ mislabelling heuristics.
 - ✅ Neighbour-consistency metrics (spacing regularity, monotonic progression). *(Item 020)*
 - ✅ Optional sagittal projection of centroids + spline for the human report. *(Item 021)*
 - ✅ Stage 3 feature serialisation & GT-vs-perturbed regression tests. *(Item 022)*
-- ✅ Local vertebra neighbourhood comparison (sliding window, n=3–5): per-vertebra deviation from neighbourhood mean/median of centroid spacing, spline offset, and volume, plus a deviation score and outlier flag. *(Item 024)* ⚠️ **Correction, 2026-08-11:** the module (`features/neighbourhood.py`) was implemented in full but **wired into nothing** — absent from `pipeline.py`, `feature_report.py` and all 10 rules, which is why it never appeared in item 103's 111-entry catalogue. ✅ **Wired, 2026-08-14 (Item 110):** the module was generalised to an arbitrary named-feature API and wired into `extract_feature_record`/`feature_report.py` as `stage3.per_label_neighbourhood[]` (computed and serialised for every case with ≥ 2 labels). It is **consumed by no rule** — `status == "unwired"` in the regenerated feature catalogue, confirmed by Item 110's AC11 (every corpus case's verdict and findings are unchanged by the wiring). No outlier this module computes is ever flagged to a verdict; that remains Stage 20's call, same as any other unwired feature.
+- ✅ Local vertebra neighbourhood comparison (sliding window, n=3–5): per-vertebra deviation from neighbourhood mean/median of centroid spacing, spline offset, and volume, plus a deviation score and outlier flag. *(Item 024)* ⚠️ **Correction, 2026-08-11:** the module (`features/neighbourhood.py`) was implemented in full but **wired into nothing** — absent from `pipeline.py`, `feature_report.py` and all 10 rules, which is why it never appeared in item 103's 111-entry catalogue. ✅ **Wired, 2026-08-14 (Item 110):** the module was generalised to an arbitrary named-feature API and wired into `extract_feature_record`/`feature_report.py` as `stage3.per_label_neighbourhood[]` (computed and serialised for every case with ≥ 2 labels). It is **consumed by no rule** — `status == "unwired"` in the regenerated feature catalogue, confirmed by Item 110's AC11 (every corpus case's verdict and findings are unchanged by the wiring). No outlier this module computes is ever flagged to a verdict; that remains Stage 20's call, same as any other unwired feature. *(Item 024)*
 
 **Acceptance.**
 
@@ -338,10 +338,11 @@ mislabelling heuristics.
 **Deliverables.**
 
 - ✅ Synthetic-failure generator: clean-GT spine builder & perturbation
-  framework *(Item 036)*; component/shape perturbations — fragment, fuse,
-  inject islands *(Item 037)*; coverage/border/overlap perturbations — remove
-  level, crop at border, force overlap *(Item 038)*; identity/ordering/
-  alignment perturbations — displace, relabel/swap, sequence-break *(Item 039)*.
+  framework (item 036); component/shape perturbations — fragment, fuse,
+  inject islands (item 037); coverage/border/overlap perturbations — remove
+  level, crop at border, force overlap (item 038); identity/ordering/
+  alignment perturbations — displace, relabel/swap, sequence-break (item 039).
+  *(Items 036–039)*
 - ✅ Small committed fixture set spanning all 8 failure modes. *(Item 040)*
 - ✅ Regression suite asserting expected verdict + which heuristic fired per case. *(Item 041)*
 - ✅ Golden-file JSON snapshots for stability/determinism. *(Item 042)*
@@ -952,7 +953,8 @@ rule(s) and any features they need; features may be added alone, modes and rules
   remedy named here could not have worked. Mode 8 stays this stage's to record.
 - 📋 Per-rule **and per-operator** corpus-exercise reporting (the registered `fuse` operator
   generates no corpus case at all).
-- 📋 Item 100's mode-1 ladder base widened so mode 1's metric swing is set by the
+- 📋 The mode-1 severity-ladder base (`tests/test_100_severity_ladder.py`, Stage 18)
+  widened so mode 1's metric swing is set by the
   perturbation rather than the fixture's FOV walls — the recorded root cause of mode 6's
   Stage-18 specificity shortfall.
 
@@ -1159,8 +1161,9 @@ justified in writing.
 - 📋 The taxonomy, written down with rationale, alternatives considered, and every deviation
   from the starting proposal justified — reviewed with the maintainer before migration (a
   human-checkpoint stage in the same sense Stage 19 was).
-- 📋 The migration applied, item 103's catalogue regenerated, item 104's drift test as the
-  safety net.
+- 📋 The migration applied, the feature catalogue
+  (`docs/aide/feature_catalogue.generated.md`) regenerated, its drift test
+  (`tests/test_104_feature_catalogue_drift.py`) as the safety net.
 - 📋 Answers for the known instances: duplicated `label`/`level_name` identity fields across
   four containers; `stage3.*` / `image_features.*` parallel to `per_label.{label}.*`;
   image-axis-relative shape features (bbox/extent, `principal_axis`) awaiting a vertebra

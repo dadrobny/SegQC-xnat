@@ -464,73 +464,25 @@ def test_adv_missing_acceptance_box_raises_assertion():
 # selects on a date they do not parse into -- aide-loop issue #76). The `assert
 # warnings` guard below is what keeps "zero warnings" from passing vacuously.
 #
-# Re-pinned 2026-09-01 on the engine update 1.21.0 -> 1.28.1. The earlier
-# baseline (four "status icon outside a structural status position" warnings
-# and three `insights.md` entry-shape warnings) is gone because the engine
-# retired both classes: 1.24.0 replaced the loose icon scan with the
-# trailing-marker ownership rule, and 1.25.3 widened the insight-entry grammar
-# so the queue/item-range provenances those three entries carry now parse
-# (aide-loop issue #76). What the new engine reports instead is below; every
-# one is an advisory about a pre-existing document state, not a regression:
-#   - items 126 and 132 pin `docs/aide/progress.md` under Asserts against
-#     (engine 1.23.0's always-authorised-path warning; both specs are merged
-#     history, and `insights.md`'s open framework entries dated 2026-08-31
-#     record the defect it names),
-#   - three `progress.md` deliverable bullets reference items only mid-prose,
-#     so under the marker rule they track nothing (engine 1.24.0),
-#   - queues 002 and 004 are marked completed while `progress.md` still holds
-#     open items for them.
-# The first and third shapes carry a path but no line number
-# (`items/NNN-x.md: text`), which `_FILE_SCOPED_WARNING_RE` keys the same way.
-_PINNED_BASELINE_WARNINGS = Counter(
-    {
-        (
-            "items/126-execute-the-golden-retirement.md",
-            "'docs/aide/progress.md' is pinned under Asserts against, but every item "
-            "is authorised to edit it — the status flip and the insight append are "
-            "loop bookkeeping — so the pin can never hold and `aide scope` will "
-            "report a contradiction on every run; put the read-only content check "
-            "in an acceptance criterion's test instead",
-        ): 1,
-        (
-            "items/132-judge-monotonicity-against-the-traversal-ordered-fit.md",
-            "'docs/aide/progress.md' is pinned under Asserts against, but every item "
-            "is authorised to edit it — the status flip and the insight append are "
-            "loop bookkeeping — so the pin can never hold and `aide scope` will "
-            "report a contradiction on every run; put the read-only content check "
-            "in an acceptance criterion's test instead",
-        ): 1,
-        (
-            "progress.md",
-            "deliverable bullet references item(s) 024, 103, 110 but ends with no "
-            "*(Item NNN)* marker — only the trailing marker ties an item to a "
-            "bullet, so this bullet tracks nothing and those items read as "
-            "untracked. End it with the marker (e.g. '. *(Item 024)*').",
-        ): 1,
-        (
-            "progress.md",
-            "deliverable bullet references item(s) 100 but ends with no "
-            "*(Item NNN)* marker — only the trailing marker ties an item to a "
-            "bullet, so this bullet tracks nothing and those items read as "
-            "untracked. End it with the marker (e.g. '. *(Item 100)*').",
-        ): 1,
-        (
-            "progress.md",
-            "deliverable bullet references item(s) 103, 104 but ends with no "
-            "*(Item NNN)* marker — only the trailing marker ties an item to a "
-            "bullet, so this bullet tracks nothing and those items read as "
-            "untracked. End it with the marker (e.g. '. *(Item 103)*').",
-        ): 1,
-        (
-            "queue-002.md",
-            "marked completed but still has open items in progress.md",
-        ): 1,
-        (
-            "queue-004.md",
-            "marked completed but still has open items in progress.md",
-        ): 1,
-    }
-)
+# Re-pinned 2026-09-01 on the engine update 1.21.0 -> 1.28.1, and then emptied
+# in the same change. The earlier baseline (four "status icon outside a
+# structural status position" warnings and three `insights.md` entry-shape
+# warnings) is gone because the engine retired both classes: 1.24.0 replaced
+# the loose icon scan with the trailing-marker ownership rule, and 1.25.3
+# widened the insight-entry grammar so the queue/item-range provenances those
+# three entries carry now parse (aide-loop issue #76). The new engine then
+# reported seven advisories about pre-existing document states -- two merged
+# specs pinning `docs/aide/progress.md` under Asserts against (engine 1.23.0),
+# three `progress.md` deliverable bullets whose item references sat only
+# mid-prose (1.24.0), and the two queues those untracked items held open --
+# and every one was repaired at the 2026-09-01 feedback loop (framework-update
+# PR #59). So the baseline is now EMPTY: any located or file-scoped warning
+# `aide check` reports on this repo's documents is a regression, and the three
+# exclusion categories below (branch state, the aggregated Assumptions
+# backlog, pending human gates) are the whole of what is tolerated. Add an
+# entry here only for a document state that genuinely cannot be fixed, with
+# the reason beside it.
+_PINNED_BASELINE_WARNINGS: Counter = Counter()
 
 #: Splits `path:lineno: text` into the parts the baseline keys on and the one
 #: it deliberately discards. The path may itself contain no colon (it is a
@@ -673,12 +625,18 @@ def test_ac8_baseline_counts_catch_one_more_of_an_already_known_warning():
     `insights.md` warnings that first motivated it no longer exist -- engine
     1.25.3 made those entries parse).
     """
-    assert _PINNED_BASELINE_WARNINGS, "the baseline must pin something"
+    # Over whatever the baseline currently pins (possibly nothing) ...
     for known, count in _PINNED_BASELINE_WARNINGS.items():
         assert not (Counter({known: count}) - _PINNED_BASELINE_WARNINGS)
         assert Counter({known: count + 1}) - _PINNED_BASELINE_WARNINGS == Counter(
             {known: 1}
         )
+    # ... and on a synthetic key, so the property is exercised even when the
+    # baseline is empty: one tolerated occurrence passes, a second is excess.
+    synthetic = ("progress.md", "a synthetic warning used only by this test")
+    tolerated = _PINNED_BASELINE_WARNINGS + Counter({synthetic: 1})
+    assert not (Counter({synthetic: 1}) - tolerated)
+    assert Counter({synthetic: 2}) - tolerated == Counter({synthetic: 1})
 
 
 def test_ac8_file_scoped_warning_keys_on_path_and_text():

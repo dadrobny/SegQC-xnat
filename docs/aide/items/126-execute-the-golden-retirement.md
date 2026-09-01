@@ -419,8 +419,6 @@ commit has a red suite for a reason unrelated to the item.
 - `tests/test_116_ras_native_corpus.py` — read by AC17's allowlist as the one
   legitimate in-tree reference to a retired path (it reads git history); not
   changed.
-- `docs/aide/progress.md` — read by `test_105`'s AC12 (Stage-19 attestation);
-  not changed by this item.
 
 **On the cross-spec conflicts `aide check --queue 018` will report.** Items 127
 (`test_111`), 129 (`tests/`, `reference_verse_v1.json`), 132 (`tests/`,
@@ -614,3 +612,9 @@ retirement audit).
   oversight rather than a deliberate constraint; captured here rather than
   edited into the spec's own "Asserts against" list, which is outside this
   section's edit scope.
+- **Asserts-against list corrected, 2026-09-01.** The `docs/aide/progress.md`
+  pin recorded above as a drafting oversight is removed from the list: engine
+  1.23.0's `aide check` names it (a spec pinning an always-authorised path can
+  never hold), and the read-only AC12 attestation it stood for lives in
+  `test_105`, where the warning says it belongs. Done at the 2026-09-01
+  feedback loop, on the reviewed framework-update PR #59.
