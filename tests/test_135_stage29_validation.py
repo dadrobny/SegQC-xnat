@@ -890,13 +890,32 @@ def test_adv_acceptance_checkbox_line_is_not_flagged_by_bullet_pattern():
 
 # =========================================================================== #
 # AC27: `aide check` reports no error and no warning class outside the
-# recorded baseline (missing '## Assumptions', a gate awaiting a decision).
+# recorded baseline (missing '## Assumptions', a gate awaiting a decision,
+# or a transient branch-state warning -- see below).
 # =========================================================================== #
 
-_BASELINE_WARNING_CLASSES = ("assumptions-block", "awaiting-a-decision")
+# Measured 2026-09-01 during `aide merge 135`'s own post-merge re-test: `aide
+# merge` deletes an item's claim branch only AFTER that re-test runs, so
+# `aide check` transiently warned "stale claim branch aide/135-validate-
+# stage-29-golden-retirement: item 135 is already ✅" -- a class this
+# classifier had never seen -- and the gate went red on the item's own merge
+# (the merge itself still completed; the branch has since been swept and the
+# warning is gone). `test_114_documentation_corrections.py`'s
+# `_BRANCH_STATE_WARNING_PREFIXES` (line ~534) already solved this generically
+# for its own warning check by excluding any warning starting with "stale
+# claim branch" or "unrecognised branch" by prefix -- both name a branch
+# left behind mid-merge rather than a defect in the document being checked.
+# Applying the same prefix tolerance here keeps AC27 from failing on a
+# merge-order artifact of the loop's own bookkeeping while leaving every
+# other warning class exactly as strict as before.
+_BRANCH_STATE_WARNING_PREFIXES = ("stale claim branch", "unrecognised branch")
+
+_BASELINE_WARNING_CLASSES = ("assumptions-block", "awaiting-a-decision", "branch-state")
 
 
 def _classify_warning(message: str) -> str:
+    if message.startswith(_BRANCH_STATE_WARNING_PREFIXES):
+        return "branch-state"
     if "assumptions" in message.lower():
         return "assumptions-block"
     if "awaiting a decision" in message.lower():
@@ -923,6 +942,24 @@ def test_adv_unclassified_warning_would_be_caught():
     assert _classify_warning("a brand new kind of warning nobody has seen before") == (
         "unclassified"
     )
+
+
+def test_adv_stale_claim_branch_warning_classifies_as_branch_state():
+    """A stale-claim-branch warning for an unrelated item (999, which does
+    not exist in this repo) must classify as 'branch-state', not
+    'unclassified' -- the transient merge-order artifact this test module
+    measured 2026-09-01 (aide merge 135's own post-merge re-test), tolerated
+    the same way test_114_documentation_corrections.py already tolerates it
+    via its own `_BRANCH_STATE_WARNING_PREFIXES`."""
+    warning = "stale claim branch aide/999-x: item 999 is already ✅"
+    assert _classify_warning(warning) == "branch-state"
+
+
+def test_adv_unrecognised_branch_warning_classifies_as_branch_state():
+    """The sibling branch-state prefix ('unrecognised branch') must also
+    classify as 'branch-state', not 'unclassified'."""
+    warning = "unrecognised branch aide/does-not-exist"
+    assert _classify_warning(warning) == "branch-state"
 
 
 # =========================================================================== #
