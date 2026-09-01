@@ -68,16 +68,12 @@ from segfacet.config import bundled_default_config
 from segfacet.pipeline import run_qc
 from segfacet.synth.corpus import load_manifest
 from segfacet.synth.golden import (
-    GOLDEN_DIR,
     VOLATILE_POINTERS,
     VOLATILE_SENTINEL,
     build_report_for_case,
     canonical_json,
     check_case_golden,
-    golden_path,
-    load_golden,
     main,
-    read_golden_text,
     reports_close,
     write_goldens,
 )
@@ -125,6 +121,14 @@ def _report_schema():
 
 
 _SCHEMA = _report_schema()
+
+
+def _fresh_report(case_id: str) -> dict:
+    """build_report_for_case(case) for the named manifest case_id (item 126
+    replacement: reads no committed golden -- the committed corpus-golden
+    snapshot store this used to read was retired, see
+    docs/aide/golden-decision-table.md's "## Retirement execution log")."""
+    return build_report_for_case(_case(case_id))
 
 
 def _walk_keys(obj):
@@ -206,49 +210,50 @@ def test_ac5_canonical_form_is_a_fixed_point(case):
 # =========================================================================== #
 
 
-def test_ac6_exactly_one_golden_per_manifest_case_no_more_no_fewer():
-    """AC6: the set of *.json filename stems under GOLDEN_DIR equals the set
-    of committed case_ids -- nine files, no orphan and no missing golden."""
-    golden_stems = {p.stem for p in GOLDEN_DIR.glob("*.json")}
+def test_ac6_exactly_one_golden_per_manifest_case_no_more_no_fewer(tmp_path):
+    """AC6 (item 126 replacement): the set of *.json filename stems written
+    by write_goldens(tmp_path) equals the set of committed case_ids -- nine
+    files, no orphan and no missing golden. The committed corpus-golden
+    snapshot store this used to check was retired; the harness
+    (write_goldens) survives and is exercised here against a fresh
+    caller-supplied directory instead."""
+    out_dir = tmp_path / "regen_ac6"
+    write_goldens(out_dir)
+    golden_stems = {p.stem for p in out_dir.glob("*.json")}
     assert golden_stems == _COMMITTED_CASE_IDS
     assert len(golden_stems) == 9
 
 
 @pytest.mark.parametrize("case", _CASES, ids=_case_id)
 def test_ac7_every_committed_golden_is_valid_json_and_validates(case):
-    """AC7: every committed golden file parses via json.loads and validates
-    against the report schema."""
-    text = read_golden_text(case["case_id"])
-    parsed = json.loads(text)
+    """AC7 (item 126 replacement ii): build_report_for_case(case) validates
+    against the report schema for every manifest case -- reads no committed
+    corpus-golden snapshot file. json.loads/json.dumps round-trip proves
+    the report is itself valid JSON (a dict returned in-process is already a
+    Python object, so the round-trip is what stands in for "parses via
+    json.loads" now that there is no file to parse)."""
+    report = build_report_for_case(case)
+    parsed = json.loads(json.dumps(report))
     jsonschema.validate(parsed, _SCHEMA)
 
 
 @pytest.mark.parametrize("case", _CASES, ids=_case_id)
-def test_ac8_committed_golden_case_id_matches_filename(case):
-    """AC8: load_golden(stem)["case_id"] == stem, and stem is a manifest
-    case_id."""
+def test_ac8_committed_golden_case_id_matches_filename(case, tmp_path):
+    """AC8 (item 126 replacement): re-pointed at a regeneration --
+    write_goldens(tmp_path) writes ``<case_id>.json`` whose embedded
+    ``case_id`` equals the filename stem, for every manifest case."""
+    out_dir = tmp_path / f"regen_ac8_{case['case_id']}"
+    write_goldens(out_dir)
     stem = case["case_id"]
-    golden = load_golden(stem)
-    assert golden["case_id"] == stem
+    written = json.loads((out_dir / f"{stem}.json").read_text(encoding="utf-8"))
+    assert written["case_id"] == stem
     assert stem in _COMMITTED_CASE_IDS
 
 
 # =========================================================================== #
-# D. Freshly-built output equals the committed golden (AC9)
-# =========================================================================== #
-
-
-@pytest.mark.parametrize("case", _CASES, ids=_case_id)
-def test_ac9_fresh_report_matches_committed_golden_within_tolerance(case):
-    """AC9: check_case_golden(case) is True against the real GOLDEN_DIR for
-    every case (fresh output matches the committed golden within numeric
-    tolerance -- see item 078; cross-platform byte-identity of the
-    asymmetric-geometry cases' floats is not achievable, so numeric leaves are
-    compared with tolerance while structure/strings/bools/ordering stay
-    exact)."""
-    assert check_case_golden(case) is True
-
-
+# D. (item 126: the committed-golden comparison this section held, AC9, was
+# discharged -- its subject, the committed golden corpus, was retired. See
+# docs/aide/golden-decision-table.md's "## Retirement execution log".)
 # =========================================================================== #
 # E. Volatile-field canonicalisation seam (AC10-AC11)
 # =========================================================================== #
@@ -299,25 +304,6 @@ def test_ac12_main_regenerates_matching_goldens(tmp_path):
         assert written.read_bytes() == expected, case["case_id"]
 
 
-def test_ac13_regeneration_reproduces_committed_goldens_within_tolerance(tmp_path):
-    """AC13: for every case, the file write_goldens(tmp) produces matches the
-    committed GOLDEN_DIR/<case_id>.json within numeric tolerance (item 078 --
-    a fresh regeneration on a different platform than the goldens' origin is
-    numerically identical but not necessarily byte-identical for the
-    asymmetric-geometry cases)."""
-    dest = tmp_path / "regen_write"
-    write_goldens(dest)
-
-    for case in _CASES:
-        regenerated = json.loads(
-            (dest / f"{case['case_id']}.json").read_text(encoding="utf-8")
-        )
-        committed = json.loads(
-            golden_path(case["case_id"]).read_text(encoding="utf-8")
-        )
-        assert reports_close(regenerated, committed), case["case_id"]
-
-
 def test_ac14_missing_golden_fails_loudly(tmp_path):
     """AC14: check_case_golden(case, golden_dir=tmp) raises
     FileNotFoundError for a case whose golden is absent from tmp."""
@@ -352,20 +338,23 @@ def test_ac15_mutated_golden_is_caught(tmp_path):
 
 @pytest.mark.parametrize("case", _RECONSTRUCTED_CASES, ids=_case_id)
 def test_ac16_reconstructed_golden_is_pipeline_blind(case):
-    """AC16: for every detection == "reconstructed_record" case, its
-    committed golden has verdict == "pass" and no golden finding's rule_id
-    is in case["expected_rule_ids"]."""
+    """AC16 (item 126 replacement): for every detection ==
+    "reconstructed_record" case, its freshly built report has verdict ==
+    "pass" and no finding's rule_id is in case["expected_rule_ids"] --
+    re-pointed at fresh output; the committed golden this used to read was
+    retired."""
     assert _RECONSTRUCTED_CASES  # sanity: modes 1, 4, 8
-    golden = load_golden(case["case_id"])
-    assert golden["verdict"] == "pass"
+    report = _fresh_report(case["case_id"])
+    assert report["verdict"] == "pass"
 
     expected_rule_ids = set(case["expected_rule_ids"])
     fired_designated_rule_ids = {
-        f["rule_id"] for f in golden.get("findings", []) if f["rule_id"] in expected_rule_ids
+        f["rule_id"] for f in report.get("findings", []) if f["rule_id"] in expected_rule_ids
     }
     assert fired_designated_rule_ids == set(), (
-        f"case {case['case_id']!r} golden unexpectedly carries a designated "
-        f"finding {fired_designated_rule_ids!r} -- it should be pipeline-blind"
+        f"case {case['case_id']!r} fresh report unexpectedly carries a "
+        f"designated finding {fired_designated_rule_ids!r} -- it should be "
+        "pipeline-blind"
     )
 
 
@@ -386,20 +375,20 @@ def test_adv_canonical_json_is_a_noop_under_default_volatile_pointers(case):
 
 
 def test_adv_mode5_remove_level_golden_canonicalises_without_crashing_on_empty_labels():
-    """Adversarial: the mode5_remove_level golden (case-level finding,
-    labels == []) canonicalises and validates without crashing on an empty
-    label list."""
+    """Adversarial (item 126 replacement): the freshly built mode5_remove_level
+    report (case-level finding, labels == []) canonicalises and validates
+    without crashing on an empty label list."""
     case = _case("mode5_remove_level")
-    golden = load_golden(case["case_id"])
-    jsonschema.validate(golden, _SCHEMA)
+    report = _fresh_report(case["case_id"])
+    jsonschema.validate(report, _SCHEMA)
 
-    case_level_findings = [f for f in golden.get("findings", []) if f["labels"] == []]
+    case_level_findings = [f for f in report.get("findings", []) if f["labels"] == []]
     assert case_level_findings, "expected at least one case-level (labels == []) finding"
 
     # Round-trips through canonical_json without error even though a
     # findings entry carries an empty labels list.
-    text = canonical_json(golden)
-    assert json.loads(text) == golden
+    text = canonical_json(report)
+    assert json.loads(text) == report
 
 
 def test_adv_reordered_top_level_keys_canonicalise_identically():
@@ -445,28 +434,30 @@ def test_adv_malformed_golden_json_is_caught_not_silently_accepted(tmp_path):
 
 
 def test_adv_clean_control_golden_passes_with_no_findings():
-    """Adversarial: clean_control's golden has verdict == "pass" and
-    findings == [] -- the positive control's report is snapshot-locked
-    too."""
+    """Adversarial (item 126 replacement): clean_control's freshly built
+    report has verdict == "pass" and findings == [] -- the positive
+    control's report shape is still pinned, just against fresh output
+    instead of a committed snapshot."""
     case = _case("clean_control")
     assert case["failure_mode"] == 0
-    golden = load_golden(case["case_id"])
-    assert golden["verdict"] == "pass"
-    assert golden["findings"] == []
+    report = _fresh_report(case["case_id"])
+    assert report["verdict"] == "pass"
+    assert report["findings"] == []
 
 
 def test_adv_reconstructed_golden_blindness_is_checked_via_rule_ids_not_empty_findings():
-    """Adversarial: AC16's "no designated finding" fact is verified by
-    explicit rule_id inspection, not merely by an accidentally-empty
-    findings list -- a reconstructed case whose golden happens to carry
-    unrelated (non-designated) findings would still correctly pass."""
+    """Adversarial (item 126 replacement): AC16's "no designated finding"
+    fact is verified by explicit rule_id inspection, not merely by an
+    accidentally-empty findings list -- a reconstructed case whose fresh
+    report happens to carry unrelated (non-designated) findings would still
+    correctly pass."""
     for case in _RECONSTRUCTED_CASES:
-        golden = load_golden(case["case_id"])
+        report = _fresh_report(case["case_id"])
         expected_rule_ids = set(case["expected_rule_ids"])
-        all_rule_ids = {f["rule_id"] for f in golden.get("findings", [])}
+        all_rule_ids = {f["rule_id"] for f in report.get("findings", [])}
         # The check must be about rule_id membership, not about the list
         # being empty -- assert the discriminator explicitly rather than
-        # via golden["findings"] == [].
+        # via report["findings"] == [].
         assert not (all_rule_ids & expected_rule_ids)
 
 

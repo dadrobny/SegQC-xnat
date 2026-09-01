@@ -97,7 +97,16 @@ jobs:
         # 079, deferred. See docs/aide/items/079-arm64-golden-reproducibility.md.
         os: [ubuntu-latest, windows-latest]
     steps:
+      # Full history, not the action's default depth-1 clone: two tests read
+      # git history. tests/test_126_golden_retirement.py::test_ac4_... asserts
+      # the retired snapshot goldens' newest history entry is a deletion and
+      # fails with "no history found" on a shallow clone (PR #58's first CI
+      # run, 2026-08-31, all four test jobs); tests/test_116_ras_native_corpus.py
+      # AC7 reads reference goldens at pinned commit aeb2f55 and would otherwise
+      # silently skip.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -151,7 +160,16 @@ jobs:
       matrix:
         numpy-version: ["1.26.4", "2.0.2"]
     steps:
+      # Full history, not the action's default depth-1 clone: two tests read
+      # git history. tests/test_126_golden_retirement.py::test_ac4_... asserts
+      # the retired snapshot goldens' newest history entry is a deletion and
+      # fails with "no history found" on a shallow clone (PR #58's first CI
+      # run, 2026-08-31, all four test jobs); tests/test_116_ras_native_corpus.py
+      # AC7 reads reference goldens at pinned commit aeb2f55 and would otherwise
+      # silently skip.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"

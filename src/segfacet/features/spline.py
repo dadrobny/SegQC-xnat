@@ -23,6 +23,26 @@ Public API
 ``evaluate_spline_derivative(fit, u_values, nu=1) -> np.ndarray``
     Evaluate the spline's ``nu``-th derivative at the supplied parameter
     values; returns ``(N, 3)`` float64 array.
+``find_coincident_centroid_pair(centroids) -> CoincidentCentroidPair | None``
+    Return the first pair of exactly-coincident centroid mm-coordinates, or
+    ``None`` when every coordinate is pairwise distinct (item 129). Used by
+    ``fit_centroid_spline`` to build its coincidence ``ValueError``, and by
+    ``pipeline.extract_feature_record`` to pre-check and degrade gracefully
+    instead of letting that error propagate.
+``ClosestPointOnCurve``
+    Frozen dataclass carrying a closest-point search result: the minimising
+    parameter, the point on the curve, and the distance to it.
+``find_closest_point(point_mm, curve, *, n_scan=500, xatol=1e-6, backend=None) -> ClosestPointOnCurve``
+    The one closest-point search (item 130): coarse-scan the curve over
+    ``n_scan`` uniformly-spaced parameter values, then refine with a bounded
+    ``scipy.optimize.minimize_scalar`` at tolerance ``xatol``. Accepts either
+    a :class:`SplineFit` or a bare ``evaluate(u_values) -> (N, 3)`` callable,
+    so a caller with no ``SplineFit`` (``scripts/compare_curve_candidates.py``'s
+    polynomial and axis-wise candidates) needs no copy of the algorithm. The
+    single owner of the search that used to be written out separately in
+    ``features/spline_offset.py``, ``features/consistency.py`` and
+    ``scripts/compare_curve_candidates.py``; ``closest_u`` is the value item
+    132 reuses for its monotonicity judgement.
 
 Deliberate CPU fallback (item 072)
 -----------------------------------
@@ -69,6 +89,7 @@ from typing import Optional, Sequence
 
 import numpy as np
 from scipy.interpolate import BSpline, make_splprep
+from scipy.optimize import minimize_scalar
 
 import segfacet.backend as _backend_mod
 from segfacet.backend import Backend
@@ -76,10 +97,22 @@ from segfacet.features.centroids import LabelCentroid
 
 __all__ = [
     "SplineFit",
+    "CoincidentCentroidPair",
+    "find_coincident_centroid_pair",
     "fit_centroid_spline",
     "evaluate_spline",
     "evaluate_spline_derivative",
+    "ClosestPointOnCurve",
+    "find_closest_point",
 ]
+
+# Closest-point search (item 130): coarse-scan resolution. 500 gives sub-mm
+# resolution for typical whole-spine extents (~400 mm total arc length).
+_CLOSEST_POINT_N_SCAN: int = 500
+
+# Closest-point search (item 130): refinement tolerance passed to
+# scipy.optimize.minimize_scalar's ``xatol`` option.
+_CLOSEST_POINT_XATOL: float = 1e-6
 
 
 # --------------------------------------------------------------------------- #
@@ -122,15 +155,66 @@ class SplineFit:
 # --------------------------------------------------------------------------- #
 
 
-def _find_coincident_pair(centroids: Sequence[LabelCentroid]):
-    """Return ``(coord, level_a, level_b)`` for the first pair of exactly
-    coincident mm-coordinates in *centroids*, or ``None`` if none exist."""
-    seen = {}
+@dataclass(frozen=True)
+class CoincidentCentroidPair:
+    """The first pair of exactly-coincident centroid mm-coordinates found by
+    :func:`find_coincident_centroid_pair` (item 129).
+
+    Attributes
+    ----------
+    coordinate_mm:
+        The shared mm-coordinate, as a 3-tuple of floats.
+    level_a, level_b:
+        The two coincident levels' names, in the order the input sequence
+        presented them.
+    label_a, label_b:
+        The two coincident levels' integer labels, in the same order.
+    """
+
+    coordinate_mm: tuple
+    level_a: str
+    level_b: str
+    label_a: int
+    label_b: int
+
+
+def find_coincident_centroid_pair(
+    centroids: Sequence[LabelCentroid],
+) -> Optional[CoincidentCentroidPair]:
+    """Return the first pair of exactly-coincident centroids in *centroids*.
+
+    Two centroids are "coincident" when their ``centroid_mm`` values compare
+    exactly equal as a 3-tuple of floats -- no tolerance, so two centroids
+    that differ by even ``1e-9`` mm are reported as distinct (item 129, AC3).
+
+    Parameters
+    ----------
+    centroids:
+        Sequence of :class:`~segfacet.features.centroids.LabelCentroid`
+        objects, in the order to search. The input is never mutated.
+
+    Returns
+    -------
+    CoincidentCentroidPair or None
+        The **first** coincident pair, in the order *centroids* was given
+        (item 129, AC2) -- i.e. the first centroid whose coordinate has
+        already been seen, paired with the earlier centroid that shares it.
+        ``None`` when every mm-coordinate is pairwise distinct (AC3).
+        Deterministic: two calls on the same input return equal results.
+    """
+    seen: dict = {}
     for c in centroids:
         coord = tuple(float(v) for v in c.centroid_mm)
         if coord in seen:
-            return coord, seen[coord], c.level_name
-        seen[coord] = c.level_name
+            earlier = seen[coord]
+            return CoincidentCentroidPair(
+                coordinate_mm=coord,
+                level_a=earlier.level_name,
+                level_b=c.level_name,
+                label_a=earlier.label,
+                label_b=c.label,
+            )
+        seen[coord] = c
     return None
 
 
@@ -243,12 +327,12 @@ def fit_centroid_spline(
             f"Supply at least 2 LabelCentroid objects."
         )
 
-    coincident = _find_coincident_pair(centroids)
+    coincident = find_coincident_centroid_pair(centroids)
     if coincident is not None:
-        coord, level_a, level_b = coincident
         raise ValueError(
             f"fit_centroid_spline received two centroids with exactly the "
-            f"same mm-coordinate {coord}: levels {level_a!r} and {level_b!r}. "
+            f"same mm-coordinate {coincident.coordinate_mm}: levels "
+            f"{coincident.level_a!r} and {coincident.level_b!r}. "
             f"A spline fit requires distinct centroid positions; check the "
             f"input segmentation for duplicated/collapsed labels."
         )
@@ -390,3 +474,161 @@ def evaluate_spline_derivative(
     # Same (3, N) -> (N, 3) transpose as evaluate_spline; see its comment.
     derivs = np.asarray(fit.spline(host_u_values, nu=nu), dtype=np.float64)
     return derivs.T
+
+
+# --------------------------------------------------------------------------- #
+# Closest-point search (item 130)
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class ClosestPointOnCurve:
+    """Result of :func:`find_closest_point`.
+
+    Attributes
+    ----------
+    closest_u:
+        The curve parameter, in the closed interval ``[0, 1]``, that
+        minimises the distance to the query point.
+    point_mm:
+        The curve evaluated at ``closest_u``, as a 3-tuple of floats
+        ``(x, y, z)`` in mm.
+    distance_mm:
+        The Euclidean distance (mm) from the query point to ``point_mm``.
+        Derived by evaluating the curve at ``closest_u`` rather than read
+        from the optimiser's own objective value, so the three fields are
+        consistent with each other by construction.
+    """
+
+    closest_u: float
+    point_mm: tuple
+    distance_mm: float
+
+
+def find_closest_point(
+    point_mm,
+    curve,
+    *,
+    n_scan: int = _CLOSEST_POINT_N_SCAN,
+    xatol: float = _CLOSEST_POINT_XATOL,
+    backend: Optional[Backend] = None,
+) -> ClosestPointOnCurve:
+    """Find the closest point on *curve* to *point_mm* (item 130).
+
+    The one closest-point search shared by every caller that used to write
+    its own copy: :func:`~segfacet.features.spline_offset.compute_spline_offsets`,
+    :func:`~segfacet.features.consistency.compute_monotonic_consistency`, and
+    ``scripts/compare_curve_candidates.py``.
+
+    Strategy: coarse-scan the curve over ``n_scan`` uniformly-spaced
+    parameter values in ``[0, 1]`` to locate an approximate minimum, then
+    refine with a bounded ``scipy.optimize.minimize_scalar`` in a bracket one
+    coarse step either side of the coarse minimum (clamped to ``[0, 1]``; the
+    bracket cannot be degenerate for any ``n_scan >= 2``, but the guard is
+    kept for defensiveness). The returned ``point_mm``/``distance_mm`` are
+    derived by evaluating *curve* once more at the final, clipped parameter
+    -- never read from the optimiser's own objective value -- so the three
+    returned fields are mutually consistent by construction.
+
+    Parameters
+    ----------
+    point_mm:
+        The query point, as an array-like of 3 mm-coordinates.
+    curve:
+        Either a :class:`SplineFit` (evaluated via :func:`evaluate_spline`),
+        or a bare callable ``evaluate(u_values) -> (N, 3)`` mapping an array
+        of parameter values to mm-coordinates -- the shape every candidate in
+        ``scripts/compare_curve_candidates.py`` already exposes, so no
+        second copy of the algorithm is needed there.
+    n_scan:
+        Number of uniformly-spaced parameter values in the coarse scan.
+        Must be >= 2. Defaults to :data:`_CLOSEST_POINT_N_SCAN` (500).
+    xatol:
+        Absolute tolerance passed to ``minimize_scalar``'s ``options``. Must
+        be > 0. Defaults to :data:`_CLOSEST_POINT_XATOL` (1e-6).
+    backend:
+        Optional :class:`~segfacet.backend.Backend` handle, accepted for
+        signature uniformity with the other Stage-2/3 feature functions (item
+        072). Only used when *curve* is a :class:`SplineFit` (forwarded to
+        :func:`evaluate_spline`); the numeric work always runs on host
+        NumPy/SciPy regardless -- see the module docstring's "Deliberate CPU
+        fallback" section.
+
+    Returns
+    -------
+    ClosestPointOnCurve
+        ``closest_u`` is always in the closed interval ``[0, 1]``.
+        Deterministic: two calls with the same *point_mm* and *curve* return
+        equal results. Non-mutating: neither *point_mm* nor any array *curve*
+        closes over is modified.
+
+    Raises
+    ------
+    ValueError
+        When ``n_scan < 2`` or ``xatol <= 0``, naming the offending
+        parameter and its value.
+    """
+    if n_scan < 2:
+        raise ValueError(
+            f"find_closest_point: n_scan must be >= 2 (a coarse scan needs at "
+            f"least 2 parameter values), but received n_scan={n_scan!r}."
+        )
+    if xatol <= 0:
+        raise ValueError(
+            f"find_closest_point: xatol must be > 0, but received xatol={xatol!r}."
+        )
+
+    backend = backend or _backend_mod.get_backend()
+
+    if isinstance(curve, SplineFit):
+        fit = curve
+
+        def evaluate(u_values):
+            return evaluate_spline(fit, u_values, backend=backend)
+
+    else:
+        evaluate = curve
+
+    pt = np.asarray(point_mm, dtype=np.float64)
+
+    u_scan = np.linspace(0.0, 1.0, n_scan)
+    scan_pts = np.asarray(evaluate(u_scan), dtype=np.float64)
+    diffs = scan_pts - pt
+    sq_dists = np.einsum("ij,ij->i", diffs, diffs)
+    best_idx = int(np.argmin(sq_dists))
+    u_coarse = float(u_scan[best_idx])
+
+    # Bracket for refinement: one coarse step each side (clamped to [0, 1]).
+    step = 1.0 / (n_scan - 1)
+    lo = max(0.0, u_coarse - step)
+    hi = min(1.0, u_coarse + step)
+
+    if lo >= hi:
+        # Degenerate bracket -- cannot fire for any n_scan >= 2 (see
+        # docstring); kept for defensiveness, unchanged from the three prior
+        # copies of this algorithm (item 130).
+        u_final = u_coarse
+    else:
+
+        def _sq_distance(u_scalar: float) -> float:
+            eval_pt = np.asarray(evaluate([float(u_scalar)]), dtype=np.float64)[0]
+            diff = pt - eval_pt
+            return float(np.dot(diff, diff))
+
+        result = minimize_scalar(
+            _sq_distance,
+            bounds=(lo, hi),
+            method="bounded",
+            options={"xatol": xatol},
+        )
+        u_final = float(np.clip(result.x, 0.0, 1.0))
+
+    final_pt = np.asarray(evaluate([u_final]), dtype=np.float64)[0]
+    diff = pt - final_pt
+    distance = float(math.sqrt(float(np.dot(diff, diff))))
+
+    return ClosestPointOnCurve(
+        closest_u=u_final,
+        point_mm=(float(final_pt[0]), float(final_pt[1]), float(final_pt[2])),
+        distance_mm=distance,
+    )

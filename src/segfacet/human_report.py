@@ -125,7 +125,11 @@ def render_human_report(
         report and the CLI's stdout "Label inventory" table. When
         ``None`` (default), the section lists only labels that have
         findings, exactly as before -- preserving byte-identical output
-        for every existing caller.
+        for every existing caller. When this mapping carries
+        ``"stage3_unavailable"`` (item 129), a "Degraded features:" section
+        naming the cause is appended after "Per-label findings" and before
+        "Findings"; when the key is absent, output is byte-identical to
+        before this section existed (AC16).
 
     Returns
     -------
@@ -192,6 +196,17 @@ def render_human_report(
     else:
         lines.append("  (none)")
     lines.append("")
+
+    # ------------------------------------------------------------------ #
+    # Degraded features section (item 129) — only rendered when the supplied
+    # features block carries "stage3_unavailable", so the omitted-key case is
+    # byte-for-byte the pre-item report (AC16).
+    # ------------------------------------------------------------------ #
+    if features is not None and features.get("stage3_unavailable") is not None:
+        stage3_unavailable = features["stage3_unavailable"]
+        lines.append("Degraded features:")
+        lines.append(f"  {stage3_unavailable.get('detail', '')}")
+        lines.append("")
 
     # ------------------------------------------------------------------ #
     # Findings section (item 035) — only rendered when explicitly requested,

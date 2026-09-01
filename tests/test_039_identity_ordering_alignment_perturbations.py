@@ -374,15 +374,22 @@ def test_ac10_relabel_swap_fires_ordering_finding_via_reconstructed_record():
 
 
 def test_ac11_relabel_swap_run_qc_does_not_surface_swap():
-    """AC11: plain run_qc on the swapped map emits no finding at all (empty
-    findings, verdict "pass") -- documented limitation."""
+    """Pin FLIPPED 2026-08-31 (item 132): plain run_qc on the swapped map
+    now fires MislabelRule's ordering finding (Detector B) on {21, 22} with
+    verdict "flagged-for-review" -- the traversal-ordered reference fit
+    surfaces the swap that used to be a documented limitation."""
     clean = _clean()
     result = RelabelSwapPerturbation(target_label=21, neighbour_label=22).apply(
         clean.seg_img, seed=0
     )
     case_result, _block = run_qc(result.labelmap, bundled_default_config())
-    assert case_result.findings == ()
-    assert case_result.verdict.overall.label == "pass"
+    matches = [
+        f
+        for f in case_result.findings
+        if f.rule_id == "mislabel" and f.labels == frozenset({21, 22})
+    ]
+    assert matches
+    assert case_result.verdict.overall.label == "flagged-for-review"
 
 
 def test_ac12_relabel_swap_expectation_well_formed():

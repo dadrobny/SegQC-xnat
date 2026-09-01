@@ -7,7 +7,14 @@ A. **Spacing regularity** — mean inter-centroid spacing, coefficient of
 
 B. **Monotonic progression** — whether the spline parameter *u* increases
    (non-decreasingly) at every consecutive pair in anatomical order; the
-   non-monotonic pairs are listed by level name.
+   non-monotonic pairs are listed by level name. *u* is measured against a
+   curve fitted through the centroids in their **geometric traversal
+   order** — S coordinate (``centroid_mm[2]``), in the supplied sequence's
+   own net-advance direction (item 132) — not against the curve fitted
+   through the ordering under test, so a pure ordering defect (two adjacent
+   levels swapped) cannot hide behind a curve that simply doubles back to
+   follow it. When the traversal order already is the supplied order, the
+   caller's own fit is reused and no second fit is made.
 
 Public API
 ----------
@@ -28,10 +35,9 @@ from dataclasses import dataclass
 from typing import List, Sequence, Tuple
 
 import numpy as np
-from scipy.optimize import minimize_scalar
 
 from segfacet.features.centroids import LabelCentroid
-from segfacet.features.spline import SplineFit, evaluate_spline
+from segfacet.features.spline import SplineFit, find_closest_point, fit_centroid_spline
 
 __all__ = [
     "SpacingConsistency",
@@ -39,10 +45,6 @@ __all__ = [
     "compute_spacing_consistency",
     "compute_monotonic_consistency",
 ]
-
-# Number of u samples in the coarse scan.  500 gives sub-mm resolution for
-# typical whole-spine extents (~400 mm total arc length).
-_N_SCAN: int = 500
 
 
 # --------------------------------------------------------------------------- #
@@ -92,13 +94,15 @@ class MonotonicConsistency:
         True iff u values increase (non-decreasingly) along the anatomical
         order.  ``u[i] >= u[i+1]`` is considered non-monotonic (equal values
         are also flagged — two vertebrae at the same spline parameter indicate
-        a stacking or near-coincident issue).
+        a stacking or near-coincident issue). u is measured against a curve
+        fitted through the centroids in their geometric traversal order
+        (item 132), not against the ordering under test.
     non_monotonic_pairs : tuple[tuple[str, str], ...]
         (level_a, level_b) pairs where ``u[a] >= u[b]`` (spline parameter did
-        not advance).
+        not advance) on the traversal-ordered reference curve.
     u_values : tuple[float, ...]
-        Per-centroid spline parameter values used for the assessment
-        (length == n_centroids).
+        Per-centroid spline parameter values, each the closest_u on the
+        traversal-ordered reference curve (length == n_centroids).
     """
 
     is_monotonic: bool
@@ -118,45 +122,25 @@ def _euclidean_mm(a: LabelCentroid, b: LabelCentroid) -> float:
     return math.sqrt((bx - ax) ** 2 + (by - ay) ** 2 + (bz - az) ** 2)
 
 
-def _sq_distance_u(u_scalar: float, pt: np.ndarray, fit: SplineFit) -> float:
-    """Squared Euclidean distance from pt to the spline point at parameter u."""
-    spline_pt = evaluate_spline(fit, [float(u_scalar)])  # shape (1, 3)
-    diff = pt - spline_pt[0]
-    return float(np.dot(diff, diff))
+def _traversal_order(centroids: Sequence[LabelCentroid]) -> List[int]:
+    """Return the index permutation that sorts ``centroids`` by their S
+    coordinate (``centroid_mm[2]``) in the sequence's own net-advance
+    direction (item 132).
 
-
-def _find_closest_u(pt: np.ndarray, fit: SplineFit) -> float:
-    """Return the spline parameter u* in [0, 1] closest to point pt (mm coords).
-
-    Strategy:
-    1. Coarse scan over _N_SCAN equally-spaced u values.
-    2. Refine with ``minimize_scalar`` in a bracket centred on the coarse best.
+    Direction follows the same convention item 122's ``orientation.py``
+    already uses to decide a sequence's net travel: the sort descends when
+    ``centroids[-1].centroid_mm[2] - centroids[0].centroid_mm[2] < 0``
+    (strictly caudal net advance) and ascends otherwise, including an exact
+    zero net advance. ``sorted`` is stable, so centroids sharing an identical
+    S coordinate keep their input order (AC11).
     """
-    u_scan = np.linspace(0.0, 1.0, _N_SCAN)
-    spline_pts = evaluate_spline(fit, u_scan)  # (_N_SCAN, 3)
-    diffs = spline_pts - pt  # (_N_SCAN, 3)
-    sq_dists = np.einsum("ij,ij->i", diffs, diffs)  # (_N_SCAN,)
-    best_idx = int(np.argmin(sq_dists))
-    u_coarse = float(u_scan[best_idx])
-
-    # Bracket for refinement: one step each side (clamped to [0, 1]).
-    step = 1.0 / (_N_SCAN - 1)
-    lo = max(0.0, u_coarse - step)
-    hi = min(1.0, u_coarse + step)
-
-    if lo >= hi:
-        # Degenerate bracket (e.g. only 2-point spline at boundary) — skip refinement.
-        return u_coarse
-
-    result = minimize_scalar(
-        _sq_distance_u,
-        bounds=(lo, hi),
-        args=(pt, fit),
-        method="bounded",
-        options={"xatol": 1e-6},
+    n = len(centroids)
+    net_advance_s = float(centroids[-1].centroid_mm[2]) - float(centroids[0].centroid_mm[2])
+    return sorted(
+        range(n),
+        key=lambda i: float(centroids[i].centroid_mm[2]),
+        reverse=(net_advance_s < 0.0),
     )
-    u_refined = float(np.clip(result.x, 0.0, 1.0))
-    return u_refined
 
 
 # --------------------------------------------------------------------------- #
@@ -240,9 +224,23 @@ def compute_monotonic_consistency(
     """Assess whether the anatomical order is consistent with monotonically
     increasing spline parameter values.
 
-    For each centroid, finds its closest point on the spline (coarse scan +
-    scalar refinement, same approach as item 018) and records the spline
-    parameter *u*.  The anatomical order is consistent with the spline when
+    *u* is measured against a **reference curve** fitted through the
+    centroids in their geometric traversal order (item 132) — sorted by S
+    coordinate in the supplied sequence's own net-advance direction, see
+    :func:`_traversal_order` — rather than against the curve fitted through
+    the ordering under test. Judging against the in-sample curve alone is
+    self-referential: ``splprep``'s chord-length parameterisation advances
+    along whatever order it is given, so a curve fitted through a swapped
+    ordering simply doubles back and follows the swap, and *u* still
+    increases. When the traversal order already is the supplied order (every
+    clean case), the caller's own ``fit`` is used unchanged and no second fit
+    is made; when it differs, one reference curve is fit from the reordered
+    centroids, inheriting ``fit``'s own ``degree`` and ``smoothing``.
+
+    For each centroid, finds its closest point on the reference curve via
+    :func:`segfacet.features.spline.find_closest_point` (item 130's shared
+    coarse-scan-then-refine search) and records the spline parameter *u*.
+    The anatomical order is consistent with the spline when
     ``u[i] < u[i+1]`` for every consecutive pair.
 
     Parameters
@@ -270,14 +268,29 @@ def compute_monotonic_consistency(
             f"Supply at least 2 LabelCentroid objects."
         )
 
-    # Find the closest spline parameter u* for each centroid.
+    # Pick the reference curve: the supplied fit when the traversal order
+    # already is the supplied order (no second fit), otherwise a fresh fit
+    # over the reordered centroids inheriting the supplied fit's degree and
+    # smoothing (item 132).
+    order = _traversal_order(centroids)
+    if order == list(range(n)):
+        reference_fit = fit
+    else:
+        reference_fit = fit_centroid_spline(
+            [centroids[i] for i in order],
+            degree=fit.degree,
+            smoothing=fit.smoothing,
+        )
+
+    # Find the closest spline parameter u* for each centroid on the
+    # reference curve.
     u_values: List[float] = []
     for c in centroids:
         pt = np.array(
             [float(c.centroid_mm[0]), float(c.centroid_mm[1]), float(c.centroid_mm[2])],
             dtype=np.float64,
         )
-        u_star = _find_closest_u(pt, fit)
+        u_star = find_closest_point(pt, reference_fit).closest_u
         u_values.append(u_star)
 
     # Identify non-monotonic consecutive pairs: u[i] >= u[i+1].

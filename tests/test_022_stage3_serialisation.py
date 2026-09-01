@@ -84,7 +84,13 @@ import numpy as np
 
 from synthetic import anisotropic_case, empty_case, labelled_blocks_case, make_labelmap
 
-GOLDEN_PATH = pathlib.Path(__file__).parent / "golden" / "022_stage3_report.json"
+#: Shared, feature-value-free format fixture (item 126 replacement iv). The
+#: committed 022-specific snapshot this used to point at was retired --
+#: see docs/aide/golden-decision-table.md's Section 1 "retire" rows and its
+#: "## Retirement execution log". This fixture pins only the serialisation
+#: *format* (key order, key set, float rendering); its content is entirely
+#: literal (tests/report_format_fixture.py) and shared with test_016.
+GOLDEN_PATH = pathlib.Path(__file__).parent / "golden" / "report_format_contract.json"
 
 
 # =========================================================================== #
@@ -777,20 +783,53 @@ def test_ac8_json_text_round_trip_preserves_offset_values():
 
 
 def test_ac8_golden_snapshot():
-    """AC8: serialize_report_json for a fixture matches the committed golden JSON."""
-    centroids = _straight_spine(5)
-    block = _full_block_for_spine(centroids)
-    produced = serialize_report_json(
-        _empty_verdict(), "golden-case-022", _config(), features=block
-    )
+    """AC8: serialize_report_json for the shared, feature-value-free
+    format-contract fixture (item 126 replacement iv) matches the committed
+    golden JSON. Every value in the fixture is a literal from
+    tests/report_format_fixture.py, carrying a full 'stage3' sub-block, so
+    this pins the report *format*, not any computed feature value."""
+    from report_format_fixture import format_contract_text
+
+    produced = format_contract_text()
 
     golden = GOLDEN_PATH.read_text(encoding="utf-8")
     assert produced == golden, (
         "Golden snapshot drift detected. If this change is intentional, "
-        f"regenerate {GOLDEN_PATH.name} by writing `produced` to "
-        f"{GOLDEN_PATH} and committing the result -- this test no longer "
-        "does that for you."
+        f"regenerate {GOLDEN_PATH.name} via "
+        "`.venv/bin/python tests/report_format_fixture.py` and commit the "
+        "result -- this test no longer does that for you."
     )
+
+
+def test_ac9_stage3_key_order_and_key_set_explicit():
+    """Item 126 AC10: assert, against freshly serialised output, the
+    'stage3' sub-block's key set and the report's top-level key order --
+    complementing test_016's near-zero-float assertion so a failure names
+    which of the three (key order / key set / float rendering) moved."""
+    from report_format_fixture import format_contract_text
+
+    produced_text = format_contract_text()
+    produced = json.loads(produced_text)
+
+    assert list(produced.keys()) == [
+        "schema_version",
+        "config_version",
+        "case_id",
+        "verdict",
+        "reasons",
+        "per_label",
+        "features",
+        "findings",
+    ], f"top-level key order moved: {list(produced.keys())!r}"
+
+    stage3_keys = set(produced["features"]["stage3"].keys())
+    assert stage3_keys == {
+        "per_label_offsets",
+        "per_label_orientations",
+        "curvature",
+        "spacing_consistency",
+        "monotonic_consistency",
+    }, f"stage3 key set moved: {stage3_keys!r}"
 
 
 # =========================================================================== #

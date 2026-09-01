@@ -8,18 +8,26 @@ Covers Acceptance Criteria AC1-AC13:
   well-formed ``reference_default.json``, a self-vs-self eval manifest,
   a well-formed ``eval_report.json`` with FPR in [0, 1], and a
   machine-checkable structured summary written + returned.
-- AC7-AC9: the real-VerSe steps are a GENUINE skip (present, status
-  "skipped", non-empty reason) when no/nonexistent ``--verse-cohort`` is
-  supplied, and the skip never aborts the synthetic path or leaks a
-  traceback.
-- AC10: with a stand-in VerSe-shaped cohort supplied, the verse-build step
-  runs and produces a loadable, provenance-tagged artifact.
+- AC7-AC9 (the real-VerSe skip/build steps this module used to pin) and AC10
+  (the stand-in-cohort verse-build run): **retired 2026-08-31, item 133.**
+  ``refresh_reference.py --verse-cohort`` no longer delegates to a real-VerSe
+  build at all -- the flag is rejected outright with exit code 2 and a
+  pointer to ``scripts/rebuild_verse_reference.py`` (item 123's dedicated,
+  working real-cohort tool). The five tests that pinned the old genuine-skip
+  / stand-in-build behaviour (``test_ac7_verse_build_is_genuine_skip_without_cohort``,
+  ``test_ac9_nonexistent_verse_cohort_is_absent_not_a_crash``,
+  ``test_ac10_verse_build_runs_with_standin_cohort``,
+  ``test_adversarial_empty_but_present_verse_cohort_no_crash``, and the
+  ``--verse-cohort`` half of ``test_ac12_writes_only_into_out_dir``) and the
+  ``_build_standin_verse_cohort`` helper they used are deleted here, not
+  rewritten -- the retirement they described is now this module's owner's
+  responsibility, not item 083's. See
+  ``tests/test_133_tptbox_pin_and_verse_retirement.py`` (AC8/AC9) for the
+  retired-mode coverage.
 - AC11-AC13: determinism, output containment under ``--out``, and
   self-containment (no ``tests/`` coupling).
 
 Adversarial / edge-case scenarios included:
-- Empty-but-present ``--verse-cohort`` (no matching files): no crash, exit 0,
-  no traceback.
 - ``--out`` under a not-yet-existing parent: created with parents.
 - Idempotent re-run into the same ``--out``: overwrites cleanly, equal
   summary.
@@ -36,12 +44,9 @@ import sys
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
-import nibabel as nib
 import pytest
 
 from segfacet.reference import default_artifact_path, load_artifact
-from segfacet.synth.clean_gt import build_clean_spine
-from segfacet.synth.intensity import paint_clean_scan
 
 # --------------------------------------------------------------------------- #
 # Module loader (mirrors tests/test_aide_status_report.py's by-path pattern)
@@ -60,25 +65,6 @@ def _load_wrapper():
 
 def _read_summary(out: Path) -> dict:
     return json.loads((out / "refresh_summary.json").read_text(encoding="utf-8"))
-
-
-def _build_standin_verse_cohort(dest_dir: Path, rr) -> Path:
-    """Write a tiny 2-subject VerSe-shaped stand-in cohort: build_clean_spine
-    L1-L5 + paint_clean_scan siblings, saved as
-    ``<id>_seg-vert_msk.nii.gz`` + ``<id>_scan.nii.gz`` pairs. Built here in
-    the test, never by the wrapper (item 082's stand-in convention)."""
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    for i in range(2):
-        spine = build_clean_spine(
-            levels=("L1", "L2", "L3", "L4", "L5"),
-            spacing=(1.0, 1.0, 1.0 + 0.1 * i),
-            curve_amplitude_mm=4.0 + i,
-        )
-        scan_img = paint_clean_scan(spine.seg_img, seed=0)
-        subject_id = f"verse-{i:03d}"
-        nib.save(spine.seg_img, str(dest_dir / f"{subject_id}{rr.DEFAULT_VERSE_SEG_SUFFIX}"))
-        nib.save(scan_img, str(dest_dir / f"{subject_id}_scan.nii.gz"))
-    return dest_dir
 
 
 def _no_traceback(text: str) -> bool:
@@ -193,22 +179,8 @@ def test_ac6_structured_summary_written_and_returned_match(tmp_path):
 
 
 # =========================================================================== #
-# Group C -- genuine skip of the real-VerSe steps (AC7-AC9)
+# Group C -- AC8 (the synthetic path is unaffected by real-VerSe absence)
 # =========================================================================== #
-
-
-def test_ac7_verse_build_is_genuine_skip_without_cohort(tmp_path):
-    rr = _load_wrapper()
-    out = tmp_path / "out"
-    rr.main(["--out", str(out)])
-    summary = _read_summary(out)
-
-    steps_by_name = {s["name"]: s for s in summary["steps"]}
-    assert rr.STEP_VERSE_BUILD in steps_by_name
-    verse_step = steps_by_name[rr.STEP_VERSE_BUILD]
-    assert verse_step["status"] == "skipped"
-    assert verse_step["reason"]
-    assert "--verse-cohort" in verse_step["reason"]
 
 
 def test_ac8_skip_does_not_abort_synthetic_path(tmp_path):
@@ -221,45 +193,6 @@ def test_ac8_skip_does_not_abort_synthetic_path(tmp_path):
     for name in (rr.STEP_SYNTH_REBUILD, rr.STEP_EVAL_COHORT, rr.STEP_SYNTH_EVALUATE):
         assert steps_by_name[name]["status"] == "ran"
     assert rc == 0
-
-
-def test_ac9_nonexistent_verse_cohort_is_absent_not_a_crash(tmp_path):
-    rr = _load_wrapper()
-    out = tmp_path / "out"
-    nonexistent = tmp_path / "no-such-verse-dir"
-
-    rc, captured = _capture_main(rr, ["--out", str(out), "--verse-cohort", str(nonexistent)])
-
-    assert rc == 0
-    assert _no_traceback(captured)
-    summary = _read_summary(out)
-    verse_step = {s["name"]: s for s in summary["steps"]}[rr.STEP_VERSE_BUILD]
-    assert verse_step["status"] == "skipped"
-    assert verse_step["reason"]
-    assert str(nonexistent) in verse_step["reason"] or nonexistent.name in verse_step["reason"]
-
-
-# =========================================================================== #
-# Group D -- real-VerSe build path (stand-in cohort supplied) (AC10)
-# =========================================================================== #
-
-
-def test_ac10_verse_build_runs_with_standin_cohort(tmp_path):
-    rr = _load_wrapper()
-    verse_dir = _build_standin_verse_cohort(tmp_path / "verse-cohort", rr)
-    out = tmp_path / "out"
-
-    rc = rr.main(["--out", str(out), "--verse-cohort", str(verse_dir)])
-    assert rc == 0
-
-    summary = _read_summary(out)
-    verse_step = {s["name"]: s for s in summary["steps"]}[rr.STEP_VERSE_BUILD]
-    assert verse_step["status"] == "ran"
-
-    verse_artifacts = list(out.glob("reference_verse_*.json"))
-    assert len(verse_artifacts) >= 1
-    dist = load_artifact(verse_artifacts[0])
-    assert dist.provenance.source.startswith("verse-")
 
 
 # =========================================================================== #
@@ -297,8 +230,7 @@ def test_ac12_writes_only_into_out_dir(tmp_path):
     before = default_path.read_bytes()
 
     out = tmp_path / "out"
-    verse_dir = _build_standin_verse_cohort(tmp_path / "verse-cohort", rr)
-    rr.main(["--out", str(out), "--verse-cohort", str(verse_dir)])
+    rr.main(["--out", str(out)])
 
     after = default_path.read_bytes()
     assert before == after
@@ -323,23 +255,6 @@ def test_ac13_no_tests_corpus_or_tests_package_coupling():
 # =========================================================================== #
 # Adversarial / edge cases
 # =========================================================================== #
-
-
-def test_adversarial_empty_but_present_verse_cohort_no_crash(tmp_path):
-    rr = _load_wrapper()
-    empty_verse_dir = tmp_path / "empty-verse"
-    empty_verse_dir.mkdir()
-    out = tmp_path / "out"
-
-    rc, captured = _capture_main(rr, ["--out", str(out), "--verse-cohort", str(empty_verse_dir)])
-
-    assert rc == 0
-    assert _no_traceback(captured)
-    summary = _read_summary(out)
-    verse_step = {s["name"]: s for s in summary["steps"]}[rr.STEP_VERSE_BUILD]
-    assert verse_step["status"] in {"ran", "failed"}
-    if verse_step["status"] == "failed":
-        assert verse_step["reason"]
 
 
 def test_adversarial_out_dir_under_not_yet_existing_parent(tmp_path):

@@ -74,7 +74,7 @@ from segfacet.reference import (
 from segfacet.reference.artifact import DEFAULT_BUILD_DATE, DEFAULT_SOURCE
 from segfacet.reference.ingest import DEFAULT_SEG_SUFFIX, SIZE_PROXY_NAME
 from segfacet.synth.clean_gt import build_clean_spine
-from segfacet.synth.golden import reports_close
+from segfacet.synth.golden import assert_matches_committed_artifact
 
 
 # =========================================================================== #
@@ -282,12 +282,12 @@ def test_ac10_regenerating_reproduces_committed_bytes(tmp_path):
 
     # Item 081: the bundled artifact now carries a platform-sensitive PCA
     # float (eigenvalue_ratio), so the regenerated-vs-committed comparison
-    # switches to numeric tolerance (item 078's reports_close). Intra-platform
+    # switches to numeric tolerance (item 078's reports_close, wrapped by
+    # item 127's assert_matches_committed_artifact). Intra-platform
     # determinism across two independent regenerations stays byte-exact
     # (asserted separately below).
     regenerated = json.loads(dest_json.read_text(encoding="utf-8"))
-    committed = json.loads(default_artifact_path().read_text(encoding="utf-8"))
-    assert reports_close(regenerated, committed)
+    assert_matches_committed_artifact(regenerated, default_artifact_path())
 
 
 def test_ac10_two_regenerations_stay_byte_identical(tmp_path):

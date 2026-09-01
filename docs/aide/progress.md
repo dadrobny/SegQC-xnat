@@ -1255,16 +1255,20 @@ corpus alone cannot separate that from a broken feature. Do not widen on that ev
   the 1.0 mm bound; `mode1_displace`'s max offset (`18.7186` mm) separates from
   `clean_control`'s (`0.6733` mm) by an ~18 mm margin, both clear of the shipped `13.0` mm
   threshold on opposite sides.)*
-- [ ] `mislabel` fires through plain `run_qc` on the mode-1 case and `is_monotonic` is
+- [x] `mislabel` fires through plain `run_qc` on the mode-1 case and `is_monotonic` is
   `False` on the mode-4 case, with the clean control still firing nothing (**G2**).
-  *(Unticked — item 125's 2026-08-30 replay: the `mislabel`/clean-control halves hold — `mislabel`
+  *(Item 125's 2026-08-30 replay established the `mislabel`/clean-control halves: `mislabel`
   fires on `mode1_displace` naming label 22 (L3) both through plain `run_qc` and through a
   real `segfacet run --no-reference` CLI invocation, and `clean_control` fires nothing
-  through either path — but `mode4_relabel_swap`'s `is_monotonic` measures `True` with zero
-  `non_monotonic_pairs`, not `False`. Pinned by `tests/test_125_stage28_validation.py`'s
-  `test_ac7_mode4_relabel_swap_is_monotonic_pinned_true`; the gap was already logged to
-  insights.md by item 120's 2026-08-28 entry, and mode 4 stays `reconstructed_record` in
-  `tests/corpus/manifest.json`.)*
+  through either path. Item 132 changed `consistency.py` to judge monotonicity against the
+  smoothed, traversal-ordered reference fit rather than the in-sample fit alone, moving
+  `mode4_relabel_swap` from `detection="reconstructed_record"` to `detection="pipeline"` in
+  `tests/corpus/manifest.json`. Item 135's 2026-08-31 replay closes this box on that change:
+  `mode4_relabel_swap` reads `is_monotonic == False` with
+  `non_monotonic_pairs == [["L2", "L3"]]` through both `extract_feature_record` and a real
+  `segfacet run --no-reference` CLI invocation (which also emits a `mislabel` finding
+  naming labels 21/22), and `clean_control` still reads `is_monotonic == True` with empty
+  `non_monotonic_pairs` and fires zero findings through both paths.)*
 - [ ] A real scoliotic curve in the VerSe cohort is not flagged as an offset outlier
   (**G3**). *(Unticked — item 125's 2026-08-30 replay: of the 17 real VerSe19 subjects the decision
   document's scoliosis-selection rule selects (`coronal_deviation_mm >= 8.0` mm, 17 of 80
@@ -1282,7 +1286,7 @@ corpus alone cannot separate that from a broken feature. Do not widen on that ev
   `tests/golden/022_stage3_report.json` are byte-identical to each other and to the
   committed files.)*
 
-## Stage 29 — Golden Retirement & Test-Artifact Hygiene (G2, G7) — 📋
+## Stage 29 — Golden Retirement & Test-Artifact Hygiene (G2, G7) — ✅
 
 **Goal.** Execute the maintainer-signed retirement of the 11 whole-record snapshot goldens
 (`golden-decision-table.md`, dispositioned *retire* 2026-07-28, execution pulled forward
@@ -1293,26 +1297,94 @@ per-deliverable provenance.
 
 **Deliverables.**
 
-- 📋 The golden retirement executed: nine `tests/corpus/golden/*.json` and two
+- ✅ **D1** The golden retirement executed: nine `tests/corpus/golden/*.json` and two
   `tests/golden/` snapshots gone, the four per-row replacements in place, nothing
-  regenerated on the way out (D1).
-- 📋 Tolerance by construction: shared committed-artifact comparison helper plus an
-  enforcing guard extending `tests/test_111_golden_guard.py`'s byte-exact allowlist (D2).
-- 📋 The remaining hygiene and located-defect sweep: the `reference_verse_v1` integrity
-  pin relocated and the `test_102` fence header renamed (D3); `fit_centroid_spline`
-  degenerate-input handling (D4); the 4-centroid held-out fallback boundary (D5); spline
-  plumbing consolidation (D6); `tangent_angles_deg[]` direction normalisation (D7);
-  `consistency.py` monotonicity against the smoothed fit so mode 4 fires (D8); the
-  `tptbox` ≥ 0.7.6 pin (D9); `refresh_reference.py --verse-cohort` delegated or retired
-  (D10); the decision table's live counts split into a generated companion (D11).
+  regenerated on the way out. *(Item 126)*
+- ✅ **D2** Tolerance by construction: shared committed-artifact comparison helper plus an
+  enforcing guard extending `tests/test_111_golden_guard.py`'s byte-exact allowlist.
+  *(Item 127)*
+- ✅ **D3** The `reference_verse_v1` integrity pin relocated to a test named for the
+  artifact (its `.gitattributes` pin carried across) and the `test_102` fence header
+  renamed to say what it checks. *(Item 128)*
+- ✅ **D4 + D5** Coincident centroids degrade to a report instead of a traceback at the
+  pipeline level (the fit's descriptive error already exists — item 119 AC16), and the
+  4-centroid held-out fallback boundary moves to `< 5` with the affected reference
+  distributions rebuilt. *(Item 129)*
+- ✅ **D6** Spline plumbing consolidation: one closest-point search, one in-sample fit per
+  case. *(Item 130)*
+- ✅ **D7** `tangent_angles_deg[]` traversal-direction normalisation to item 122's
+  convention. *(Item 131)*
+- ✅ **D8** `consistency.py` monotonicity judged against the smoothed fit so mode 4 fires.
+  *(Item 132)*
+- ✅ **D9 + D10** The `tptbox` ≥ 0.7.6 pin (non-AGPL metadata), and
+  `refresh_reference.py --verse-cohort` delegated to `rebuild_verse_reference.py` or
+  retired. *(Item 133)*
+- ✅ **D11** The decision table's live `N/M leaf paths unwired` counts split into a
+  generated, byte-reproducible companion the signed document references. *(Item 134)*
+- ✅ Stage 29 end-to-end validation: retirement audit, guard replay on a scratch branch,
+  mode-4 replay closing Stage 28's unticked acceptance half, fails-before-the-fix
+  verification per defect, fresh-clone suite. *(Item 135)*
 
 **Acceptance.**
 
-- [ ] All 11 retired snapshots are gone with their named replacements in place, and no
+- [x] All 11 retired snapshots are gone with their named replacements in place, and no
   snapshot was regenerated on the way out; the guard fails a deliberately added byte-exact
-  comparison against a committed float-carrying artifact (**G7**).
-- [ ] `mode4_relabel_swap` yields `is_monotonic == False` through `extract_feature_record`,
-  closing Stage 28's unticked mode-4 acceptance half (**G2**).
+  comparison against a committed float-carrying artifact (**G7**). *(Item 135's 2026-08-31
+  replay: all eleven paths — nine `tests/corpus/golden/{clean_control,mode1_displace,
+  mode2_fragment,mode3_inject_islands,mode4_relabel_swap,mode5_remove_level,
+  mode6_crop_at_border,mode7_sequence_break,mode8_force_overlap}.json` plus
+  `tests/golden/016_features_report.json` and `tests/golden/022_stage3_report.json` — are
+  absent from the tree, and `git log --follow --name-status` over `69e5cf5..HEAD` shows
+  each path's most recent history entry is a single `D` at commit `cafd4cc`, with no later
+  `A`/`M`. The four named replacements resolve to live code: intra-run determinism in
+  `test_042`/`test_098`/`test_016`/`test_022` (none reads a `tests/corpus/golden` path);
+  `test_126_golden_retirement.py::test_ac3_fresh_report_validates_against_schema`;
+  `test_098_stray_components.py::test_ac15_golden_verdict_and_findings_unchanged`; and the
+  shared `tests/golden/report_format_contract.json` built by `tests/report_format_fixture.py`,
+  the sole survivor under `tests/golden/`. On a scratch branch in a throwaway clone,
+  deleting that fixture made `test_016_features_json.py::test_ac5_golden_snapshot` fail
+  with a `FileNotFoundError` naming the missing file rather than self-healing; on the same
+  scratch branch, adding a real `dest.read_bytes() == Path("src/segfacet/reference/
+  reference_default.json").read_bytes()` comparison under `tests/` made
+  `test_127_committed_artifact_tolerance.py::test_ac15_classifier_reports_zero_violations_on_tests_tree`
+  fail, its message naming `assert_matches_committed_artifact`; the scratch branch was
+  discarded afterward and the working checkout was never touched. Committed whole-record
+  snapshot inventory: 11 → 0, with one shared, feature-value-free format fixture surviving
+  under `tests/golden/`.)*
+- [x] `mode4_relabel_swap` yields `is_monotonic == False` through `extract_feature_record`,
+  closing Stage 28's unticked mode-4 acceptance half (**G2**). *(Item 135's 2026-08-31
+  replay: `extract_feature_record` on the committed `mode4_relabel_swap` fixture reads
+  `stage3.monotonic_consistency.is_monotonic == False` with
+  `non_monotonic_pairs == [["L2", "L3"]]`; a real `segfacet run --scan
+  tests/corpus/fixtures/base_scan.nii.gz --seg
+  tests/corpus/fixtures/mode4_relabel_swap_seg.nii.gz --out <scratch> --no-reference` exits
+  `0` and its `segfacet_report.json` carries the same reading plus a `mislabel` finding
+  naming labels 21/22. `clean_control` reads `is_monotonic == True` with empty
+  `non_monotonic_pairs` and fires zero findings through both paths, so the tick is not
+  bought at the clean control's expense. `tests/corpus/manifest.json`'s pipeline-detected
+  mode count is now **7 of 8** (mode 4 moved in at item 132; mode 8 remains
+  `reconstructed_record`), agreeing with `test_040`'s and `test_057`'s mode-set constants —
+  up from 6 of 8 at Stage 28's close.)*
 - [ ] A 4-level field of view yields non-degenerate held-out offsets; `pip show tptbox`
   reports a non-AGPL licence; each fixed defect carries a regression test that fails
-  before the fix (**G7**).
+  before the fix (**G7**). *(Unticked — item 135's 2026-08-31 replay: the `pip show tptbox`
+  clause and the fails-before-the-fix clause are both **verified**, and this box is
+  unticked **solely** on the four-level clause below, not on either of those two. `pip show
+  tptbox` in the project venv reports `Version: 0.7.6` and `License: Apache License Version
+  2.0, January 2004` (neither `agpl` nor `affero`), matching both `pyproject.toml`'s and
+  `constraints.txt`'s `tptbox==0.7.6` pins. In a throwaway clone, all eight designated
+  regression-test nodes for items 129/131/132/133 fail at each implementation commit's
+  immediate parent (`1466b8b`←`021f0bc`, `8b94e62`←`5efd27d`, `628f673`←`cc22bfd`,
+  `26b5cf5`←`8586772`) — confirmed by execution, not assumed. The four-level clause itself
+  is re-measured and remains **unmeetable**: a synthetic 4-level curve with an interior
+  level displaced 15 mm reproduces item 129's exact degenerate array `[7.348609152784843e-05,
+  5.330684370393181e-06, 5.740531122353952e-06, 3.782179445898854e-05]` mm (all `< 0.001`
+  mm), while the same displacement at 5 and 6 levels separates well above that floor — at
+  exactly four points a cubic (`k = 3`) spline has exactly four coefficients and
+  interpolates all four points regardless of weights, so the "held-out" curve is
+  numerically the in-sample curve. Closing this needs the fit's degree clamped below
+  `n − 1` at small `n`, which changes the formulation the 2026-08-27 "Spinal curve model —
+  the deformity envelope" human gate approved (`✅ Approved`, blocking nothing today); see
+  `docs/aide/items/129-coincident-centroids-in-the-pipeline.md`'s Decisions log and
+  `src/segfacet/features/spline_offset.py`'s docstring limitation block for the standing
+  evidence. No agent resolves that gate.)*

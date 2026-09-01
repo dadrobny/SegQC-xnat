@@ -53,7 +53,7 @@ from segfacet.features.spline import evaluate_spline_derivative, fit_centroid_sp
 from segfacet.features.spline_offset import compute_spline_offsets  # noqa: E402
 from segfacet.report import _SCHEMA, serialize_report  # noqa: E402
 from segfacet.synth.corpus import load_manifest  # noqa: E402
-from segfacet.synth.golden import GOLDEN_DIR  # noqa: E402
+from segfacet.synth.golden import build_report_for_case  # noqa: E402
 from segfacet.synth.regression import loaded_seg_image  # noqa: E402
 from segfacet.verdict import Verdict  # noqa: E402
 
@@ -172,8 +172,9 @@ def _mode4_relabel_swap_case() -> dict:
 def _mode4_relabel_swap_ordered_centroids() -> List[LabelCentroid]:
     """The real ``mode4_relabel_swap`` corpus case's centroids, ordered by
     label -- unlike ``_mode4_relabel_swap_shape``'s hand-built approximation,
-    its committed golden (``tests/corpus/golden/mode4_relabel_swap.json``)
-    measures ``coronal_tangent_angles_deg`` entries at 182.3510, 184.7816 and
+    a freshly built report for this case (its committed golden snapshot was
+    retired by item 126) measures ``coronal_tangent_angles_deg`` entries at
+    182.3510, 184.7816 and
     358.5342 degrees, genuinely outside (-180, 180], which is what this
     adversarial test needs to contrast against item 121's wrapped
     convention."""
@@ -363,11 +364,14 @@ def test_ac9_sagittal_c_curve_signed_angles():
 
 
 def test_ac10_principal_axis_within_0996_of_left_right_on_every_golden():
+    """AC10 (item 126 replacement): re-pointed at fresh output -- a live
+    property of the pipeline, not a committed golden. The committed golden
+    this used to read was retired, see docs/aide/golden-decision-table.md's
+    "## Retirement execution log"."""
     cases = load_manifest()["cases"]
     assert cases, "corpus manifest has no cases"
     for case in cases:
-        golden_file = GOLDEN_DIR / f"{case['case_id']}.json"
-        data = json.loads(golden_file.read_text(encoding="utf-8"))
+        data = build_report_for_case(case)
         entries = data["features"]["stage3"]["per_label_orientations"]
         assert entries, f"{case['case_id']!r} has no per_label_orientations entries"
         for entry in entries:
@@ -380,13 +384,14 @@ def test_ac10_principal_axis_within_0996_of_left_right_on_every_golden():
 
 
 def test_ac10_principal_axis_exactly_left_right_on_seven_of_nine_cases():
+    """AC10 (item 126 replacement): re-pointed at fresh output; the
+    committed golden this used to read was retired."""
     exceptions = {"mode3_inject_islands", "mode8_force_overlap"}
     cases = load_manifest()["cases"]
     seven = [c for c in cases if c["case_id"] not in exceptions]
     assert len(seven) == 7, "expected exactly seven non-exceptional corpus cases"
     for case in seven:
-        golden_file = GOLDEN_DIR / f"{case['case_id']}.json"
-        data = json.loads(golden_file.read_text(encoding="utf-8"))
+        data = build_report_for_case(case)
         entries = data["features"]["stage3"]["per_label_orientations"]
         assert entries
         for entry in entries:
@@ -419,37 +424,12 @@ def test_ac11_compute_vertebra_orientations_signature_unchanged():
 # =========================================================================== #
 
 
-def test_ac12_pca_values_match_fresh_computation_within_tolerance():
-    """AC12: eigenvalue_ratio and principal_axis are unchanged, compared
-    within tight numeric tolerance rather than exact equality -- the
-    committed golden's float values differ from a freshly-computed PCA by
-    ~1 ULP across numpy versions/platforms (item 078's convention; see
-    CLAUDE.md "Note what the golden tests actually assert"). Observed on
-    ``mode3_inject_islands`` in CI's numpy/Windows matrix, not locally or on
-    ubuntu-latest."""
-    cases = load_manifest()["cases"]
-    assert cases
-    for case in cases:
-        seg_img = loaded_seg_image(case)
-        data = np.asanyarray(seg_img.dataobj)
-        labels = sorted(int(v) for v in np.unique(data) if v != 0)
-        if not labels:
-            continue
-        fresh = {o.label: o for o in compute_vertebra_orientations(seg_img, labels)}
-
-        golden_file = GOLDEN_DIR / f"{case['case_id']}.json"
-        golden_data = json.loads(golden_file.read_text(encoding="utf-8"))
-        stage3 = golden_data["features"].get("stage3")
-        if not stage3:
-            continue
-        for entry in stage3["per_label_orientations"]:
-            fresh_o = fresh[entry["label"]]
-            assert entry["principal_axis"] == pytest.approx(
-                list(fresh_o.principal_axis), abs=1e-9
-            ), case["case_id"]
-            assert entry["eigenvalue_ratio"] == pytest.approx(
-                fresh_o.eigenvalue_ratio, abs=1e-9
-            ), case["case_id"]
+# (item 126: test_ac12_pca_values_match_fresh_computation_within_tolerance
+# was discharged -- with the committed golden retired, this compared fresh
+# computation against fresh computation (its own subject), which asserts
+# nothing beyond compute_vertebra_orientations's intra-run determinism,
+# already covered by test_042's determinism replacement (i). See
+# docs/aide/golden-decision-table.md's "## Retirement execution log".)
 
 
 # =========================================================================== #

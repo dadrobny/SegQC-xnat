@@ -35,8 +35,9 @@ Covers Acceptance Criteria AC1-AC19:
         ``reports_close`` against the committed goldens still hold.
 - AC17: the reference vocabulary (``INGESTED_MORPHOLOGY_FEATURES``) is
         unaffected; no ``stray_*`` key appears in a morphology-delta output.
-- AC18: ``reference_verse_v1.json`` is byte-untouched (pinned sha256) and
-        still loads/scores a case.
+- AC18: the ``reference_verse_v1.json`` integrity pin and its load-and-score
+        companion have relocated to
+        ``tests/test_128_reference_verse_v1_integrity.py``.
 - AC19: (docstring corrections -- not independently unit-tested; verified by
         code review per the item's Testing Strategy.)
 
@@ -85,7 +86,7 @@ from segfacet.reference import (
 from segfacet.reference.delta import compute_morphology_reference_delta
 from segfacet.reference.ingest import INGESTED_MORPHOLOGY_FEATURES
 from segfacet.synth.corpus import load_manifest
-from segfacet.synth.golden import GOLDEN_DIR, load_golden, write_goldens, reports_close
+from segfacet.synth.golden import build_report_for_case, write_goldens
 from segfacet.synth.regression import loaded_seg_image
 
 
@@ -792,11 +793,12 @@ def test_ac13_reference_derived_excess_finding_matches_frozen_snapshot():
 
 
 def test_ac14_every_golden_components_block_has_four_new_keys():
-    """AC14: every per-label components block in every committed golden
-    carries the four new keys (post-regeneration)."""
+    """AC14 (item 126 replacement): every per-label components block in
+    every freshly built report carries the four new keys. Re-pointed at
+    fresh output -- the committed golden this used to read was retired."""
     manifest = load_manifest()
     for case in manifest["cases"]:
-        golden = load_golden(case["case_id"])
+        golden = build_report_for_case(case)
         per_label = golden.get("features", {}).get("per_label", {})
         assert per_label, f"case {case['case_id']!r} has no per_label entries"
         for label_key, entry in per_label.items():
@@ -816,10 +818,12 @@ def test_ac14_every_golden_components_block_has_four_new_keys():
 
 
 def test_ac14_every_golden_still_validates_against_schema():
+    """AC14 (item 126 replacement): re-pointed at fresh output -- the
+    committed golden this used to read and validate was retired."""
     schema = _report_schema()
     manifest = load_manifest()
     for case in manifest["cases"]:
-        golden = load_golden(case["case_id"])
+        golden = build_report_for_case(case)
         jsonschema.validate(golden, schema)
 
 
@@ -889,7 +893,24 @@ _PRE_098_GOLDEN_VERDICT_AND_FINDINGS = {
             }
         ],
     },
-    "mode4_relabel_swap": {"verdict": "pass", "findings": []},
+    # 2026-08-31 (item 132): the traversal-ordered monotonicity fit now
+    # surfaces the swap through plain run_qc's mislabel Detector B, so this
+    # entry moved from {"verdict": "pass", "findings": []}.
+    "mode4_relabel_swap": {
+        "verdict": "flagged-for-review",
+        "findings": [
+            {
+                "rule_id": "mislabel",
+                "severity": "flagged-for-review",
+                "labels": [21, 22],
+                "reason": (
+                    "Vertebra ordering inconsistent with label: labels 21 "
+                    "(L2) and 22 (L3) are out of expected order along the "
+                    "spine (spline parameter does not advance)."
+                ),
+            }
+        ],
+    },
     "mode5_remove_level": {
         "verdict": "flagged-for-review",
         "findings": [
@@ -971,21 +992,26 @@ def _finding_summary(f, *, include_reason: bool) -> dict:
     "case_id", sorted(_PRE_098_GOLDEN_VERDICT_AND_FINDINGS.keys())
 )
 def test_ac15_golden_verdict_and_findings_unchanged(case_id):
-    """AC15: the regenerated golden's top-level verdict and findings array
-    (length, order, rule_id/severity/labels, and -- except for the one
-    face-name-sensitive case, item 116 -- reason) are identical to the
-    pre-098 committed golden's, for every case except ``mode1_displace`` and
-    ``mode6_crop_at_border`` -- item 120 deliberately fires a ``mislabel``
-    finding through plain ``run_qc`` for both (AC18/AC23), so their entries
-    in ``_PRE_098_GOLDEN_VERDICT_AND_FINDINGS`` above are the post-120
-    values, not the frozen pre-098 ones. For every other case only the
-    features block grew."""
-    golden = load_golden(case_id)
+    """AC15 (item 126 replacement iii): the freshly built report's top-level
+    verdict and findings array (length, order, rule_id/severity/labels, and
+    -- except for the one face-name-sensitive case, item 116 -- reason) are
+    identical to the pre-098 committed golden's, for every case except
+    ``mode1_displace`` and ``mode6_crop_at_border`` -- item 120 deliberately
+    fires a ``mislabel`` finding through plain ``run_qc`` for both
+    (AC18/AC23), so their entries in ``_PRE_098_GOLDEN_VERDICT_AND_FINDINGS``
+    above are the post-120 values, not the frozen pre-098 ones. For every
+    other case only the features block grew. Re-pointed at fresh output
+    (item 126) -- the committed golden this used to read was retired; the
+    ``_PRE_098_GOLDEN_VERDICT_AND_FINDINGS`` constant this compares against
+    is unchanged and still importable by test_102."""
+    manifest = load_manifest()
+    case = next(c for c in manifest["cases"] if c["case_id"] == case_id)
+    fresh = build_report_for_case(case)
     expected = _PRE_098_GOLDEN_VERDICT_AND_FINDINGS[case_id]
-    assert golden["verdict"] == expected["verdict"]
+    assert fresh["verdict"] == expected["verdict"]
 
     include_reason = case_id not in _FACE_NAME_SENSITIVE_CASES
-    got_findings = [_finding_summary(f, include_reason=include_reason) for f in golden["findings"]]
+    got_findings = [_finding_summary(f, include_reason=include_reason) for f in fresh["findings"]]
     expected_findings = [
         _finding_summary(f, include_reason=include_reason) for f in expected["findings"]
     ]
@@ -1011,18 +1037,10 @@ def test_ac16_write_goldens_intra_run_determinism(tmp_path):
         assert (dest1 / name).read_bytes() == (dest2 / name).read_bytes()
 
 
-def test_ac16_write_goldens_matches_committed_within_tolerance(tmp_path):
-    """AC16: reports_close(fresh, committed) is true for each case."""
-    dest = tmp_path / "fresh"
-    write_goldens(dest)
-
-    manifest = load_manifest()
-    for case in manifest["cases"]:
-        fresh = json.loads((dest / f"{case['case_id']}.json").read_text(encoding="utf-8"))
-        committed = json.loads(
-            (GOLDEN_DIR / f"{case['case_id']}.json").read_text(encoding="utf-8")
-        )
-        assert reports_close(fresh, committed), case["case_id"]
+# (item 126: test_ac16_write_goldens_matches_committed_within_tolerance was
+# discharged -- its subject, the committed golden corpus, was retired. Its
+# determinism sibling above, test_ac16_write_goldens_intra_run_determinism,
+# survives and needs no committed file.)
 
 
 # =========================================================================== #
@@ -1068,51 +1086,6 @@ def test_ac17_morphology_delta_output_has_no_stray_keys():
                 f"unexpected stray_* feature in morphology delta output: {fd.feature!r}"
             )
             assert fd.feature in INGESTED_MORPHOLOGY_FEATURES
-
-
-# =========================================================================== #
-# AC18: reference_verse_v1.json is untouched
-# =========================================================================== #
-
-# sha256 of the committed reference_verse_v1.json artifact. Originally pinned
-# pre-098; item 123 (docs/aide/items/123-recalibrate-and-regenerate-
-# downstream-artifacts.md, AC33) rebuilds this artifact from the real VerSe19
-# cohort under the item-120 held-out estimator, so this literal now pins the
-# item-123 rebuilt state -- golden-decision-table.md's signed row for this
-# file is "keep" (not CI-regenerable), so the fence stays; only the digest
-# moves, updated by whoever runs the actual rebuild against the real cohort
-# (this literal cannot be computed without it). tests/test_115_stage26_
-# validation.py::test_ac8_no_hardcoded_literal_fence_remains caps the corpus
-# at exactly one such fence, which is this one.
-_PRE_098_REFERENCE_VERSE_V1_SHA256 = (
-    "2048804f60208a4dea0cbe8d0980e1e6228c68b52b6331375f768254fc73b5da"
-)
-
-
-def test_ac18_reference_verse_v1_bytes_unchanged():
-    """AC18: reference_verse_v1.json is byte-identical to its pre-098
-    state (pinned sha256)."""
-    import hashlib
-
-    path = bundled_production_reference_path()
-    assert path.name == "reference_verse_v1.json"
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    assert digest == _PRE_098_REFERENCE_VERSE_V1_SHA256
-
-
-def test_ac18_reference_verse_v1_still_loads_and_scores_a_case():
-    """AC18: the artifact still loads and scores a case without change."""
-    from segfacet.pipeline import run_qc_with_reference
-
-    manifest = load_manifest()
-    case = next(c for c in manifest["cases"] if c["case_id"] == "mode6_crop_at_border")
-    seg_img = loaded_seg_image(case)
-    reference = bundled_production_reference()
-    case_result, _block, _delta = run_qc_with_reference(
-        seg_img, bundled_default_config(), reference
-    )
-    bounds_findings = [f for f in case_result.findings if f.rule_id == "bounds" and 22 in f.labels]
-    assert len(bounds_findings) >= 1
 
 
 # =========================================================================== #

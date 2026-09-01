@@ -4,7 +4,10 @@
 .gitattributes text eol=lf
 
 tests/corpus/manifest.json text eol=lf
-tests/corpus/golden/*.json text eol=lf
+# The committed corpus-golden snapshot family's eol=lf pin was removed here
+# by item 126, which retired the family (docs/aide/golden-decision-table.md's
+# "## Retirement execution log"); tests/corpus/fixtures/*.nii.gz below is
+# untouched -- the corpus itself survives.
 tests/corpus/fixtures/*.nii.gz binary
 src/segfacet/reference/reference_default.json text eol=lf
 src/segfacet/reference/reference_verse_*.json text eol=lf
@@ -36,6 +39,10 @@ src/segfacet/**/*.yaml text eol=lf
 # (AC19) subject to the same Windows core.autocrlf gotcha as the pins above.
 docs/aide/feature_catalogue.generated.json text eol=lf
 docs/aide/feature_catalogue.generated.md text eol=lf
+
+# Item 134's golden decision table evidence companion -- byte-reproducible,
+# same Windows core.autocrlf gotcha as the pins above.
+docs/aide/golden_evidence.generated.json text eol=lf
 
 # Item 105's golden-file decision table (AC1: must be write_bytes with \n
 # newlines) -- same Windows core.autocrlf gotcha as everything else here.

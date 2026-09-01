@@ -42,9 +42,8 @@ spline-family candidates ``u`` is the chord-length parameterisation SciPy's
 for ``polynomial_per_plane`` -- which fits the lateral and antero-posterior
 offset as low-order polynomials of the *cranio-caudal* (stacking-axis, RAS
 ``S``) coordinate rather than of arc length -- ``u`` is linearly remapped onto
-that coordinate's own training range. One shared coarse-scan-then-refine
-closest-point search (mirroring
-``segfacet.features.spline_offset._find_closest_u``) therefore works
+that coordinate's own training range. The one shared closest-point search,
+``segfacet.features.spline.find_closest_point`` (item 130), therefore works
 unmodified for every candidate.
 
 Usage::
@@ -152,8 +151,8 @@ _DETERMINISM_N_SAMPLES = 100
 #: straight line joining the most cranial and most caudal centroid.
 SCOLIOSIS_THRESHOLD_MM = 8.0
 
-#: Closest-point search coarse-scan resolution (mirrors
-#: segfacet.features.spline_offset._N_SCAN).
+#: Closest-point search coarse-scan resolution, forwarded to
+#: segfacet.features.spline.find_closest_point (item 130).
 _N_SCAN = 500
 
 
@@ -207,31 +206,17 @@ class _PolynomialPlaneCurve:
 
 def _closest_point_distance(evaluate_fn: Callable, point_mm: np.ndarray, n_scan: int = _N_SCAN) -> Tuple[float, float]:
     """Coarse-scan-then-refine closest point on ``evaluate_fn``'s curve to
-    ``point_mm``. Mirrors
-    ``segfacet.features.spline_offset._find_closest_u``, but works against
-    any candidate exposing the shared ``evaluate(u) -> (N, 3)`` interface."""
-    from scipy.optimize import minimize_scalar
+    ``point_mm``. Delegates to the one shared search,
+    ``segfacet.features.spline.find_closest_point`` (item 130), which works
+    against any candidate exposing the shared ``evaluate(u) -> (N, 3)``
+    interface; this script keeps its own tighter ``xatol=1e-7`` (rather than
+    the feature module's default ``1e-6``) so
+    ``docs/spinal-curve-model.md``'s measurements table stays exactly
+    reproducible."""
+    from segfacet.features.spline import find_closest_point
 
-    u_scan = np.linspace(0.0, 1.0, n_scan)
-    pts = evaluate_fn(u_scan)
-    diffs = pts - point_mm
-    sq_dists = np.einsum("ij,ij->i", diffs, diffs)
-    best_idx = int(np.argmin(sq_dists))
-    u_coarse = float(u_scan[best_idx])
-
-    step = 1.0 / (n_scan - 1)
-    lo = max(0.0, u_coarse - step)
-    hi = min(1.0, u_coarse + step)
-    if lo >= hi:
-        return math.sqrt(float(sq_dists[best_idx])), u_coarse
-
-    def _sq(u_scalar: float) -> float:
-        pt = evaluate_fn(np.array([u_scalar]))[0]
-        diff = pt - point_mm
-        return float(np.dot(diff, diff))
-
-    result = minimize_scalar(_sq, bounds=(lo, hi), method="bounded", options={"xatol": 1e-7})
-    return math.sqrt(float(result.fun)), float(np.clip(result.x, 0.0, 1.0))
+    result = find_closest_point(point_mm, evaluate_fn, n_scan=n_scan, xatol=1e-7)
+    return result.distance_mm, result.closest_u
 
 
 # =========================================================================== #

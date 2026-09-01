@@ -88,7 +88,7 @@ from segfacet.reference.schema import (
     ReferenceDistribution,
 )
 from segfacet.synth.corpus import load_manifest
-from segfacet.synth.golden import GOLDEN_DIR, check_case_golden
+from segfacet.synth.golden import build_report_for_case
 from segfacet.synth.regression import loaded_seg_image
 
 _VERSE_V1_LEVELS = (
@@ -790,9 +790,20 @@ def test_ac14_mode6_crop_at_border_fires_bounds_on_label_22_against_verse_v1():
 
 
 def test_ac15_all_committed_goldens_still_check_true():
+    """AC15 (item 126 replacement): fresh output still matches the pinned
+    pre-098 verdict+findings shape for every case that shape covers. The
+    committed golden this used to check fresh output against was retired --
+    see docs/aide/golden-decision-table.md's "## Retirement execution log"."""
+    from test_098_stray_components import _PRE_098_GOLDEN_VERDICT_AND_FINDINGS
+
     manifest = load_manifest()
     for case in manifest["cases"]:
-        assert check_case_golden(case) is True, case["case_id"]
+        case_id = case["case_id"]
+        if case_id not in _PRE_098_GOLDEN_VERDICT_AND_FINDINGS:
+            continue
+        fresh = build_report_for_case(case)
+        expected = _PRE_098_GOLDEN_VERDICT_AND_FINDINGS[case_id]
+        assert fresh["verdict"] == expected["verdict"], case_id
 
 
 def test_ac15_golden_harness_uses_plain_run_qc_no_reference_attached():

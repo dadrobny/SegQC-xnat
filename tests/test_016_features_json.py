@@ -57,7 +57,14 @@ from synthetic import (
     make_labelmap,
 )
 
-GOLDEN_PATH = pathlib.Path(__file__).parent / "golden" / "016_features_report.json"
+#: Shared, feature-value-free format fixture (item 126 replacement iv). The
+#: committed 016-specific snapshot this used to point at was retired --
+#: see docs/aide/golden-decision-table.md's Section 1 "retire" rows and its
+#: "## Retirement execution log" -- because it pinned real extractor output
+#: and so drifted on both a ~1 ULP float change and a feature retune. This
+#: fixture pins only the serialisation *format* (key order, key set, float
+#: rendering); its content is entirely literal (tests/report_format_fixture.py).
+GOLDEN_PATH = pathlib.Path(__file__).parent / "golden" / "report_format_contract.json"
 
 
 # =========================================================================== #
@@ -308,17 +315,54 @@ def test_ac5_overlaps_sorted_by_label_pair():
 
 
 def test_ac5_golden_snapshot():
-    """serialize_report_json for the labelled-blocks fixture equals the committed
-    golden JSON string byte-for-byte."""
-    case = labelled_blocks_case()
-    block, *_ = _features_for_case(case)
-    produced = serialize_report_json(_empty_verdict(), "golden-case", _config(), features=block)
+    """serialize_report_json for the shared, feature-value-free format-contract
+    fixture (item 126 replacement iv) equals the committed golden JSON string
+    byte-for-byte. Deliberately reads no NIfTI fixture and computes no real
+    feature: every value in the fixture is a literal from
+    tests/report_format_fixture.py, so this test pins the report *format*
+    (key order, key set, float rendering), not any feature value."""
+    from report_format_fixture import format_contract_text
+
+    produced = format_contract_text()
 
     golden = GOLDEN_PATH.read_text(encoding="utf-8")
     assert produced == golden, (
         "Golden snapshot drift. If this change is intentional, regenerate "
-        f"{GOLDEN_PATH.name}."
+        f"{GOLDEN_PATH.name} via `.venv/bin/python tests/report_format_fixture.py`."
     )
+
+
+def test_ac9_format_key_order_key_set_and_float_rendering_explicit():
+    """Item 126 AC10: assert, against freshly serialised output, the report's
+    top-level key order, its exact key set, and float rendering -- so a
+    failure here names which of the three moved, rather than only a golden
+    text diff."""
+    from report_format_fixture import format_contract_text
+
+    produced_text = format_contract_text()
+    produced = json.loads(produced_text)
+
+    expected_key_order = [
+        "schema_version",
+        "config_version",
+        "case_id",
+        "verdict",
+        "reasons",
+        "per_label",
+        "features",
+        "findings",
+    ]
+    # Key order.
+    assert list(produced.keys()) == expected_key_order, (
+        f"top-level key order moved: {list(produced.keys())!r}"
+    )
+    # Key set (exact, no more no fewer).
+    assert set(produced.keys()) == set(expected_key_order), (
+        f"top-level key set moved: {set(produced.keys())!r}"
+    )
+    # Float rendering: the fixture's near-zero literal (1e-12) must render in
+    # exponent form in the produced JSON text.
+    assert "1e-12" in produced_text, "near-zero float no longer renders in exponent form"
 
 
 # =========================================================================== #

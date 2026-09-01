@@ -823,7 +823,7 @@ def test_adv_two_harness_runs_yield_equal_to_dict(block_d):
 
 
 # =========================================================================== #
-# AC24: the scope fence -- no production code changed by this item
+# AC24: intra-run non-mutation of src/segfacet/**
 # =========================================================================== #
 
 
@@ -839,16 +839,18 @@ def _src_tree_files():
     return sorted(_SEGFACET_SRC.rglob("*.py")) + sorted(_SEGFACET_SRC.rglob("*.json"))
 
 
-# Snapshotted once at collection time -- this item makes no production-code
-# change, so the tree must be identical before and after this module's own
-# tests run (a builder mistakenly touching src/segfacet/** would flip this).
+# Snapshotted once at collection time -- detects a test run that mutates
+# production source under src/segfacet/**; it cannot say anything about what
+# item 102 itself did or did not change (a builder mistakenly touching
+# src/segfacet/** during this module's own tests would flip this).
 _SRC_TREE_HASH_AT_COLLECTION = _combined_hash(_src_tree_files(), _SEGFACET_SRC)
 
 
 def test_ac24_src_tree_is_byte_identical_across_the_test_run():
-    """AC24: every file under src/segfacet/ is byte-identical to its
-    pre-102 state. This item adds no production code, so the combined hash
-    taken now must equal the one taken at module-collection time."""
+    """AC24: intra-run non-mutation of src/segfacet/** -- every file under
+    src/segfacet/ is byte-identical to the hash taken at module-collection
+    time. This detects a test run that mutates production source; it says
+    nothing about what item 102 itself changed."""
     current_hash = _combined_hash(_src_tree_files(), _SEGFACET_SRC)
     assert current_hash == _SRC_TREE_HASH_AT_COLLECTION
 

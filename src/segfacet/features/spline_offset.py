@@ -3,11 +3,12 @@
 For each vertebra centroid in the ordered sequence, compute its closest-approach
 distance to the parametric spline produced by :func:`segfacet.features.spline.fit_centroid_spline`.
 
-The closest point on the spline is found by:
-1. Coarse scan over N_SCAN=500 uniformly-spaced u values to locate the
-   approximate minimum.
-2. Refinement with ``scipy.optimize.minimize_scalar`` bracketed around the
-   coarse minimum for sub-mm accuracy.
+The closest point on the spline is found by
+:func:`segfacet.features.spline.find_closest_point` (item 130) -- the one
+shared coarse-scan-then-refine search this module used to write out for
+itself: a coarse scan over uniformly-spaced ``u`` values locates the
+approximate minimum, then ``scipy.optimize.minimize_scalar`` refines it,
+bracketed around the coarse minimum, for sub-mm accuracy.
 
 The result is a :class:`VertebralSplineOffset` per centroid capturing the
 Euclidean distance in mm and in voxel units (anisotropic-aware), the raw
@@ -59,9 +60,29 @@ measuring each level against a curve it did not shape:
    itself. Withholding the case's dominant outlier too prevents one broken
    vertebra from bending its neighbours' held-out curves (outlier
    cross-talk).
-3. Below four levels the held-out path falls back to the in-sample
-   measurement: withholding two of four-or-fewer points leaves too few
-   effective points for a refit to mean anything.
+3. Below **five** levels the held-out path falls back to the in-sample
+   measurement (item 129, D5). The floor is five, not four, for a reason
+   specific to this fit: at exactly four points the spline is a **cubic**
+   (``k=3``) with exactly four coefficients, so it **interpolates** all four
+   points **regardless of the weights** -- down-weighting a level to
+   ``_WITHHELD_WEIGHT`` still leaves it, and every other point, exactly on
+   the curve. The "held-out" curve at four points is therefore numerically
+   the in-sample curve (the two agree to ~1e-13 mm on the corpus's one
+   four-level case), and a floor of four silently claimed a held-out
+   measurement it never made.
+
+**Documented limitation: the four-level blind spot.** At exactly four
+levels, an interior level displaced by a full **15 mm** still reads a
+held-out ``offset_mm`` below **0.001 mm** -- both the held-out and in-sample
+paths read essentially zero, so a four-level field of view cannot raise a
+``mislabel`` offset finding under any threshold. Measured 2026-08-31 (item
+129); asserted, not only documented, by
+``tests/test_129_coincident_centroids_and_held_out_floor.py``'s
+four-level-blind-spot tests. Closing this gap needs a change to the fit's
+**degree** at small ``n`` (clamping it below ``n - 1`` so a cubic cannot
+interpolate four points) -- a change to the curve formulation the
+2026-08-27 "Spinal curve model -- the deformity envelope" **human gate**
+approved, and therefore not this module's (or any agent's) call to make.
 
 **Documented limitation.** A displaced *terminal* level on a short spine is
 not reliably separable: withholding a terminal level and the dominant outlier
@@ -132,12 +153,16 @@ from dataclasses import dataclass, replace
 from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
-from scipy.optimize import minimize_scalar
 
 import segfacet.backend as _backend_mod
 from segfacet.backend import Backend
 from segfacet.features.centroids import LabelCentroid
-from segfacet.features.spline import SplineFit, evaluate_spline, fit_centroid_spline
+from segfacet.features.spline import (
+    SplineFit,
+    evaluate_spline,
+    find_closest_point,
+    fit_centroid_spline,
+)
 
 __all__ = [
     "VertebralSplineOffset",
@@ -145,20 +170,20 @@ __all__ = [
     "compute_leave_one_out_spline_offsets",
 ]
 
-# Number of u samples in the coarse scan.  500 gives sub-mm resolution for
-# typical whole-spine extents (~400 mm total arc length).
-_N_SCAN: int = 500
-
 # Weight assigned to a withheld level's own point (and the case's dominant
 # outlier) in a leave-one-out refit (item 120). Small enough to be
 # negligible relative to the uniform 1.0 weight on every other point, but
 # strictly positive -- make_splprep rejects a zero weight.
 _WITHHELD_WEIGHT: float = 1e-6
 
-# Below this many levels, withholding two of them (the level under test plus
-# the dominant outlier) leaves too few effective points for a refit to mean
-# anything -- fall back to the in-sample measurement (item 120, AC7).
-_MIN_LEVELS_FOR_HELD_OUT: int = 4
+# Below this many levels, the held-out refit cannot mean anything -- fall
+# back to the in-sample measurement (item 120, AC7). Five, not four (item
+# 129, D5): at four points the fit is a cubic (k=3) with exactly four
+# coefficients, so it interpolates all four points regardless of the
+# weights -- the "held-out" curve is numerically the in-sample curve. See
+# the module docstring's "Held-out evaluation" step 3 for the full argument
+# and the measured four-level blind spot.
+_MIN_LEVELS_FOR_HELD_OUT: int = 5
 
 
 # --------------------------------------------------------------------------- #
@@ -219,49 +244,6 @@ class VertebralSplineOffset:
 # --------------------------------------------------------------------------- #
 
 
-def _sq_distance(
-    u_scalar: float, pt: np.ndarray, fit: SplineFit, backend: Optional[Backend]
-) -> float:
-    """Squared Euclidean distance from pt to the spline point at parameter u."""
-    spline_pt = evaluate_spline(fit, [float(u_scalar)], backend=backend)  # shape (1, 3)
-    diff = pt - spline_pt[0]
-    return float(np.dot(diff, diff))
-
-
-def _find_closest_u(pt: np.ndarray, fit: SplineFit, backend: Optional[Backend]) -> float:
-    """Return the spline parameter u* in [0, 1] closest to point pt (mm coords).
-
-    Strategy:
-    1. Coarse scan over _N_SCAN equally-spaced u values.
-    2. Refine with ``minimize_scalar`` in a bracket centred on the coarse best.
-    """
-    u_scan = np.linspace(0.0, 1.0, _N_SCAN)
-    spline_pts = evaluate_spline(fit, u_scan, backend=backend)  # (N_SCAN, 3)
-    diffs = spline_pts - pt  # (N_SCAN, 3)
-    sq_dists = np.einsum("ij,ij->i", diffs, diffs)  # (N_SCAN,)
-    best_idx = int(np.argmin(sq_dists))
-    u_coarse = float(u_scan[best_idx])
-
-    # Bracket for refinement: one step each side (clamped to [0, 1]).
-    step = 1.0 / (_N_SCAN - 1)
-    lo = max(0.0, u_coarse - step)
-    hi = min(1.0, u_coarse + step)
-
-    if lo >= hi:
-        # Degenerate bracket (e.g. only 2-point spline at boundary) — skip refinement.
-        return u_coarse
-
-    result = minimize_scalar(
-        _sq_distance,
-        bounds=(lo, hi),
-        args=(pt, fit, backend),
-        method="bounded",
-        options={"xatol": 1e-6},
-    )
-    u_refined = float(np.clip(result.x, 0.0, 1.0))
-    return u_refined
-
-
 # --------------------------------------------------------------------------- #
 # Public compute function
 # --------------------------------------------------------------------------- #
@@ -289,8 +271,8 @@ def compute_spline_offsets(
         offset_voxel == offset_mm).
     backend:
         Optional :class:`~segfacet.backend.Backend` handle, forwarded to
-        :func:`~segfacet.features.spline.evaluate_spline`. When ``None`` (the
-        default), resolved via :func:`segfacet.backend.get_backend`; the
+        :func:`~segfacet.features.spline.find_closest_point`. When ``None``
+        (the default), resolved via :func:`segfacet.backend.get_backend`; the
         optimisation itself always runs on host NumPy/SciPy regardless (see
         the module docstring's "Deliberate CPU fallback" section).
 
@@ -322,6 +304,15 @@ def compute_spline_offsets(
     records: List[VertebralSplineOffset] = []
     n_points = len(centroids)
 
+    # Route the curve evaluation `find_closest_point` performs through this
+    # module's own `evaluate_spline` name (rather than handing it the
+    # `SplineFit` directly) so that name stays the observable seam for
+    # backend forwarding -- item 072, AC10 patches this module's
+    # `evaluate_spline` attribute and asserts it is both called and handed
+    # `backend`.
+    def _evaluate(u_values):
+        return evaluate_spline(fit, u_values, backend=backend)
+
     for idx, c in enumerate(centroids):
         is_terminal = n_points <= 2 or idx == 0 or idx == n_points - 1
 
@@ -330,10 +321,11 @@ def compute_spline_offsets(
             dtype=np.float64,
         )
 
-        u_star = _find_closest_u(pt, fit, backend)
+        closest = find_closest_point(pt, _evaluate, backend=backend)
+        u_star = closest.closest_u
 
         # Displacement vector: centroid - closest spline point.
-        spline_pt = evaluate_spline(fit, [u_star], backend=backend)[0]  # shape (3,)
+        spline_pt = np.asarray(closest.point_mm, dtype=np.float64)  # shape (3,)
         diff = pt - spline_pt  # (dx_mm, dy_mm, dz_mm)
 
         dx_mm = float(diff[0])
@@ -374,6 +366,7 @@ def compute_leave_one_out_spline_offsets(
     centroids: Sequence[LabelCentroid],
     spacing_mm: Optional[Tuple[float, float, float]] = None,
     *,
+    fit: Optional[SplineFit] = None,
     backend: Optional[Backend] = None,
 ) -> List[VertebralSplineOffset]:
     """Compute each centroid's offset from a spline it did not shape.
@@ -395,6 +388,21 @@ def compute_leave_one_out_spline_offsets(
     spacing_mm:
         Voxel spacings (sx, sy, sz) in mm, forwarded to
         :func:`compute_spline_offsets` for the ``offset_voxel`` conversion.
+    fit:
+        Optional externally-supplied in-sample :class:`SplineFit` to use as
+        the reference fit (item 130), sparing a caller that already fit the
+        same curve (``pipeline.extract_feature_record``, for curvature /
+        tangent orientations / monotonic consistency) a second, redundant
+        fit. When supplied, this function makes **no** ``fit_centroid_spline``
+        call of its own for the reference fit -- the per-level held-out
+        refits are unaffected and still happen here. The caller is
+        responsible for supplying the in-sample fit through *these exact*
+        centroids, fit at this module's own defaults (chord-length ``u``,
+        uniform weights, default degree/smoothing) -- ``fit`` is validated
+        only on centroid count (below), not on geometry: re-deriving it to
+        verify would reinstate the second fit this parameter exists to
+        remove. ``None`` (the default) reproduces today's behaviour: fit
+        internally.
     backend:
         Optional :class:`~segfacet.backend.Backend` handle, forwarded to the
         fit/evaluate calls this function makes. The refits themselves always
@@ -412,11 +420,22 @@ def compute_leave_one_out_spline_offsets(
     ValueError
         Propagated from :func:`~segfacet.features.spline.fit_centroid_spline`
         or :func:`compute_spline_offsets` (e.g. fewer than 2 centroids, or
-        two centroids sharing an exactly-coincident mm-coordinate).
+        two centroids sharing an exactly-coincident mm-coordinate). Also
+        raised when *fit* is supplied and its ``n_points`` does not equal
+        ``len(centroids)``, naming both counts -- checked before any other
+        validation, including the single-centroid early return below.
     """
     backend = backend or _backend_mod.get_backend()
 
     n_points = len(centroids)
+
+    if fit is not None and fit.n_points != n_points:
+        raise ValueError(
+            f"compute_leave_one_out_spline_offsets received a fit with "
+            f"n_points={fit.n_points}, but centroids has length {n_points}. "
+            f"The supplied fit must be the in-sample fit through exactly "
+            f"these centroids."
+        )
 
     if n_points == 1:
         # No curve can be fit through a single point (fit_centroid_spline
@@ -441,7 +460,7 @@ def compute_leave_one_out_spline_offsets(
             )
         ]
 
-    reference_fit = fit_centroid_spline(centroids, backend=backend)
+    reference_fit = fit if fit is not None else fit_centroid_spline(centroids, backend=backend)
 
     if n_points < _MIN_LEVELS_FOR_HELD_OUT:
         return compute_spline_offsets(

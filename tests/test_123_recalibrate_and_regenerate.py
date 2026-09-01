@@ -96,10 +96,8 @@ from segfacet.pipeline import extract_feature_record
 from segfacet.synth.clean_gt import build_clean_spine
 from segfacet.synth.corpus import load_manifest
 from segfacet.synth.golden import (
-    GOLDEN_DIR,
-    check_case_golden,
-    load_golden,
-    reports_close,
+    assert_matches_committed_artifact,
+    build_report_for_case,
     write_goldens,
 )
 from segfacet.synth.intensity import paint_clean_scan
@@ -251,7 +249,8 @@ def _distribution(levels: dict) -> ReferenceDistribution:
 #: item 123's first commit (``4a2ae50``, "docs(123): work item spec ..."),
 #: i.e. ``51d8e41``'s "progress(aide): item 121 -> done" -- the state
 #: carrying items 119-122 and nothing of 123. Verified to lack
-#: ``is_terminal`` anywhere in ``tests/corpus/golden/clean_control.json``.
+#: ``is_terminal`` anywhere in the committed ``clean_control`` corpus-golden
+#: snapshot (retired by item 126).
 #:
 #: Pinned as a literal SHA, deliberately NOT a live
 #: ``git merge-base HEAD aide/queue-017``: that live form self-invalidates
@@ -772,10 +771,18 @@ def test_ac15_clean_control_fires_nothing_verdict_pass():
     assert pipeline_verdict_label(case) == "pass"
 
 
-def test_ac15_mode4_relabel_swap_fires_no_mislabel_finding():
+def test_ac15_mode4_relabel_swap_fires_no_offset_misalignment_finding():
+    """Narrowed 2026-08-31 (item 132): mode 4's swap now fires MislabelRule's
+    ORDERING detector (Detector B, "Vertebra ordering inconsistent with
+    label:") through plain run_qc, so the finding list is no longer empty --
+    but Detector A's offset-MISALIGNMENT reason never fires on this case,
+    which is what this recalibration test preserves."""
     case = _corpus_case("mode4_relabel_swap")
     findings = [f for f in pipeline_findings(case) if f.rule_id == "mislabel"]
-    assert findings == []
+    assert not any(
+        f.reason.startswith("Vertebra misaligned from spinal curve:")
+        for f in findings
+    )
 
 
 # =========================================================================== #
@@ -935,8 +942,7 @@ def test_ac21_reference_default_matches_fresh_build_within_tolerance(tmp_path):
     dest = tmp_path / "reference_default.json"
     build_and_write_default(dest)
     fresh = json.loads(dest.read_text(encoding="utf-8"))
-    committed = json.loads(default_artifact_path().read_text(encoding="utf-8"))
-    assert reports_close(fresh, committed)
+    assert_matches_committed_artifact(fresh, default_artifact_path())
 
 
 def test_ac21_two_fresh_builds_are_byte_identical(tmp_path):
@@ -963,11 +969,9 @@ def test_ac22_default_artifact_keeps_synthetic_role():
 # =========================================================================== #
 
 
-def test_ac23_every_manifest_case_matches_committed_golden():
-    manifest = load_manifest()
-    assert len(manifest["cases"]) == 9
-    for case in manifest["cases"]:
-        assert check_case_golden(case), f"{case['case_id']} does not match its committed golden"
+# (item 126: test_ac23_every_manifest_case_matches_committed_golden was
+# discharged -- its subject, the committed golden corpus, was retired. See
+# docs/aide/golden-decision-table.md's "## Retirement execution log".)
 
 
 def test_ac24_write_goldens_into_two_dirs_is_byte_identical(tmp_path):
@@ -995,99 +999,13 @@ def _all_offset_entries(golden: dict) -> list:
     return golden.get("features", {}).get("stage3", {}).get("per_label_offsets", [])
 
 
-def test_ac25_seven_non_mislabel_goldens_gain_only_is_terminal():
-    base_rev = _pre_123_base_rev()
-    manifest = load_manifest()
-    unaffected = [c for c in manifest["cases"] if c["case_id"] not in _THRESHOLD_CARRYING_CASES]
-    assert len(unaffected) == 7
-
-    if base_rev is not None:
-        checked_any = False
-        for case in unaffected:
-            case_id = case["case_id"]
-            pre = _git_show_json(base_rev, f"tests/corpus/golden/{case_id}.json")
-            if pre is None:
-                continue
-            checked_any = True
-            committed = load_golden(case_id)
-            diffs = _diff_leaves(pre, committed)
-            assert diffs, f"{case_id}: expected the added is_terminal booleans to be visible as diffs"
-            for path, _old, new in diffs:
-                assert path.endswith(".is_terminal"), (
-                    f"{case_id}: unexpected changed leaf {path!r} outside is_terminal"
-                )
-                assert isinstance(new, bool)
-        if checked_any:
-            return
-
-    # Fallback (git unavailable to the test runner): every offset entry
-    # carries a boolean is_terminal, exactly the first/last are True, and no
-    # non-threshold-carrying case's text carries the threshold clause.
-    for case in unaffected:
-        golden = load_golden(case["case_id"])
-        entries = _all_offset_entries(golden)
-        if not entries:
-            continue
-        for entry in entries:
-            assert isinstance(entry.get("is_terminal"), bool)
-        assert entries[0]["is_terminal"] is True
-        assert entries[-1]["is_terminal"] is True
-        for entry in entries[1:-1]:
-            assert entry["is_terminal"] is False
-        text = (GOLDEN_DIR / f"{case['case_id']}.json").read_text(encoding="utf-8")
-        assert "(threshold" not in text
-
-
-def test_ac26_two_changed_goldens_move_only_is_terminal_and_the_threshold_clause():
-    from segfacet.heuristics.mislabel import _DEFAULT_MAX_OFFSET_MM
-
-    base_rev = _pre_123_base_rev()
-    if base_rev is not None:
-        checked_any = False
-        for case_id in sorted(_THRESHOLD_CARRYING_CASES):
-            pre = _git_show_json(base_rev, f"tests/corpus/golden/{case_id}.json")
-            if pre is None:
-                continue
-            checked_any = True
-            committed = load_golden(case_id)
-            diffs = _diff_leaves(pre, committed)
-            assert diffs, f"{case_id}: expected is_terminal + the recalibrated threshold to move"
-            old_threshold_clause = "(threshold 15.0 mm)"
-            new_threshold_clause = f"(threshold {_DEFAULT_MAX_OFFSET_MM:.1f} mm)"
-            saw_threshold_diff = False
-            for path, old_value, new_value in diffs:
-                if path.endswith(".is_terminal"):
-                    assert isinstance(new_value, bool)
-                    continue
-                assert path.endswith(".reason") or path.endswith(".message"), (
-                    f"{case_id}: unexpected changed leaf {path!r} outside is_terminal/threshold"
-                )
-                assert old_threshold_clause in old_value
-                assert old_value.replace(old_threshold_clause, new_threshold_clause) == new_value
-                saw_threshold_diff = True
-            assert saw_threshold_diff, f"{case_id}: expected the threshold clause to have moved"
-        if checked_any:
-            return
-
-    # Fallback: every offset entry carries is_terminal (first/last True); only
-    # the two named cases carry "(threshold", naming the current default.
-    manifest = load_manifest()
-    for case in manifest["cases"]:
-        case_id = case["case_id"]
-        golden = load_golden(case_id)
-        entries = _all_offset_entries(golden)
-        for entry in entries:
-            assert isinstance(entry.get("is_terminal"), bool)
-        if entries:
-            assert entries[0]["is_terminal"] is True
-            assert entries[-1]["is_terminal"] is True
-
-        text = (GOLDEN_DIR / f"{case_id}.json").read_text(encoding="utf-8")
-        if case_id in _THRESHOLD_CARRYING_CASES:
-            assert "(threshold" in text
-            assert f"(threshold {_DEFAULT_MAX_OFFSET_MM:.1f} mm)" in text
-        else:
-            assert "(threshold" not in text
+# (item 126: test_ac25_seven_non_mislabel_goldens_gain_only_is_terminal and
+# test_ac26_two_changed_goldens_move_only_is_terminal_and_the_threshold_clause
+# were discharged -- both were pre/post-123 fences comparing the committed
+# golden corpus's state before and after item 123 landed; item 123 has
+# already landed, and the committed golden corpus both fences read (via
+# git history and/or the live tree) was retired by this item. See
+# docs/aide/golden-decision-table.md's "## Retirement execution log".)
 
 
 # =========================================================================== #
@@ -1096,26 +1014,14 @@ def test_ac26_two_changed_goldens_move_only_is_terminal_and_the_threshold_clause
 # =========================================================================== #
 
 
-def test_ac27_stage3_report_golden_matches_test_022_output():
-    import test_022_stage3_serialisation as t022
-
-    centroids = t022._straight_spine(5)
-    block = t022._full_block_for_spine(centroids)
-    produced = t022.serialize_report_json(
-        t022._empty_verdict(), "golden-case-022", t022._config(), features=block
-    )
-    committed = t022.GOLDEN_PATH.read_text(encoding="utf-8")
-    assert produced == committed
-
-
-def test_ac27_stage3_report_golden_offset_entries_carry_is_terminal():
-    import test_022_stage3_serialisation as t022
-
-    committed = json.loads(t022.GOLDEN_PATH.read_text(encoding="utf-8"))
-    entries = committed.get("features", {}).get("stage3", {}).get("per_label_offsets", [])
-    assert entries, "expected at least one per_label_offsets entry in the Stage-3 golden"
-    for entry in entries:
-        assert isinstance(entry.get("is_terminal"), bool)
+# (item 126: test_ac27_stage3_report_golden_matches_test_022_output and
+# test_ac27_stage3_report_golden_offset_entries_carry_is_terminal were
+# discharged -- both compared their own _straight_spine(5)-derived content
+# against t022.GOLDEN_PATH, which now names the shared, feature-value-free
+# tests/golden/report_format_contract.json (item 126 replacement iv),
+# content unrelated to either test's input. See
+# docs/aide/golden-decision-table.md's "## Retirement execution log" and
+# this item's Decisions & Trade-offs log.)
 
 
 # =========================================================================== #
@@ -1137,19 +1043,25 @@ def test_ac28_pinned_snapshot_reasons_name_the_current_threshold():
 
 
 def test_ac28_pinned_snapshot_reasons_equal_committed_golden_reasons():
+    """AC28 (item 126 replacement): re-pointed at fresh output; the
+    committed golden this used to read was retired, see
+    docs/aide/golden-decision-table.md's "## Retirement execution log"."""
     from test_098_stray_components import _PRE_098_GOLDEN_VERDICT_AND_FINDINGS
 
+    manifest = load_manifest()
+    cases_by_id = {c["case_id"]: c for c in manifest["cases"]}
+
     mode1_expected = _PRE_098_GOLDEN_VERDICT_AND_FINDINGS["mode1_displace"]["findings"][0]["reason"]
-    mode1_golden = load_golden("mode1_displace")
-    mode1_actual = next(f["reason"] for f in mode1_golden["findings"] if f["rule_id"] == "mislabel")
+    mode1_report = build_report_for_case(cases_by_id["mode1_displace"])
+    mode1_actual = next(f["reason"] for f in mode1_report["findings"] if f["rule_id"] == "mislabel")
     assert mode1_actual == mode1_expected
 
     mode6_expected = next(
         f["reason"] for f in _PRE_098_GOLDEN_VERDICT_AND_FINDINGS["mode6_crop_at_border"]["findings"]
         if f["rule_id"] == "mislabel"
     )
-    mode6_golden = load_golden("mode6_crop_at_border")
-    mode6_actual = next(f["reason"] for f in mode6_golden["findings"] if f["rule_id"] == "mislabel")
+    mode6_report = build_report_for_case(cases_by_id["mode6_crop_at_border"])
+    mode6_actual = next(f["reason"] for f in mode6_report["findings"] if f["rule_id"] == "mislabel")
     assert mode6_actual == mode6_expected
 
 
@@ -1201,11 +1113,13 @@ def test_ac32_reference_build_doc_records_the_rebuild():
 # =========================================================================== #
 
 
-def test_ac33_test098_digest_fence_matches_committed_file():
-    from test_098_stray_components import _PRE_098_REFERENCE_VERSE_V1_SHA256
+def test_ac33_reference_verse_v1_digest_fence_matches_committed_file():
+    from test_128_reference_verse_v1_integrity import (
+        _RELEASED_REFERENCE_VERSE_V1_SHA256,
+    )
 
     digest = hashlib.sha256(bundled_production_reference_path().read_bytes()).hexdigest()
-    assert digest == _PRE_098_REFERENCE_VERSE_V1_SHA256
+    assert digest == _RELEASED_REFERENCE_VERSE_V1_SHA256
 
 
 def test_ac34_retired_test_names_absent_from_test_120_source():
@@ -1507,13 +1421,16 @@ def test_ac44_default_max_offset_mm_is_thirteen():
 
 
 def _interior_offset_ceiling_over_corpus(exclude_case_ids=frozenset()):
+    """Item 126 re-pointed this helper at fresh output; the committed golden
+    it used to read was retired, see docs/aide/golden-decision-table.md's
+    "## Retirement execution log"."""
     manifest = load_manifest()
     ceiling = 0.0
     for case in manifest["cases"]:
         if case["case_id"] in exclude_case_ids:
             continue
-        golden = load_golden(case["case_id"])
-        entries = _all_offset_entries(golden)
+        report = build_report_for_case(case)
+        entries = _all_offset_entries(report)
         for entry in entries[1:-1] if len(entries) > 2 else []:
             ceiling = max(ceiling, entry["offset_mm"])
     return ceiling

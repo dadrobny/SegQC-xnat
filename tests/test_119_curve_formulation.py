@@ -71,7 +71,7 @@ from segfacet.features.spline import SplineFit, evaluate_spline, fit_centroid_sp
 from segfacet.features.spline_offset import compute_spline_offsets
 from segfacet.synth.clean_gt import build_clean_spine
 from segfacet.synth.corpus import load_manifest
-from segfacet.synth.golden import GOLDEN_DIR, check_case_golden, load_golden, write_goldens
+from segfacet.synth.golden import write_goldens
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -588,13 +588,10 @@ def test_ac17_near_coincident_centroids_still_fit():
 
 # =========================================================================== #
 # AC18: The nine corpus goldens are regenerated and agree with a fresh build
+# (item 126: test_ac18_every_manifest_case_matches_committed_golden was
+# discharged -- its subject, the committed golden corpus, was retired. See
+# docs/aide/golden-decision-table.md's "## Retirement execution log".)
 # =========================================================================== #
-
-
-def test_ac18_every_manifest_case_matches_committed_golden():
-    manifest = load_manifest()
-    for case in manifest["cases"]:
-        assert check_case_golden(case), f"{case['case_id']} does not match its committed golden"
 
 
 def test_ac18_write_goldens_into_two_dirs_is_byte_identical(tmp_path):
@@ -617,16 +614,16 @@ def test_ac18_write_goldens_into_two_dirs_is_byte_identical(tmp_path):
 # =========================================================================== #
 
 
-def test_ac19_stage3_report_golden_matches_test_022_output():
-    import test_022_stage3_serialisation as t022
-
-    centroids = t022._straight_spine(5)
-    block = t022._full_block_for_spine(centroids)
-    produced = t022.serialize_report_json(
-        t022._empty_verdict(), "golden-case-022", t022._config(), features=block
-    )
-    committed = t022.GOLDEN_PATH.read_text(encoding="utf-8")
-    assert produced == committed
+# (item 126: test_ac19_stage3_report_golden_matches_test_022_output was
+# discharged -- it duplicated test_022_stage3_serialisation.py's own golden
+# comparison against a *different* fixture from a *different* fitted spine,
+# comparing the two only by coincidentally sharing a GOLDEN_PATH attribute
+# name; test_022's own committed 022_stage3_report.json snapshot this used
+# to piggyback on was retired and replaced with the shared, feature-value-
+# free tests/golden/report_format_contract.json (item 126 replacement iv),
+# which is unrelated to this test's _straight_spine(5)-derived content. See
+# docs/aide/golden-decision-table.md's "## Retirement execution log" and
+# this item's Decisions & Trade-offs log.)
 
 
 # =========================================================================== #
@@ -648,41 +645,10 @@ def test_ac19_stage3_report_golden_matches_test_022_output():
 #: Authorised paths (widened by human decision, 2026-08-28).
 
 
-def _leaf_paths(node, prefix=()):
-    """Yield dotted-tuple paths to every scalar/list leaf in a nested dict."""
-    if isinstance(node, dict):
-        for key, value in node.items():
-            yield from _leaf_paths(value, prefix + (key,))
-    else:
-        yield prefix
-
-
-def test_ac20_diff_against_committed_goldens_stays_under_stage3(tmp_path):
-    """Every changed JSON leaf between a fresh regeneration and the committed
-    goldens lies under features.stage3."""
-    fresh_dir = tmp_path / "fresh"
-    write_goldens(fresh_dir)
-
-    for case_path in GOLDEN_DIR.glob("*.json"):
-        case_id = case_path.stem
-        committed = json.loads(case_path.read_text(encoding="utf-8"))
-        fresh = json.loads((fresh_dir / case_path.name).read_text(encoding="utf-8"))
-
-        committed_leaves = set(_leaf_paths(committed))
-        fresh_leaves = set(_leaf_paths(fresh))
-        assert committed_leaves == fresh_leaves, f"{case_id}: leaf-path set changed"
-
-        for path in committed_leaves:
-            node_committed = committed
-            node_fresh = fresh
-            for key in path:
-                node_committed = node_committed[key]
-                node_fresh = node_fresh[key]
-            if node_committed != node_fresh:
-                assert "stage3" in path, (
-                    f"{case_id}: change outside features.stage3 at {'.'.join(path)}: "
-                    f"{node_committed!r} -> {node_fresh!r}"
-                )
+# (item 126: test_ac20_diff_against_committed_goldens_stays_under_stage3 was
+# discharged -- it would iterate an empty glob over the retired corpus-golden
+# snapshot directory. See docs/aide/golden-decision-table.md's
+# "## Retirement execution log".)
 
 
 # =========================================================================== #
@@ -729,7 +695,7 @@ def test_ac23_scipy_floor_raised_other_bounds_unchanged():
         '"nibabel>=4.0"',
         '"PyYAML>=5.4"',
         '"jsonschema>=3.2"',
-        '"tptbox==0.7.5"',
+        '"tptbox==0.7.6"',
     ):
         assert other in text, f"unexpected change to dependency bound: {other!r} missing"
 
