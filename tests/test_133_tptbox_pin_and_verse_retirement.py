@@ -133,6 +133,20 @@ _PRE_ITEM_OTHER_CONSTRAINTS_PINS = {
     "urllib3": "2.7.0",
 }
 
+#: Pins deliberately ADDED to constraints.txt after item 133, each named here
+#: with the change that added it. AC2's guarantee is "no pin item 133 did not
+#: intend to touch moves", not "the file never grows again": every pre-item
+#: pin above must still hold at its recorded version, and any pin that is
+#: neither recorded above nor listed here still fails the comparison.
+_POST_ITEM_ADDED_CONSTRAINTS_PINS = {
+    # The CI test runner. Every `python -m pytest` step in ci.yml runs `-n 4`
+    # as of 2026-09-01 (branch ci/xdist-and-pip-cache), and the `test` job
+    # installs `-e .[dev] -c constraints.txt`, so the runner is pinned with
+    # the rest. Not part of the Docker image's runtime graph -- a constraint
+    # pins a version, it never pulls a package in.
+    "pytest-xdist": "3.8.0",
+}
+
 
 # --------------------------------------------------------------------------- #
 # Shared helpers
@@ -258,7 +272,10 @@ def test_ac2_constraints_tptbox_pin_moved():
 def test_ac2_constraints_other_pins_unchanged():
     pins = _constraints_pins()
     other_pins = {name: version for name, version in pins.items() if name != "tptbox"}
-    assert other_pins == _PRE_ITEM_OTHER_CONSTRAINTS_PINS
+    assert other_pins == {
+        **_PRE_ITEM_OTHER_CONSTRAINTS_PINS,
+        **_POST_ITEM_ADDED_CONSTRAINTS_PINS,
+    }
 
 
 # =========================================================================== #

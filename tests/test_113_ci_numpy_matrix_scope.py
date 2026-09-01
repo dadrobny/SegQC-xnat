@@ -69,16 +69,21 @@ REPRESENTATIVE_NUMPY_MODULES = (
     "tests/test_010_pipeline.py",
 )
 
-# AC5/AC6 pinned expected forms (normalized -- see _normalize_run).
+# AC5/AC6 pinned expected forms (normalized -- see _normalize_run). The
+# `-n 4` in the two pytest invocations is pytest-xdist, added to every CI
+# pytest step on 2026-09-01 to cut the workflow's wall clock (windows-latest
+# was the critical path at 21.0 min); it changes how the same selection is
+# scheduled, never what is selected, so AC5/AC6 keep pinning the commands and
+# AC7 keeps comparing the same collected node IDs.
 EXPECTED_TEST_INSTALL_RUN = "pip install -e .[dev] -c constraints.txt"
-EXPECTED_TEST_TEST_RUN = "python -m pytest"
+EXPECTED_TEST_TEST_RUN = "python -m pytest -n 4"
 EXPECTED_TEST_MATRIX_OS = ["ubuntu-latest", "windows-latest"]
 EXPECTED_VG_INSTALL_BASE_RUN = "pip install -e .[dev]"
 EXPECTED_VG_INSTALL_VERSIONEER_RUN = "pip install versioneer"
 EXPECTED_VG_INSTALL_PYRADIOMICS_RUN = 'pip install --no-build-isolation "pyradiomics>=3.0"'
 EXPECTED_VG_DOCKER_VERSION_RUN = "docker version"
 EXPECTED_VG_RUN_GATED_RUN = (
-    "python -m pytest -v --junitxml=gated-results.xml "
+    "python -m pytest -n 4 -v --junitxml=gated-results.xml "
     "tests/test_features_radiomics.py "
     "tests/test_066_dockerfile.py "
     "tests/test_069_container_smoke.py "
@@ -126,14 +131,36 @@ def _extract_flag_values(cmd: str, flag: str) -> list[str]:
 def _extra_pytest_args(run_cmd: str) -> list[str]:
     """Strip the ``python -m pytest`` prefix off the Test step's command and
     return the remaining arguments, tokenized -- these are appended to a
-    local ``--collect-only`` invocation for AC7."""
+    local ``--collect-only`` invocation for AC7.
+
+    ``-n``/``--numprocesses`` is dropped: it selects how many xdist workers
+    execute the run, never which node IDs are collected, and AC7's two
+    ``--collect-only`` subprocesses must differ *only* in the job's
+    selection expression. Leaving it in would also make the scoped
+    collection listing come back from workers while the baseline came from
+    the controller -- a difference in the comparison that has nothing to do
+    with what this module is testing.
+    """
     normalized = _normalize_run(run_cmd)
     match = re.match(r"^python3?\s+-m\s+pytest\b(.*)$", normalized)
     assert match, (
         "test-numpy-majors Test step is expected to be a 'python -m pytest "
         f"...' invocation; got {run_cmd!r}"
     )
-    return shlex.split(match.group(1))
+    args = shlex.split(match.group(1))
+    kept: list[str] = []
+    skip_next = False
+    for arg in args:
+        if skip_next:
+            skip_next = False
+            continue
+        if arg in ("-n", "--numprocesses"):
+            skip_next = True
+            continue
+        if arg.startswith("-n") or arg.startswith("--numprocesses="):
+            continue
+        kept.append(arg)
+    return kept
 
 
 def _job_comment_and_body(ci_text: str, job_name: str) -> str:
