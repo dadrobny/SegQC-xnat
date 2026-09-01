@@ -1511,3 +1511,24 @@ defect carries a regression test that fails before the fix (**G7**).
   pattern broke `test_134` on `windows-latest` (PR #58) the first time a capture carried an
   em dash. `tests/run_process.py::run_utf8` is the drop-in replacement. Candidate item:
   convert all nine in one mechanical sweep, closing the class in the suite.
+- **Shorten CI wall-clock — the `windows-latest` leg is the critical path at 21 min**
+  *(2026-09-01 feedback loop)*. Measured on the last green run of queue-018 (PR #58,
+  run 33483503854): `test (windows-latest)` 21.0 min, `test (ubuntu-latest)` 13.7 min,
+  `test (numpy 1.26.4)` 13.2 min, `test (numpy 2.0.2)` 10.0 min, gated 1.5 min, scope
+  check 4 s — five near-full suite runs per PR, the slowest gating the whole run. Two
+  measured facts point at the fix: (i) the suite is **parallel-safe** — `pytest -n 4`
+  (pytest-xdist, four workers, the vCPU count of a GitHub-hosted runner) passed 6690/6690
+  locally in **4 m 51 s against 15 m 00 s serial** on 2026-09-01, so adding `pytest-xdist`
+  to `[project.optional-dependencies] dev` and `-n 4` to every `python -m pytest` step in
+  `.github/workflows/ci.yml` should bring ubuntu to ~5 min and windows to ~8 min with no
+  coverage change; (ii) four tests dominate the serial tail and set the parallel floor —
+  `test_128_relocation_checks.py::test_ac13_test115_fence_cap_still_passes_and_points_at_new_module`
+  (103 s), `test_057_evaluate_cli.py::test_ac5_calibrate_writes_config_and_calibration_block`
+  (76 s), and `test_115_stage26_validation.py`'s two `test_ac8_*` AST sweeps (~50 s each) —
+  ~4.7 min of serial time, and the 103 s test alone caps what `-n 4` can reach. Also worth
+  taking: `actions/setup-python`'s `cache: pip` (five installs per run). aide-loop's own
+  Windows work (issue #74, branch `ci/74-windows-defender-and-shards`) measured that the
+  runner image already ships Defender real-time scanning off, so the Windows cost is
+  per-subprocess spawn overhead (~55–70 ms each), not scanning — sharding the Windows leg
+  into parallel jobs is the fallback if xdist proves flaky there, not a first move.
+  Candidate item: xdist + pip cache in one workflow PR, then profile the four outliers.
