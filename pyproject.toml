@@ -42,6 +42,13 @@ dynamic = ["version"]
 [project.optional-dependencies]
 dev = [
     "pytest>=7",
+    # Parallel test execution. The suite is parallel-safe (no shared mutable
+    # state between tests; every fixture writes under its own tmp_path), and
+    # every `python -m pytest` step in .github/workflows/ci.yml passes `-n 4`
+    # -- measured 2026-09-01: 6690 passed in 4m51s under `-n 4` against
+    # 15m00s serial. A lower bound here, exact-pinned in constraints.txt for
+    # the CI installs that pass `-c constraints.txt`.
+    "pytest-xdist>=3",
     "matplotlib>=3.5",
 ]
 # Optional Stage-8 extra (item 060): PyRadiomics (GLCM + shape features) behind

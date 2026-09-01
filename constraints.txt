@@ -11,7 +11,9 @@
 # pulled in by the `dev` extra (pytest and its own transitives) are excluded,
 # as is the optional `radiomics` extra (pyradiomics and its own transitives)
 # — see AC5/AC7. matplotlib, previously dev-only, is now also a direct
-# transitive of TPTBox (item 094) and so is included below.
+# transitive of TPTBox (item 094) and so is included below. The one
+# deliberate exception to the dev-extra rule is the CI test-runner pin at the
+# end of this file; see the comment there.
 #
 # Consumed by the Dockerfile via: pip install -c constraints.txt .
 #
@@ -65,3 +67,13 @@ tifffile==2026.3.3
 tqdm==4.69.1
 typing_extensions==4.16.0
 urllib3==2.7.0
+
+# --- CI test-runner pin (not part of the image's runtime graph) ---
+# pytest-xdist is a `dev`-extra package and so is NOT installed by the
+# Dockerfile's `pip install -c constraints.txt .` (a constraint pins a
+# version, it never pulls a package in) — the image's runtime graph above is
+# unchanged. It is pinned here because `.github/workflows/ci.yml`'s `test`
+# job installs `-e .[dev] -c constraints.txt` and every `python -m pytest`
+# step now runs `-n 4`: an unpinned runner would let a future xdist release
+# change how the suite is scheduled without a commit here saying so.
+pytest-xdist==3.8.0

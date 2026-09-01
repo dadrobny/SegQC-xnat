@@ -110,6 +110,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          # Restore pip's HTTP/wheel cache between runs, keyed on the files
+          # below. Five near-full installs of the same pinned scientific stack
+          # happen per PR; without this each one re-downloads every wheel.
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            constraints.txt
       - name: Install
         # Installed via constraints.txt (the Stage-9 Docker lockfile, item
         # 066), not pyproject.toml's loose lower bounds -- per item 001's own
@@ -124,7 +131,12 @@ jobs:
         # likewise install via `-c constraints.txt`.
         run: pip install -e .[dev] -c constraints.txt
       - name: Test
-        run: python -m pytest
+        # -n 4 (pytest-xdist): the suite is parallel-safe and a GitHub-hosted
+        # runner has 4 vCPUs, so the worker count is pinned to that rather
+        # than left to `-n auto`. Measured locally 2026-09-01: 6690 passed in
+        # 4m51s against 15m00s serial. windows-latest was the critical path of
+        # the whole workflow at 21.0 min (run 33483503854).
+        run: python -m pytest -n 4
 
   # Item 095: numpy-major agnosticism check. pyproject.toml declares a numpy
   # *range* (`numpy>=1.26,<3`), not a pin, specifically so the identical
@@ -173,6 +185,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install
         run: pip install -e .[dev]
       - name: Pin numpy leg
@@ -185,7 +199,7 @@ jobs:
         # module is numpy-sensitive builtin-backend coverage that must stay
         # collected.
         run: |
-          python -m pytest \
+          python -m pytest -n 4 \
             --ignore=tests/test_066_dockerfile.py \
             --ignore=tests/test_069_container_smoke.py \
             --ignore=tests/test_070_acceptance_stage9.py \
@@ -206,6 +220,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
       - name: Install base project (numpy etc. first)
         run: pip install -e .[dev]
       - name: Install pyradiomics's undeclared build-time dependencies
@@ -224,7 +240,7 @@ jobs:
         run: docker version
       - name: Run environment-gated test modules
         run: |
-          python -m pytest -v --junitxml=gated-results.xml \
+          python -m pytest -n 4 -v --junitxml=gated-results.xml \
             tests/test_features_radiomics.py \
             tests/test_066_dockerfile.py \
             tests/test_069_container_smoke.py \
