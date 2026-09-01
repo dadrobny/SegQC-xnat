@@ -188,6 +188,18 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - name: Install
+        # Deliberately NOT `-c constraints.txt`, unlike the `test` job:
+        # the lockfile pins numpy==2.4.6, which is exactly the pin this
+        # leg exists to override. The consequence is that every dev-extra
+        # tool floats here -- `pytest>=7` and `pytest-xdist>=3` both admit
+        # a future major -- so the `-n 4` runner can differ from the 3.8.0
+        # the `test` job resolves under constraints. Accepted rather than
+        # hardcoding a third copy of the version in this file: the drift
+        # predates xdist and covers the whole dev extra, so the real
+        # question is whether the dev tooling wants a lockfile of its own,
+        # separate from the image's runtime graph. Recorded as an open
+        # `gap` in docs/aide/insights.md (2026-09-01) rather than answered
+        # in a CI wall-clock change.
         run: pip install -e .[dev]
       - name: Pin numpy leg
         run: pip install numpy==${{ matrix.numpy-version }}
@@ -223,6 +235,11 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - name: Install base project (numpy etc. first)
+        # Unconstrained for the same reason the numpy legs are, minus the
+        # numpy override: pyradiomics resolves its own SimpleITK/numpy
+        # floor below, and `-c constraints.txt` would fight it. So the
+        # `-n 4` runner floats here too -- see the note on the
+        # test-numpy-majors Install step above.
         run: pip install -e .[dev]
       - name: Install pyradiomics's undeclared build-time dependencies
         # pyradiomics's legacy setup.py imports numpy AND versioneer at
