@@ -1461,3 +1461,53 @@ defect carries a regression test that fails before the fix (**G7**).
   an independent second-platform scope signal, with none of the collateral risk it used to
   carry. *(insights.md 2026-08-20, item 117; re-assessed against engine 1.20.0 on
   2026-08-25)*
+- **Mechanically verify the golden decision table's `asserted by` column in both
+  directions, including indirect consumers** *(insights.md, item 126, 2026-08-30/31)*.
+  `tests/test_105_golden_decision_table.py` AC6 checks that every named test exists;
+  nothing checks that every consuming test is named — an AST sweep on 2026-08-30 found
+  twelve consuming modules against the six listed, so item 126's blast radius was three
+  times the queue's estimate, and even that sweep missed consumers reaching a golden through
+  another module's `GOLDEN_PATH` attribute (test_119/120/123 piggybacking on test_022).
+  Candidate item: a completeness check in the other direction (or a generated column, as
+  item 134 did for the evidence counts) whose sweep also matches shared-attribute idioms
+  (`\.GOLDEN_PATH\b`) across the whole tree.
+- **`test_082_verse_build_recipe.py::test_adv_determinism_two_builds_produce_equal_parsed_artifacts`
+  compares two same-platform builds with numeric tolerance** *(insights.md, item 127,
+  2026-08-31)*. Every sibling regeneration test (test_063/081/120/123) asserts byte-identity
+  for two fresh in-process builds and drops to tolerance only fresh-vs-committed; as written,
+  a run-to-run nondeterminism in the `segfacet build-reference` CLI path passes unnoticed.
+  Candidate item: tighten it to byte-identity.
+- **A collapsed or duplicated label set can pass silently once Stage 3 degrades on
+  coincident centroids** *(insights.md, item 129, 2026-08-31)*. Two labels sharing an exact
+  centroid make Stage 3 absent (`features.stage3_unavailable` records why), every
+  `stage3`-reading rule short-circuits, and `detect_overlaps` sees no overlapping voxels — so
+  no finding of any kind. Candidate item: a rule consuming `stage3_unavailable`, which also
+  gives that key its `FEATURE_DOCS` catalogue entry.
+- **`features/sagittal_projection.py` (item 021) is reachable from nothing** *(insights.md,
+  item 130, 2026-08-31)*. Not `pipeline.py`, `feature_report.py`, `cli.py`, any rule or
+  `scripts/` — only its own test. The dead-wiring shape Stage 26 D8 raised for
+  `neighbourhood.py`, except that it renders a PNG rather than record leaves, so "wire it
+  in" may mean a CLI flag. Decide: wire or retire — no roadmap deliverable owns it.
+- **The synthetic fixture corpus is anatomically inverted along S** *(insights.md, item
+  131, 2026-08-31)*. `synth/clean_gt.py::build_clean_spine` stacks ascending labels along
+  ascending axis 2, so `clean_control_seg.nii.gz` puts L1 at S = 27 mm and L5 at S = 187 mm;
+  every in-repo driver therefore advances superiorly while real VerSe input advances
+  caudally — the inversion that hid item 131's traversal-direction defect for nine items,
+  and which silently flips the sign of any future feature measured against +S. Correcting
+  the stacking moves committed values across the suite and both reference artifacts, so it
+  needs its own item — and Stage 20's specificity baseline should be pinned after it, not
+  before.
+- **Maintainer pass over `feature_docs.STATUS_OVERRIDES`' `monotonic_consistency` notes**
+  *(insights.md, item 132, 2026-08-31)*. The `is_monotonic` note says it "should be wired
+  into the sequence rule directly"; `MislabelRule`'s Detector B has consumed
+  `non_monotonic_pairs` since item 033 and fires end-to-end since item 132, so the note
+  reads as an open action that is closed. It is maintainer-signed text no item may rewrite
+  from inside — either a maintainer pass, or the Stage 29 D11 treatment (separate what is
+  measured from what is signed).
+- **Nine pre-existing test files capture subprocess output with `text=True` and no
+  `encoding=`** *(insights.md, queue-018, 2026-09-01)*. `tests/conftest.py` (2),
+  `test_066`, `test_069`, `test_070`, `test_074`, `test_111`, `test_113`, `test_117`,
+  `test_123` (2). All capture ASCII today, which is why none has fired; the identical
+  pattern broke `test_134` on `windows-latest` (PR #58) the first time a capture carried an
+  em dash. `tests/run_process.py::run_utf8` is the drop-in replacement. Candidate item:
+  convert all nine in one mechanical sweep, closing the class in the suite.

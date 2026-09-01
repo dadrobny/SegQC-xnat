@@ -523,3 +523,13 @@ branch as part of the Stage 29 acceptance.
   **Authorised paths** and to AC11's module list; the module now calls
   `assert_matches_committed_artifact(regenerated, default_artifact_path())`
   and no longer imports `reports_close`. *(2026-08-31)*
+- **Correction, 2026-09-01 (from insights.md's item-127 entry of 2026-08-31):**
+  the Validation section's step-1 scratch replay uses a function-call operand
+  (`default_artifact_path().read_bytes()`) that
+  `committed_artifact_guard.classify_module`'s documented resolution rules
+  cannot resolve, so the guard stays green on that exact scratch file; a
+  literal `Path("src/segfacet/reference/reference_default.json")` operand
+  (AC16's own shape) reproduces the described failure. Step 2's
+  `-k allowlist` filter matches no test — the enforcement test is
+  `test_committed_artifact_guard_reports_zero_violations`, unfiltered.
+  AC15–AC19 pin the real behaviour; only this prose was wrong.

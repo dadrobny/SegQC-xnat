@@ -1133,6 +1133,15 @@ discovery.
   checker's out-of-scope-detection half is independently verified live on a
   scratch branch (AC10). See item 115's Decisions log for the full AC8 audit
   and why this box is left honestly unticked rather than ticked around.)*
+  *(2026-09-01, from insights.md's item-128 entry of 2026-08-31: the box's `_PRE_NNN_*`
+  naming-pattern wording is no longer a faithful key — item 128 renamed
+  `_PRE_098_REFERENCE_VERSE_V1_SHA256` to `_RELEASED_REFERENCE_VERSE_V1_SHA256`, so no
+  `_PRE_NNN_*`-shaped name survives in `tests/` while the digest-literal fence itself is
+  intact. The box is judged by the mechanism —
+  `tests/test_115_stage26_validation.py::test_ac8_no_hardcoded_literal_fence_remains`
+  classifies by AST shape and still reports one fence, legitimate because
+  `reference_verse_v1.json` is not regenerable in CI and its digest is the only guard — and
+  stays unticked on that reading, not on the name.)*
 
 ---
 

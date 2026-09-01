@@ -301,6 +301,14 @@ from the local working tree):
   reproduce a stage's "clean control fires nothing end-to-end" claim via the
   CLI, pass `--no-reference` (measured 2026-08-30, item 125). Not a
   regression; it is the documented default operating out of its calibration.
+- **A "fails before the fix" replay needs a separate clone with its own venv**,
+  not a second tree pointed at by `PYTHONPATH` from the working checkout:
+  `pip install -e .` installs a meta-path finder that resolves `segfacet`
+  ahead of `sys.path`, so the second tree is silently shadowed by the working
+  checkout's `src/` and every "pre-fix" result is invalid with no error at
+  all. `git switch --detach` in the working checkout avoids the shadowing but
+  detaches HEAD mid-item. Item 135's per-defect verification rig (fresh clone
+  plus its own venv) is the worked example (2026-08-31).
 
 ## What is committed vs. per-machine
 

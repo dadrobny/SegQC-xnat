@@ -72,7 +72,21 @@
       "Edit(tests/**)",
       "Write(.claude/settings.local.json)",
       "Write(scripts/*.py)",
-      "Write(docs/*.md)"
+      "Write(docs/*.md)",
+      "Edit(scripts/*.py)",
+      "Edit(docs/*.md)",
+      "Bash(sed -n:*)",
+      "Bash(ps:*)",
+      "Bash(sleep:*)",
+      "Bash(awk:*)",
+      "Bash(nl:*)",
+      "Bash(true:*)",
+      "Bash(sha256sum:*)",
+      "Bash(diff:*)",
+      "Bash(cmp:*)",
+      "Bash(printf:*)",
+      "Bash(git merge-base:*)",
+      "Bash(git check-attr:*)"
     ],
     "ask": [
       "Bash(git push --force:*)",

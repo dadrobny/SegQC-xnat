@@ -617,3 +617,10 @@ fails-before-the-fix check as part of the Stage 29 validation.
   tables; the `segfacet run --no-reference` CLI replay on
   `clean_control_seg.nii.gz` emits `features.stage3.curvature.tangent_angles_deg
   == [8.1652..., 4.0730..., 0.0, 4.0730..., 8.1652...]`, matching AC5's row.
+- **Correction, 2026-09-01 (from insights.md's item-131 entry of 2026-08-31):**
+  AC16 says "the six `stage3.curvature.*` paths"; the committed catalogue
+  (`docs/aide/feature_catalogue.generated.json`) carries eight — the four
+  angle arrays plus `total_curvature_deg`, `coronal_curvature_deg`,
+  `sagittal_curvature_deg` and `curvature_plane`. The test module pins the
+  real set of eight; the AC's property (no path added or removed) is
+  unaffected by the miscount.

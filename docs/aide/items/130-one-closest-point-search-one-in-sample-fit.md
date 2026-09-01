@@ -640,3 +640,9 @@ Recorded at spec time, confirmed unchanged during implementation:
   the searches, but it changes what `u_values[]` is *derived from*, which is
   item 132's territory. AC20 pins the agreement instead, so the redundancy
   is now an asserted invariant rather than an unobserved coincidence.
+- **Correction, 2026-09-01 (from insights.md's item-130 entry of 2026-08-31):**
+  the Validation section's `segfacet run --seg <fixture> --out <dir>
+  --no-reference` recipe omits `--scan`; `cli.py`'s `_handle_run` requires
+  `--scan` and `--seg` together and errors otherwise. Pass `--scan` pointed at
+  any valid NIfTI — the seg fixture itself will do, since only the `stage3`
+  block's shape is under test.
