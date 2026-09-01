@@ -293,9 +293,41 @@ def test_ac4_written_json_report_is_schema_valid_and_carries_metrics(tmp_path):
 # =========================================================================== #
 
 
-def test_ac5_calibrate_writes_config_and_calibration_block(tmp_path):
+def test_ac5_calibrate_writes_config_and_calibration_block(tmp_path, monkeypatch):
     from segfacet import cli
     from segfacet.config import load_config
+    from segfacet.eval.calibrate import ThresholdAxis
+
+    # What AC5 asserts is the CLI *wiring* -- that --calibrate writes
+    # calibrated_config.yaml and embeds a "calibration" report block. It does
+    # not inspect which thresholds were chosen, so the shipped
+    # default_calibration_axes() grid (5x5x5 = 125 points, each a full
+    # re-evaluation of the cohort) buys none of the three assertions below:
+    # measured 2026-09-01, this invocation cost 74.25 s with the default grid
+    # against 0.64 s for the identical one without --calibrate. Shrink the
+    # grid to the smallest one that still exercises a real sweep and a real
+    # selection (2 candidates, so `best` is chosen rather than forced).
+    #
+    # The shipped default grid is not left uncovered: test_055_calibrate.py::
+    # test_ac13_default_axes_cover_both_rule_families_and_run_without_error
+    # runs it in full, in ~2.8 s, against a tiny in-memory cohort.
+    #
+    # _handle_evaluate imports default_calibration_axes inside the function
+    # body (segfacet/cli.py, deferred-import convention), so the patch must
+    # target the defining module -- patching segfacet.cli would bind nothing.
+    def _tiny_axes():
+        return (
+            ThresholdAxis(
+                name="reference_delta.max_robust_z",
+                rule_id="reference_delta",
+                param_path=("max_robust_z",),
+                values=(3.5, 4.0),
+            ),
+        )
+
+    monkeypatch.setattr(
+        "segfacet.eval.calibrate.default_calibration_axes", _tiny_axes
+    )
 
     manifest_path = _write_manifest(tmp_path, _SMALL_COHORT_CASES, name="ac5.json")
     out_dir = tmp_path / "out_calibrate"
