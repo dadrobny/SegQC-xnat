@@ -1713,6 +1713,22 @@ def cli_subprocess_test_warnings(repo_root: Path,
     was structured a moment earlier. The recorded instance returned
     ``stdout is None`` on a Windows runner — and had it returned ``""`` the test
     would have passed while checking nothing.
+
+    **No exemption for the self-referential case**, asked for and declined
+    (issue #123). A test whose whole job is to replay `aide check`'s literal
+    stdout trips this rule, which reads like the verb flagging itself. It is
+    not: `cmd_check` calls `run_checks`, that function returns
+    ``(errors, warnings)`` as structured data, and asserting on it in-process
+    is both the fix and the better test — which is what the reporting consumer
+    did. Exempting the shape would license the worse test in the one place the
+    argument for it sounds strongest.
+
+    What the report actually found is a *measurement* defect, and it belongs to
+    the spec, not to this lint: a module that shells out to the CLI raises the
+    warning count by one the moment it is committed, so any baseline count
+    recorded before it existed is falsified by the act of adding it. Measured:
+    a spec recorded 3, the base commit already carrying the module reported 4,
+    and the 4th was the module. §6 now says never to pin a count that way.
     """
     out: List[str] = []
     for path in _test_files(repo_root, config):
@@ -1736,6 +1752,98 @@ def cli_subprocess_test_warnings(repo_root: Path,
                     f"stdout/encoding surface that has failed on Windows only, "
                     f"and can pass while checking nothing (conventions.md §6)")
                 break
+    return out
+
+
+#: The subprocess entry points that can hand *decoded* text back to the caller.
+#: `call` and `check_call` return an exit status and never a capture, so a
+#: `text=` on one of those decodes nothing and flagging it would be exactly the
+#: false positive that stops a lint being read.
+_DECODING_SUBPROCESS_FUNCS = frozenset({"run", "Popen", "check_output"})
+
+#: Both spellings of "decode this for me". `universal_newlines=` is the pre-3.7
+#: name and is still accepted, so a lint that knows only `text=` sees half the
+#: shape — and the older spelling is the one an author copies from an old
+#: answer, which is where this class comes from in the first place.
+_TEXT_MODE_KWARGS = frozenset({"text", "universal_newlines"})
+
+
+def _asks_for_text(node: ast.Call) -> bool:
+    """Does this call ask for decoded output, as far as the source can say?
+
+    `text=False` and `universal_newlines=None` ask for bytes and are not the
+    defect. Anything else — `True`, a name, an expression — is treated as
+    asking, because a call that may decode and names no codec is wrong in
+    exactly the way a call that certainly decodes is.
+    """
+    for kw in node.keywords:
+        if kw.arg not in _TEXT_MODE_KWARGS:
+            continue
+        if isinstance(kw.value, ast.Constant) and not kw.value.value:
+            continue
+        return True
+    return False
+
+
+def subprocess_encoding_test_warnings(repo_root: Path,
+                                      config: Dict[str, Dict[str, object]]) -> List[str]:
+    """Tests decoding subprocess output with whatever codec the platform guesses.
+
+    conventions.md §6: a test that captures subprocess output as text passes
+    `encoding="utf-8"`. Without it Python decodes with
+    `locale.getpreferredencoding()` — UTF-8 on a Linux runner, **cp1252** on a
+    Windows one — so the same bytes become different strings on the two legs of
+    the same CI run.
+
+    The recorded instance is the reason this is a lint and not advice. Six
+    items in one consumer queue independently wrote
+    `subprocess.run(..., capture_output=True, text=True)`; all six passed the
+    Linux-only validator, and `windows-latest` returned a `KeyError` on a
+    cp1252-mangled em-dash heading in one test and — worse — an **emoji-diff
+    guard that matched nothing and reported PASS** in another. The second is a
+    false negative: a gate that reports green having verified nothing, which is
+    the worst outcome this loop has available and is invisible to every gate
+    inside it (§7). Six independent authors reproducing one shape in one queue
+    is the signature of a missing rule, not of a careless author.
+
+    Decidable by AST, in the same shape as the eol-pin lint next door: a call
+    to `run` / `Popen` / `check_output` carrying a `text=` or
+    `universal_newlines=` keyword and no `encoding=` keyword. The two
+    narrowings — the function set above, and a literal-false `text=` — are
+    there so every warning this emits names a call that really would decode.
+
+    **The limit, stated rather than left to be discovered:** only a direct
+    call is seen. A project that has wrapped its subprocess calls in a helper
+    — which is the fix a consumer reached for — presents one call site to this
+    lint and silence for the rest, and a `**kwargs` spread hides the keyword
+    entirely. Silence here means "no call of the recorded shape", never "this
+    suite decodes safely".
+    """
+    out: List[str] = []
+    for path in _test_files(repo_root, config):
+        try:
+            tree = ast.parse(path.read_text(encoding=_ENCODING))
+        except (OSError, UnicodeDecodeError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+            if name not in _DECODING_SUBPROCESS_FUNCS:
+                continue
+            if any(kw.arg == "encoding" for kw in node.keywords):
+                continue
+            if not _asks_for_text(node):
+                continue
+            out.append(
+                f"{_rel_display(path, repo_root)}:{node.lineno}: captures "
+                f"subprocess output as text with no encoding= — Python then "
+                f"decodes with the platform's locale codec, UTF-8 here and "
+                f"cp1252 on a Windows runner, which mangles non-ASCII and has "
+                f"defeated a guard silently rather than failing. Pass "
+                f'encoding="utf-8". See conventions.md §6')
+            break
     return out
 
 
@@ -1925,6 +2033,18 @@ def _byte_exact_reads(tree: ast.AST) -> List[Tuple[str, int]]:
     it. A read stored in a local and compared later is missed on purpose: that
     indirection is the shape of a determinism check between two generated
     files, which needs no pin at all.
+
+    **What that costs, stated so it is not rediscovered** (issue #124). This
+    function decides a *read shape*, and a read shape is only a proxy for the
+    question that matters, which is whether the file needs a pin. A committed
+    text artifact whose tests `json.loads` it, or walk a Markdown table cell by
+    cell, matches nothing here and draws no warning **whether or not it is
+    pinned** — silent in both directions. Widening to cover it would be wrong,
+    not merely noisy: `read_text()` applies universal-newline translation, so a
+    CRLF-rewritten file parses to the identical object and a pin buys that
+    parse nothing. The file may still need one — for a byte-reproducibility
+    claim asserted somewhere this lint cannot see, a regenerate-and-diff or a
+    digest kept elsewhere — and that claim is the project's to assert directly.
     """
     out: List[Tuple[str, int]] = []
     for node in ast.walk(tree):
@@ -1983,6 +2103,17 @@ def gitattributes_eol_pin_warnings(repo_root: Path,
     A resolved path is only reported if it **exists** in the checkout, which is
     the cheap proxy for "committed": a path that resolves but is not there is a
     generated artifact, not a fixture.
+
+    **Two causes of silence, and only one of them is the one above.** The first
+    is resolution: a path this lint cannot follow is skipped. The second is
+    shape, in `_byte_exact_reads` — a committed artifact its tests *parse*
+    rather than byte-compare draws no warning whether or not it is pinned. The
+    second is the one that misleads, because such a file looks exactly like the
+    kind this lint exists for. Recorded (issue #124): a spec wrote "the eol-pin
+    lint passes" as an acceptance criterion for a committed generated JSON
+    artifact its tests `json.loads`; the criterion was vacuous by construction,
+    and the pin had to be asserted by a project-side test instead. Read a
+    warning here as authoritative and silence as *no reading taken*.
     """
     files = _test_files(repo_root, config)
     if not files:
@@ -2381,10 +2512,11 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
                branches: Optional[List[str]] = None) -> Tuple[List[str], List[str]]:
     """Return ``(errors, warnings)``. Empty errors == pass.
 
-    The first ten checks all run before, and survive, the two early returns
-    below, but for two different reasons. Four of them —
+    The first eleven checks all run before, and survive, the two early returns
+    below, but for two different reasons. Five of them —
     `absolute_path_test_warnings`, `separator_dependent_test_warnings`,
-    `cli_subprocess_test_warnings`, `gitattributes_eol_pin_warnings` — read
+    `cli_subprocess_test_warnings`, `subprocess_encoding_test_warnings`,
+    `gitattributes_eol_pin_warnings` — read
     `tests_dir` and never touch `docs_dir`, so they are the ones that make this
     function worth calling in a repo with no document set. The other six *are* document checks; they
     simply find nothing to say when `docs_dir` is absent, so keeping them costs
@@ -2408,6 +2540,7 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
     warnings.extend(absolute_path_test_warnings(repo_root, config))
     warnings.extend(separator_dependent_test_warnings(repo_root, config))
     warnings.extend(cli_subprocess_test_warnings(repo_root, config))
+    warnings.extend(subprocess_encoding_test_warnings(repo_root, config))
     warnings.extend(gitattributes_eol_pin_warnings(repo_root, config))
     warnings.extend(header_blockquote_warnings(ddir))
     warnings.extend(root_document_warnings(ddir))
@@ -2621,9 +2754,23 @@ def _parse_item_status(lines: List[str]) -> Tuple[List[str], List[str], Dict[int
 # git plumbing
 # --------------------------------------------------------------------------- #
 def git(args: List[str], repo_root: Path, check: bool = True) -> subprocess.CompletedProcess:
+    """Run git and hand back its output decoded as UTF-8, never as the locale.
+
+    conventions.md §6, applied to the engine that states it. `text=True` alone
+    decodes with `locale.getpreferredencoding()` — cp1252 on a Windows
+    consumer — so a branch name, a changed path or a commit subject carrying a
+    non-ASCII character came back as different characters there than here, and
+    a prefix match against it quietly stopped matching. Git speaks UTF-8 for
+    refs and paths, so this says so.
+
+    `errors="replace"` rather than strict: a stray byte in one branch name must
+    not raise out of `aide claim`. The replacement character fails the same
+    match a mangled one did, and does it identically on every platform.
+    """
     return subprocess.run(
         ["git", *args], cwd=str(repo_root), check=check,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        encoding="utf-8", errors="replace",
     )
 
 
@@ -3702,8 +3849,11 @@ def cmd_env(args: argparse.Namespace) -> int:
         vpy = venv_python(repo_root, config)
         interpreter = str(vpy) if vpy.exists() else sys.executable
         code = f"import sys\nsys.exit(0 if ({expr}) else 1)"
+        # §6: name the codec — a traceback carrying a non-ASCII path decodes
+        # differently under a Windows locale, and this text is reported to a user.
         res = subprocess.run([interpreter, "-c", code], cwd=str(repo_root),
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             encoding="utf-8", errors="replace")
         if res.returncode == 0:
             print(f"aide env: profile '{args.profile}' satisfied")
             return 0
@@ -4756,9 +4906,11 @@ def cmd_status(args: argparse.Namespace) -> int:
 
     # Open PRs, best effort — informative only, silently skipped without `gh`.
     try:
+        # §6: PR titles are arbitrary UTF-8 and are printed straight through.
         res = subprocess.run(["gh", "pr", "list", "--state", "open"],
                              cwd=str(repo_root), stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, text=True, timeout=20)
+                             stderr=subprocess.PIPE, encoding="utf-8",
+                             errors="replace", timeout=20)
         if res.returncode == 0:
             prs = res.stdout.strip()
             if prs:

@@ -316,6 +316,29 @@ def test_shelling_out_to_the_cli_is_reported(tmp_path: Path):
     assert len(w) == 1 and "call the function instead" in w[0]
 
 
+def test_the_self_referential_replay_is_still_flagged(tmp_path: Path):
+    """Issue #123, pinned as a refusal rather than left to be re-argued.
+
+    A test whose object under test *is* `aide check`'s own stdout trips this
+    rule, which reads like the verb flagging itself, and an exemption was
+    proposed for exactly that. Declined: `cmd_check` calls `run_checks`, which
+    hands back `(errors, warnings)` as structured data, so asserting on it
+    in-process is both the fix and the better test — the reporting consumer
+    rewrote it that way and said so. Exempting the shape would license the
+    worse test in the one place the argument for it sounds strongest.
+    """
+    repo = _repo(tmp_path)
+    (repo / "tests" / "test_check_output.py").write_text(
+        'import subprocess\n'
+        'def test_check_reports_the_warning():\n'
+        '    out = subprocess.run(["python", ".aide/scripts/aide.py", "check"],\n'
+        '                         capture_output=True, encoding="utf-8").stdout\n'
+        '    assert "warning:" in out\n',
+        encoding="utf-8")
+    w = aide.cli_subprocess_test_warnings(repo, _cfg(repo))
+    assert len(w) == 1 and "run_checks" in w[0]
+
+
 def test_a_docstring_mentioning_the_cli_is_not_flagged(tmp_path: Path):
     """Measured against a real consumer, the ONLY textual match was a docstring
     explaining why the author had removed a subprocess. A line-based lint flags

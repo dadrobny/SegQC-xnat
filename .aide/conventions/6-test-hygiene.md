@@ -39,7 +39,42 @@ reviewer outside the loop — never by a gate inside it.
   majority of `read_bytes()` calls in a real suite compare two freshly
   generated files to each other and need no pin at all. Treat a warning as
   authoritative and its silence as partial: the pin is still your
-  responsibility on a path the check cannot see.
+  responsibility on a path the check cannot see. **Silence has a second cause,
+  and it is the one that misleads:** the lint decides a *read shape*, not
+  whether a file needs a pin. A committed artifact whose tests `json.loads` it,
+  or walk a Markdown table cell by cell, draws no warning whether or not it is
+  pinned — universal newlines make a parsed read immune to the rewrite, so
+  covering it would be wrong rather than merely noisy, yet the file may still
+  need the pin for a byte-reproducibility claim made where the lint cannot look.
+  So never write "the eol-pin lint passes" as an acceptance criterion: assert
+  the pin itself.
+- **A test that captures subprocess output as text must pass
+  `encoding="utf-8"`.** `text=True` (and its older spelling
+  `universal_newlines=True`) names no codec, so Python decodes with
+  `locale.getpreferredencoding()` — UTF-8 on a Linux runner, **cp1252** on a
+  Windows one — and the same bytes become different strings on the two legs of
+  one CI run. Recorded: six items in a single queue independently wrote
+  `capture_output=True, text=True`; all six passed the Linux-only validator,
+  and `windows-latest` raised a `KeyError` on a mangled em-dash heading in one
+  test and — worse — left an emoji-diff guard **matching nothing and reporting
+  PASS** in another. That second one is the shape to fear: a false negative, a
+  gate that is green having verified nothing. `aide check` warns on a
+  `run`/`Popen`/`check_output` call carrying `text=` or `universal_newlines=`
+  and no `encoding=`. It sees only direct calls: a suite that wraps its
+  subprocess calls in a helper shows this lint one call site and hides the
+  rest. **The codec is the producing side's job too**, and both ends must
+  agree: a script that writes non-ASCII to stdout or stderr inherits the
+  console codepage on Windows, so it must reconfigure its own streams —
+  `aide.py`'s `main()` and the command-hygiene hook both do. Recorded, by the
+  windows CI leg on the very branch that added this rule: the hook wrote its
+  em-dash as cp1252, a strict UTF-8 reader rejected byte `0x97`, and the read
+  came back **`None`** — because the decode runs in `subprocess.run`'s reader
+  thread, where a `UnicodeDecodeError` never reaches the caller. That is the
+  `stdout is None` instance below, explained at last: it is not a Windows
+  quirk, it is a codec disagreement surfacing as a missing value rather than
+  as an error. So name the codec on the read, fix the writer if you own it,
+  and pass `errors="replace"` when you do not — then assert the value is
+  there before asserting anything about it.
 
 **Tests that can actually fail.**
 
@@ -48,7 +83,19 @@ reviewer outside the loop — never by a gate inside it.
   boundary adds stdout encoding, platform quirks, and a re-parse of what was
   structured a moment earlier. Recorded: `capture_output=True, text=True`
   returned `stdout is None` on a Windows runner — documented not to happen —
-  and the fix was to delete the boundary, not harden it.
+  and the fix was to delete the boundary, not harden it. This binds hardest
+  where it looks least applicable: **a test asserting on `aide check`'s own
+  output should call `run_checks` in-process**, which returns
+  `(errors, warnings)` as structured data, rather than replaying the CLI's
+  stdout. `aide check` flags such a module, and that is the rule working rather
+  than the verb flagging itself.
+- **Never pin an exact warning or error count from a module that itself trips
+  the lint being counted.** The module raises the count by one the moment it is
+  committed, so a baseline recorded before it existed is falsified by the act of
+  adding it — a measurement that includes the measurer. Recorded: a spec's
+  Assumptions held 3 warnings, the base commit already carrying the checking
+  module reported 4, and the 4th was that module. Assert on the warning you mean
+  by matching it, not on how many there are.
 - **Assert a derived value is recognisable *before* asserting anything about
   it.** A glob that matched nothing, a capture that came back empty, a slice
   taken from a failed `find()` — each yields a value that flows into the
@@ -56,9 +103,13 @@ reviewer outside the loop — never by a gate inside it.
   returned `""` rather than `None`, the loop over its lines would have iterated
   zero times and the test would have reported PASS having verified nothing.
 
-`aide check` warns when a file under `tests_dir` contains the repository's own
-absolute path — the one rule here a script can decide, and the one whose
-recorded instance survived every other gate for weeks.
+`aide check` decides the ones a script can, five of them: the repository's own
+absolute path written into a test file, a `str()` around a `relative_to(...)`,
+a shell-out to the CLI whose function was importable, a text capture that names
+no codec, and a byte-compared fixture no `eol=lf` pattern covers. Each was added
+after the class it names had already reached `main`. The rest of this section
+binds identically and is checked by nobody, so read a warning as authoritative
+and silence as partial throughout — not only on the pin.
 
 The lints in this section read `tests_dir`, never `docs_dir`, so they do **not**
 require the roadmap document set: `aide check` in a repo with no `docs_dir` runs

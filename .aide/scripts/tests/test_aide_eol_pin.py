@@ -219,6 +219,70 @@ def test_comments_and_blank_lines_are_ignored(tmp_path: Path):
     assert len(_warn(repo)) == 1
 
 
+def test_a_parsed_committed_artifact_is_silent_both_ways(tmp_path: Path):
+    """Issue #124, pinned as a decision rather than left as an accident.
+
+    A committed, byte-reproducible generated artifact whose tests `json.loads`
+    it. It looks exactly like the file this lint exists for, and it draws no
+    warning — **unpinned here, and pinned in the sibling test below**, so the
+    lint says nothing in either direction about it.
+
+    That silence is correct and is not a gap to close. `read_text()` applies
+    universal-newline translation, so the CRLF rewrite this rule guards against
+    parses to the identical object; widening to cover the shape would be wrong
+    rather than merely noisy. What is *not* correct is reading the silence as
+    coverage: the recorded instance wrote "the eol-pin lint passes" as an
+    acceptance criterion for such a file, which was vacuous by construction.
+    """
+    repo = _repo(tmp_path, gitattributes="")
+    _fixture(repo, "docs/aide/golden_evidence.generated.json", '{"a": 1}\n')
+    (repo / "tests" / "test_ev.py").write_text(
+        'import json\n'
+        'from pathlib import Path\n'
+        'ROOT = Path(__file__).resolve().parents[1]\n'
+        'GOLDEN = ROOT / "docs" / "aide" / "golden_evidence.generated.json"\n'
+        'def test_it():\n'
+        '    assert json.loads(GOLDEN.read_text(encoding="utf-8"))["a"] == 1\n',
+        encoding="utf-8")
+    assert _warn(repo) == []
+
+
+def test_the_pin_does_not_change_that_silence(tmp_path: Path):
+    """The other direction of the same decision: pinning the artifact changes
+    nothing the lint says, because it was never speaking about it."""
+    repo = _repo(
+        tmp_path,
+        gitattributes="docs/aide/*.generated.json text eol=lf\n")
+    _fixture(repo, "docs/aide/golden_evidence.generated.json", '{"a": 1}\n')
+    (repo / "tests" / "test_ev.py").write_text(
+        'import json\n'
+        'from pathlib import Path\n'
+        'ROOT = Path(__file__).resolve().parents[1]\n'
+        'GOLDEN = ROOT / "docs" / "aide" / "golden_evidence.generated.json"\n'
+        'def test_it():\n'
+        '    assert json.loads(GOLDEN.read_text(encoding="utf-8"))["a"] == 1\n',
+        encoding="utf-8")
+    assert _warn(repo) == []
+
+
+def test_the_same_artifact_byte_compared_does_warn(tmp_path: Path):
+    """The boundary, so the two silences above are read as a shape decision and
+    not as "this lint cannot see `docs/`". One `==` on the bytes and the same
+    unpinned artifact is reported."""
+    repo = _repo(tmp_path, gitattributes="")
+    _fixture(repo, "docs/aide/golden_evidence.generated.json", '{"a": 1}\n')
+    (repo / "tests" / "test_ev.py").write_text(
+        'from pathlib import Path\n'
+        'ROOT = Path(__file__).resolve().parents[1]\n'
+        'GOLDEN = ROOT / "docs" / "aide" / "golden_evidence.generated.json"\n'
+        'def test_it(tmp_path):\n'
+        '    assert (tmp_path / "out.json").read_bytes() == GOLDEN.read_bytes()\n',
+        encoding="utf-8")
+    warnings = _warn(repo)
+    assert len(warnings) == 1
+    assert "docs/aide/golden_evidence.generated.json" in warnings[0]
+
+
 # --------------------------------------------------------------------------- #
 # robustness
 # --------------------------------------------------------------------------- #

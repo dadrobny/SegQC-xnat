@@ -80,19 +80,21 @@ Coverage.
 
 def _run(args, cwd):
     return subprocess.run(args, cwd=str(cwd), check=True,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          encoding="utf-8")
 
 
 def _show_utf8(cwd: Path, rev_path: str) -> str:
-    """`git show <rev>:<path>`, decoded as UTF-8 **explicitly**.
+    """`git show <rev>:<path>`, decoded as UTF-8 **strictly**.
 
-    `_run` passes `text=True` with no encoding, so Python decodes with the
-    locale codec — cp1252 on the Windows CI leg, which mangles the status icons
-    into characters `_parse_item_status` cannot match. The documents this
-    project reads are UTF-8 by definition (conventions.md §1), so anything
-    reading one out of git says so rather than inheriting the platform's guess.
-    This is the conventions §6 defect class exactly: green on Linux, red only
-    on the platform no local run sees.
+    The documents this project reads are UTF-8 by definition (conventions.md
+    §1), so anything reading one out of git says so rather than inheriting the
+    platform's guess. Left decoding from bytes even though `_run` now names the
+    codec itself: this one wants the *strict* decoder, so a byte that is not
+    UTF-8 raises here instead of arriving as a replacement character that no
+    status icon matches. That is the recorded §6 shape — the locale codec
+    mangled the icons into characters `_parse_item_status` could not match,
+    green on Linux and red only on the platform no local run sees.
     """
     out = subprocess.run(["git", "show", rev_path], cwd=str(cwd), check=True,
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout
