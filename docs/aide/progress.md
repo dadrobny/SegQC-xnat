@@ -44,7 +44,7 @@
 | 17    | Foreign-Convention Interop & Orientation-Safe Image Layer               | G2, G6          | ✅     |
 | 18    | Failure-Mode-Specific Metric Surface                                    | G2, G7          | ✅     |
 | 19    | Generated Feature & Rule Catalogue + Steering Review                    | G7, G8          | ✅     |
-| 20    | Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness      | G2, G7          | 📋     |
+| 20    | Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness      | G2, G7          | 🚧     |
 | 21    | Real-GT Perturbation Corpus                                             | G3, G7          | 📋     |
 | 22    | *(placeholder)* Unified `(scan, seg)` Extraction                    | —              | 📋     |
 | 23    | *(placeholder)* Multivariate Normative Model                          | G3              | 📋     |
@@ -910,7 +910,7 @@ verifies they agree, and no document records which failure mode each feature ser
 
 ---
 
-## Stage 20 — Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness (G2, G7) — 📋
+## Stage 20 — Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness (G2, G7) — 🚧
 
 **Goal.** Close the gap between "the suite is green" and "the rules are specific".
 Measured 2026-07-25 on the committed corpus: **10 rules registered and enabled, 4 ever
@@ -939,9 +939,12 @@ rule(s) and any features they need; features may be added alone, modes and rules
 - 📋 Traceability matrix, *generated* (not hand-maintained): 8 failure modes × 10 rules ×
   the features each rule consumes, scored in all three directions, every mode row carrying
   its evidence rung. *(Item 138)*
+- 🚧 The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
+  `intensity_reference_delta`) mapped to §6 modes, or recorded as targeting none with a
+  reason — the root close of Stage 19's G8 shortfall. *(Item 136)*
 - 📋 The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
   `intensity_reference_delta`) mapped to §6 modes, or recorded as targeting none with a
-  reason — the root close of Stage 19's G8 shortfall. *(Items 136, 137)*
+  reason — the root close of Stage 19's G8 shortfall. *(Item 137)*
 - 📋 Specificity assertion — no unintended rule may fire — adopted as a ratchet. *(Item 140)*
 - 📋 Reachability hole closed *with its mechanism named per mode*: mode 8 is
   single-channel-unobservable, mode 1's ladder is FOV-capped, mode 4's cause TBD. Made
