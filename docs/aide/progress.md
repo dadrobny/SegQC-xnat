@@ -939,7 +939,7 @@ rule(s) and any features they need; features may be added alone, modes and rules
 - 📋 Traceability matrix, *generated* (not hand-maintained): 8 failure modes × 10 rules ×
   the features each rule consumes, scored in all three directions, every mode row carrying
   its evidence rung. *(Item 138)*
-- 🚧 The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
+- 🔍 The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
   `intensity_reference_delta`) mapped to §6 modes, or recorded as targeting none with a
   reason — the root close of Stage 19's G8 shortfall. *(Item 136)*
 - 📋 The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
