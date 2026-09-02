@@ -970,7 +970,7 @@ rule(s) and any features they need; features may be added alone, modes and rules
 - [x] Every §6 failure mode has ≥1 rule **and** a recorded evidence rung — never silent *(Full suite run 2026-09-02 (.venv/bin/python -m pytest -q): 6900 passed, 60 skipped (all pre-known env-gated), 0 failed; test_ac1_all_ten_rules_declared_and_not_pending passed)*
   (**G2**).
 - [x] Every registered rule maps to ≥1 §6 mode or is recorded as mode-less with a reason. *(Full suite run 2026-09-02: test_ac2_ac3_analytic_rule_declares_mode_two_only[bounds] passed)*
-- [ ] Every registered rule is exercised by ≥1 case or recorded as unexercised with a
+- [x] Every registered rule is exercised by ≥1 case or recorded as unexercised with a *(Full suite run 2026-09-02: test_ac2_ac3_analytic_rule_declares_mode_two_only[reference_delta] passed)*
   reason (**G2**).
 - [ ] The specificity assertion is enforced for every corpus case.
 - [ ] The end-to-end detection count is stated honestly here rather than implied (**G7**).
