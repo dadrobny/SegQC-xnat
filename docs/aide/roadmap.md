@@ -180,6 +180,8 @@ any heavy feature work.
   hand-computed expectations.
 - An anisotropic-spacing fixture yields correct physical volumes/extents.
 - `features` block emitted in JSON; tests cover each feature.
+- EDT-based centroid variants computed; centroid depth available per label.
+- Fragmentation index computed per label and serialised in the `features` block.
 
 ---
 
@@ -209,7 +211,9 @@ ordering, and mislabelling heuristics.
 - Spline fits cleanly on GT fixtures; offsets near-zero for GT, large for
   displaced/mislabelled fixtures.
 - Robust to a deliberately missing level (no crash, sensible fit).
-- New features in JSON; tests over GT + perturbed cases.
+- Orientation / curvature features in JSON; tests pass.
+- Neighbour-consistency features in JSON.
+- Regression tests over GT + perturbed cases pass.
 
 ---
 
@@ -337,8 +341,10 @@ heuristics and seed abnormality detection.
 
 **Dependencies.** Stages 2, 6.
 
-**Validation / acceptance.** Image features computed on fixtures; ≥1 intensity-
-based heuristic fires appropriately; tests pass.
+**Validation / acceptance.**
+
+- Image features computed on fixtures; ≥1 intensity-based heuristic fires
+  appropriately; tests pass.
 
 ---
 
@@ -357,9 +363,10 @@ based heuristic fires appropriately; tests pass.
 
 **Dependencies.** Stage 7 (stable, calibrated pipeline).
 
-**Validation / acceptance.** Container runs the pipeline on a mounted case,
-producing JSON + human report; `command.json` validates; install steps
-documented (**G5**).
+**Validation / acceptance.**
+
+- Container runs the pipeline on a mounted case, producing JSON + human report.
+- `command.json` validates; install steps documented (**G5**).
 
 ---
 
@@ -376,8 +383,12 @@ path; GPU never required.
 
 **Dependencies.** Stage 7.
 
-**Validation / acceptance.** GPU path is optional + auto-detected; CPU/GPU
-verdict-equivalence tests pass; the tool runs fully CPU-only (**G6**).
+**Validation / acceptance.**
+
+- GPU path is optional + auto-detected; CPU/GPU verdict-equivalence tests pass.
+- The tool runs fully CPU-only (**G6**).
+- On a CuPy-present GPU host the GPU-gated suite is green: the equivalence tests
+  execute rather than skip, and the inverse-condition tests skip cleanly.
 
 ---
 
@@ -395,9 +406,12 @@ handled abnormalities are accounted for rather than naively flagged.
 
 **Dependencies.** Stage 7 (and Stage 8 for image features).
 
-**Validation / acceptance.** A new heuristic + abnormality class can be added via
-the documented path in a test; explicitly-handled abnormalities are not naively
-flagged (Vision Success Criterion 4) (**G8**).
+**Validation / acceptance.**
+
+- A new heuristic + abnormality class can be added via the documented path in a
+  test.
+- Explicitly-handled abnormalities are not naively flagged (Vision Success
+  Criterion 4) (**G8**).
 
 ---
 
@@ -566,13 +580,19 @@ points at calibration.
 
 **Validation / acceptance.**
 
-- Held-out real VerSe19 GT yields **FPR ≤ 0.10** (**G3**).
-- Per-mode sensitivity ≥ item 057's synthetic baseline (5/8 pipeline-detectable
-  modes at 1.0), and those modes still fire on perturbed **real** GT (**G7**).
-  *FPR and sensitivity are acceptance criteria as a **pair**: FPR alone is
+- Target: held-out real VerSe19 GT yields **FPR ≤ 0.10** (**G3**).
+- Target: per-mode sensitivity ≥ item 057's synthetic baseline (5/8
+  pipeline-detectable modes at 1.0), and those modes still fire on perturbed
+  **real** GT (**G7**). *FPR and sensitivity are a **pair**: FPR alone is
   trivially driven to 0.0 by loosening or disabling rules.*
+- The recalibration + held-out measurement pipeline runs end-to-end and records
+  held-out FPR + per-mode sensitivity honestly, rather than committing a target
+  as achieved.
+- The evaluation harness engages the reference-derived rules and
+  `reference_delta`, so a measured FPR is measured against the shipped config.
 - Flags on real cases still carry reasons + offending labels (explainability is
   not traded for specificity).
+- The "Real VerSe GT" verification row carries the post-recalibration number.
 
 ---
 
@@ -604,9 +624,13 @@ install steps were written from the XNAT documentation and never executed.
 
 **Dependencies.** Stage 9 (✅). Blocked on XNAT server access.
 
-**Validation / acceptance.** The command runs on a real XNAT session producing
-JSON + human reports as resources (**G5**); documented steps match reality; the
-verification row flips to ✅.
+**Validation / acceptance.**
+
+- The command runs on a real XNAT session, producing JSON + human reports as
+  session resources (**G5**).
+- The documented install steps match what was actually done.
+- The "XNAT Container Service command on a real server" verification row reads
+  ✅ Verified.
 
 ---
 
@@ -643,10 +667,16 @@ when they do.
 **Dependencies.** Stages 13, 14 (calibrate first — sensitivity is only meaningful
 against the rules we intend to ship). Feeds Stage 11's abnormality arm.
 
-**Validation / acceptance.** ≥1 heuristic fires on a **real** instance of each §6
-mode present in the cohort (**G2**); real DICE-vs-flag correlation measured and
-correctly signed (**G7**); curated cases run with recorded outcomes and
-legitimate variation is not flagged at Stage 14's FPR bar.
+**Validation / acceptance.**
+
+- ≥1 heuristic fires on a **real** instance of each §6 mode the cohort actually
+  contains; modes absent from real data are recorded as such rather than
+  silently credited (**G2**).
+- Real DICE-vs-flag correlation is measured and correctly signed (**G7**).
+- Curated challenging cases run with recorded outcomes, and legitimate variation
+  is not flagged at Stage 14's FPR bar.
+- The "Real automatic-segmentation failure corpus" verification row reads
+  ✅ Verified.
 
 ---
 
@@ -690,11 +720,13 @@ real-segmenter number is computed.
 
 **Dependencies.** None blocking; supersedes nothing.
 
-**Validation / acceptance.** A regression test asserts 25/26/29 now match the TPTBox
-table; the reference artifact (`reference_verse_v1.json`, keyed by vertebra **name**)
-loads and scores unchanged, proving no re-fit was needed; the suite is green on both
-numpy majors (**G6**); a real segmenter output round-trips with correct level names
-(**G2**).
+**Validation / acceptance.**
+
+- A regression test asserts labels 25/26/29 match the TPTBox table (**G2**).
+- The reference artifact (`reference_verse_v1.json`, keyed by vertebra **name**)
+  loads and scores unchanged, proving no re-fit was needed.
+- The suite is green on both numpy majors (**G6**).
+- A real segmenter output round-trips with correct level names.
 
 ---
 
@@ -721,9 +753,11 @@ existing as a named field anything else can read.
 **Dependencies.** Stage 17 (level names must be right before per-level metrics mean
 anything).
 
-**Validation / acceptance.** Each §6 mode has ≥1 named metric that moves monotonically
-with injected severity of that mode and is comparatively insensitive to the others
-(**G2**); the fragmentation rule's behaviour is unchanged by the refactor (**G7**).
+**Validation / acceptance.**
+
+- Each §6 mode has ≥1 named metric that moves monotonically with injected
+  severity of that mode and is comparatively insensitive to the others (**G2**).
+- The fragmentation rule's behaviour is unchanged by the refactor (**G7**).
 
 ---
 
@@ -758,11 +792,14 @@ verifies the two agree, and no document records *which failure mode each feature
 `clarify = "assume"`, so run it through `/aide-spec-queue`, which front-loads the review
 so execution can then proceed unattended.
 
-**Validation / acceptance.** The catalogue is generated, not hand-written; the drift test
-fails on a deliberately undocumented feature (**G7**); every feature carries a status and
-**one of**: a named failure mode · the marker `unwired` · or *statused but mode-unmapped,
-with the consuming mode-less rule named* (**G8**); the golden decision table is complete
-and signed off.
+**Validation / acceptance.**
+
+- The catalogue is generated, not hand-written; the drift test fails on a
+  deliberately undocumented feature (**G7**).
+- Every feature carries a status and **one of**: a named failure mode · the
+  marker `unwired` · or *statused but mode-unmapped, with the consuming
+  mode-less rule named* (**G8**).
+- The golden decision table is complete and signed off by the human reviewer.
 
 > **G8 wording amended 2026-08-11.** The original sentence named only two
 > states and was unsatisfiable as written by the mechanism this stage shipped: a path
@@ -862,11 +899,16 @@ Stage-26 remediation defects touch the same surfaces this stage audits (`normali
 attribution, the RAS `touches_*` face mapping, `neighbourhood.py`'s dead wiring) — auditing
 before they are fixed records findings that are about to change.
 
-**Validation / acceptance.** Every §6 failure mode has ≥1 rule **and** a recorded evidence
-rung, never silent (**G2**); every registered rule maps to ≥1 §6 mode or is recorded as
-mode-less with a reason; every registered rule is exercised by ≥1 case or recorded as
-unexercised with a reason (**G2**); the specificity assertion is enforced for every case;
-the end-to-end detection count is stated honestly in `progress.md` (**G7**).
+**Validation / acceptance.**
+
+- Every §6 failure mode has ≥1 rule **and** a recorded evidence rung — never
+  silent (**G2**).
+- Every registered rule maps to ≥1 §6 mode or is recorded as mode-less with a
+  reason.
+- Every registered rule is exercised by ≥1 case or recorded as unexercised with
+  a reason (**G2**).
+- The specificity assertion is enforced for every corpus case.
+- The end-to-end detection count is stated honestly in `progress.md` (**G7**).
 **Explicitly not required:** feature→rule completeness — unwired features are a designed
 state, not a defect.
 
@@ -906,10 +948,12 @@ Make the **three rungs of realism** explicit, and stop conflating them:
 **Dependencies.** Stages 13 (VerSe adapter), 19 (golden decision), 20 (specificity
 harness — the new corpus is exactly what the ratchet is there to police).
 
-**Validation / acceptance.** Every threshold-bearing rule is calibrated against rung 2,
-not rung 1 (**G3**); the specificity assertion from Stage 20 holds on the new corpus, or
-each violation is recorded with a reason (**G7**); the corpus regenerates reproducibly
-from the manifest.
+**Validation / acceptance.**
+
+- Every threshold-bearing rule is calibrated against rung 2, not rung 1 (**G3**).
+- Stage 20's specificity assertion holds on the new corpus, or each violation is
+  recorded with a reason (**G7**).
+- The corpus regenerates reproducibly from its manifest.
 
 ---
 
@@ -1013,13 +1057,19 @@ a named location — this stage does no discovery.
 20 audits, so auditing first records findings that are about to move. D2 is additionally a
 prerequisite for any real-data claim (Stages 16/21).
 
-**Validation / acceptance.** Each defect has a regression test that fails before the fix
-(**G7**); `border`/`fov` findings carry anatomically correct face names under RAS (**G2**);
-per-mode attribution distinguishes a large move from a small one on a fixture built to have
-both; `neighbourhood.py` is either reachable from `extract_feature_record` and present in
-the regenerated catalogue, or removed with the Stage 3 deliverable reworded; no
-`_PRE_NNN_*` byte-hash fence remains, and the diff-based scope check that replaces it flags
-a deliberately out-of-scope edit on a scratch branch (**G7**).
+**Validation / acceptance.**
+
+- Each defect has a regression test that fails before its fix (**G7**).
+- `border`/`fov` findings carry anatomically correct face names under RAS
+  (**G2**).
+- Per-mode attribution distinguishes a large move from a small one on a fixture
+  built to have both.
+- `neighbourhood.py` is either reachable from `extract_feature_record` and
+  present in the regenerated catalogue, or removed with the Stage 3 deliverable
+  reworded.
+- No `_PRE_NNN_*` byte-hash fence remains, and the diff-based scope check that
+  replaces it flags a deliberately out-of-scope edit on a scratch branch
+  (**G7**).
 
 ---
 
@@ -1068,11 +1118,15 @@ paths wholesale, so it is the natural moment to execute item 105's golden retire
 dispositions if Stage 21 has not already. *(Superseded 2026-08-30: Stage 29 D1 owns the
 retirement and runs before both.)*
 
-**Validation / acceptance.** The taxonomy is documented with its rationale and every
-deviation from the starting proposal justified, and is signed off by the maintainer before
-migration (**G8**); every feature is addressable under it and no identity field is stored
-more than once; the regenerated catalogue and the drift test agree; no rule's behaviour
-changes on the corpus except where a retune is explicitly authorised.
+**Validation / acceptance.**
+
+- The taxonomy is documented with its rationale and every deviation from the
+  starting proposal justified, and is signed off by the maintainer before
+  migration (**G8**).
+- Every feature is addressable under it; no identity field is stored more than
+  once.
+- The regenerated catalogue and the drift test agree; no rule's behaviour
+  changes on the corpus except where a retune is explicitly authorised.
 
 ---
 
@@ -1178,15 +1232,21 @@ ratchet, and this stage changes which rules fire on which cases. Auditing first 
 record a matrix that is about to move, and would pin a specificity baseline against a
 corpus where `mislabel` cannot fire.
 
-**Validation / acceptance.** The formulation decision is recorded with its measurements and
-signed off at its human gate before D2 lands (**G8**); a clean GT spine stays within a
-**1.0 mm** pass-through bound across level counts and spacings, while a displaced vertebra
-separates from the clean distribution by a stated margin (**G2**); `mislabel` fires through
-plain `run_qc` on the mode-1 case and `is_monotonic` is `False` on the mode-4 case, with the
-clean control still firing nothing (**G2**); a real scoliotic curve in the VerSe cohort is
-not flagged as an offset outlier (**G3**); both reference artifacts are rebuilt from real GT
-and `spline_offset_mm` shows real spread; every regenerated golden is byte-reproducible
-run-to-run (**G7**).
+**Validation / acceptance.**
+
+- The formulation decision is recorded with its measurements and signed off at
+  its human gate before D2 lands (**G8**).
+- A clean GT spine stays within a **1.0 mm** pass-through bound across level
+  counts and spacings, while a displaced vertebra separates from the clean
+  distribution by a stated margin (**G2**).
+- `mislabel` fires through plain `run_qc` on the mode-1 case and `is_monotonic`
+  is `False` on the mode-4 case, with the clean control still firing nothing
+  (**G2**).
+- A real scoliotic curve in the VerSe cohort is not flagged as an offset outlier
+  (**G3**).
+- Both reference artifacts are rebuilt from real GT and `spline_offset_mm` shows
+  real spread; every regenerated golden is byte-reproducible run-to-run
+  (**G7**).
 
 **The pass-through bound was raised 0.5 mm → 1.0 mm on 2026-08-28.** This acceptance line
 originally reused item 017's AC1 tolerance, which is a *unit* tolerance measured on that
@@ -1305,14 +1365,18 @@ line Stage 20 would otherwise re-record as a reachability hole. The Stage 21 del
 "Act on Stage 19's golden decision" and Stage 27's "natural moment to execute item 105's
 golden retire dispositions" are both superseded by D1.
 
-**Validation / acceptance.** The nine corpus snapshot goldens and both `tests/golden/`
-snapshots are gone with all four named replacements in place, and no snapshot was
-regenerated on the way out; the D2 guard fails a deliberately added byte-exact comparison
-against a committed float-carrying artifact on a scratch branch (**G7**);
-`mode4_relabel_swap` yields `is_monotonic == False` through `extract_feature_record` and
-Stage 28's mode-4 acceptance half is closed (**G2**); a 4-level field of view yields
-non-degenerate held-out offsets; `pip show tptbox` reports a non-AGPL licence; each fixed
-defect carries a regression test that fails before the fix (**G7**).
+**Validation / acceptance.**
+
+- All 11 retired snapshots — the nine corpus snapshot goldens and both
+  `tests/golden/` snapshots — are gone with their four named replacements in
+  place and no snapshot regenerated on the way out; the D2 guard fails a
+  deliberately added byte-exact comparison against a committed float-carrying
+  artifact on a scratch branch (**G7**).
+- `mode4_relabel_swap` yields `is_monotonic == False` through
+  `extract_feature_record`, closing Stage 28's mode-4 acceptance half (**G2**).
+- A 4-level field of view yields non-degenerate held-out offsets; `pip show
+  tptbox` reports a non-AGPL licence; each fixed defect carries a regression
+  test that fails before the fix (**G7**).
 
 ---
 
