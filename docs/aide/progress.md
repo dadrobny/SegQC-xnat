@@ -936,7 +936,7 @@ rule(s) and any features they need; features may be added alone, modes and rules
 
 **Deliverables.**
 
-- 🚧 Traceability matrix, *generated* (not hand-maintained): 8 failure modes × 10 rules ×
+- 🔍 Traceability matrix, *generated* (not hand-maintained): 8 failure modes × 10 rules ×
   the features each rule consumes, scored in all three directions, every mode row carrying
   its evidence rung. *(Item 138)*
 - ✅ Rule-layer declaration seam: every registered rule carries a `RuleModeDeclaration`
@@ -947,7 +947,7 @@ rule(s) and any features they need; features may be added alone, modes and rules
   `intensity_reference_delta`) mapped to §6 modes, or recorded as targeting none with a
   reason — the root close of Stage 19's G8 shortfall. *(Item 137)*
 - 📋 Specificity assertion — no unintended rule may fire — adopted as a ratchet. *(Item 140)*
-- 🚧 Reachability hole closed *with its mechanism named per mode*: mode 8 is
+- 🔍 Reachability hole closed *with its mechanism named per mode*: mode 8 is
   single-channel-unobservable, mode 1's ladder is FOV-capped, mode 4's cause TBD. Made
   detectable where the mechanism allows, recorded where it does not. Not both silent.
   ⚠️ **Superseded in part, 2026-08-27:** modes 1 and 4 are **one** defect, the interpolating
