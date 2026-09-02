@@ -938,11 +938,11 @@ rule(s) and any features they need; features may be added alone, modes and rules
 
 - 📋 Traceability matrix, *generated* (not hand-maintained): 8 failure modes × 10 rules ×
   the features each rule consumes, scored in all three directions, every mode row carrying
-  its evidence rung.
+  its evidence rung. *(Item 138)*
 - 📋 The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
   `intensity_reference_delta`) mapped to §6 modes, or recorded as targeting none with a
-  reason — the root close of Stage 19's G8 shortfall.
-- 📋 Specificity assertion — no unintended rule may fire — adopted as a ratchet.
+  reason — the root close of Stage 19's G8 shortfall. *(Items 136, 137)*
+- 📋 Specificity assertion — no unintended rule may fire — adopted as a ratchet. *(Item 140)*
 - 📋 Reachability hole closed *with its mechanism named per mode*: mode 8 is
   single-channel-unobservable, mode 1's ladder is FOV-capped, mode 4's cause TBD. Made
   detectable where the mechanism allows, recorded where it does not. Not both silent.
@@ -950,13 +950,16 @@ rule(s) and any features they need; features may be added alone, modes and rules
   spline fit (`splprep(..., s=0)`), and are owned by **Stage 28**. `offset_mm` is zero on
   every committed golden (max `6.8e-04` mm vs a 15.0 mm threshold) and on real VerSe GT
   (mean `2.9e-05` mm), so no field of view produces a non-zero offset and the FOV-headroom
-  remedy named here could not have worked. Mode 8 stays this stage's to record.
+  remedy named here could not have worked. Mode 8 stays this stage's to record. *(Item 138)*
 - 📋 Per-rule **and per-operator** corpus-exercise reporting (the registered `fuse` operator
-  generates no corpus case at all).
+  generates no corpus case at all). *(Item 139)*
 - 📋 The mode-1 severity-ladder base (`tests/test_100_severity_ladder.py`, Stage 18)
   widened so mode 1's metric swing is set by the
   perturbation rather than the fixture's FOV walls — the recorded root cause of mode 6's
-  Stage-18 specificity shortfall.
+  Stage-18 specificity shortfall. *(Item 141)*
+- 📋 Stage 20 end-to-end validation: traceability artifact regenerated from a clean tree,
+  the specificity assertion driven over every corpus case, the cross-mode margins
+  re-measured, and the end-to-end detection count stated honestly here. *(Item 142)*
 
 **Acceptance.**
 
