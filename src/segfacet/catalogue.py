@@ -31,6 +31,7 @@ Four derivation mechanisms, each carrying its own evidence tag
   off every ``Expectation(failure_mode=N, ..., expected_rule_ids=frozenset(
   {...}))`` call's literal keyword pairs. No hand-typed rule-id -> mode
   dictionary exists anywhere in this module's source (drift guard, AC13).
+  Exposed publicly as :func:`scan_synth_rule_mode_map`.
 - **D. Non-rule consumers** (``observed`` / ``vocabulary``) — the same trace
   proxy run through ``eval.per_mode.compute_per_mode_metrics`` and
   ``human_report.render_feature_table``, plus the declared feature-name
@@ -39,10 +40,25 @@ Four derivation mechanisms, each carrying its own evidence tag
   TRACKED_FEATURES``) matched by last path segment via
   :data:`segfacet.feature_docs.PATH_ALIASES`.
 
+A third source of ``mode_evidence`` (item 136) sits alongside C: each
+registered rule's own class-attribute ``RuleModeDeclaration``
+(:mod:`segfacet.heuristics.rule`) states the §6 mode(s) it targets (or that
+it targets none, or that its disposition is pending). ``mode_evidence`` gains
+the tag ``"rule_declaration"`` (ordered last) when at least one of an
+entry's ``consuming_rules`` carries a declaration with non-empty ``modes``.
+Because this item's declared modes are always a subset of mechanism C's
+corpus-derived map (:func:`segfacet.catalogue.rule_declaration_conflicts`
+enforces agreement), the declaration source contributes no mode
+``failure_modes`` would not already carry from C. Disagreement between the
+declaration and the corpus-derived map — in *either* direction — is reported
+by :func:`rule_declaration_conflicts`, never silently resolved here.
+
 ``consuming_rules = A ∪ B``. ``failure_modes`` = (item-099 mode anchors) ∪
-(modes of ``consuming_rules`` under C). ``status`` = an authored
-:data:`segfacet.feature_docs.STATUS_OVERRIDES` entry if present, else
-``"keep"`` when A ∪ B ∪ D is non-empty, else **``"unwired"``**.
+(modes of ``consuming_rules`` under C) ∪ (modes of ``consuming_rules``
+declared per rule, item 136 — a subset of the C term on this tree).
+``status`` = an authored :data:`segfacet.feature_docs.STATUS_OVERRIDES`
+entry if present, else ``"keep"`` when A ∪ B ∪ D is non-empty, else
+**``"unwired"``**.
 
 Two tiers, one ``origin``
 --------------------------
@@ -124,6 +140,8 @@ __all__ = [
     "build_catalogue",
     "catalogue_to_dict",
     "render_markdown",
+    "scan_synth_rule_mode_map",
+    "rule_declaration_conflicts",
     "main",
 ]
 
@@ -649,6 +667,18 @@ def _scan_synth_rule_mode_map() -> Dict[str, Tuple[int, ...]]:
     return {rule_id: tuple(sorted(modes)) for rule_id, modes in accum.items()}
 
 
+def scan_synth_rule_mode_map() -> Dict[str, Tuple[int, ...]]:
+    """Public name for :func:`_scan_synth_rule_mode_map` (item 136).
+
+    ``rule_id -> §6 mode(s)``, read from every ``Expectation(...)`` call's
+    literal ``failure_mode=``/``expected_rule_ids=`` keyword pair across
+    ``src/segfacet/synth/*.py`` -- the corpus-derived side of the
+    declaration <-> corpus agreement checked by
+    :func:`rule_declaration_conflicts`.
+    """
+    return _scan_synth_rule_mode_map()
+
+
 # =========================================================================== #
 # Step 7: mechanism D -- non-rule consumers
 # =========================================================================== #
@@ -738,7 +768,7 @@ def build_catalogue(*, strict: bool = True, reference: Any = None) -> FeatureCat
     """
     from segfacet import feature_docs as _feature_docs_module
     from segfacet.config import bundled_default_config
-    from segfacet.heuristics.rule import iter_rules
+    from segfacet.heuristics.rule import iter_rule_declarations, iter_rules
     from segfacet.observed_range import build_observed_ranges
 
     config = bundled_default_config()
@@ -804,6 +834,14 @@ def build_catalogue(*, strict: bool = True, reference: Any = None) -> FeatureCat
     # Mechanism C: rule_id -> §6 mode(s), from synth/*.py's Expectation(...).
     rule_mode_map = _scan_synth_rule_mode_map()
 
+    # Declaration source (item 136): rule_id -> declared §6 mode(s), read
+    # from each rule's own class-attribute RuleModeDeclaration.
+    declared_modes_by_rule: Dict[str, Tuple[int, ...]] = {
+        rule_id: decl.modes
+        for rule_id, decl in iter_rule_declarations()
+        if decl is not None and decl.modes
+    }
+
     # Mechanism D: non-rule consumers.
     consumers_map = _mechanism_d_consumers(
         driver_records, _feature_docs_module.PATH_ALIASES, leaf_union
@@ -857,20 +895,26 @@ def build_catalogue(*, strict: bool = True, reference: Any = None) -> FeatureCat
 
         anchor_modes = anchor_modes_by_path.get(path, set())
         mapped_rule_modes: Set[int] = set()
+        declared_rule_modes: Set[int] = set()
         had_unmapped_rule = False
         for rule_id in rule_ids:
             modes_for_rule = rule_mode_map.get(rule_id)
+            declared_for_rule = declared_modes_by_rule.get(rule_id)
             if modes_for_rule:
                 mapped_rule_modes.update(modes_for_rule)
-            else:
+            if declared_for_rule:
+                declared_rule_modes.update(declared_for_rule)
+            if not modes_for_rule and not declared_for_rule:
                 had_unmapped_rule = True
 
-        all_modes = anchor_modes | mapped_rule_modes
+        all_modes = anchor_modes | mapped_rule_modes | declared_rule_modes
         mode_evidence_parts: List[str] = []
         if anchor_modes:
             mode_evidence_parts.append("per_mode_metric")
         if mapped_rule_modes:
             mode_evidence_parts.append("rule_mode_map")
+        if declared_rule_modes:
+            mode_evidence_parts.append("rule_declaration")
 
         if all_modes:
             failure_modes = tuple(sorted(all_modes))
@@ -950,6 +994,69 @@ def build_catalogue(*, strict: bool = True, reference: Any = None) -> FeatureCat
         groups=tuple(groups),
         entries=tuple(all_entries),
     )
+
+
+# =========================================================================== #
+# Step 8b: rule <-> mode declaration/corpus agreement checker (item 136)
+# =========================================================================== #
+
+
+def rule_declaration_conflicts() -> Tuple[str, ...]:
+    """Report every disagreement between each rule's ``RuleModeDeclaration``
+    and the corpus-derived ``rule_id -> §6 mode(s)`` map (item 136).
+
+    Returns a sorted tuple of human-readable messages, empty when the two
+    sources agree. Reports, for the shipped registry:
+
+    - a registered rule with no declaration at all (naming its ``rule_id``);
+    - a corpus-designated ``(rule_id, mode)`` pair the rule's declaration does
+      not carry in ``modes`` (naming both);
+    - a ``"corpus"``-tagged declaration carrying a mode no committed corpus
+      case designates for that rule (naming both);
+    - a declared mode outside :data:`segfacet.feature_docs.MODE_ANCHOR_PATHS`'s
+      key set -- the in-code §6 mode catalogue (A5) -- (naming both).
+
+    Pure: never mutates the registry, never raises for a missing declaration
+    (A3 -- absence is reported, not rejected).
+    """
+    from segfacet import feature_docs as _feature_docs_module
+    from segfacet.heuristics.rule import iter_rule_declarations
+
+    known_modes = set(_feature_docs_module.MODE_ANCHOR_PATHS.keys())
+    corpus_map = _scan_synth_rule_mode_map()
+
+    messages: List[str] = []
+    for rule_id, decl in iter_rule_declarations():
+        if decl is None:
+            messages.append(
+                f"rule {rule_id!r} has no RuleModeDeclaration (mode_declaration is None)."
+            )
+            continue
+
+        corpus_modes = set(corpus_map.get(rule_id, ()))
+        declared_modes = set(decl.modes)
+
+        for mode in sorted(corpus_modes - declared_modes):
+            messages.append(
+                f"rule {rule_id!r}: corpus designates §6 mode {mode} but the "
+                f"declaration does not include it (declared modes: {sorted(declared_modes)!r})."
+            )
+
+        if "corpus" in decl.evidence:
+            for mode in sorted(declared_modes - corpus_modes):
+                messages.append(
+                    f"rule {rule_id!r}: declaration claims §6 mode {mode} tagged "
+                    f"'corpus' but no committed corpus case designates it "
+                    f"(corpus modes: {sorted(corpus_modes)!r})."
+                )
+
+        for mode in sorted(declared_modes - known_modes):
+            messages.append(
+                f"rule {rule_id!r}: declared §6 mode {mode} is outside "
+                f"MODE_ANCHOR_PATHS's key set {sorted(known_modes)!r}."
+            )
+
+    return tuple(sorted(messages))
 
 
 # =========================================================================== #

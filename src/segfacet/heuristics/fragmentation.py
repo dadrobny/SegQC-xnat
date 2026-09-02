@@ -64,7 +64,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, register_rule
+from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
 from segfacet.verdict import Severity
 
 if TYPE_CHECKING:  # pragma: no cover - type-only import, no runtime dependency
@@ -266,6 +266,12 @@ class FragmentationRule(Rule):
     """
 
     rule_id = "fragmentation"
+
+    # §6 modes 2, 3 (item 136): FragmentPerturbation / FusePerturbation
+    # designate mode 2, InjectIslandsPerturbation designates mode 3
+    # (src/segfacet/synth/component_shape.py), all via
+    # Expectation(..., expected_rule_ids={"fragmentation"}).
+    mode_declaration = RuleModeDeclaration(modes=(2, 3), evidence=("corpus",))
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate fragmentation and island/excess checks for every label in

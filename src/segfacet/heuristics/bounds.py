@@ -26,7 +26,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, register_rule
+from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
 from segfacet.labels import CANONICAL_ORDER
 from segfacet.verdict import Severity
 
@@ -285,6 +285,19 @@ class BoundsRule(Rule):
     """
 
     rule_id = "bounds"
+
+    # §6 disposition pending (item 136): no committed synth corpus case
+    # designates "bounds" for any §6 mode, so the existing corpus-derived
+    # mechanism attributes it to nothing by construction -- the disposition
+    # is item 137's analytic judgement, not derivable here.
+    mode_declaration = RuleModeDeclaration(
+        pending_reason=(
+            "disposition deferred to item 137: no committed synth corpus case "
+            "designates 'bounds' for any §6 mode, so the corpus-derived "
+            "mechanism attributes it to nothing by construction; whether it "
+            "targets a mode on analytic grounds (or none) is item 137's judgement."
+        )
+    )
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate bounds for every label in *record*.

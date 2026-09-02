@@ -48,7 +48,7 @@ from __future__ import annotations
 from typing import Dict, List
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, register_rule
+from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
 from segfacet.verdict import Severity
 
 __all__ = ["ReferenceDeltaRule"]
@@ -107,6 +107,20 @@ class ReferenceDeltaRule(Rule):
     """
 
     rule_id = "reference_delta"
+
+    # §6 disposition pending (item 136): no committed synth corpus case
+    # designates "reference_delta" for any §6 mode, so the existing
+    # corpus-derived mechanism attributes it to nothing by construction --
+    # the disposition is item 137's analytic judgement, not derivable here.
+    mode_declaration = RuleModeDeclaration(
+        pending_reason=(
+            "disposition deferred to item 137: no committed synth corpus case "
+            "designates 'reference_delta' for any §6 mode, so the "
+            "corpus-derived mechanism attributes it to nothing by construction; "
+            "whether it targets a mode on analytic grounds (or none) is item "
+            "137's judgement."
+        )
+    )
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate delta-to-reference signals for *record*.

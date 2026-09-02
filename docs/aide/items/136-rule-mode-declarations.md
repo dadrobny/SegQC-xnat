@@ -367,4 +367,46 @@ served by AC9's non-enforcing `register_rule`.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- **Field-name mapping for AC2 messages**: each `__post_init__` branch's
+  `ValueError` message spells the exact dataclass field name it violates
+  (`'modes'`, `'evidence'`, `'mode_less_reason'`, `'pending_reason'`) so the
+  test's `any(name in message for name in expected_field_names)` check binds
+  regardless of which offending field the test parametrises on. The
+  multi-state check (`all_four_empty`, the three pairwise combinations) names
+  all candidate fields in one message rather than picking one, since more
+  than one field is genuinely implicated.
+- **Duplicate check runs before the ascending check**: `modes=(2, 2)` fails
+  the `len(set(...)) != len(...)` duplicate test before it would reach the
+  `sorted(...) != list(...)` ascending test (which a duplicate value alone
+  would not necessarily fail, e.g. `(2, 2)` is technically "sorted"). This
+  keeps the two AC2 rows (`modes_duplicate`, `modes_not_ascending`) reporting
+  on the field they are testing rather than always landing on the same
+  message.
+- **`declared_modes_by_rule` union is safe for AC12 because AC10 holds**: the
+  catalogue's `all_modes` now unions `anchor_modes | mapped_rule_modes |
+  declared_rule_modes`. AC12 requires `failure_modes` to equal
+  `anchor_modes ∪ corpus_rule_modes` alone (recomputed independently, with no
+  declaration term) — this only holds because every declared mode on this
+  tree is already a member of the corpus-derived map (AC10, enforced by
+  `rule_declaration_conflicts()`). Item 137, which is explicitly allowed to
+  declare a mode with no corpus case (A4), will need to keep this invariant
+  in mind: an analytic-only declared mode would need `failure_modes` (item
+  138's traceability matrix territory, per the item 136 spec's "What this
+  item is NOT") reconsidered, not this item's `build_catalogue` union as
+  written — but on this tree the union changes nothing (`declared ⊆ corpus`
+  everywhere, verified by AC10's own test).
+- **`had_unmapped_rule`** now fires only when a `consuming_rules` entry has
+  *neither* a corpus-derived nor a declared mode — this matches the spec's
+  Implementation Steps wording exactly and, since the four contested rules'
+  declarations are `pending` (empty `modes`), it leaves
+  `test_ac15_unmapped_rule_only_entry_is_honestly_unmapped` untouched (their
+  `mode_evidence` still lands on `("rule_unmapped",)`).
+- **`rule_declaration_conflicts()` message text is free-form**, not a stable
+  format string — AC7-AC9 only assert on substring presence (`rule_id` and a
+  mode's decimal form), matching the Testing Strategy's explicit "assert on
+  message content, never on message identity or ordering position."
+- **Regeneration measured**: `python -m segfacet.catalogue` moved exactly 32
+  `mode_evidence` entries (all gaining `"rule_declaration"` as the last
+  element), 0 `failure_modes` lines, and left
+  `feature_catalogue.generated.md` byte-unchanged — matching the item's
+  "Expected artifact movement" section exactly.

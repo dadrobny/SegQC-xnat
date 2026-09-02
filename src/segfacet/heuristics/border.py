@@ -43,7 +43,7 @@ from typing import Dict, List
 
 from segfacet.heuristics.finding import Finding
 from segfacet.heuristics.fov import derive_fov_coverage
-from segfacet.heuristics.rule import Rule, register_rule
+from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
 from segfacet.verdict import Severity
 
 __all__ = ["BorderRule"]
@@ -116,6 +116,11 @@ class BorderRule(Rule):
     """
 
     rule_id = "border"
+
+    # §6 mode 6 (item 136): CropAtBorderPerturbation
+    # (src/segfacet/synth/coverage_border_overlap.py) designates "border" for
+    # mode 6 via its Expectation(failure_mode=6, expected_rule_ids={"border"}).
+    mode_declaration = RuleModeDeclaration(modes=(6,), evidence=("corpus",))
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate border contact for *record*.

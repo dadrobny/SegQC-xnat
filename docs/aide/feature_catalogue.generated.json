@@ -837,7 +837,8 @@
           ],
           "measures": "Whether the label touches the anterior image face.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -898,7 +899,8 @@
           ],
           "measures": "Whether the label touches the inferior image face.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -960,7 +962,8 @@
           "measures": "Whether the label touches the left image face.",
           "mode_evidence": [
             "per_mode_metric",
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -1021,7 +1024,8 @@
           ],
           "measures": "Whether the label touches the posterior image face.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -1082,7 +1086,8 @@
           ],
           "measures": "Whether the label touches the right image face.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -1143,7 +1148,8 @@
           ],
           "measures": "Whether the label touches the superior image face.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -1264,7 +1270,8 @@
           ],
           "measures": "Number of distinct connected pieces the label is split into.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -1332,7 +1339,8 @@
           ],
           "measures": "Voxel count of each connected component, largest first.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -1448,7 +1456,8 @@
           "measures": "Alias of largest_component_fraction, exposed under its item-025 public name.",
           "mode_evidence": [
             "per_mode_metric",
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -1514,7 +1523,8 @@
           ],
           "measures": "Fraction of the label's voxels belonging to its single largest piece.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -1675,7 +1685,8 @@
           "measures": "Voxel sizes of every non-dominant component.",
           "mode_evidence": [
             "per_mode_metric",
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -1942,7 +1953,8 @@
           ],
           "measures": "The integer vertebra label this per_label entry describes.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -2010,7 +2022,8 @@
           ],
           "measures": "Anatomical vertebra name, e.g. \"T8\", \"L3\".",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -2094,7 +2107,8 @@
           ],
           "measures": "Case-level spine relationships, or null for a 0-label map.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -2216,7 +2230,8 @@
           ],
           "measures": "Canonical levels absent within the observed present-level span.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -2332,7 +2347,8 @@
           ],
           "measures": "Level names that broke the monotonic canonical-rank check.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -2401,7 +2417,8 @@
           "measures": "Recognised anatomical levels, in canonical head-to-tail order.",
           "mode_evidence": [
             "per_mode_metric",
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -2479,7 +2496,8 @@
           ],
           "measures": "The list of overlapping label pairs for this case.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -2544,7 +2562,8 @@
           ],
           "measures": "The lower integer label of an overlapping pair.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -2604,7 +2623,8 @@
           ],
           "measures": "The higher integer label of an overlapping pair.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -2664,7 +2684,8 @@
           ],
           "measures": "Anatomical vertebra name for label_a.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -2724,7 +2745,8 @@
           ],
           "measures": "Anatomical vertebra name for label_b.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -2786,7 +2808,8 @@
           "measures": "Number of voxels claimed by both labels of the pair.",
           "mode_evidence": [
             "per_mode_metric",
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -2900,7 +2923,8 @@
           ],
           "measures": "Signed x-axis displacement from the fitted spline.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -2959,7 +2983,8 @@
           ],
           "measures": "Signed y-axis displacement from the fitted spline.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -3018,7 +3043,8 @@
           ],
           "measures": "Signed z-axis displacement from the fitted spline.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -3077,7 +3103,8 @@
           ],
           "measures": "Whether this entry is the first or last vertebra of the ordered centroid sequence it was measured in (item 123) -- true for a field-of-view / anatomical end, false for an interior vertebra.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -3140,7 +3167,8 @@
           ],
           "measures": "The integer label this spline-offset entry describes.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -3199,7 +3227,8 @@
           ],
           "measures": "Anatomical vertebra name for this spline-offset entry.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -3261,7 +3290,8 @@
           "measures": "Perpendicular distance from the vertebra's centroid to the fitted spline.",
           "mode_evidence": [
             "per_mode_metric",
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -4196,7 +4226,8 @@
           ],
           "measures": "Level-name pairs whose spline parameter does not advance.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -7250,7 +7281,8 @@
           ],
           "measures": "The per-label feature map, keyed by integer label.",
           "mode_evidence": [
-            "rule_mode_map"
+            "rule_mode_map",
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {

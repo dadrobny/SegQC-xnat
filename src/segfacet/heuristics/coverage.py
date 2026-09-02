@@ -54,7 +54,7 @@ from typing import Dict, List, Optional
 
 from segfacet.heuristics.finding import Finding
 from segfacet.heuristics.fov import derive_fov_coverage
-from segfacet.heuristics.rule import Rule, register_rule
+from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
 from segfacet.labels import CANONICAL_ORDER
 from segfacet.verdict import Severity
 
@@ -126,6 +126,11 @@ class CoverageRule(Rule):
     """
 
     rule_id = "coverage"
+
+    # §6 mode 5 (item 136): RemoveLevelPerturbation
+    # (src/segfacet/synth/coverage_border_overlap.py) designates "coverage"
+    # for mode 5 via its Expectation(failure_mode=5, expected_rule_ids={"coverage"}).
+    mode_declaration = RuleModeDeclaration(modes=(5,), evidence=("corpus",))
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate the coverage checks for *record*.

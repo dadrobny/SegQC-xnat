@@ -92,7 +92,7 @@ import math
 from typing import Dict, List, Optional
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, register_rule
+from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
 from segfacet.verdict import Severity
 
 __all__ = ["MislabelRule"]
@@ -164,6 +164,12 @@ class MislabelRule(Rule):
     """
 
     rule_id = "mislabel"
+
+    # §6 modes 1, 4 (item 136): DisplacePerturbation designates mode 1,
+    # RelabelSwapPerturbation designates mode 4
+    # (src/segfacet/synth/identity_ordering_alignment.py), both via
+    # Expectation(..., expected_rule_ids={"mislabel"}).
+    mode_declaration = RuleModeDeclaration(modes=(1, 4), evidence=("corpus",))
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate mislabel / misalignment signals for *record*.
