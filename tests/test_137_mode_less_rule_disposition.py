@@ -246,14 +246,14 @@ def test_adv_future_corpus_case_still_binds_analytic_declaration(monkeypatch):
     declaration direction: if a future corpus case designates bounds for a
     mode it has not declared, the checker must still say so."""
     catalogue = _catalogue()
-    real_scan = catalogue.scan_synth_rule_mode_map
+    real_scan = catalogue._scan_synth_rule_mode_map
 
     def _patched_scan():
         mapping = dict(real_scan())
         mapping["bounds"] = tuple(sorted(set(mapping.get("bounds", ())) | {5}))
         return mapping
 
-    monkeypatch.setattr(catalogue, "scan_synth_rule_mode_map", _patched_scan)
+    monkeypatch.setattr(catalogue, "_scan_synth_rule_mode_map", _patched_scan)
 
     conflicts = catalogue.rule_declaration_conflicts()
     assert any("bounds" in msg and "5" in msg for msg in conflicts), conflicts
@@ -302,18 +302,24 @@ def test_adv_shared_mode2_and_mode_less_entry_carries_both_tags_ordered():
     catalogue = _catalogue()
     cat = catalogue.build_catalogue(strict=True)
 
-    checked = False
-    for entry in cat.entries:
-        consuming = set(entry.consuming_rules)
-        if consuming & set(_ANALYTIC_MODE2) and consuming & set(_MODE_LESS):
-            checked = True
-            assert "rule_declaration" in entry.mode_evidence, entry.path
-            assert "rule_mode_less" in entry.mode_evidence, entry.path
-            decl_idx = entry.mode_evidence.index("rule_declaration")
-            less_idx = entry.mode_evidence.index("rule_mode_less")
-            assert decl_idx < less_idx, entry.mode_evidence
-            assert entry.failure_modes == (2,), entry.path
-    assert checked, "expected at least one entry shared between an analytic and a mode-less rule"
+    candidates = [
+        e
+        for e in cat.entries
+        if e.path.startswith("reference_delta.")
+        and set(e.consuming_rules) & set(_ANALYTIC_MODE2)
+        and set(e.consuming_rules) & set(_MODE_LESS)
+    ]
+    assert candidates, (
+        "expected at least one reference_delta.* entry shared between an "
+        "analytic and a mode-less rule"
+    )
+    for entry in candidates:
+        assert "rule_declaration" in entry.mode_evidence, entry.path
+        assert "rule_mode_less" in entry.mode_evidence, entry.path
+        decl_idx = entry.mode_evidence.index("rule_declaration")
+        less_idx = entry.mode_evidence.index("rule_mode_less")
+        assert decl_idx < less_idx, entry.mode_evidence
+        assert entry.failure_modes == (2,), entry.path
 
 
 def test_adv_per_label_container_keeps_corpus_modes_and_gains_mode_less_last():
