@@ -972,7 +972,8 @@ rule(s) and any features they need; features may be added alone, modes and rules
 - [x] Every registered rule maps to ≥1 §6 mode or is recorded as mode-less with a reason. *(Full suite run 2026-09-02: test_ac2_ac3_analytic_rule_declares_mode_two_only[bounds] passed)*
 - [x] Every registered rule is exercised by ≥1 case or recorded as unexercised with a *(Full suite run 2026-09-02: test_ac2_ac3_analytic_rule_declares_mode_two_only[reference_delta] passed)*
   reason (**G2**).
-- [x] The specificity assertion is enforced for every corpus case. *(Full suite run 2026-09-02: test_ac4_mode_two_declaration_is_analytic_with_named_mechanism passed for both rules)*
+- [ ] The specificity assertion is enforced for every corpus case. *(Full suite run 2026-09-02: test_ac4_mode_two_declaration_is_analytic_with_named_mechanism passed for both rules)*
+  - **2026-09-02** → retracted: Retracting an attestation-mapping error: this criterion (specificity assertion enforced for every corpus case) was mistakenly ticked by positional mismapping to item 137's AC4 test; the specificity assertion is Item 140's future deliverable, not yet built, so this criterion does not hold.
 - [ ] The end-to-end detection count is stated honestly here rather than implied (**G7**). *(Full suite run 2026-09-02: test_ac5_mode_less_rule_declares_no_modes_not_pending passed for both rules)*
   - **2026-09-02** → retracted: Retracting an attestation-mapping error: this criterion (end-to-end detection count stated honestly) was mistakenly ticked using item 137's AC5 test as evidence by positional mismapping; that test verifies mode-less declarations, not this stage-level claim, which remains open (Item 142).
 
