@@ -171,7 +171,7 @@ def _row_for_rule(lines: list, rule_id: str):
         if not line.startswith("|"):
             continue
         cells = [c.strip() for c in line.strip("|").split("|")]
-        if cells and rule_id in cells[0]:
+        if cells and cells[0] == rule_id:
             return line
     return None
 
@@ -366,8 +366,48 @@ def test_ac8_mode_set_equals_mode_anchor_paths_keys():
 # AC9: mode titles transcribed from vision.md §6
 # =========================================================================== #
 
+# Hand-transcribed from docs/aide/vision.md §6 "Segmentation Failure Modes"
+# (lines 279-286 as of this writing), independently of
+# ``_vision_mode_titles()`` / ``traceability._vision_mode_titles()`` -- both
+# of those parse §6 with the identical regex, so comparing the builder's
+# output only to that helper's output would let a shared parsing bug through
+# undetected (both sides would agree with each other while disagreeing with
+# the actual document). These literals are the trailing-period-stripped,
+# whitespace-normalised title text exactly as §6 states it, preserving its
+# em dashes and arrows. If §6's wording changes, these must be updated by
+# hand to match -- there is no automated way to keep them in sync.
+VISION_SECTION_SIX_MODE_TITLES = {
+    1: "Label not aligned with the anatomical vertebra it names",
+    2: "Over-/under-segmentation — fused or fragmented vertebra segments",
+    3: "Disconnected components / islands, especially tiny rogue segments",
+    4: "Semantic mislabelling (wrong vertebra identification)",
+    5: "Not all vertebrae in the image are segmented",
+    6: "Partial vertebra at the image border whose appearance changes",
+    7: "Non-continuous label sequence (e.g. L1 → T12 → L2 → L5)",
+    8: "Overlapping segments",
+}
+
+
+def test_ac9_mode_titles_match_the_hand_transcribed_vision_literals():
+    """Independent ground truth: compares the built titles directly against
+    literals transcribed by hand from vision.md §6, not against another
+    parse of the same section -- this is the assertion that can actually
+    catch a parser bug shared by the builder and this test module."""
+    import segfacet.traceability as traceability
+
+    d = traceability.matrix_to_dict(traceability.build_matrix())
+    modes = _mode_records(d)
+    assert modes
+    assert set(modes.keys()) == set(VISION_SECTION_SIX_MODE_TITLES.keys())
+    for mode, record in modes.items():
+        assert record["title"] == VISION_SECTION_SIX_MODE_TITLES[mode], mode
+
 
 def test_ac9_mode_titles_are_transcribed_from_vision_section_six():
+    """Complementary derived check: still useful as a live-document guard
+    (it fails loudly if §6 is edited and the hand-transcribed literals above
+    are not updated to match), but it is not the AC9 ground-truth check --
+    see test_ac9_mode_titles_match_the_hand_transcribed_vision_literals."""
     import segfacet.traceability as traceability
 
     d = traceability.matrix_to_dict(traceability.build_matrix())
