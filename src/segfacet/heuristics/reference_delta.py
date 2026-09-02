@@ -42,8 +42,9 @@ in the same order. Findings are emitted ascending by integer label; within a
 label, in fixed condition order (distribution-distance -> out-of-range ->
 robust-z), with per-feature findings in ascending feature-name order.
 
-Targets §6 mode 2 (over-/under-segmentation), declared on analytic grounds
-(item 137) -- see ``ReferenceDeltaRule.mode_declaration``.
+Targets §6 modes 1 and 2 (spline-offset displacement, and over-/under-
+segmentation), declared on analytic grounds (item 137, corrected 2026-09-02)
+-- see ``ReferenceDeltaRule.mode_declaration``.
 """
 
 from __future__ import annotations
@@ -111,25 +112,35 @@ class ReferenceDeltaRule(Rule):
 
     rule_id = "reference_delta"
 
-    # §6 disposition (item 137): declares mode 2 (over-/under-segmentation)
-    # on analytic grounds, the same grounds as "bounds" -- no committed
-    # corpus case designates "reference_delta" for any mode, so evidence
-    # carries "analytic" plus the mechanism sentence, never "corpus". This
-    # is the distributional form of the same magnitude judgement: the only
-    # per-label feature the committed reference artifact carries is
-    # physical_volume_mm3, so "out of distribution" here means "implausible
-    # volume" measured against a cohort instead of against hand-set bounds.
+    # §6 disposition (item 137, corrected 2026-09-02): declares modes 1 and 2
+    # on analytic grounds -- no committed corpus case designates
+    # "reference_delta" for any mode, so evidence carries "analytic" plus the
+    # mechanism sentence, never "corpus". compute_reference_delta scores
+    # every feature the reference artifact tracks
+    # (`tracked_features = tuple(sorted(reference.features))`,
+    # segfacet/reference/delta.py), not physical_volume_mm3 alone: both
+    # committed reference artifacts (reference_verse_v1.json,
+    # reference_default.json) track 21 per-label features. That set spans
+    # physical_volume_mm3 and extent_{x,y,z}_mm -- the same magnitude
+    # features "bounds" targets verbatim (§6 mode 2), here measured against a
+    # cohort instead of hand-set bounds -- and also spline_offset_mm, read
+    # from stage3.per_label_offsets[].offset_mm, which is §6 mode 1's own
+    # anchor path (feature_docs.MODE_ANCHOR_PATHS[1]). A displaced-but-
+    # plausibly-sized label can therefore fire this rule on spline_offset_mm
+    # alone, a mode-1 detection, so mode 1 is declared alongside mode 2.
     mode_declaration = RuleModeDeclaration(
-        modes=(2,),
+        modes=(1, 2),
         evidence=(
             "analytic",
-            "the only per-label feature the committed reference artifact "
-            "carries is physical_volume_mm3 (z-score, robust-z, percentile "
-            "rank, out-of-range, plus the label-level distribution_distance "
-            "computed over it), so an out-of-distribution verdict here is an "
-            "implausible-volume judgement, the same §6 mode 2 magnitude "
-            "signal 'bounds' targets, measured against a cohort instead of "
-            "hand-set bounds.",
+            "compute_reference_delta scores every feature the reference "
+            "artifact tracks, not a single feature: both committed reference "
+            "artifacts carry 21 per-label features, spanning "
+            "physical_volume_mm3 and extent_{x,y,z}_mm -- the same §6 mode 2 "
+            "magnitude signal 'bounds' targets, measured against a cohort "
+            "instead of hand-set bounds -- and spline_offset_mm (from "
+            "stage3.per_label_offsets[].offset_mm), which is §6 mode 1's own "
+            "anchor feature, so an out-of-distribution verdict on that "
+            "feature alone is a mode 1 detection.",
         ),
     )
 

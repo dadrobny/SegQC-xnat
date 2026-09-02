@@ -494,3 +494,52 @@ records that `intensity` is exercised by the second committed corpus; item 142
 - `vision.md`/`feature_docs.MODE_ANCHOR_PATHS` were read only, never edited
   (AC17); no rule's `evaluate()` logic, threshold, or return shape changed
   (AC18) — the disposition is metadata-only, exactly as scoped.
+
+### Correction (2026-09-02, post-merge review)
+
+- The `reference_delta` disposition above rested on a false premise: its
+  evidence sentence asserted "the only per-label feature the committed
+  reference artifact carries is physical_volume_mm3". Measured directly
+  against both committed reference artifacts
+  (`src/segfacet/reference/reference_verse_v1.json`,
+  `src/segfacet/reference/reference_default.json`), each carries **21**
+  per-label features (`json.load(...)['features']`), and
+  `compute_reference_delta` (`src/segfacet/reference/delta.py:322`) scores
+  `tracked_features = tuple(sorted(reference.features))` — every tracked
+  feature it finds a case value for, not one hand-picked feature. Among
+  those 21 is `spline_offset_mm`, read from
+  `features_block["stage3"]["per_label_offsets"][…]["offset_mm"]`
+  (`delta.py:327-333`), which is exactly §6 mode 1's own anchor path
+  (`feature_docs.MODE_ANCHOR_PATHS[1] == ('stage3.per_label_offsets[].offset_mm',)`).
+  A displaced-but-plausibly-sized label can therefore fire `reference_delta`
+  on `spline_offset_mm` alone — a mode-1 detection from a rule that declared
+  only mode 2.
+- `bounds`' sentence was checked against the same premise and found accurate
+  as written: it reads `geometry.physical_volume_mm3` and
+  `extent_{x,y,z}_mm` directly from the case's own per-label record (see
+  `_METRICS` in `src/segfacet/heuristics/bounds.py`), a claim about what the
+  rule itself reads, not about the reference artifact's feature set — so it
+  was left unchanged.
+- Fix: `ReferenceDeltaRule.mode_declaration` in
+  `src/segfacet/heuristics/reference_delta.py` now declares `modes=(1, 2)`,
+  with a corrected evidence sentence stating what the rule actually reads
+  (every reference-tracked feature, spanning the mode-2 magnitude features
+  `bounds` also targets and the mode-1 `spline_offset_mm` anchor). Both
+  committed catalogue artifacts were regenerated
+  (`.venv/bin/python -m segfacet.catalogue`): 10 `reference_delta`-owned
+  leaf paths (`reference_delta.lower_pct`, `.upper_pct`,
+  `.{label}.available`, `.{label}.distribution_distance`,
+  `.{label}.features.physical_volume_mm3.{percentile_rank,robust_z,value}`,
+  `.{label}.label`, `.{label}.level_name`, `.{label}.out_of_range_features[]`)
+  gained mode 1 alongside their existing mode 2 (entries carrying mode 1:
+  9 → 19); the `mode_evidence` tag-composition distribution is unchanged
+  (86 `()` · 25 `("rule_mode_map", "rule_declaration")` · 7
+  `("rule_declaration",)` · 7 `("rule_declaration", "rule_mode_less")` · 6
+  `("per_mode_metric", "rule_mode_map", "rule_declaration")` · 4
+  `("rule_mode_less",)` · 2 `("per_mode_metric",)` · 1 `("rule_mode_map",
+  "rule_declaration", "rule_mode_less")`) since these paths already carried
+  the `"rule_declaration"` tag — only the `failure_modes` integer sets
+  changed, not which evidence mechanisms fired.
+- `tests/test_137_mode_less_rule_disposition.py`'s AC2/AC3 (which pinned
+  `reference_delta` at `modes == (2,)`) are updated separately by a
+  test-writer pass, not by this correction.
