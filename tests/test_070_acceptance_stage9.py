@@ -15,8 +15,11 @@ Stage-9 acceptance bar holds, decomposed into its three clauses:
        ``tests/test_070_deployment_docs.py``).
 
 AC7 (this module exists and is collect-clean) and AC11 (the literal roadmap
-sentence is traceable in this closer) are structural/self-referential and
-require no Docker either.
+wording is traceable in this closer) are structural/self-referential and
+require no Docker either. The three clauses above are one bullet plus one
+two-part bullet in roadmap.md since engine 1.37.0's drift lint required that
+block to carry one bullet per progress.md acceptance box; the decomposition
+here is unchanged.
 """
 
 from __future__ import annotations
@@ -54,10 +57,19 @@ REQUIRED_TOP_LEVEL_KEYS = (
 # whole path component, mirroring item 067's closure-check regex.
 MOUNT_PATH_TOKEN_RE = re.compile(r"/input/[A-Za-z0-9_-]+|/output(?![A-Za-z0-9_-])")
 
-# The roadmap's literal Stage-9 acceptance sentence (roadmap.md, Stage 9 ->
-# "Validation / acceptance", verbatim minus the trailing "(G5)" objective
-# tag). AC11 requires this exact sentence be traceable in this closer module.
-STAGE9_ACCEPTANCE_SENTENCE = "Container runs the pipeline on a mounted case, producing JSON + human report; `command.json` validates; install steps documented"
+# The roadmap's literal Stage-9 acceptance criteria (roadmap.md, Stage 9 ->
+# "Validation / acceptance"), verbatim minus the trailing "(**G5**)" objective
+# tag. AC11 requires these exact criteria be traceable in this closer module.
+#
+# One string per roadmap bullet. It was one semicolon-joined sentence until
+# engine 1.37.0's roadmap<->progress drift lint (aide-loop#142) required the
+# block to be a bullet list with one bullet per acceptance box in progress.md
+# -- which Stage 9 has always had two of. The wording is unchanged; only where
+# the clause boundary falls is.
+STAGE9_ACCEPTANCE_CRITERIA = (
+    "Container runs the pipeline on a mounted case, producing JSON + human report",
+    "`command.json` validates; install steps documented",
+)
 
 
 # =========================================================================== #
@@ -304,19 +316,21 @@ def test_ac11_stage9_acceptance_sentence_constant_matches_roadmap_wording():
     roadmap_path = REPO_ROOT / "docs" / "aide" / "roadmap.md"
     roadmap_text = roadmap_path.read_text(encoding="utf-8")
     normalized_roadmap_text = re.sub(r"\s+", " ", roadmap_text)
-    normalized_sentence = re.sub(r"\s+", " ", STAGE9_ACCEPTANCE_SENTENCE)
-    assert normalized_sentence in normalized_roadmap_text, (
-        "the module's STAGE9_ACCEPTANCE_SENTENCE constant must match roadmap.md's "
-        "literal Stage-9 'Validation / acceptance' wording verbatim"
-    )
+    for criterion in STAGE9_ACCEPTANCE_CRITERIA:
+        normalized_criterion = re.sub(r"\s+", " ", criterion)
+        assert normalized_criterion in normalized_roadmap_text, (
+            "every STAGE9_ACCEPTANCE_CRITERIA entry must match roadmap.md's "
+            f"literal Stage-9 'Validation / acceptance' wording verbatim: {criterion!r}"
+        )
 
 
 def test_ac11_stage9_acceptance_sentence_embedded_in_module_source():
     """The acceptance module must record the roadmap's literal Stage-9
-    sentence verbatim in its own source (module docstring or a module-level
+    criteria verbatim in its own source (module docstring or a module-level
     constant), so AC8/AC9/AC10 are self-documenting against the roadmap bar."""
     source = MODULE_PATH.read_text(encoding="utf-8")
-    assert STAGE9_ACCEPTANCE_SENTENCE in source, (
-        "tests/test_070_acceptance_stage9.py must embed the verbatim roadmap "
-        "Stage-9 acceptance sentence"
-    )
+    for criterion in STAGE9_ACCEPTANCE_CRITERIA:
+        assert criterion in source, (
+            "tests/test_070_acceptance_stage9.py must embed the verbatim roadmap "
+            f"Stage-9 acceptance wording: {criterion!r}"
+        )

@@ -164,6 +164,126 @@ def test_missing_assumptions_is_aggregated_into_one_warning(tmp_path: Path):
     assert "12 item spec(s)" in assumption_warnings[0] and "+4 more" in assumption_warnings[0]
 
 
+# --------------------------------------------------------------------------- #
+# an assumption pinned to an engine that has since moved (issue #144)
+# --------------------------------------------------------------------------- #
+def _marked(label: str, marker: str) -> str:
+    return (f"# Item 027 — Bounds\n\n> **Created:** 2026-08-18\n\n---\n\n"
+            f"## Assumptions\n\n- **{label} ({marker}):** `aide check` will "
+            f"warn that the pin is not one.\n")
+
+
+def test_an_assumption_pinned_to_an_older_engine_is_reported(tmp_path: Path):
+    """The recorded case: three merged specs asserting `aide check` warnings a
+    later release deliberately removed, one calling their presence "expected
+    output". `--update` copies the new engine and says nothing about the claims
+    it just falsified, so the only detector is the spec's own marker."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md", _marked("A8", "engine 1.28.1"))
+    w = aide.item_spec_warnings(repo / "docs" / "aide", engine="1.35.0")
+    assert len(w) == 1 and "027 A8 (engine 1.28.1)" in w[0] and "1.35.0" in w[0]
+
+
+def test_the_marker_is_read_in_the_spelling_consumers_actually_use(tmp_path: Path):
+    """The template closes the bold after the label; a real consumer's 112
+    specs close it after the whole sentence — `- **A8: the CLI warns …**`. A
+    parser requiring the first shape matches nothing in the second and the
+    check silently never fires, which is how the sibling `**Status:**` lint
+    was nearly shipped dead."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md",
+               "# Item 027 — Bounds\n\n> **Created:** 2026-08-18\n\n---\n\n"
+               "## Assumptions\n\n"
+               "- **A8 (engine 1.28.1): `aide check`'s two standing `eol=lf` "
+               "warnings are not acted on.** They are expected output.\n")
+    w = aide.item_spec_warnings(repo / "docs" / "aide", engine="1.35.0")
+    assert len(w) == 1 and "027 A8 (engine 1.28.1)" in w[0]
+
+
+def test_a_bold_label_wrapped_across_lines_is_still_read(tmp_path: Path):
+    """Two of the three specs #144 was filed over write the assumption as a
+    paragraph, so the bold label opens on the bullet line and closes two lines
+    down. A line-at-a-time reader sees an unterminated `**` and never fires."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md",
+               "# Item 027 — Bounds\n\n> **Created:** 2026-08-18\n\n---\n\n"
+               "## Assumptions\n\n"
+               "- **A14 (engine 1.28.1): `binary` is the correct pin for the\n"
+               "  snapshots, and `aide check` will warn that it is not.** Do not\n"
+               "  act on that warning.\n")
+    w = aide.item_spec_warnings(repo / "docs" / "aide", engine="1.35.0")
+    assert len(w) == 1 and "027 A14 (engine 1.28.1)" in w[0]
+
+
+def test_an_engine_version_in_prose_is_not_a_marker(tmp_path: Path):
+    """The marker is parenthesised and sits in the label run. A version
+    discussed in the assumption's body is being talked about, not pinned."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md",
+               GOOD_SPEC.replace("None.",
+                                 "- **A8:** engine 1.28.1 was current when this "
+                                 "was written (see the note below).\n"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide", engine="1.35.0") == []
+
+
+def test_a_patch_release_does_not_falsify_an_assumption(tmp_path: Path):
+    """Patch is defined as a fix with no interface change, so it cannot
+    falsify a claim about what a verb does — warning on one would be noise on
+    a record the consumer is not allowed to rewrite."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md", _marked("A8", "engine 1.28.1"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide", engine="1.28.9") == []
+
+
+def test_a_re_check_appended_to_the_marker_clears_it(tmp_path: Path):
+    """The clearing path is append, not rewrite: the original pin stays and the
+    newest version named is the one the claim stands on."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md",
+               _marked("A8", "engine 1.28.1, re-checked 1.35.0"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide", engine="1.35.0") == []
+
+
+def test_an_unmarked_assumption_is_never_warned_about(tmp_path: Path):
+    """The marker is what makes the claim checkable. Guessing an engine for an
+    assumption that names none would warn on every spec ever written."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md",
+               GOOD_SPEC.replace("None.", "- **A8:** the CLI warns about eol pins."))
+    assert aide.item_spec_warnings(repo / "docs" / "aide", engine="1.35.0") == []
+
+
+def test_the_marker_is_read_only_inside_the_assumptions_block(tmp_path: Path):
+    """A later section may discuss an old engine in passing; only the
+    Assumptions block holds claims the loop hands forward."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md", GOOD_SPEC + (
+        "\n## Decisions & Trade-offs\n\n"
+        "- **D1 (engine 1.10.0):** measured back then.\n"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide", engine="1.35.0") == []
+
+
+def test_stale_pins_are_aggregated_and_capped(tmp_path: Path):
+    """Same reasoning as the missing-Assumptions aggregate: a consumer with a
+    long queue must not have its substantive findings buried."""
+    repo = _repo(tmp_path)
+    for n in range(1, 10):
+        _spec_file(repo, f"{n:03d}-x.md",
+                   _marked("A1", "engine 1.28.1").replace("Item 027", f"Item {n:03d}"))
+    w = aide.item_spec_warnings(repo / "docs" / "aide", engine="1.35.0")
+    stale = [x for x in w if "pin an engine older" in x]
+    assert len(stale) == 1
+    assert "9 assumption(s)" in stale[0] and "+3 more" in stale[0]
+
+
+def test_no_engine_version_available_skips_the_check(tmp_path: Path):
+    """A script copied away from its VERSION file says nothing rather than
+    guessing — the same posture `_engine_stamp` already takes."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md", _marked("A8", "engine 1.28.1"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide") == []
+
+
 def _with_paths(asserts: str, may: str = "src/a.py") -> str:
     return (GOOD_SPEC + "\n## Authorised paths\n\n**May change:**\n\n"
             f"- `{may}` — work\n\n**Asserts against:**\n\n"

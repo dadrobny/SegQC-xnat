@@ -55,6 +55,13 @@ validator surfaces them for audit). A spec written before a dependency is
 *implemented* pins that interface here as an assumption; the builder/validator
 hand back if reality diverged. Write "None." if the item was fully specified._
 
+_An assumption that pins **engine** behaviour — what `aide check` warns about,
+what a verb does — names the engine it was true for, in the bold label:
+`- **A3 (engine 1.28.1):** ...`. This spec outlives its branch and the engine
+moves under it, and `aide check` then says so. Append the outcome of a
+re-check to the marker (`(engine 1.28.1, re-checked 1.36.0)`); never rewrite
+the assumption to agree with a later engine — a merged spec is a record._
+
 - {{assumption, and the interface/behaviour it pins}}
 
 ## Implementation Steps

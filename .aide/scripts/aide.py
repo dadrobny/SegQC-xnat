@@ -846,8 +846,12 @@ _ACCEPT_TRAIL_RE = re.compile(
 #: have to find it again after the fact.
 _RETRACTED_PREFIX = "retracted: "
 #: An attestation annotation, as `accept --evidence` writes it: a trailing
-#: `*(…)*`. `reword` refuses over one — see `reword_criterion`.
-_ACCEPT_EVIDENCE_RE = re.compile(r"\*\([^)]*\)\*\s*$")
+#: `*(…)*`. `reword` refuses over one — see `reword_criterion`. The body is
+#: greedy and the close anchored at end of line, because evidence carrying its
+#: own parentheses is ordinary ("(4 cores)", "(see §6)"): a `[^)]*` body
+#: stopped at the first `)` and then matched nothing at all, so the guard
+#: opened on exactly the annotations most worth keeping (#143).
+_ACCEPT_EVIDENCE_RE = re.compile(r"\*\(.*\)\*\s*$")
 
 
 def acceptance_box_trail(lines: List[str], box: int, end: int) -> List[int]:
@@ -1088,6 +1092,53 @@ def reword_roadmap_bullet(text: str, stage: str, n: int, new_text: str,
     m = re.match(r"^(?P<pre>\s*[-*]\s+)(?P<body>.*)$", lines[i])
     lines[i] = m.group("pre") + new_text.strip()
     return "\n".join(lines) + ("\n" if text.endswith("\n") else ""), None
+
+
+def acceptance_drift_warnings(ddir: Path, plines: List[str]) -> List[str]:
+    """Stages whose acceptance box count disagrees with roadmap.md's mirror.
+
+    §1 → progress.md says the Acceptance boxes come "from the matching roadmap
+    stage", and `templates/roadmap.md` says the Validation / acceptance bullets
+    become those boxes — the one mirror in §1 nothing enforced (issue #142).
+    The observed drift: a consumer's stage carried a fourth, load-bearing box
+    its roadmap never grew, and there was no moment at which anything would
+    have said so. Since 1.35.0 the silence also has teeth: `aide progress
+    reword` matches boxes to bullets by index and refuses on a drifted stage,
+    so a consumer met a refusal with no tool that would say which stages drift
+    or where.
+
+    Counts, not text: comparing wording would fire on every honest tightening
+    of a criterion's prose, which is exactly what `reword` exists to make
+    cheap. The count is the signal that a criterion was *added or dropped* on
+    one side only.
+
+    A warning, never an error — a stage may legitimately be mid-replan, and a
+    document set that was fine yesterday must not start failing today. Silent
+    when roadmap.md is absent, when a stage has no roadmap section, and when
+    its section has no Validation / acceptance block at all: no mirror is a
+    different situation from a mirror that disagrees, and
+    ``roadmap_acceptance_bullets`` keeps the two apart for `reword` already.
+    """
+    rpath = ddir / "roadmap.md"
+    if not rpath.is_file():
+        return []
+    rlines = rpath.read_text(encoding=_ENCODING).splitlines()
+    out: List[str] = []
+    for start, end, stage in stage_sections(plines):
+        bullets = roadmap_acceptance_bullets(rlines, stage)
+        if bullets is None:
+            continue
+        boxes = len(acceptance_boxes(plines, start, end))
+        if boxes != len(bullets):
+            out.append(
+                f"stage {stage}: progress.md has {boxes} acceptance "
+                f"box{'' if boxes == 1 else 'es'} but roadmap.md's Validation "
+                f"/ acceptance block lists {len(bullets)} "
+                f"bullet{'' if len(bullets) == 1 else 's'} — a criterion was "
+                f"added or dropped on one side only; line the two up by hand "
+                f"('aide progress reword' refuses on this stage until they "
+                f"agree)")
+    return out
 
 
 def _objective_stages(delivered_by: str) -> List[str]:
@@ -2945,7 +2996,139 @@ def root_document_warnings(ddir: Path) -> List[str]:
     return out
 
 
-def item_spec_warnings(ddir: Path, ddir_rel: str = "docs/aide") -> List[str]:
+#: An assumption bullet that names the engine it was true for — the §1 marker
+#: ``- **A8 (engine 1.28.1):** …``. The engine version goes in the bold label,
+#: beside the assumption's own code, because that is where a reader looking for
+#: "which claim is this?" already is; a version buried in the assumption's prose
+#: is not read, so a claim about engine behaviour written without the marker
+#: goes unchecked rather than wrongly checked.
+#:
+#: The marker is free-form apart from the word ``engine`` and a SemVer triple:
+#: it may carry a re-check — ``(engine 1.28.1, re-checked 1.35.0)`` — and the
+#: **newest** version it names is the one the claim currently stands on.
+#: The **label run** of an assumption bullet: the bold opener the template
+#: writes. Two real spellings, and the marker has to survive both — the closing
+#: `**` may sit right after the label (`- **A8 (engine 1.28.1):** …`) or at the
+#: end of the whole sentence (`- **A8 (engine 1.28.1): the CLI warns …**`),
+#: which is what one consumer's 112 specs actually use. An unbolded bullet
+#: falls back to the text before its first colon, so `- A8 (engine 1.28.1): …`
+#: is read too; without that boundary the marker would be hunted through the
+#: assumption's whole prose, where a version is being discussed rather than
+#: pinned.
+_ASSUMPTION_LABEL_RE = re.compile(r"^\s*[-*]\s+(?:\*\*(?P<bold>.+?)\*\*|(?P<plain>[^:*]*):)")
+#: A parenthesised marker naming the engine, anywhere in that label run.
+_ENGINE_MARKER_RE = re.compile(r"\(([^)]*engine[^)]*)\)", re.IGNORECASE)
+#: A SemVer triple anywhere in that marker. Prerelease and build suffixes are
+#: not read: the comparison below is on `major.minor` alone, and a consumer
+#: running `1.29.0-rc1` is on 1.29 for the purpose of "has the engine moved".
+_SEMVER_RE = re.compile(r"\b(\d+)\.(\d+)\.(\d+)\b")
+
+
+def _feature_line(version: str) -> Optional[Tuple[int, int]]:
+    """``(major, minor)`` of *version*, or ``None`` if it is not SemVer.
+
+    Deliberately drops the patch. This repo's own bump policy defines patch as
+    "a fix with no interface change", so a patch release cannot falsify a claim
+    about what a verb does or what `check` reports — warning on one would be
+    noise the consumer cannot act on, on a record it is not allowed to rewrite.
+    """
+    m = _SEMVER_RE.search(version)
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def assumption_engine_pin(line: str) -> Optional[Tuple[str, str]]:
+    """``(label, version)`` for an engine-marked assumption bullet, else None.
+
+    *version* is the newest SemVer triple in the marker, so a re-check note
+    supersedes the original pin: that is how a stale marker is cleared without
+    rewriting the assumption itself — the claim stands, and what was learned
+    about it afterwards is appended, exactly as `progress amend` and an
+    insights status trail already work (§1).
+    """
+    m = _ASSUMPTION_LABEL_RE.match(line)
+    if not m:
+        return None
+    run = m.group("bold") or m.group("plain") or ""
+    versions = [f"{a}.{b}.{c}"
+                for marker in _ENGINE_MARKER_RE.findall(run)
+                for a, b, c in _SEMVER_RE.findall(marker)]
+    if not versions:
+        return None
+    newest = max(versions, key=lambda v: tuple(int(x) for x in v.split(".")))
+    # The label is what stands before the marker — "A8" out of "A8 (engine
+    # 1.28.1): the CLI warns …" — so the warning names the assumption the way
+    # the spec's own cross-references do.
+    label = run.split("(", 1)[0].strip().rstrip(":").strip()
+    return (label or "assumption"), newest
+
+
+def _assumption_bullets(text: str) -> List[str]:
+    """The bullets of the ``## Assumptions`` block, each joined onto one line.
+
+    Joining is the whole point: a real spec's assumption runs to a paragraph,
+    so its bold label routinely opens on the bullet line and closes two lines
+    down — two of the three specs issue #144 was filed over are written that
+    way. A line-at-a-time reader sees an unterminated `**`, matches nothing,
+    and the check silently never fires.
+
+    A blank line ends a bullet, a `## ` heading ends the block, and a `### `
+    sub-heading does not: it is still inside Assumptions.
+    """
+    out: List[str] = []
+    current: Optional[str] = None
+    in_block = False
+    for line in text.splitlines():
+        if re.match(r"^##\s+", line):
+            if current:
+                out.append(current)
+                current = None
+            in_block = bool(re.match(r"^##\s+Assumptions\b", line))
+            continue
+        if not in_block:
+            continue
+        if re.match(r"^\s*[-*]\s+\S", line):
+            if current:
+                out.append(current)
+            current = line.strip()
+        elif current is not None:
+            if line.strip():
+                current += " " + line.strip()
+            else:
+                out.append(current)
+                current = None
+    if current:
+        out.append(current)
+    return out
+
+
+def _stale_assumption_pins(text: str, engine: str) -> List[Tuple[str, str]]:
+    """Engine-marked assumptions in *text* whose engine predates *engine*.
+
+    Reads the ``## Assumptions`` block only. An assumption is a durable record
+    that outlives its branch and can legitimately pin **engine** behaviour —
+    what `aide check` warns about, what a verb does — and `install.py --update`
+    says nothing about the specs whose assumptions it has just falsified
+    (issue #144). One consumer carried three merged specs asserting warnings a
+    later release had deliberately removed, one of them calling their presence
+    "expected output"; nothing detected it, and the specs are records, so the
+    repair is not to edit them.
+    """
+    installed = _feature_line(engine)
+    if installed is None:
+        return []
+    out: List[Tuple[str, str]] = []
+    for bullet in _assumption_bullets(text):
+        pin = assumption_engine_pin(bullet)
+        if pin is None:
+            continue
+        pinned = _feature_line(pin[1])
+        if pinned is not None and pinned < installed:
+            out.append(pin)
+    return out
+
+
+def item_spec_warnings(ddir: Path, ddir_rel: str = "docs/aide",
+                       engine: Optional[str] = None) -> List[str]:
     """Item specs that break the shapes §1 and §5 fix.
 
     Four rules: the `# Item NNN — Title` heading must agree with the filename
@@ -2959,9 +3142,15 @@ def item_spec_warnings(ddir: Path, ddir_rel: str = "docs/aide") -> List[str]:
     bookkeeping. Pinning progress.md is the natural way to write an AC that
     reads a gate row, which is exactly why it needs a spec-time warning.
 
+    A fifth is advisory rather than structural: an assumption marked with the
+    engine it was true for — `- **A8 (engine 1.28.1):** …` — whose engine
+    predates the installed one. See `_stale_assumption_pins`.
+
     *ddir_rel* is the docs dir as specs spell it in their repo-relative paths;
     `run_checks` passes the configured value, and the default matches the
-    scaffolded `aide.toml`.
+    scaffolded `aide.toml`. *engine* is the installed engine version, as
+    `.aide/VERSION` holds it; `None` (the default, and what a script copied
+    away from its VERSION file gets) skips the assumption check entirely.
 
     The missing-Assumptions finding is reported as ONE aggregated line. Specs
     predating the rule are common — 32 of 112 in the consumer this was measured
@@ -2974,6 +3163,7 @@ def item_spec_warnings(ddir: Path, ddir_rel: str = "docs/aide") -> List[str]:
     always = _always_authorised_paths(ddir_rel)
     out: List[str] = []
     missing_assumptions: List[str] = []
+    stale_pins: List[str] = []
     for path in sorted(idir.glob("*.md")):
         m = re.match(r"0*(\d+)", path.name)
         if not m:
@@ -2997,6 +3187,9 @@ def item_spec_warnings(ddir: Path, ddir_rel: str = "docs/aide") -> List[str]:
                        f"and only drifts")
         if not re.search(r"^##\s+Assumptions", text, re.MULTILINE):
             missing_assumptions.append(f"{num:03d}")
+        elif engine:
+            stale_pins.extend(f"{num:03d} {label} (engine {version})"
+                              for label, version in _stale_assumption_pins(text, engine))
         parsed = parse_authorised_paths(text)
         for pin in (parsed.asserts_against if parsed else []):
             if any(patterns_overlap(pin, a) for a in always):
@@ -3045,6 +3238,15 @@ def item_spec_warnings(ddir: Path, ddir_rel: str = "docs/aide") -> List[str]:
         out.append(f"{len(missing_assumptions)} item spec(s) have no mandatory "
                    f"'## Assumptions' block: {shown}{more} — it is what the "
                    f"validator surfaces for audit at the queue boundary")
+    if stale_pins:
+        shown = "; ".join(stale_pins[:6])
+        more = f" (+{len(stale_pins) - 6} more)" if len(stale_pins) > 6 else ""
+        out.append(f"{len(stale_pins)} assumption(s) pin an engine older than "
+                   f"the installed {engine}: {shown}{more} — the engine has "
+                   f"moved under the claim, so re-check it before a reader "
+                   f"trusts it. The spec is a record: append the outcome to "
+                   f"the marker (`(engine 1.28.1, re-checked {engine})`) "
+                   f"rather than rewriting the assumption")
     return out
 
 
@@ -3147,7 +3349,8 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
     # cannot appear in a spec's repo-relative paths — the always-authorised
     # pin lint then has nothing to match; the other spec-shape lints still
     # apply.
-    warnings.extend(item_spec_warnings(ddir, _rel_display(ddir, repo_root)))
+    warnings.extend(item_spec_warnings(ddir, _rel_display(ddir, repo_root),
+                                       installed_engine_version()))
     if ddir.exists() and not ddir.is_dir():
         # `docs_dir` pointing at something that is not a directory is a
         # misconfiguration, and a third case again: it is neither "no document
@@ -3187,6 +3390,7 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
             f"attestation is kept above the correction")
     warnings.extend(nested_deliverable_warnings(lines))
     warnings.extend(unattributed_reference_warnings(lines))
+    warnings.extend(acceptance_drift_warnings(ddir, lines))
 
     # Mandatory sections.
     has_stage_table = any(
@@ -4030,11 +4234,23 @@ def _cmd_progress_accept(args: argparse.Namespace) -> int:
 _VERSION_FILE = Path(__file__).resolve().parents[1] / "VERSION"
 
 
-def _engine_stamp() -> Optional[str]:
+def installed_engine_version() -> Optional[str]:
+    """The engine version this script belongs to, or None if it cannot be read.
+
+    Two readers: the stamp a captured insight carries (§1), and the assumption
+    marker check in `item_spec_warnings`. Both treat a missing file as "say
+    nothing" rather than as an error — the script may have been copied away
+    from its siblings, and neither reader is load-bearing enough to fail over.
+    """
     try:
         v = _VERSION_FILE.read_text(encoding=_ENCODING).strip()
     except OSError:
         return None
+    return v or None
+
+
+def _engine_stamp() -> Optional[str]:
+    v = installed_engine_version()
     return f"engine {v}" if v else None
 
 

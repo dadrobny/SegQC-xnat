@@ -174,6 +174,22 @@ def test_reword_refuses_a_criterion_carrying_a_correction_trail():
         aide.reword_criterion(seeded, "1", 2, "something else")
 
 
+def test_reword_refuses_an_annotation_whose_evidence_carries_parentheses():
+    """Issue #143: the guard read the annotation, not just its outline.
+
+    Evidence with parentheses of its own — "(4 cores)", "(see §6)" — is
+    ordinary, and a non-greedy body stopped at the first `)`, matched nothing,
+    and let `reword` replace the whole box body: the evidence vanished with
+    nothing in the trail to say it had been there.
+    """
+    seeded = PROGRESS.replace(
+        "- [ ] The CLI reports a non-zero exit on failure.",
+        "- [ ] The CLI reports a non-zero exit on failure. "
+        "*(validator, 2026-09-02: measured on the bench (4 cores), see §6)*")
+    with pytest.raises(ValueError, match="carries an annotation"):
+        aide.reword_criterion(seeded, "1", 2, "something else")
+
+
 def test_reword_refuses_text_carrying_a_line_break():
     with pytest.raises(ValueError, match="line break"):
         aide.reword_criterion(PROGRESS, "1", 2, "one\ntwo")

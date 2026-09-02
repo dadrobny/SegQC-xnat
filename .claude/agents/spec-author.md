@@ -37,6 +37,11 @@ audits it at the queue boundary. Nothing ever hangs waiting for input.
 Either way: if a dependency is not yet *implemented*, pin the interface you assume
 in **Assumptions** (the builder/validator hand back if reality diverged).
 
+An assumption that pins **engine** behaviour — what `aide check` warns about,
+what a verb does — names the engine it was true for: `- **A3 (engine 1.28.1):**
+…`. The spec outlives its branch, the engine moves under it, and the marker is
+what lets `aide check` say so later (§1 → items.md).
+
 ## What you do
 
 1. **Land on the claim branch:** `python .aide/scripts/aide.py sync --item NNN`
