@@ -73,6 +73,59 @@ change for *any* item in *any* stage, converting a recorded shortfall into a
 false claim that nobody had made. A stage may be ✅ with an unticked box; say
 why in an annotation beside it.
 
+**The attestation is immutable; what is recorded about it is not.** The same
+rule `insights.md` runs on, and load-bearing for the same reason: an
+attestation that turns out to be wrong is the record, and a correction written
+beneath it teaches what a silent rewrite would erase. So the criterion line is
+never reworded once anything has been claimed against it, and every later
+statement about it goes in an appendable **correction trail** — dated lines
+indented under the box, newest last:
+
+```
+- [ ] Benchmark run end to end. *(validator, 2026-08-29: on this CPU-only machine)*
+  - **2026-09-01** → the host has four GPUs; the CPU-only basis was misread
+  - **2026-09-02** → retracted: re-run pending on a host we have identified
+```
+
+Three verbs, and **none of them edits the original line**:
+
+```
+aide progress amend   <stage> --criterion N --evidence "<the corrected basis>"
+aide progress retract <stage> --criterion N --reason   "<why it is withdrawn>"
+aide progress reword  <stage> --criterion N --text     "<the new wording>"
+```
+
+- **`amend` appends, and only to a ticked box.** The attestation stands; what
+  was recorded about it was wrong or thin. This is the whole guard, and it is
+  structural rather than advisory: **a verb that can only add cannot be used to
+  make an inconvenient attestation agree with a shipped stage.** Over-using it
+  costs verbosity, never truth.
+- **`retract` unticks, and keeps the original attestation visible.** The
+  criterion does not hold after all, so the box reads as *claimed, then
+  withdrawn, for this reason* — not as one nobody ever ticked. **A retraction
+  is a finding, so the verb routes it like one**: an `insights.md` `- [ ] gap`
+  entry in the same commit, exactly as a `❌ Not met` outcome target does. That
+  is what keeps the honest path the cheap one.
+- **`reword` is the one amendment that edits rather than appends**, and it is
+  safe for exactly one reason: nothing has been claimed yet. It **refuses over
+  a box that is ticked, annotated, or already carries a correction trail** —
+  the precondition is mechanical, so no role has to remember it. Rewording a
+  criterion an attestation was made against would silently re-point that
+  attestation at a different claim.
+
+**`reword` writes both documents or neither.** `roadmap.md` mirrors a stage's
+criteria, so a rewording that lands in one file is precisely the two-file drift
+the verb exists to remove. The Nth box is matched to the Nth non-`Target:`
+bullet of the roadmap stage's **Validation / acceptance** block; if the two
+cannot be lined up, **nothing is written** and the message says which counts
+disagreed.
+
+Neither `amend` nor `retract` takes `--all`: each attestation was made
+separately and is corrected or withdrawn separately. Both refuse without a
+stated reason. And `aide check` warns on every retracted criterion while
+`aide status` prints it, so a withdrawal stays visible instead of living only
+in one commit's diff.
+
 **What a stage's ✅ means — and what it deliberately does not.** The rollup
 makes stage status track exactly one thing: *the planned work shipped*. An
 Acceptance box is therefore an observable check **of the built thing** (the

@@ -280,18 +280,12 @@ from the local working tree):
   bytes with `\n` (`write_bytes`, not `write_text`, since Python 3.9 can't set
   `newline=` on `Path.write_text`). Engine 1.19.0 gave the rule a lint: `aide
   check` resolves a fixture path through the test's AST and warns when nothing in
-  `.gitattributes` covers it. It is precise rather than exhaustive by design — a
-  path reached through `tmp_path`, a function argument or an imported constant
-  resolves to nothing and is skipped in silence — so a warning is authoritative
-  and its absence is not a clean bill of health. Engine 1.29.1 documented a
-  **second** silence, and it is the one that misleads here: the lint decides a
-  *read shape*, not whether a file needs a pin, and `read_text()` applies
-  universal-newline translation — so a committed artifact read that way and then
-  parsed draws no warning whether or not it is pinned. Both fixtures named above
-  are exactly that shape (`json.loads` over `read_text()`), so their pins are
-  held by this rule and by `tests/test_111_golden_guard.py`, never by the lint;
-  removing either pin would fail on Windows in silence. `read_bytes()` has no
-  such immunity and is always reported.
+  `.gitattributes` covers it. **That lint says nothing about either fixture named
+  above**, and its two silences are §6's to explain, not this file's: both are
+  read with `read_text()` and parsed with `json.loads`, the shape §6 records as
+  immune and therefore unreported whether or not it is pinned. Their pins are
+  held by this gotcha and by `tests/test_111_golden_guard.py`; drop one and
+  Windows fails with no warning anywhere.
 - **A test that reads the insight inbox must also search its archives.** `aide
   insights archive` moves closed entries from `docs/aide/insights.md` to
   `docs/aide/insights/archive-YYYY-QN.md` as routine housekeeping, so a test

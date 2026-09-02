@@ -125,6 +125,22 @@ Read `aide.toml` for `project.source_dir`, `project.tests_dir` and
      unticked box, and that record is the point — nothing will re-tick it.
      Nothing forces you to tick anything, and a criterion you cannot evaluate
      is not yours to claim.
+
+     **Correcting an earlier attestation is a re-check, never a rewrite.** If
+     a box you or anyone else ticked no longer squares with what you just ran:
+     ```
+     python .aide/scripts/aide.py progress amend <stage> --criterion N \
+         --evidence "what you re-ran, and how the result differs"
+     python .aide/scripts/aide.py progress retract <stage> --criterion N \
+         --reason "why the criterion does not hold"
+     ```
+     `amend` when the attestation still stands and its recorded basis was
+     wrong; `retract` when the criterion itself does not hold — that unticks
+     the box and captures a `gap` in `insights.md` for the loop to plan
+     against. Neither touches the original line. Reach for one only on the
+     strength of a check you actually performed in this run: a criterion you
+     did not re-run is not yours to correct any more than it was yours to
+     tick.
   3. **Merge via the CLI** — it honours `git.mode` (§4) and lands the item on
      the base its claim recorded, which is the queue branch when the item was
      claimed from one:
