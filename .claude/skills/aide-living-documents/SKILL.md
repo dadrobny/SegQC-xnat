@@ -53,6 +53,14 @@ paths:
 
 <!-- pins: .aide/conventions/1-format-contract/progress.md
      - ticked only by `aide progress accept` — never derived
+     - The attestation is immutable; what is recorded about it is not
+     - `amend` appends, and only to a ticked box
+     - a verb that can only add cannot be used to make an inconvenient attestation agree with a shipped stage
+     - `retract` unticks, and keeps the original attestation visible
+     - A retraction is a finding, so the verb routes it like one
+     - `reword` is the one amendment that edits rather than appends
+     - refuses over a box that is ticked, annotated, or already carries a correction trail
+     - writes both documents or neither
 -->
 
 <!-- pins: .aide/conventions/1-format-contract/items.md
@@ -118,6 +126,20 @@ slot.
 `progress.md` is adding a row to the `## Human gates` table, which has no verb —
 **resolving is a CLI operation, never a hand edit** (`aide gate` only lists,
 approves and declines).
+
+**Correcting an attestation has verbs too, so it is never a hand edit either.**
+**The attestation is immutable; what is recorded about it is not** (§1 →
+`progress.md`) — the rule `insights.md` already runs on. `aide progress amend`
+appends a dated correction to a ticked box, `retract` unticks one while keeping
+the original visible, and `reword` fixes a criterion's wording. **`amend`
+appends, and only to a ticked box** — the guard is structural, not advisory:
+**a verb that can only add cannot be used to make an inconvenient attestation
+agree with a shipped stage.** **`retract` unticks, and keeps the original
+attestation visible**; **a retraction is a finding, so the verb routes it like
+one** into `insights.md`. **`reword` is the one amendment that edits rather
+than appends**, so it **refuses over a box that is ticked, annotated, or
+already carries a correction trail**, and it **writes both documents or
+neither** — `roadmap.md` mirrors the criteria.
 
 **An acceptance criterion is an invariant over the resulting content** (§1 →
 `items.md`) — never a bound on the diff that produced it, and never a premise

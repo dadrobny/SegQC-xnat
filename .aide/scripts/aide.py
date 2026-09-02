@@ -834,6 +834,262 @@ def accept_criteria(text: str, stage: str, criteria: Optional[List[int]],
     return "\n".join(lines) + ("\n" if text.endswith("\n") else ""), messages
 
 
+#: A correction line under an acceptance box: same shape as an insights.md
+#: status trail (§1), and for the same reason — the attestation above it is
+#: never reworded, so everything said *about* it afterwards goes underneath,
+#: dated, newest last. Indentation is what separates a trail line from the next
+#: box, so leading whitespace is required where `_CHECKBOX_RE` forbids it.
+_ACCEPT_TRAIL_RE = re.compile(
+    r"^(?P<indent>\s+)[-*]\s+\*\*(?P<date>\d{4}-\d{2}-\d{2})\*\*\s*→\s*(?P<text>.*)$")
+#: The one trail prefix the tooling reads back. A correction is prose nobody
+#: parses; a retraction changes what the box claims, so `check` and `status`
+#: have to find it again after the fact.
+_RETRACTED_PREFIX = "retracted: "
+#: An attestation annotation, as `accept --evidence` writes it: a trailing
+#: `*(…)*`. `reword` refuses over one — see `reword_criterion`.
+_ACCEPT_EVIDENCE_RE = re.compile(r"\*\([^)]*\)\*\s*$")
+
+
+def acceptance_box_trail(lines: List[str], box: int, end: int) -> List[int]:
+    """Line indices of the correction trail under the acceptance box at *box*.
+
+    A box owns every indented trail line between it and the next box, header,
+    or the end of its section. Returned in file order, so the last element is
+    where the newest correction goes after.
+    """
+    out: List[int] = []
+    for i in range(box + 1, end):
+        if _ACCEPT_TRAIL_RE.match(lines[i]):
+            out.append(i)
+            continue
+        if not lines[i].strip():
+            # A blank line inside the trail is tolerated, but only if more
+            # trail follows: a blank then prose ends the box.
+            if any(_ACCEPT_TRAIL_RE.match(lines[j]) for j in range(i + 1, end)
+                   if lines[j].strip()):
+                continue
+        break
+    return out
+
+
+def _resolve_box(text: str, stage: str, n: int) -> Tuple[List[str], int, int]:
+    """``(lines, section_end, box_line_index)`` for criterion *n* of *stage*.
+
+    The shared front half of amend/retract/reword: every one of them resolves
+    exactly one box and refuses the same way when it cannot, so the error text
+    a consumer sees does not depend on which verb they reached for.
+    """
+    lines = text.splitlines()
+    section = stage_section(lines, stage)
+    if section is None:
+        raise ValueError(f"no Stage {stage} section in progress.md")
+    start, end, _ = section
+    boxes = acceptance_boxes(lines, start, end)
+    if not boxes:
+        raise ValueError(f"Stage {stage} has no acceptance checkboxes")
+    if not 1 <= n <= len(boxes):
+        raise ValueError(
+            f"Stage {stage} has {len(boxes)} acceptance criteria; {n} is out of range")
+    return lines, end, boxes[n - 1]
+
+
+def _append_trail(lines: List[str], box: int, end: int, date: str, note: str) -> str:
+    """Insert a dated trail line after the box at *box*; return the line written.
+
+    Indentation follows an existing trail line when there is one, so a file
+    that indents by four spaces keeps doing so.
+    """
+    trail = acceptance_box_trail(lines, box, end)
+    indent = "  "
+    if trail:
+        last = lines[trail[-1]]
+        indent = last[: len(last) - len(last.lstrip())]
+    written = f"{indent}- **{date}** → {note}"
+    lines.insert((trail[-1] if trail else box) + 1, written)
+    return written
+
+
+def amend_criterion(text: str, stage: str, n: int, note: str,
+                    date: str) -> Tuple[str, str]:
+    """Correct the evidence on a **ticked** acceptance box, append-only.
+
+    The attestation stands; what was recorded about it was wrong or thin. The
+    original line is never touched — that is the whole guard, and it is the
+    same one insights.md's immutability rule buys: a verb that can only add
+    cannot be used to make an inconvenient attestation agree with a shipped
+    stage. Over-using it costs verbosity, never truth.
+
+    Refuses on an unticked box, which has no attestation to correct: that is
+    `accept` (to make one) or `reword` (to fix the criterion's wording).
+    """
+    lines, end, box = _resolve_box(text, stage, n)
+    m = _CHECKBOX_RE.match(lines[box])
+    if m.group("mark") == " ":
+        raise ValueError(
+            f"Stage {stage} criterion {n} is not ticked, so there is no "
+            f"attestation to amend — `accept` records one, `reword` fixes the "
+            f"criterion's wording")
+    _append_trail(lines, box, end, date, note)
+    return ("\n".join(lines) + ("\n" if text.endswith("\n") else ""),
+            f"criterion {n}: amended ({date}) — {note}")
+
+
+def retract_criterion(text: str, stage: str, n: int, reason: str,
+                      date: str) -> Tuple[str, str]:
+    """Untick a **ticked** acceptance box, keeping the original attestation.
+
+    The sharp half of the pair: the criterion does not hold after all. The box
+    goes back to `- [ ]` and both the original annotation and the retraction
+    stay visible, so the record reads as "this was claimed, then withdrawn,
+    for this reason" rather than as a box that was never ticked.
+
+    A retraction is a *finding*, so `aide progress retract` routes it like one
+    — an insights.md `gap` entry in the same commit (§1's Outcome-target rule,
+    applied one level down). That is what keeps it cheap to be honest.
+    """
+    lines, end, box = _resolve_box(text, stage, n)
+    m = _CHECKBOX_RE.match(lines[box])
+    if m.group("mark") == " ":
+        raise ValueError(
+            f"Stage {stage} criterion {n} is already unticked — nothing to retract")
+    written = _append_trail(lines, box, end, date, _RETRACTED_PREFIX + reason)
+    # The trail was inserted below the box, so the box index still addresses it.
+    lines[box] = m.group("pre") + " " + m.group("post")
+    return ("\n".join(lines) + ("\n" if text.endswith("\n") else ""),
+            f"criterion {n}: retracted — {reason}")
+
+
+def reword_criterion(text: str, stage: str, n: int, new_text: str) -> Tuple[str, str]:
+    """Reword an **unticked, unevidenced** acceptance criterion in place.
+
+    The one amendment that edits rather than appends, and it is safe for
+    exactly one reason: nothing has been claimed yet. The precondition is
+    mechanical, so no instruction has to carry it — a box that is ticked, or
+    annotated, or already carries a correction trail, has an attestation
+    hanging off its wording, and rewording it would silently re-point that
+    attestation at a different criterion.
+    """
+    if "\n" in new_text or "\r" in new_text:
+        raise ValueError(
+            "the criterion text may not contain a line break — it is written "
+            "into a single checkbox line, and a break would split one "
+            "criterion into two and renumber every box below it")
+    lines, end, box = _resolve_box(text, stage, n)
+    m = _CHECKBOX_RE.match(lines[box])
+    body = m.group("post")[1:]
+    if m.group("mark") != " ":
+        raise ValueError(
+            f"Stage {stage} criterion {n} is ticked; its wording is what an "
+            f"attestation was made against. Retract it first (`aide progress "
+            f"retract`) if the criterion itself was wrong")
+    annotation = _ACCEPT_EVIDENCE_RE.search(body)
+    if annotation:
+        raise ValueError(
+            f"Stage {stage} criterion {n} carries an annotation "
+            f"({annotation.group(0).strip()}), so "
+            f"something has already been recorded against this wording")
+    if acceptance_box_trail(lines, box, end):
+        raise ValueError(
+            f"Stage {stage} criterion {n} carries a correction trail, so "
+            f"something has already been recorded against this wording")
+    old = body.strip()
+    lines[box] = m.group("pre") + m.group("mark") + "] " + new_text.strip()
+    return ("\n".join(lines) + ("\n" if text.endswith("\n") else ""), old)
+
+
+def retracted_criteria(lines: List[str]) -> List[Tuple[str, int, str, str]]:
+    """``(stage, criterion_index, date, reason)`` per retracted acceptance box.
+
+    Read back out of the trail so `check` and `status` can surface it: a
+    retraction that only ever appeared in one commit's diff is exactly the
+    quiet the append-only rule exists to prevent.
+    """
+    out: List[Tuple[str, int, str, str]] = []
+    for start, end, num in stage_sections(lines):
+        for n, box in enumerate(acceptance_boxes(lines, start, end), start=1):
+            for i in acceptance_box_trail(lines, box, end):
+                tm = _ACCEPT_TRAIL_RE.match(lines[i])
+                note = tm.group("text")
+                if note.startswith(_RETRACTED_PREFIX):
+                    out.append((num, n, tm.group("date"),
+                                note[len(_RETRACTED_PREFIX):].strip()))
+    return out
+
+
+#: The roadmap block whose bullets become a stage's acceptance boxes, and the
+#: prefix that marks a bullet as an Outcome target instead (§1 → progress.md:
+#: a measured outcome is deliberately NOT an acceptance box, so it must not
+#: consume a box index when the two files are lined up).
+_ROADMAP_ACCEPTANCE_RE = re.compile(r"^\*\*Validation\s*/\s*acceptance\.?\*\*", re.I)
+_ROADMAP_BLOCK_END_RE = re.compile(r"^\*\*\S")
+_ROADMAP_TARGET_RE = re.compile(r"^\s*[-*]\s+Target:", re.I)
+#: Authoring guidance in the template — `_italic line_`, read then replaced.
+#: It sits inside the block and is not a criterion.
+_GUIDANCE_RE = re.compile(r"^\s*_.*_\s*$")
+
+
+def roadmap_acceptance_bullets(lines: List[str], stage: str) -> Optional[List[int]]:
+    """Line indices of *stage*'s acceptance bullets in roadmap.md, in order.
+
+    ``None`` when the stage has no Validation / acceptance block at all — a
+    roadmap that never mirrored the criteria, which is a different situation
+    from one whose block disagrees with progress.md and must not be treated
+    the same way (see ``_cmd_progress_reword``).
+
+    ``Target:`` bullets are skipped: §1 routes a measured outcome to the
+    Outcome-targets table precisely so it is not an acceptance box, so
+    counting one here would slide every index below it by one.
+    """
+    section = stage_section(lines, stage)
+    if section is None:
+        return None
+    start, end, _ = section
+    head = next((i for i in range(start, end)
+                 if _ROADMAP_ACCEPTANCE_RE.match(lines[i])), None)
+    if head is None:
+        return None
+    out: List[int] = []
+    for i in range(head + 1, end):
+        line = lines[i]
+        if _ROADMAP_BLOCK_END_RE.match(line):
+            break
+        if not line.strip() or _GUIDANCE_RE.match(line):
+            continue
+        if _ROADMAP_TARGET_RE.match(line):
+            continue
+        if re.match(r"^\s*[-*]\s+\S", line):
+            out.append(i)
+    return out
+
+
+def reword_roadmap_bullet(text: str, stage: str, n: int, new_text: str,
+                          expected: int) -> Tuple[Optional[str], Optional[str]]:
+    """Mirror a reworded criterion into roadmap.md; ``(new_text, error)``.
+
+    Returns ``(None, None)`` when the stage has no acceptance block to mirror —
+    nothing to keep in step — and ``(None, <reason>)`` when there is one but it
+    cannot be lined up with progress.md's *expected* box count. The caller
+    writes neither file in that case: a rewording that lands in one document
+    and not the other leaves exactly the two-file drift this verb exists to
+    prevent.
+    """
+    lines = text.splitlines()
+    bullets = roadmap_acceptance_bullets(lines, stage)
+    if bullets is None:
+        return None, None
+    if len(bullets) != expected:
+        return None, (
+            f"roadmap.md stage {stage} lists {len(bullets)} acceptance "
+            f"bullet{'' if len(bullets) == 1 else 's'} but progress.md has "
+            f"{expected} box{'' if expected == 1 else 'es'}, so criterion {n} "
+            f"cannot be matched across the two. Line them up by hand, then "
+            f"re-run — nothing was written")
+    i = bullets[n - 1]
+    m = re.match(r"^(?P<pre>\s*[-*]\s+)(?P<body>.*)$", lines[i])
+    lines[i] = m.group("pre") + new_text.strip()
+    return "\n".join(lines) + ("\n" if text.endswith("\n") else ""), None
+
+
 def _objective_stages(delivered_by: str) -> List[str]:
     return re.findall(r"\bStage[s]?\s+([\d,\s]+)", delivered_by)
 
@@ -2920,6 +3176,15 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
     text = progress_path.read_text(encoding=_ENCODING)
     lines = text.splitlines()
     warnings.extend(gate_warnings(lines))
+    # A withdrawn attestation is normal, not a defect — the point is that it
+    # stays visible. Retracting is append-only, so without a surfacing rule the
+    # withdrawal would live only in one commit's diff, which is exactly the
+    # quiet the trail exists to prevent.
+    for stg, cn, cdate, creason in retracted_criteria(lines):
+        warnings.append(
+            f"progress.md: stage {stg} criterion {cn} was retracted on "
+            f"{cdate} ({creason}) — the box is open again, and the original "
+            f"attestation is kept above the correction")
     warnings.extend(nested_deliverable_warnings(lines))
     warnings.extend(unattributed_reference_warnings(lines))
 
@@ -3630,8 +3895,17 @@ _SET_STATUS_MAP = {"in-progress": "in-progress", "in-review": "in-review",
 
 
 def cmd_progress(args: argparse.Namespace) -> int:
+    #: The acceptance verbs, in the order §1 describes them: make an
+    #: attestation, correct its evidence, withdraw it, or reword a criterion
+    #: nobody has attested yet.
     if args.action == "accept":
         return _cmd_progress_accept(args)
+    if args.action == "amend":
+        return _cmd_progress_amend(args)
+    if args.action == "retract":
+        return _cmd_progress_retract(args)
+    if args.action == "reword":
+        return _cmd_progress_reword(args)
     if args.action != "set":
         print("usage: aide progress set NNN <in-progress|in-review|done>", file=sys.stderr)
         return 2
@@ -3743,6 +4017,213 @@ def _cmd_progress_accept(args: argparse.Namespace) -> int:
         what = "all criteria" if args.all_criteria else f"criterion {args.criterion}"
         _commit_progress_file(
             repo_root, config, f"progress(aide): stage {args.number} accept {what}")
+    return 0
+
+
+#: ``.aide/VERSION`` beside this script, for the engine stamp a captured
+#: insight carries (§1). One directory up from ``scripts/``, which is the
+#: layout in a consumer *and* in the framework's own tree (``core/VERSION``),
+#: so one relative step serves both — the same reasoning ``_TEMPLATES_DIR``
+#: is built on. Missing only where the script has been copied away from its
+#: siblings, and that is not an error: the note is free-form and optional, so
+#: the entry is written without it.
+_VERSION_FILE = Path(__file__).resolve().parents[1] / "VERSION"
+
+
+def _engine_stamp() -> Optional[str]:
+    try:
+        v = _VERSION_FILE.read_text(encoding=_ENCODING).strip()
+    except OSError:
+        return None
+    return f"engine {v}" if v else None
+
+
+def _route_retraction_to_insights(repo_root: Path, config, stage: str, n: int,
+                                  reason: str, date: str) -> Tuple[Optional[str], str]:
+    """Append the ``gap`` entry a retraction *is*; ``(rel_path, message)``.
+
+    §1 already says a `❌ Not met` outcome target is a finding and must be
+    routed like one. A withdrawn acceptance box is the same event one level
+    down, so the verb does the routing itself rather than asking the caller to
+    remember: the honest path has to be the cheap one, or the quiet path wins.
+    """
+    ddir = docs_dir(repo_root, config)
+    path = insights_path(ddir)
+    if not path.is_file():
+        return None, ("notice: no insights.md, so the retraction was not "
+                      "routed — capture it wherever this project keeps findings")
+    stamp = _engine_stamp()
+    source = f"stage {stage} criterion {n}"
+    marker = f"*({source}, {date}" + (f", {stamp}" if stamp else "") + ")*"
+    entry = f"- [ ] gap — acceptance criterion retracted: {reason} {marker}"
+    text = path.read_text(encoding=_ENCODING)
+    if not text.endswith("\n"):
+        text += "\n"
+    path.write_text(text + entry + "\n", encoding="utf-8")
+    rel = str(config["project"].get("docs_dir", "docs/aide")) + "/insights.md"
+    return rel, f"insights.md: captured a gap entry for the retraction"
+
+
+def _cmd_progress_amend(args: argparse.Namespace) -> int:
+    """``aide progress amend STAGE --criterion N --evidence TEXT`` — append-only.
+
+    The correction path for an attestation whose *evidence* was wrong, which
+    before this verb had no CLI route at all: `accept` reports an already-ticked
+    box as "unchanged", so the only remedy was the hand edit of `progress.md`
+    every role is otherwise forbidden from making (issue #118).
+    """
+    if args.all_criteria:
+        print("aide progress amend: --all is not offered — an attestation is "
+              "corrected one at a time, or the correction says nothing about "
+              "any of them", file=sys.stderr)
+        return 2
+    if args.criterion is None:
+        print("usage: aide progress amend STAGE --criterion N --evidence TEXT",
+              file=sys.stderr)
+        return 2
+    if not (args.evidence or "").strip():
+        print("aide progress amend: --evidence is required — a correction "
+              "with no stated basis is not one", file=sys.stderr)
+        return 2
+    return _apply_criterion_edit(
+        args, lambda text, date: amend_criterion(
+            text, str(args.number), args.criterion, args.evidence.strip(), date),
+        f"stage {args.number} amend criterion {args.criterion}")
+
+
+def _cmd_progress_retract(args: argparse.Namespace) -> int:
+    """``aide progress retract STAGE --criterion N --reason TEXT``.
+
+    Unticks, keeps the original attestation visible, and captures the finding.
+    """
+    if args.all_criteria:
+        print("aide progress retract: --all is not offered — each attestation "
+              "was made separately and is withdrawn separately", file=sys.stderr)
+        return 2
+    if args.criterion is None:
+        print("usage: aide progress retract STAGE --criterion N --reason TEXT",
+              file=sys.stderr)
+        return 2
+    if not (args.reason or "").strip():
+        print("aide progress retract: --reason is required — the reason is "
+              "what the record keeps", file=sys.stderr)
+        return 2
+    reason = args.reason.strip()
+    repo_root = find_repo_root(args.repo)
+    config = load_config(repo_root)
+    progress_path = docs_dir(repo_root, config) / "progress.md"
+    if not progress_path.is_file():
+        print(f"error: {progress_path} not found", file=sys.stderr)
+        return 1
+    import datetime as _dt
+    date = args.date or _dt.date.today().isoformat()
+    text = progress_path.read_text(encoding=_ENCODING)
+    try:
+        updated, message = retract_criterion(
+            text, str(args.number), args.criterion, reason, date)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    progress_path.write_text(updated, encoding="utf-8")
+    print(f"stage {args.number}: {message}")
+    rel_insights, note = _route_retraction_to_insights(
+        repo_root, config, str(args.number), args.criterion, reason, date)
+    print(note)
+    if not args.no_commit and (repo_root / ".git").exists():
+        rels = [str(config["project"].get("docs_dir", "docs/aide")) + "/progress.md"]
+        if rel_insights:
+            rels.append(rel_insights)
+        _commit_docs_files(
+            repo_root, config,
+            f"progress(aide): stage {args.number} retract criterion {args.criterion}",
+            rels)
+    return 0
+
+
+def _cmd_progress_reword(args: argparse.Namespace) -> int:
+    """``aide progress reword STAGE --criterion N --text TEXT``.
+
+    Both files or neither. The roadmap mirrors the criteria, so a rewording
+    that lands in one document is the drift the verb exists to remove; when the
+    two cannot be lined up, nothing is written and the message says so.
+    """
+    if args.all_criteria:
+        print("aide progress reword: --all is not offered — criteria are "
+              "reworded one at a time", file=sys.stderr)
+        return 2
+    if args.criterion is None:
+        print("usage: aide progress reword STAGE --criterion N --text TEXT",
+              file=sys.stderr)
+        return 2
+    if not (args.text or "").strip():
+        print("aide progress reword: --text is required", file=sys.stderr)
+        return 2
+    repo_root = find_repo_root(args.repo)
+    config = load_config(repo_root)
+    ddir = docs_dir(repo_root, config)
+    progress_path = ddir / "progress.md"
+    roadmap_path = ddir / "roadmap.md"
+    if not progress_path.is_file():
+        print(f"error: {progress_path} not found", file=sys.stderr)
+        return 1
+    text = progress_path.read_text(encoding=_ENCODING)
+    try:
+        updated, old = reword_criterion(
+            text, str(args.number), args.criterion, args.text)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    # How many boxes the stage has, for lining the roadmap up against it.
+    plines = text.splitlines()
+    psec = stage_section(plines, str(args.number))
+    box_count = len(acceptance_boxes(plines, psec[0], psec[1]))
+    road_updated: Optional[str] = None
+    if roadmap_path.is_file():
+        road_updated, err = reword_roadmap_bullet(
+            roadmap_path.read_text(encoding=_ENCODING), str(args.number),
+            args.criterion, args.text, box_count)
+        if err:
+            print(f"error: {err}", file=sys.stderr)
+            return 1
+    progress_path.write_text(updated, encoding="utf-8")
+    rels = [str(config["project"].get("docs_dir", "docs/aide")) + "/progress.md"]
+    print(f"stage {args.number}: criterion {args.criterion} reworded")
+    print(f"  was: {old}")
+    print(f"  now: {args.text.strip()}")
+    if road_updated is not None:
+        roadmap_path.write_text(road_updated, encoding="utf-8")
+        rels.append(str(config["project"].get("docs_dir", "docs/aide")) + "/roadmap.md")
+        print("  roadmap.md: mirrored")
+    else:
+        print("  roadmap.md: no acceptance block for this stage — nothing to mirror")
+    if not args.no_commit and (repo_root / ".git").exists():
+        _commit_docs_files(
+            repo_root, config,
+            f"progress(aide): stage {args.number} reword criterion {args.criterion}",
+            rels)
+    return 0
+
+
+def _apply_criterion_edit(args: argparse.Namespace, edit, message: str) -> int:
+    """Read progress.md, apply *edit*, write and commit — the amend path."""
+    repo_root = find_repo_root(args.repo)
+    config = load_config(repo_root)
+    progress_path = docs_dir(repo_root, config) / "progress.md"
+    if not progress_path.is_file():
+        print(f"error: {progress_path} not found", file=sys.stderr)
+        return 1
+    import datetime as _dt
+    date = args.date or _dt.date.today().isoformat()
+    text = progress_path.read_text(encoding=_ENCODING)
+    try:
+        updated, msg = edit(text, date)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    progress_path.write_text(updated, encoding="utf-8")
+    print(f"stage {args.number}: {msg}")
+    if not args.no_commit and (repo_root / ".git").exists():
+        _commit_progress_file(repo_root, config, f"progress(aide): {message}")
     return 0
 
 
@@ -5714,6 +6195,8 @@ def cmd_status(args: argparse.Namespace) -> int:
                 t.kind, "⚠ unrecognised status")
             objs = f" [{', '.join(t.objectives)}]" if t.objectives else ""
             print(f"  target: {t.text}{objs} — {label}")
+        for stg, cn, cdate, creason in retracted_criteria(plines):
+            print(f"  retracted: stage {stg} criterion {cn} ({cdate}) — {creason}")
 
     branches = _list_claim_branches(repo_root, prefix)
     # Guarded the way `run_checks` guards it: two git spawns are not worth
@@ -6101,18 +6584,27 @@ def build_parser() -> argparse.ArgumentParser:
     p_check.set_defaults(func=cmd_check)
 
     p_prog = sub.add_parser("progress", help="edit progress.md status / acceptance")
-    p_prog.add_argument("action", choices=["set", "accept"])
+    p_prog.add_argument("action",
+                        choices=["set", "accept", "amend", "retract", "reword"])
     p_prog.add_argument("number", type=int,
-                        help="item number (set) | stage number (accept)")
+                        help="item number (set) | stage number (every other action)")
     p_prog.add_argument("status", nargs="?", default=None,
                         help="set: in-progress | in-review | done "
                              "(in-review = pushed, awaiting a human's merge)")
     p_prog.add_argument("--criterion", type=int, default=None,
-                        help="accept: 1-based acceptance-criterion index within the stage")
+                        help="1-based acceptance-criterion index within the stage")
     p_prog.add_argument("--all", action="store_true", dest="all_criteria",
-                        help="accept: every acceptance criterion in the stage")
+                        help="accept: every acceptance criterion in the stage "
+                             "(amend/retract/reword act on one criterion only)")
     p_prog.add_argument("--evidence", default=None,
-                        help="accept: annotation appended to the ticked criterion")
+                        help="accept: annotation appended to the ticked criterion; "
+                             "amend: the corrected evidence, appended as a dated line")
+    p_prog.add_argument("--reason", default=None,
+                        help="retract: why the attestation is withdrawn (required)")
+    p_prog.add_argument("--text", default=None,
+                        help="reword: the criterion's new wording (required)")
+    p_prog.add_argument("--date", default=None,
+                        help="amend/retract: ISO date for the trail line (default: today)")
     p_prog.add_argument("--no-commit", action="store_true", help="edit only, do not git commit")
     p_prog.set_defaults(func=cmd_progress)
 
