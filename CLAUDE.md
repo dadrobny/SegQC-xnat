@@ -262,8 +262,9 @@ from the local working tree):
    overlay.
 3. **Review the `git diff`** — it should be exactly the intended change (most
    copied files are byte-identical no-ops git shows nothing for). Run the suite.
-4. **Land via a reviewed PR** (framework/process files are PR-gated — see the last
-   paragraph of this file). Pushing the change to `aide-loop`'s own remote is a
+4. **Land via a reviewed PR** (framework/process files are PR-gated — see
+   "Branching, and what it means for the scope check" below). Pushing the
+   change to `aide-loop`'s own remote is a
    separate, optional step for sharing the framework itself.
 
 ## Gotchas
@@ -364,5 +365,51 @@ enforced, by `validator.md` step 3 running `aide scope` in-loop. Evidence and
 the three options are recorded in
 [`docs/aide/insights.md`](docs/aide/insights.md) (2026-08-20, item 117);
 switching to `pr` mode is one of the things that would resolve it.
+
+## Code review
+
+A queue reaches `main` as one reviewed PR (see "Branching" above), but a whole
+queue of code is too much to review as first contact, so the review runs
+**incrementally, per item**, while the queue is still executing:
+
+- **Open the queue PR as a draft as soon as the first item lands** on the
+  pushed queue branch — head `aide/queue-NNN`, base `main` — not when the
+  queue completes. Opening the PR is a human-gated action, once per queue.
+- **After each `aide merge NNN` returns an item to the queue branch**, launch
+  the per-item review from the routing table below and push the queue branch.
+  The review runs in the background while the next item's spec and tests
+  start — review latency does not block the loop. Review the item's slice of
+  the diff (the merge commit against its first parent), not the accumulated
+  queue diff.
+- **Triage findings where they arrive**: a finding in scope for the running
+  queue becomes a fix commit on the queue branch (or a queued item); a true
+  finding out of scope becomes one line in
+  [`docs/aide/insights.md`](docs/aide/insights.md). All findings are triaged
+  before the PR is marked ready — so marking it ready is a seam check, not a
+  first read of ten items at once.
+
+The review contract — unit of review, severity, what to check, what never to
+flag — is [`REVIEW.md`](REVIEW.md), the single source. Copilot code review
+and Claude Code Review read it (and this file) from the head branch natively;
+Codex — cloud and CLI — applies it through the Code Review Rules section of
+[`AGENTS.md`](AGENTS.md); a **local** `/code-review` subagent reads only
+CLAUDE.md, so hand it `REVIEW.md` in the prompt. Keep the three files from
+drifting: `AGENTS.md` restates only `REVIEW.md` highlights, and nothing here
+restates either.
+
+Reviewer routing is **budget-ranked** — the reviewers draw on three
+independent quotas (ChatGPT subscription, Copilot premium requests, Claude),
+and Claude also drives the development loop itself, so it reviews last:
+
+| Rank | Reviewer | Trigger | Budget / notes |
+|---|---|---|---|
+| 1 | Codex CLI (local) | `codex review --commit <merge sha>` on the queue branch, custom instructions naming the item's spec; non-interactive, run in the background after each item merges | ChatGPT-subscription quota, independent of Copilot's. Reads `AGENTS.md` for the repo rules; depth is steerable via the instructions argument, unlike the cloud `@codex review`, which reports only P0/P1 findings by documented design |
+| 2 | Copilot code review | re-request on the draft queue PR after each item, via the GraphQL `requestReviews` mutation with `botIds` (the REST reviewers endpoint returns 200 and silently does nothing; verify via the PR's timeline events) | strongest reviewer, but the monthly premium-request pool empties within days and it declines queue-sized diffs — per-item rounds keep each request small; quota exhaustion mid-queue is expected, not a failure, because rank 1 is the primary |
+| 3 | Claude review subagent | `/code-review high` on the item's diff, prompt must include `REVIEW.md` — fallback when ranks 1–2 are exhausted or unavailable | cap at two rounds; round two re-asks the same agent whether the fix is complete and hunts regressions the fix introduced |
+
+`/code-review ultra` (multi-agent cloud review, billed) is user-triggered
+only — never launched by an agent on its own. The `codex` CLI is a
+per-machine prerequisite (install + ChatGPT login), like `gh` — see "What is
+committed vs. per-machine"; when a machine lacks it, start at rank 2.
 
 @.aide/AGENT-CONTEXT.md
