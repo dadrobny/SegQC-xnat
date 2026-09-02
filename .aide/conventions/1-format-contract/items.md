@@ -6,6 +6,24 @@
   header carries `Created`, Stage, Queue, Objectives, Suggested branch, and a
   mandatory **Assumptions** block (see the item template). *(spec-author,
   validator)*
+- **An assumption that pins engine behaviour names the engine it was true
+  for** — `- **A3 (engine 1.28.1):** …`, the marker `insights.md` provenance
+  already carries, in the bold label beside the assumption's own code. A spec
+  outlives its branch and the engine moves under it: three merged specs in one
+  consumer asserted `aide check` warnings that a later release had
+  deliberately removed, one calling their presence "expected output", and
+  nothing detected it — `install.py --update` copies a new engine and says
+  nothing about the claims it has just falsified. `aide check` warns
+  (advisory, never an exit code) when a marked assumption names an engine
+  whose **feature line** predates the installed one; a patch release cannot
+  falsify a claim about behaviour, so it is silent. Clear it the way every
+  other durable record in this loop is corrected — **append**: a re-check goes
+  into the marker, `(engine 1.28.1, re-checked 1.36.0)`, and the newest version
+  named is the one the claim stands on. A merged spec is never rewritten to
+  agree with a later engine; that is the failure mode, not the fix. An
+  unmarked assumption is not warned about — the marker is what makes the claim
+  checkable, and inventing a version for one is worse than leaving it
+  unclaimed. *(spec-author, validator, `aide check`)*
 - **`## Dependencies` blocks `aide claim`.** Every item number named in this
   section (any of the accepted forms in the table above) is read as something
   this item is blocked on until that item is **merged** (✅), or leaves the
