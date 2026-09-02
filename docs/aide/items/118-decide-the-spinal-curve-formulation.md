@@ -322,13 +322,21 @@ and left untouched. The work lands in `scripts/` and `docs/`.
   today's `fit_centroid_spline` invoked unchanged, so the artifact's baseline
   numbers are a live measurement of the shipped code. Read and pinned by
   AC10–AC16; **not** modified (that is item 119).
-- `src/segfacet/features/spline_offset.py`, `consistency.py`, `orientation.py`,
-  `neighbourhood.py` — read for the measurement definitions the candidates must
-  reproduce (`closest_u`, the `_find_closest_u` scan/refine strategy, the
-  monotonic-`u` test). Read only.
-- `src/segfacet/synth/clean_gt.py`, `src/segfacet/synth/identity_ordering_alignment.py`,
-  `src/segfacet/synth/regression.py` — the fixture builders, the `displace`
-  operator, and the leave-one-out technique the script reuses. Read only.
+- `src/segfacet/features/spline_offset.py` — read for the measurement
+  definitions the candidates must reproduce (`closest_u`, the `_find_closest_u`
+  scan/refine strategy, the monotonic-`u` test). Read only.
+- `src/segfacet/features/consistency.py` — read for the same measurement
+  definitions as `spline_offset.py` above. Read only.
+- `src/segfacet/features/orientation.py` — read for the same measurement
+  definitions as `spline_offset.py` above. Read only.
+- `src/segfacet/features/neighbourhood.py` — read for the same measurement
+  definitions as `spline_offset.py` above. Read only.
+- `src/segfacet/synth/clean_gt.py` — the fixture builders the script reuses.
+  Read only.
+- `src/segfacet/synth/identity_ordering_alignment.py` — the `displace` operator
+  the script reuses. Read only.
+- `src/segfacet/synth/regression.py` — the leave-one-out technique the script
+  reuses. Read only.
 
 **Explicitly out of scope** (an edit here means the item has overrun):
 `src/segfacet/**` of any kind, `src/segfacet/default_config.yaml`'s

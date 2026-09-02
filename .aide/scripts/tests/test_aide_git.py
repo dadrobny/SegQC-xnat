@@ -80,19 +80,21 @@ Coverage.
 
 def _run(args, cwd):
     return subprocess.run(args, cwd=str(cwd), check=True,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          encoding="utf-8")
 
 
 def _show_utf8(cwd: Path, rev_path: str) -> str:
-    """`git show <rev>:<path>`, decoded as UTF-8 **explicitly**.
+    """`git show <rev>:<path>`, decoded as UTF-8 **strictly**.
 
-    `_run` passes `text=True` with no encoding, so Python decodes with the
-    locale codec — cp1252 on the Windows CI leg, which mangles the status icons
-    into characters `_parse_item_status` cannot match. The documents this
-    project reads are UTF-8 by definition (conventions.md §1), so anything
-    reading one out of git says so rather than inheriting the platform's guess.
-    This is the conventions §6 defect class exactly: green on Linux, red only
-    on the platform no local run sees.
+    The documents this project reads are UTF-8 by definition (conventions.md
+    §1), so anything reading one out of git says so rather than inheriting the
+    platform's guess. Left decoding from bytes even though `_run` now names the
+    codec itself: this one wants the *strict* decoder, so a byte that is not
+    UTF-8 raises here instead of arriving as a replacement character that no
+    status icon matches. That is the recorded §6 shape — the locale codec
+    mangled the icons into characters `_parse_item_status` could not match,
+    green on Linux and red only on the platform no local run sees.
     """
     out = subprocess.run(["git", "show", rev_path], cwd=str(cwd), check=True,
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout
@@ -914,8 +916,11 @@ def test_merge_records_the_tick_itself_in_local_mode(tmp_path: Path):
     """✅ is set by the process that did the merge, so it cannot outrun it."""
     root = _init_repo(tmp_path / "r", mode="local")
     _make_item_branch(root, "aide/027-bounds-rules", "feature.txt")
-    assert aide.main(["--repo", str(root), "progress", "set", "27", "in-review",
-                      "--no-commit"]) == 0
+    # The 🔍 tick is committed, not left in the tree: `merge` refuses to
+    # `switch`/`pull`/`merge` from a dirty one (issue #133), so a run that
+    # means to land must hand it a clean tree first.
+    assert aide.main(["--repo", str(root), "progress", "set", "27",
+                      "in-review"]) == 0
     assert aide.main(["--repo", str(root), "merge", "27", "--no-test"]) == 0
     progress = (root / "docs" / "aide" / "progress.md").read_text(encoding="utf-8")
     assert "✅ Bounds rules" in progress or "27" in progress
@@ -1030,6 +1035,81 @@ def test_auto_merge_pushes_the_commit_that_records_the_tick(tmp_path: Path):
     assert status[27] == "complete"
 
 
+def test_merge_after_a_no_commit_run_names_the_tick_it_is_blocked_on(
+        tmp_path: Path, capsys):
+    """`--no-commit` leaves the tick in the tree, and the NEXT merge — of any
+    item — meets the dirty-tree precondition (issue #133).
+
+    The refusal is right: git will not rebase over unstaged changes either. But
+    the block outlives the item that caused it, so the message has to name the
+    cause. A run that says only "uncommitted changes: docs/aide/progress.md"
+    sends a human hunting for an edit nobody made.
+    """
+    root = _init_repo(tmp_path / "r", mode="local")
+    _make_item_branch(root, "aide/027-bounds-rules", "feature.txt")
+    assert aide.main(["--repo", str(root), "merge", "27", "--no-test",
+                      "--no-commit"]) == 0
+    assert "progress.md" in _run(["git", "status", "--porcelain"], root).stdout
+
+    # Item 028's own work, committed by path the way a careful consumer does —
+    # so the stray tick is NOT swept into that commit by a `git add -A`.
+    _run(["git", "switch", "-c", "aide/028-coverage-rules"], root)
+    (root / "feature2.txt").write_text("work\n", encoding="utf-8")
+    _run(["git", "add", "feature2.txt"], root)
+    _run(["git", "commit", "-m", "work on 028"], root)
+    _run(["git", "switch", "main"], root)
+    capsys.readouterr()
+    assert aide.main(["--repo", str(root), "merge", "28", "--no-test"]) == 1
+    err = capsys.readouterr().err
+    assert "progress.md" in err and "--no-commit" in err
+    # ...and committing it is all that was needed.
+    _run(["git", "add", "-A"], root)
+    _run(["git", "commit", "-m", "chore: the tick"], root)
+    assert aide.main(["--repo", str(root), "merge", "28", "--no-test"]) == 0
+
+
+@pytest.mark.parametrize("docs_rel", ["docs/aide", "docs/a spacé dir"])
+def test_the_uncommitted_tick_is_recognised_whatever_the_layout(
+        tmp_path: Path, docs_rel: str):
+    """The diagnosis must not quietly fall back to the generic message.
+
+    Two layouts break a naive string compare, and neither is documented as
+    unsupported: `git status --porcelain` **quotes and escapes** a path with a
+    space or a non-ASCII byte, and it reports every path relative to the git
+    **top level** — which is not `repo_root` when `aide.toml` sits in a
+    subdirectory of the repository.
+    """
+    top = tmp_path / "outer"
+    top.mkdir()
+    _run(["git", "init", "-b", "main"], top)
+    _run(["git", "config", "user.email", "t@example.com"], top)
+    _run(["git", "config", "user.name", "Tester"], top)
+    root = top / "sub"                       # aide.toml BELOW the git top level
+    root.mkdir()
+    (root / "aide.toml").write_text(
+        AIDE_TOML.format(mode="local").replace(
+            'docs_dir = "docs/aide"', f'docs_dir = "{docs_rel}"'),
+        encoding="utf-8")
+    ddir = root / docs_rel
+    ddir.mkdir(parents=True)
+    (ddir / "progress.md").write_text(PROGRESS, encoding="utf-8")
+    _run(["git", "add", "-A"], top)
+    _run(["git", "commit", "-m", "init"], top)
+
+    config = aide.load_config(root)
+    tick = aide.docs_dir(root, config) / "progress.md"
+    assert aide._unsafe_tree_state(root, tick) is None
+    tick.write_text(PROGRESS.replace("📋 Bounds", "🔍 Bounds"), encoding="utf-8")
+    state = aide._unsafe_tree_state(root, tick)
+    assert state is not None and "uncommitted status tick" in state
+
+    # An unrelated dirty file is still the generic refusal, not the tick's.
+    (root / "stray.txt").write_text("x\n", encoding="utf-8")
+    _run(["git", "add", "stray.txt"], root)
+    other = aide._unsafe_tree_state(root, tick)
+    assert other is not None and "uncommitted status tick" not in other
+
+
 def test_merge_no_commit_leaves_the_tick_uncommitted(tmp_path: Path):
     root = _init_repo(tmp_path / "r", mode="local")
     _make_item_branch(root, "aide/027-bounds-rules", "feature.txt")
@@ -1109,3 +1189,190 @@ def test_queue_start_refuses_a_name_that_exists_only_on_origin(tmp_path: Path, c
     rc = aide.main(["--repo", str(root), "queue", "start", "16"])
     assert rc == 1
     assert "already exists on origin" in capsys.readouterr().err
+
+
+# --------------------------------------------------------------------------- #
+# a failed push — issue #137: a sentence, and never a silent half-claim
+# --------------------------------------------------------------------------- #
+def test_claim_push_failure_is_a_sentence_not_a_traceback(tmp_path: Path, capsys):
+    """`auto-merge` with no remote: the push cannot succeed, and used to raise.
+
+    `git(..., check=True)` let every cause of a failed push out of `main()` as
+    a `CalledProcessError` — a raw traceback in a flow meant to be unattended.
+    """
+    root = _init_repo(tmp_path / "r", mode="auto-merge")
+    rc = aide.main(["--repo", str(root), "claim"])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "pushing aide/027-bounds-rules to origin FAILED" in err
+    assert "claimed LOCALLY ONLY" in err
+    # The branch is kept, not rolled back, and it is what we are standing on.
+    assert _current_branch(root) == "aide/027-bounds-rules"
+
+
+def test_a_failed_claim_does_not_come_back_as_none_left(tmp_path: Path, capsys):
+    """The defect the traceback hid: the item then counted as claimed.
+
+    `_pick_item` skips any item with a claim branch, so the run *after* the
+    failure reported an exhausted queue and exited 0 — the loop's own "is
+    there work left?" answering no, successfully, with nothing built.
+    """
+    root = _init_repo(tmp_path / "r", mode="auto-merge")
+    assert aide.main(["--repo", str(root), "claim"]) == 1        # 027, push fails
+    assert aide.main(["--repo", str(root), "claim"]) == 1        # 028, push fails
+    capsys.readouterr()
+
+    rc = aide.main(["--repo", str(root), "claim"])
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert out.strip() != "none left"
+    assert "2 item(s) still open" in out
+    assert out.count("ORIGIN HAS NEVER SEEN") == 2
+    assert "aide/027-bounds-rules" in out and "aide/028-coverage-rules" in out
+
+
+def test_status_names_an_unpublished_claim(tmp_path: Path, capsys):
+    root = _init_repo(tmp_path / "r", mode="auto-merge")
+    assert aide.main(["--repo", str(root), "claim"]) == 1
+    capsys.readouterr()
+    assert aide.main(["--repo", str(root), "status", "--no-fetch"]) == 0
+    out = capsys.readouterr().out
+    assert "claim: aide/027-bounds-rules" in out
+    assert "NOT on origin" in out
+
+
+def test_a_published_claim_is_in_flight_not_a_failure(tmp_path: Path, capsys):
+    """The control: a claim whose push landed is an ordinary hold, exit 0."""
+    remote = _mkbare(tmp_path / "remote.git")
+    root = _init_repo(tmp_path / "r", mode="auto-merge")
+    _run(["git", "remote", "add", "origin", str(remote)], root)
+    _run(["git", "push", "-u", "origin", "main"], root)
+    assert aide.main(["--repo", str(root), "claim"]) == 0        # takes 027
+    assert aide.main(["--repo", str(root), "claim"]) == 0        # takes 028
+    capsys.readouterr()
+
+    rc = aide.main(["--repo", str(root), "claim"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "none left" in out
+    assert "already in flight" in out
+    assert "ORIGIN HAS NEVER SEEN" not in out
+
+
+def test_local_mode_never_calls_a_claim_branch_unpublished(tmp_path: Path, capsys):
+    """`local` mode is the one place an unpushed claim branch is the design."""
+    root = _init_repo(tmp_path / "r", mode="local")
+    assert aide.main(["--repo", str(root), "claim"]) == 0
+    assert aide.main(["--repo", str(root), "claim"]) == 0
+    capsys.readouterr()
+
+    rc = aide.main(["--repo", str(root), "claim"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "already in flight" in out
+    assert "ORIGIN HAS NEVER SEEN" not in out
+
+
+def test_none_left_names_a_dependency_that_has_not_landed(tmp_path: Path, capsys):
+    """The third reason a queue is open with nothing offerable."""
+    root = _init_repo(tmp_path / "r", mode="local")
+    items = root / "docs" / "aide" / "items"
+    for num, dep in ((27, 28), (28, 27)):
+        (items / f"{num:03d}-x.md").write_text(
+            f"# Item {num:03d} — X\n\n## Dependencies\n- Item {dep:03d}.\n\n## End\n",
+            encoding="utf-8")
+    rc = aide.main(["--repo", str(root), "claim", "--dry-run"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "027 Bounds rules — waiting on 028 (planned)" in out
+    assert "028 Coverage rules — waiting on 027 (planned)" in out
+
+
+def test_an_empty_queue_still_says_only_none_left(tmp_path: Path, capsys):
+    """The genuinely exhausted case keeps its one-line answer.
+
+    Open queue, nothing in it still 📋 — the state `/aide-run-queue` reads as
+    "the queue is exhausted, stop". It must stay a bare `none left`, or the
+    reason lines would be noise on every finished queue.
+    """
+    root = _init_repo(tmp_path / "r", mode="local")
+    assert aide.main(["--repo", str(root), "progress", "set", "27", "in-progress"]) == 0
+    assert aide.main(["--repo", str(root), "progress", "set", "28", "done"]) == 0
+    capsys.readouterr()
+    rc = aide.main(["--repo", str(root), "claim", "--dry-run"])
+    assert rc == 0
+    assert capsys.readouterr().out.strip().splitlines()[-1] == "none left"
+
+
+def test_queue_start_push_failure_is_a_sentence(tmp_path: Path, capsys):
+    root = _init_repo(tmp_path / "r", mode="auto-merge")
+    rc = aide.main(["--repo", str(root), "queue", "start", "4"])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "pushing aide/queue-004 to origin FAILED" in err
+    assert "exists locally, branched from main" in err
+    assert _current_branch(root) == "aide/queue-004"
+
+
+def test_merge_pr_mode_push_failure_leaves_the_item_unticked(tmp_path: Path, capsys):
+    root = _init_repo(tmp_path / "r", mode="pr")
+    _make_item_branch(root, "aide/027-bounds-rules", "feature.txt")
+    rc = aide.main(["--repo", str(root), "merge", "27", "aide/027-bounds-rules",
+                    "--no-test"])
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "pushing aide/027-bounds-rules to origin FAILED" in err
+    assert "is NOT ticked" in err
+    # progress.md untouched: 027 is still 📋.
+    progress = (root / "docs" / "aide" / "progress.md").read_text(encoding="utf-8")
+    assert "📋 Bounds. *(Item 027)*" in progress
+
+
+def test_check_warns_about_an_unpublished_branch(tmp_path: Path, capsys):
+    """The third reporting surface, beside `claim` and `status`.
+
+    §2 already puts claim-branch/status agreement in `check`, and a branch
+    origin has never seen is the same kind of disagreement: the document set
+    says an item is taken, and no other checkout can see the claim.
+    """
+    root = _init_repo(tmp_path / "r", mode="auto-merge")
+    assert aide.main(["--repo", str(root), "claim"]) == 1
+    capsys.readouterr()
+    aide.main(["--repo", str(root), "check"])
+    out = capsys.readouterr().out
+    assert "unpublished branch aide/027-bounds-rules" in out
+    assert "git push -u origin aide/027-bounds-rules" in out
+
+
+def test_check_is_silent_about_claim_branches_in_local_mode(tmp_path: Path, capsys):
+    root = _init_repo(tmp_path / "r", mode="local")
+    assert aide.main(["--repo", str(root), "claim"]) == 0
+    capsys.readouterr()
+    aide.main(["--repo", str(root), "check"])
+    assert "unpublished branch" not in capsys.readouterr().out
+
+
+def test_none_left_reports_in_the_queues_own_order(tmp_path: Path, capsys):
+    """The report follows `_pick_item`'s walk, not the item numbers.
+
+    A queue is free to list its items out of numeric order, and under
+    `claim_scope = "all-open"` the walk crosses queues in turn — sorting
+    numerically would describe a scan that never happened.
+    """
+    root = _init_repo(tmp_path / "r", mode="local")
+    (root / "docs" / "aide" / "queue" / "queue-003.md").write_text(
+        "# Demo — Work Queue 003\n\n"
+        "> **Status:** Live · **Created:** 2026-07-01\n\n"
+        "### Item 026: Rule engine core\nCore.\n\n"
+        "### Item 028: Coverage rules\nCoverage.\n\n"
+        "### Item 027: Bounds rules\nBounds.\n",
+        encoding="utf-8")
+    items = root / "docs" / "aide" / "items"
+    for num, dep in ((27, 28), (28, 27)):
+        (items / f"{num:03d}-x.md").write_text(
+            f"# Item {num:03d} — X\n\n## Dependencies\n- Item {dep:03d}.\n\n## End\n",
+            encoding="utf-8")
+    assert aide.main(["--repo", str(root), "claim", "--dry-run"]) == 0
+    reported = [line.split()[0] for line in capsys.readouterr().out.splitlines()
+                if line.startswith("  0")]
+    assert reported == ["028", "027"]

@@ -287,7 +287,8 @@ QUEUE = "# Demo — Work Queue 003\n\n### Item 027: Alpha\nA.\n\n### Item 028: B
 
 def _run(args, cwd):
     return subprocess.run(args, cwd=str(cwd), check=True,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          encoding="utf-8")
 
 
 def _repo(tmp_path: Path, rows: str) -> Path:

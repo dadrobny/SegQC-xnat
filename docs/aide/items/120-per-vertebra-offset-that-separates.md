@@ -574,12 +574,14 @@ The code path in `src/segfacet` (see `aide.toml` `project.source_dir`):
   `test_ac21_no_regenerated_golden_offset_reaches_2mm`, both of which pin
   pre-120 behaviour this item deliberately supersedes (widened by human
   decision, 2026-08-28).
-- `tests/test_115_stage26_validation.py` and the redundant second digest
-  fence in `tests/test_120_leave_one_out_offset.py` — both assert against
+- `tests/test_115_stage26_validation.py` — asserts against
   `tests/corpus/119_pre_119_digests.json`, whose `pipeline_sha256` key this
   item's step 9 drops (widened by human decision, 2026-08-28).
-- `docs/aide/golden-decision-table.md` and
-  `tests/test_105_golden_decision_table.py` — the "asserted by" cell naming
+- `tests/test_120_leave_one_out_offset.py` — the redundant second digest fence,
+  against the same dropped `pipeline_sha256` key (widened by human decision,
+  2026-08-28). Listed above as this item's new test module too; this is the one
+  assertion in it that exists only to retire an older fence.
+- `docs/aide/golden-decision-table.md` — the "asserted by" cell naming
   the deleted `test_ac22_pipeline_is_byte_identical_to_pre_119` (widened by
   human decision, 2026-08-28). This reverses this spec's own earlier decision
   not to pin them (see the "Asserts against" note below this list, now
@@ -587,6 +589,9 @@ The code path in `src/segfacet` (see `aide.toml` `project.source_dir`):
   `tests/corpus/119_pre_119_digests.json` already predicted that item 120
   ends the `pipeline_sha256` fence's life, so updating the row is this
   item's job, not a later one's.
+- `tests/test_105_golden_decision_table.py` — the same deleted-test reference
+  the table row above carries, checked from the test side (widened by the same
+  2026-08-28 human decision).
 
 **Asserts against:**
 
@@ -596,9 +601,13 @@ The code path in `src/segfacet` (see `aide.toml` `project.source_dir`):
   `("R", "A", "S")`, the fact that makes the direction components readable.
 - `src/segfacet/features/centroids.py` — read, not changed. AC31 pins that
   `centroid_mm` is `centroid_voxel * spacing` with no affine.
-- `src/segfacet/features/consistency.py`, `src/segfacet/features/orientation.py`,
-  `src/segfacet/features/neighbourhood.py` — read, not changed. They consume
-  the fit or the offset *values*; if any needs editing, step 3 reached too far.
+- `src/segfacet/features/consistency.py` — read, not changed. It and the two
+  paths below consume the fit or the offset *values*; if any needs editing,
+  step 3 reached too far.
+- `src/segfacet/features/orientation.py` — read, not changed; consumes the fit
+  or the offset values, as `consistency.py` above.
+- `src/segfacet/features/neighbourhood.py` — read, not changed; consumes the
+  fit or the offset values, as `consistency.py` above.
 - `tests/test_017_centroid_spline_fit.py` — read, not changed. AC10 is
   satisfied by this module staying green as committed.
 - `tests/test_018_per_vertebra_spline_offset.py` — read, not changed. AC13 is

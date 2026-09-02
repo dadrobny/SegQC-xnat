@@ -356,10 +356,11 @@ Given the ordered unit tangents `t` already computed by
 - `.gitattributes` — read, not changed: every file this item regenerates is
   already pinned (`tests/corpus/golden/*.json`, `tests/golden/*.json`,
   `docs/aide/feature_catalogue.generated.{json,md}`, `src/segfacet/**/*.json`).
-- `src/segfacet/reference/reference_default.json` and
-  `src/segfacet/reference/reference_verse_v1.json` — pinned unchanged. Neither
-  carries any `stage3.curvature` key; if either moves, this item has exceeded
-  its scope.
+- `src/segfacet/reference/reference_default.json` — pinned unchanged. It
+  carries no `stage3.curvature` key; if it moves, this item has exceeded its
+  scope.
+- `src/segfacet/reference/reference_verse_v1.json` — pinned unchanged, for the
+  same reason as `reference_default.json` above.
 
 ## Testing Strategy
 

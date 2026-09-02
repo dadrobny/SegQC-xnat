@@ -92,9 +92,11 @@ on whatever branch it's on, then returns a one-line summary. **You** (orchestrat
 prepare the branch and handle push/PR around it.
 
 - **Triage the insight inbox first** — if `docs/aide/insights.md` has unchecked
-  entries, run `/aide-feedback-loop` §0 (triage) before planning: `defect`/`gap`/
-  `automation` entries become candidate items the queue-planner must see, and the
-  queue PR is where the human reviews them.
+  entries, run `/aide-feedback-loop` §0 (triage) before planning. `defect`,
+  `gap` and `automation` entries stay **open** through triage on purpose: the
+  open inbox is an input to queue authoring, so the planner reads them with
+  `insights list --open` and ticks the ones it queues. The queue PR is where the
+  human reviews both those and the ones it passed over.
 - **Create the queue branch with the CLI**, off an up-to-date `main`
   (`git pull --rebase`): `python .aide/scripts/aide.py queue start NNN`. It
   builds the name, records the base, and pushes it. Typing the name by hand
@@ -108,7 +110,9 @@ prepare the branch and handle push/PR around it.
   branch name is typed. Do this **before** `gh pr create`: with commits
   unpushed it prompts for where to push, and a prompt stalls an unattended
   run rather than failing loudly. Then open a **PR**:
-  `gh pr create` titled `docs(aide): work queue NNN`, body summarising the batch.
+  `gh pr create` titled `docs(aide): work queue NNN`, body summarising the batch
+  — including the inbox entries it absorbed and the ones it passed over, which
+  the planner's summary names.
 - **STOP and tell the user**: review/edit/merge the queue PR, then re-invoke
   `/aide-run-roadmap` (or `/aide-run-queue NNN`) to execute it. A queue PR is
   the right place to reshape the plan before any code is built against it.

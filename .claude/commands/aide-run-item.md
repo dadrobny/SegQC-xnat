@@ -78,7 +78,8 @@ and stated canonically in `.aide/conventions.md` §3. A `PreToolUse` hook
    > PASS: reconcile + merge via the CLI —
    > `python .aide/scripts/aide.py progress set NNN in-review` then
    > `python .aide/scripts/aide.py merge NNN` (honours git.mode: direct-merge +
-   > re-test + branch cleanup for auto-merge; push-and-stop for pr; local merge for
+   > branch cleanup + re-test for auto-merge, where a red re-test blocks the ✅
+   > and the push and exits non-zero; push-and-stop for pr; local merge for
    > local). **`in-review`, never `done`** — ✅ means merged and is written by
    > `merge` itself, so under `pr` the item stays 🔍 until a human merges the PR;
    > marking it done here is what once let the exhaustion sweep target an open

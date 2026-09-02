@@ -101,6 +101,8 @@ def _docker_available() -> bool:
             capture_output=True,
             timeout=15,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
     except (OSError, subprocess.TimeoutExpired):
         return False
@@ -140,6 +142,8 @@ def docker_image_tag():
             capture_output=True,
             timeout=1800,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         pytest.skip(f"docker build could not run in this environment: {exc}")

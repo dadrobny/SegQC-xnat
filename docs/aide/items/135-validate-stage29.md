@@ -448,31 +448,43 @@ of them added during this queue) is the **queue boundary's** job
   `violation_message` over the real `tests/` tree. Read, never edited.
 - `tests/test_127_committed_artifact_tolerance.py` — AC5 runs its AC15 sweep
   test. Read, never edited.
-- `tests/report_format_fixture.py`, `tests/golden/report_format_contract.json` —
-  AC2/AC3 exercise the surviving format fixture; the deletion replay happens in
-  the clone, and both files are unchanged in this item's diff.
+- `tests/report_format_fixture.py` — AC2/AC3 exercise the surviving format
+  fixture; the deletion replay happens in the clone, and this file is unchanged
+  in this item's diff.
+- `tests/golden/report_format_contract.json` — the contract that fixture
+  writes; read by the same AC2/AC3 and likewise unchanged in this item's diff.
 - `tests/test_129_coincident_centroids_and_held_out_floor.py` — AC15 reuses its
   coincident-label-map builder; AC18 designates two of its nodes. Read, never
   edited.
-- `tests/test_131_tangent_direction_normalisation.py`,
-  `tests/test_132_monotonicity_against_traversal_order.py`,
-  `tests/test_133_tptbox_pin_and_verse_retirement.py` — AC18's designated
-  fails-before-the-fix nodes. Read, never edited.
-- `tests/test_128_relocation_checks.py`,
-  `tests/test_130_one_closest_point_search.py`,
-  `tests/test_134_decision_table_evidence_companion.py` — AC20's structural
-  statement resolves against them. Read, never edited.
+- `tests/test_131_tangent_direction_normalisation.py` — one of AC18's
+  designated fails-before-the-fix nodes. Read, never edited.
+- `tests/test_132_monotonicity_against_traversal_order.py` — likewise an AC18
+  designated node. Read, never edited.
+- `tests/test_133_tptbox_pin_and_verse_retirement.py` — likewise an AC18
+  designated node. Read, never edited.
+- `tests/test_128_relocation_checks.py` — one of the three modules AC20's
+  structural statement resolves against. Read, never edited.
+- `tests/test_130_one_closest_point_search.py` — likewise resolved against by
+  AC20. Read, never edited.
+- `tests/test_134_decision_table_evidence_companion.py` — likewise resolved
+  against by AC20. Read, never edited.
 - `tests/corpus/manifest.json` — AC25 reads every `detection` field; AC8–AC11
   resolve the mode-4 and clean-control fixtures through it.
 - `tests/corpus/fixtures/*.nii.gz` — AC8–AC11 run the pipeline over them;
   recomputed live, never modified.
-- `tests/test_040_synthetic_corpus.py`, `tests/test_057_acceptance_stage7.py`,
-  `tests/test_120_leave_one_out_offset.py`,
-  `tests/test_125_stage28_validation.py` — AC25 asserts the recorded 7/8 count
-  agrees with their mode-set constants. Read only; a disagreement is a finding,
-  not a licence to edit them.
-- `pyproject.toml`, `constraints.txt` — AC16 reads the `tptbox==0.7.6` pin from
-  both. Read only.
+- `tests/test_040_synthetic_corpus.py` — AC25 asserts the recorded 7/8 count
+  agrees with this module's mode-set constants, and with those of the three
+  modules below. Read only; a disagreement is a finding, not a licence to edit
+  them.
+- `tests/test_057_acceptance_stage7.py` — read for the same AC25 mode-set
+  agreement.
+- `tests/test_120_leave_one_out_offset.py` — read for the same AC25 mode-set
+  agreement.
+- `tests/test_125_stage28_validation.py` — read for the same AC25 mode-set
+  agreement.
+- `pyproject.toml` — AC16 reads the `tptbox==0.7.6` pin from it. Read only.
+- `constraints.txt` — AC16 reads the same pin from it, and checks the two
+  agree. Read only.
 - `aide.toml` — AC23 reads the `[validation]` profile names. Read only;
   PR-gated.
 

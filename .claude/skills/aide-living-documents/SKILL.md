@@ -33,7 +33,7 @@ paths:
 
 <!-- pins: .aide/conventions/1-format-contract/status-icons.md
      Quoted from that section; `test_rule_pins.py` fails if either copy moves
-     alone. One block per section file, so six blocks follow.
+     alone. One block per section file, so seven blocks follow.
      - 📋 Planned
      - 🚧 In Progress
      - 🔍 In Review
@@ -55,6 +55,11 @@ paths:
      - ticked only by `aide progress accept` — never derived
 -->
 
+<!-- pins: .aide/conventions/1-format-contract/items.md
+     - An acceptance criterion is an invariant over the resulting content
+     - never a bound on the diff that produced it
+-->
+
 <!-- pins: .aide/conventions/1-format-contract/human-gates.md
      - Resolving is a CLI operation, never a hand edit
 -->
@@ -62,6 +67,10 @@ paths:
 <!-- pins: .aide/conventions/1-format-contract/insights.md
      - Capture is a plain append; everything after it has a verb
      - Ticking the checkbox is the one in-place edit
+     - The open inbox is an input to queue authoring, not only an output of
+       triage
+     - considered, and either queued or explicitly passed over — never
+       silently dropped
 -->
 
 <!-- pins: .aide/conventions/5-clarify-mode.md
@@ -110,6 +119,15 @@ slot.
 **resolving is a CLI operation, never a hand edit** (`aide gate` only lists,
 approves and declines).
 
+**An acceptance criterion is an invariant over the resulting content** (§1 →
+`items.md`) — never a bound on the diff that produced it, and never a premise
+about a sibling item's schedule. Its test outlives the branch it was written on:
+a criterion that cannot be re-checked once the item has merged is not one the
+suite can keep. The diff-time half of such a claim ("this item did not touch X")
+is `aide scope`'s, declared under `## Asserts against`; a premise that a sibling
+has not landed yet is guaranteed to become false, so the later item's spec lists
+that test file under **May change** from the start.
+
 **Capture is a plain append; everything after it has a verb** (§1 →
 `insights.md`): `aide insights list --open` reads the backlog without the
 closed history around it, `aide insights tick N --pointer "<where it landed>"`
@@ -119,6 +137,16 @@ verb owns it, so a hand-flipped `[x]` is the improvised form of `tick` — and
 run without `--yes`). Reading the file raw costs the whole closed history to
 see a working set of a dozen lines; editing it by hand is the failure `tick`
 exists to prevent.
+
+**The open inbox is an input to queue authoring, not only an output of triage**
+(§1 → `insights.md`). Triage happens *at* the queue boundary, when the next
+queue does not exist yet, so a `defect`, `gap` or `automation` entry routed
+there to "a candidate item" waits in the inbox for whoever authors that queue:
+`aide insights list --open` is one of its inputs, beside vision, roadmap and
+progress. Every open entry of those three types is **considered, and either
+queued or explicitly passed over — never silently dropped**; a queued one is
+ticked with the item number it became, and a passed-over one stays open,
+because an unchecked entry is still a candidate.
 
 **Root documents are authored through their loop entry point, interactively —
 whatever `loop.clarify` says** (`.aide/conventions.md` §5); here that entry point

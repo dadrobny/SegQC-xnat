@@ -302,17 +302,19 @@ default, recorded here for audit rather than blocking on a question.
 - `src/segfacet/catalogue.py` — `build_catalogue()` / `iter_leaf_paths()` are
   the measurement oracle for AC4/AC8/AC12/AC15, recomputed live from committed
   state; read, never changed.
-- `src/segfacet/synth/golden.py` (`build_report_for_case`) and
-  `src/segfacet/synth/corpus.py` (`load_manifest`) — the per-case records the
-  measurement walks; read, never changed.
-- `tests/corpus/manifest.json` and `tests/corpus/fixtures/*.nii.gz` — the
-  corpus the nine measurements derive from; unchanged, and no golden or
-  reference artifact is regenerated.
+- `src/segfacet/synth/golden.py` — `build_report_for_case`, which produces the
+  per-case records the measurement walks; read, never changed.
+- `src/segfacet/synth/corpus.py` — `load_manifest`, which supplies the cases
+  those records are built for; read, never changed.
+- `tests/corpus/manifest.json` — the corpus the nine measurements derive from;
+  unchanged, and no golden or reference artifact is regenerated.
+- `tests/corpus/fixtures/*.nii.gz` — the volumes behind that manifest; likewise
+  unchanged.
 - `tests/committed_artifact_guard.py` — AC16 pins its five-member `GROUNDS`
   and its `ALLOWLIST` as unchanged.
-- `tests/test_127_committed_artifact_tolerance.py`,
-  `tests/test_111_golden_guard.py`, `scripts/aide_status_report.py` —
-  unchanged and still green.
+- `tests/test_127_committed_artifact_tolerance.py` — unchanged and still green.
+- `tests/test_111_golden_guard.py` — unchanged and still green.
+- `scripts/aide_status_report.py` — unchanged and still green.
 
 `docs/aide/progress.md` is deliberately absent from both lists: this item's
 tests neither read nor write it, and listing it under "Asserts against" makes

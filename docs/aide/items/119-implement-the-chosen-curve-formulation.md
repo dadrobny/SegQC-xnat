@@ -525,10 +525,14 @@ The code path in `src/segfacet` (see `aide.toml` `project.source_dir`):
 - `src/segfacet/synth/regression.py` — read, not changed.
   `_recon_leave_one_out_offset` is the technique AC9 mirrors and the workaround
   item 120 retires.
-- `src/segfacet/features/spline_offset.py`, `features/consistency.py`,
-  `features/sagittal_projection.py` — read, not changed. All three reach the
-  curve through `evaluate_spline`, so the `SplineFit` change must be
-  transparent to them; if any needs editing, the migration in step 4 is wrong.
+- `src/segfacet/features/spline_offset.py` — read, not changed. It and the two
+  paths below all reach the curve through `evaluate_spline`, so the `SplineFit`
+  change must be transparent to them; if any needs editing, the migration in
+  step 4 is wrong.
+- `src/segfacet/features/consistency.py` — read, not changed; reaches the curve
+  through `evaluate_spline`, as `spline_offset.py` above.
+- `src/segfacet/features/sagittal_projection.py` — read, not changed; reaches
+  the curve through `evaluate_spline`, as `spline_offset.py` above.
 - `constraints.txt` — read, not changed (already `scipy==1.17.1`).
 - `docs/spinal-curve-model.md` — read, not changed. AC25 pins that its quoted
   non-VerSe numbers still reproduce.

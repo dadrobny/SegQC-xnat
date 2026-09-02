@@ -77,8 +77,10 @@ Run the test suite via the venv (`.venv/Scripts/python -m pytest` or
 python .aide/scripts/aide.py merge NNN
 ```
 
-(`auto-merge` direct-merges + re-tests + deletes the claim branch; `pr` pushes
-and stops for a human PR; `local` merges offline.)
+(`auto-merge` direct-merges + deletes the claim branch + re-tests, and ticks
+and pushes only when that run is green — a red one exits non-zero with the
+merge still local and the item still 🔍; `pr` pushes and stops for a human PR;
+`local` merges offline.)
 
 ### On issues
 

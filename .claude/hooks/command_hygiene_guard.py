@@ -552,6 +552,16 @@ def main():
     ]
     lines += [f"  - {fix}" for fix in issues]
     lines.append("Full contract + rationale: .aide/conventions.md §3.")
+    # A Windows console defaults to a non-UTF-8 codepage, so this message —
+    # which carries an em-dash and a `§` — leaves the process as cp1252 bytes
+    # there and as UTF-8 everywhere else. Same reconfigure `aide.py`'s `main()`
+    # does, for the same reason: what the runtime reads back must not depend on
+    # the platform's guess. Caught by the windows CI leg, where a strict UTF-8
+    # reader got byte 0x97 for the em-dash (conventions.md §6).
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError, OSError):
+        pass
     sys.stderr.write("\n".join(lines) + "\n")
     return 2
 

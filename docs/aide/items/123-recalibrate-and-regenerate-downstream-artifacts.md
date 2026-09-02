@@ -1065,28 +1065,38 @@ the rebuild is re-run, because they change what the rebuild measures.
   `_PRE_098_GOLDEN_VERDICT_AND_FINDINGS` from `test_098`, so AC28's single-point
   update covers it; if this module needs its own edit, the constant was updated
   in the wrong place.
-- `src/segfacet/reference/artifact.py`, `reference/aggregate.py`,
-  `reference/schema.py` — read, not changed. AC5 pins `ingest_cohort`'s
-  flat-directory + `<id>_scan.nii.gz` convention as the contract staging must
-  satisfy; AC20 pins `config_hash`'s field list as the reason the default
-  artifact must be rebuilt. *(`ingest.py` and `delta.py` moved to **May change**
-  by the 2026-08-29 amendment — AC41, AC42.)*
+- `src/segfacet/reference/artifact.py` — read, not changed. AC5 pins
+  `ingest_cohort`'s flat-directory + `<id>_scan.nii.gz` convention as the
+  contract staging must satisfy; AC20 pins `config_hash`'s field list as the
+  reason the default artifact must be rebuilt. *(`ingest.py` and `delta.py`
+  moved to **May change** by the 2026-08-29 amendment — AC41, AC42.)*
+- `src/segfacet/reference/aggregate.py` — read, not changed; same reason as
+  `artifact.py` above.
+- `src/segfacet/reference/schema.py` — read, not changed; same reason as
+  `artifact.py` above.
 - `tests/test_115_stage26_validation.py` — read, not changed. AC33 is satisfied
   by this module staying green as committed, which is what proves the fence count
   did not grow.
-- `tests/test_045_reference_artifact.py`, `tests/test_063_reference_intensity.py`,
-  `tests/test_081_reference_morphology.py` — read, not changed. Their five
-  "rebuild and compare to committed" tests are satisfied by AC21's rebuild.
-- `tests/test_097_stage17_validation.py`, `tests/test_049_reference_integration.py`
-  — read, not changed. *(`test_090_reference_derived_defaults.py` is listed
-  under **May change** above, not here — this item's mechanical `aide scope`
-  check treats a path listed under both sections as a contradiction
-  regardless of prose carve-outs, so it must appear in exactly one. Its one
-  authorised test is AC53's; the rest of that module is unchanged in spirit,
-  just not re-asserted here.)* Both of these two modules
-  read the production artifact structurally; if the measured footprint (step
-  11) moves a percentile they derive a threshold from, stop and hand back
-  rather than editing them.
+- `tests/test_045_reference_artifact.py` — read, not changed. Its
+  "rebuild and compare to committed" tests, and those of the two modules below,
+  are satisfied by AC21's rebuild — five across the three.
+- `tests/test_063_reference_intensity.py` — read, not changed; same rebuild
+  reason as `test_045_reference_artifact.py` above.
+- `tests/test_081_reference_morphology.py` — read, not changed; same rebuild
+  reason as `test_045_reference_artifact.py` above.
+- `tests/test_097_stage17_validation.py` — read, not changed. It and
+  `test_049_reference_integration.py` below both read the production artifact
+  structurally; if the measured footprint (step 11) moves a percentile they
+  derive a threshold from, stop and hand back rather than editing them.
+  *(`test_090_reference_derived_defaults.py` is listed under **May change**
+  above, not here — this item's mechanical `aide scope` check treats a path
+  listed under both sections as a contradiction regardless of prose carve-outs,
+  so it must appear in exactly one. Its one authorised test is AC53's; the rest
+  of that module is unchanged in spirit, just not re-asserted here.)*
+- `tests/test_049_reference_integration.py` — read, not changed; same
+  structural read of the production artifact as
+  `test_097_stage17_validation.py` above, and the same instruction to hand back
+  rather than edit.
 **Explicitly out of scope** (an edit here means the item has overrun; these are
 stated as prose rather than as **Asserts against** entries because they carry no
 acceptance criterion, and a pin that carries no AC only adds cross-spec
