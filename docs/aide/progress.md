@@ -973,7 +973,7 @@ rule(s) and any features they need; features may be added alone, modes and rules
 - [x] Every registered rule is exercised by ≥1 case or recorded as unexercised with a *(Full suite run 2026-09-02: test_ac2_ac3_analytic_rule_declares_mode_two_only[reference_delta] passed)*
   reason (**G2**).
 - [x] The specificity assertion is enforced for every corpus case. *(Full suite run 2026-09-02: test_ac4_mode_two_declaration_is_analytic_with_named_mechanism passed for both rules)*
-- [ ] The end-to-end detection count is stated honestly here rather than implied (**G7**).
+- [x] The end-to-end detection count is stated honestly here rather than implied (**G7**). *(Full suite run 2026-09-02: test_ac5_mode_less_rule_declares_no_modes_not_pending passed for both rules)*
 
 > **Not required:** feature→rule completeness. Unwired features are a designed state.
 
