@@ -48,6 +48,12 @@ docs/aide/golden_evidence.generated.json text eol=lf
 # newlines) -- same Windows core.autocrlf gotcha as everything else here.
 docs/aide/golden-decision-table.md text eol=lf
 
+# Item 138's generated failure-mode <-> rule <-> feature traceability matrix
+# -- byte-reproducible fixtures (AC7), same Windows core.autocrlf gotcha as
+# the pins above (see CLAUDE.md's Gotchas).
+docs/aide/traceability_matrix.generated.json text eol=lf
+docs/aide/traceability_matrix.generated.md text eol=lf
+
 # Item 111: 016_features_report.json and 022_stage3_report.json were the only
 # committed byte-reproducible text fixtures still unpinned -- latent only
 # because both consumers compare via read_text(), whose universal-newline

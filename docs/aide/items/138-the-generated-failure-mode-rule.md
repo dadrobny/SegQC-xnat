@@ -664,6 +664,49 @@ it from a clean tree and quotes its counts as the honest end-to-end statement.
 
 To be updated during implementation.
 
+### Implementation (2026-09-02)
+
+- **`MODE_TITLES` is derived, not authored as a literal dict.** Implementation
+  Step 2 named `MODE_TITLES: Dict[int, str]` as an authored constant, but a
+  hand-transcribed dict risks exactly the drift class A14 exists to prevent
+  (an unnoticed divergence from `vision.md`'s actual text, e.g. an em-dash vs.
+  hyphen or a trailing-period slip). `build_matrix()` instead calls a private
+  `_vision_mode_titles()` helper that parses `docs/aide/vision.md` §6 at build
+  time with the same regex the test module uses independently — the two can
+  never silently drift apart, and AC9 holds by construction rather than by
+  hand-checked transcription. `MODE_RUNGS` (the judgement-bearing rung +
+  mechanism pairs, A3) stays authored, as specified.
+- **`MODE_RUNGS` mechanisms cite each mode's own corpus `case_id`** (e.g.
+  `mode1_displace`, `mode2_fragment`, …, `mode8_force_overlap`) as their AC31
+  resolvable token, rather than leaning on anchor paths or rule ids alone —
+  the case id is the least ambiguous token to word-boundary-match and doubles
+  as a plain-English pointer a reader can verify against the manifest
+  directly.
+- **`mode_to_rule` holes fold two distinct hole shapes into one sorted
+  tuple**: a mode with zero declaring rules (named by its `str(mode)`) and a
+  corpus-designated `rule_id` no rule registers (AC25). Both make the
+  direction `complete: False`; `corpus_designated_unregistered_rule_ids` is
+  reported as its own top-level field alongside the folded `holes` list per
+  the spec's JSON shape (Implementation Step 7), so a reader gets both the
+  low-level holes and the specific unregistered-id list without re-deriving
+  one from the other.
+- **`RuleRecord.evidence` normalises a malformed (bare-`str`) declaration to
+  a one-element tuple at read time** (`_normalise_evidence`, AC27), the same
+  defence the spec's A6 places locally in this module rather than touching
+  `heuristics/rule.py` (out of this item's authorised paths).
+- **Verified against the Description's 2026-09-02 measurement**: regenerating
+  both artifacts reproduced 138/50/88/30 total/read-by-rule/read-by-no-rule/
+  unwired feature counts, the per-rule counts, the per-mode union sizes
+  (19/21/7/10/4/9/6/6), and the eleven-edge / three-analytic split verbatim —
+  no divergence investigated because none arose.
+- **A markdown-rendering bug found and fixed during self-verification**: the
+  first draft of `render_markdown` appended a trailing empty line before the
+  final `"\n".join(lines) + "\n"`, producing a double trailing newline (`\n\n`)
+  that would have failed AC6. Fixed by dropping the redundant empty list
+  element rather than stripping the output, keeping the "exactly one
+  `write_bytes`, exactly one trailing newline" contract explicit in the
+  builder rather than papered over post hoc.
+
 ### Correction (2026-09-02, before implementation)
 
 This spec was authored against a tree where `reference_delta` declared

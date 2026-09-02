@@ -1,0 +1,552 @@
+{
+  "corpus_designated_unregistered_rule_ids": [],
+  "directions": {
+    "mode_to_rule": {
+      "complete": true,
+      "holes": []
+    },
+    "rule_to_mode": {
+      "complete": true,
+      "holes": []
+    }
+  },
+  "features": {
+    "by_rule": {
+      "border": 9,
+      "bounds": 6,
+      "coverage": 4,
+      "fragmentation": 7,
+      "intensity": 5,
+      "intensity_reference_delta": 8,
+      "mislabel": 9,
+      "overlap": 6,
+      "reference_delta": 11,
+      "sequence": 5
+    },
+    "read_by_no_rule": {
+      "count": 88,
+      "qualifier": "a leaf path no rule reads is inventory, not a gap: the feature record is a deliberately over-broad vector rules select from, and full consumption is never an expected end state.",
+      "required": false
+    },
+    "read_by_rule": 50,
+    "total_paths": 138,
+    "unwired": 30
+  },
+  "modes": {
+    "1": {
+      "anchor_paths": [
+        "stage3.per_label_offsets[].offset_mm"
+      ],
+      "cases": [
+        {
+          "case_id": "mode1_displace",
+          "detection": "pipeline"
+        }
+      ],
+      "feature_paths": [
+        "per_label",
+        "reference_delta.lower_pct",
+        "reference_delta.upper_pct",
+        "reference_delta.{label}.available",
+        "reference_delta.{label}.distribution_distance",
+        "reference_delta.{label}.features.physical_volume_mm3.percentile_rank",
+        "reference_delta.{label}.features.physical_volume_mm3.robust_z",
+        "reference_delta.{label}.features.physical_volume_mm3.value",
+        "reference_delta.{label}.label",
+        "reference_delta.{label}.level_name",
+        "reference_delta.{label}.out_of_range_features[]",
+        "stage3.monotonic_consistency.non_monotonic_pairs[]",
+        "stage3.per_label_offsets[].dx_mm",
+        "stage3.per_label_offsets[].dy_mm",
+        "stage3.per_label_offsets[].dz_mm",
+        "stage3.per_label_offsets[].is_terminal",
+        "stage3.per_label_offsets[].label",
+        "stage3.per_label_offsets[].level_name",
+        "stage3.per_label_offsets[].offset_mm"
+      ],
+      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
+      "granularity": "rule",
+      "mechanism": "Item 120's held-out spline-offset measurement demonstrates label displacement end-to-end on the committed corpus case mode1_displace; mislabel and reference_delta both flag it, the latter because compute_reference_delta scores spline_offset_mm alongside every other tracked feature.",
+      "mode": 1,
+      "pipeline_detected": true,
+      "rule_attribution": {
+        "mislabel": "corpus",
+        "reference_delta": "analytic"
+      },
+      "rules": [
+        "mislabel",
+        "reference_delta"
+      ],
+      "rung": "synthetic-demonstrable",
+      "rung_label": "Demonstrated end-to-end on a synthetic corpus case",
+      "title": "Label not aligned with the anatomical vertebra it names"
+    },
+    "2": {
+      "anchor_paths": [
+        "per_label.{label}.components.fragmentation_index"
+      ],
+      "cases": [
+        {
+          "case_id": "mode2_fragment",
+          "detection": "pipeline"
+        }
+      ],
+      "feature_paths": [
+        "per_label",
+        "per_label.{label}.components.component_count",
+        "per_label.{label}.components.component_sizes[]",
+        "per_label.{label}.components.fragmentation_index",
+        "per_label.{label}.components.largest_component_fraction",
+        "per_label.{label}.components.stray_component_sizes[]",
+        "per_label.{label}.geometry.extent_x_mm",
+        "per_label.{label}.geometry.extent_y_mm",
+        "per_label.{label}.geometry.extent_z_mm",
+        "per_label.{label}.geometry.physical_volume_mm3",
+        "per_label.{label}.level_name",
+        "reference_delta.lower_pct",
+        "reference_delta.upper_pct",
+        "reference_delta.{label}.available",
+        "reference_delta.{label}.distribution_distance",
+        "reference_delta.{label}.features.physical_volume_mm3.percentile_rank",
+        "reference_delta.{label}.features.physical_volume_mm3.robust_z",
+        "reference_delta.{label}.features.physical_volume_mm3.value",
+        "reference_delta.{label}.label",
+        "reference_delta.{label}.level_name",
+        "reference_delta.{label}.out_of_range_features[]"
+      ],
+      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
+      "granularity": "rule",
+      "mechanism": "The corpus case mode2_fragment demonstrates over-/under-segmentation end-to-end, caught independently by bounds' magnitude thresholds, fragmentation's component-count checks, and reference_delta's cohort-relative scoring.",
+      "mode": 2,
+      "pipeline_detected": true,
+      "rule_attribution": {
+        "bounds": "analytic",
+        "fragmentation": "corpus",
+        "reference_delta": "analytic"
+      },
+      "rules": [
+        "bounds",
+        "fragmentation",
+        "reference_delta"
+      ],
+      "rung": "synthetic-demonstrable",
+      "rung_label": "Demonstrated end-to-end on a synthetic corpus case",
+      "title": "Over-/under-segmentation — fused or fragmented vertebra segments"
+    },
+    "3": {
+      "anchor_paths": [
+        "per_label.{label}.components.stray_component_sizes[]"
+      ],
+      "cases": [
+        {
+          "case_id": "mode3_inject_islands",
+          "detection": "pipeline"
+        }
+      ],
+      "feature_paths": [
+        "per_label",
+        "per_label.{label}.components.component_count",
+        "per_label.{label}.components.component_sizes[]",
+        "per_label.{label}.components.fragmentation_index",
+        "per_label.{label}.components.largest_component_fraction",
+        "per_label.{label}.components.stray_component_sizes[]",
+        "per_label.{label}.level_name"
+      ],
+      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
+      "granularity": "rule",
+      "mechanism": "The corpus case mode3_inject_islands demonstrates disconnected rogue-island segments end-to-end, detected by the fragmentation rule's stray-component checks.",
+      "mode": 3,
+      "pipeline_detected": true,
+      "rule_attribution": {
+        "fragmentation": "corpus"
+      },
+      "rules": [
+        "fragmentation"
+      ],
+      "rung": "synthetic-demonstrable",
+      "rung_label": "Demonstrated end-to-end on a synthetic corpus case",
+      "title": "Disconnected components / islands, especially tiny rogue segments"
+    },
+    "4": {
+      "anchor_paths": [
+        "stage3.monotonic_consistency.is_monotonic"
+      ],
+      "cases": [
+        {
+          "case_id": "mode4_relabel_swap",
+          "detection": "pipeline"
+        }
+      ],
+      "feature_paths": [
+        "per_label",
+        "stage3.monotonic_consistency.is_monotonic",
+        "stage3.monotonic_consistency.non_monotonic_pairs[]",
+        "stage3.per_label_offsets[].dx_mm",
+        "stage3.per_label_offsets[].dy_mm",
+        "stage3.per_label_offsets[].dz_mm",
+        "stage3.per_label_offsets[].is_terminal",
+        "stage3.per_label_offsets[].label",
+        "stage3.per_label_offsets[].level_name",
+        "stage3.per_label_offsets[].offset_mm"
+      ],
+      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
+      "granularity": "rule",
+      "mechanism": "Item 132 closed the interpolating-spline-fit defect for semantic mislabelling, and the corpus case mode4_relabel_swap demonstrates a relabel-swap end-to-end, caught by mislabel's Detector B via stage3.monotonic_consistency.is_monotonic.",
+      "mode": 4,
+      "pipeline_detected": true,
+      "rule_attribution": {
+        "mislabel": "corpus"
+      },
+      "rules": [
+        "mislabel"
+      ],
+      "rung": "synthetic-demonstrable",
+      "rung_label": "Demonstrated end-to-end on a synthetic corpus case",
+      "title": "Semantic mislabelling (wrong vertebra identification)"
+    },
+    "5": {
+      "anchor_paths": [
+        "relationships.present_levels[]"
+      ],
+      "cases": [
+        {
+          "case_id": "mode5_remove_level",
+          "detection": "pipeline"
+        }
+      ],
+      "feature_paths": [
+        "per_label",
+        "relationships",
+        "relationships.missing_levels[]",
+        "relationships.present_levels[]"
+      ],
+      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
+      "granularity": "rule",
+      "mechanism": "The corpus case mode5_remove_level demonstrates a missing vertebra end-to-end, caught by the coverage rule against relationships.present_levels[].",
+      "mode": 5,
+      "pipeline_detected": true,
+      "rule_attribution": {
+        "coverage": "corpus"
+      },
+      "rules": [
+        "coverage"
+      ],
+      "rung": "synthetic-demonstrable",
+      "rung_label": "Demonstrated end-to-end on a synthetic corpus case",
+      "title": "Not all vertebrae in the image are segmented"
+    },
+    "6": {
+      "anchor_paths": [
+        "per_label.{label}.geometry.touches_left"
+      ],
+      "cases": [
+        {
+          "case_id": "mode6_crop_at_border",
+          "detection": "pipeline"
+        }
+      ],
+      "feature_paths": [
+        "per_label",
+        "per_label.{label}.geometry.touches_anterior",
+        "per_label.{label}.geometry.touches_inferior",
+        "per_label.{label}.geometry.touches_left",
+        "per_label.{label}.geometry.touches_posterior",
+        "per_label.{label}.geometry.touches_right",
+        "per_label.{label}.geometry.touches_superior",
+        "per_label.{label}.level_name",
+        "relationships.present_levels[]"
+      ],
+      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
+      "granularity": "rule",
+      "mechanism": "The corpus case mode6_crop_at_border demonstrates a border-cropped vertebra end-to-end, caught by the border rule reading per_label.{label}.geometry.touches_left.",
+      "mode": 6,
+      "pipeline_detected": true,
+      "rule_attribution": {
+        "border": "corpus"
+      },
+      "rules": [
+        "border"
+      ],
+      "rung": "synthetic-demonstrable",
+      "rung_label": "Demonstrated end-to-end on a synthetic corpus case",
+      "title": "Partial vertebra at the image border whose appearance changes"
+    },
+    "7": {
+      "anchor_paths": [
+        "relationships.is_continuous"
+      ],
+      "cases": [
+        {
+          "case_id": "mode7_sequence_break",
+          "detection": "pipeline"
+        }
+      ],
+      "feature_paths": [
+        "per_label",
+        "per_label.{label}.label",
+        "per_label.{label}.level_name",
+        "relationships",
+        "relationships.is_continuous",
+        "relationships.out_of_order_labels[]"
+      ],
+      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
+      "granularity": "rule",
+      "mechanism": "rank(v) == v - 1 under the TPTBox default admits a single rank descent, so section 6.7's own two-descent example, L1 → T12 → L2 → L5, is not representable at rung 1; its corpus case mode7_sequence_break is itself pipeline-detected (a single-descent break), which is why the rung and pipeline_detected are recorded as separate fields.",
+      "mode": 7,
+      "pipeline_detected": true,
+      "rule_attribution": {
+        "sequence": "corpus"
+      },
+      "rules": [
+        "sequence"
+      ],
+      "rung": "needs-real-data",
+      "rung_label": "Needs real data, or a corpus the fixtures cannot express",
+      "title": "Non-continuous label sequence (e.g. L1 → T12 → L2 → L5)"
+    },
+    "8": {
+      "anchor_paths": [
+        "overlaps[].overlap_voxels"
+      ],
+      "cases": [
+        {
+          "case_id": "mode8_force_overlap",
+          "detection": "reconstructed_record"
+        }
+      ],
+      "feature_paths": [
+        "overlaps[]",
+        "overlaps[].label_a",
+        "overlaps[].label_b",
+        "overlaps[].name_a",
+        "overlaps[].name_b",
+        "overlaps[].overlap_voxels"
+      ],
+      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
+      "granularity": "rule",
+      "mechanism": "A single-channel integer label map cannot assign two labels to one voxel, so overlaps[] populates only on a case deliberately corrupted to violate that invariant, which no real segmenter output can be; mode8_force_overlap therefore stays detection=\"reconstructed_record\" rather than pipeline-detected, while the overlap rule and the paths it reads remain correct and fully wired.",
+      "mode": 8,
+      "pipeline_detected": false,
+      "rule_attribution": {
+        "overlap": "corpus"
+      },
+      "rules": [
+        "overlap"
+      ],
+      "rung": "structurally-unobservable",
+      "rung_label": "Structurally unobservable in the supported input format",
+      "title": "Overlapping segments"
+    }
+  },
+  "note": "Generated by `python -m segfacet.traceability` (item 138). Do not hand-edit this document -- edit MODE_RUNGS in src/segfacet/traceability.py (the authored evidence rungs) or the underlying rule/catalogue sources it derives from, then regenerate. mode -> rule and rule -> mode are complete by construction (a hole in either fails loudly); feature -> rule is deliberately incomplete -- see the `features.read_by_no_rule.qualifier` field.",
+  "rules": {
+    "border": {
+      "declaration_state": "declared",
+      "evidence": [
+        "corpus"
+      ],
+      "feature_path_count": 9,
+      "feature_paths": [
+        "per_label",
+        "per_label.{label}.geometry.touches_anterior",
+        "per_label.{label}.geometry.touches_inferior",
+        "per_label.{label}.geometry.touches_left",
+        "per_label.{label}.geometry.touches_posterior",
+        "per_label.{label}.geometry.touches_right",
+        "per_label.{label}.geometry.touches_superior",
+        "per_label.{label}.level_name",
+        "relationships.present_levels[]"
+      ],
+      "mode_less_reason": "",
+      "modes": [
+        6
+      ],
+      "rule_id": "border"
+    },
+    "bounds": {
+      "declaration_state": "declared",
+      "evidence": [
+        "analytic",
+        "per-label physical volume and x/y/z extent are compared against level-aware plausible ranges: a fused pair of vertebrae reads over the maximum and an under-segmented or partially-labelled vertebra reads under the minimum, which is §6 mode 2's own definition (over-/under-segmentation)."
+      ],
+      "feature_path_count": 6,
+      "feature_paths": [
+        "per_label",
+        "per_label.{label}.geometry.extent_x_mm",
+        "per_label.{label}.geometry.extent_y_mm",
+        "per_label.{label}.geometry.extent_z_mm",
+        "per_label.{label}.geometry.physical_volume_mm3",
+        "per_label.{label}.level_name"
+      ],
+      "mode_less_reason": "",
+      "modes": [
+        2
+      ],
+      "rule_id": "bounds"
+    },
+    "coverage": {
+      "declaration_state": "declared",
+      "evidence": [
+        "corpus"
+      ],
+      "feature_path_count": 4,
+      "feature_paths": [
+        "per_label",
+        "relationships",
+        "relationships.missing_levels[]",
+        "relationships.present_levels[]"
+      ],
+      "mode_less_reason": "",
+      "modes": [
+        5
+      ],
+      "rule_id": "coverage"
+    },
+    "fragmentation": {
+      "declaration_state": "declared",
+      "evidence": [
+        "corpus"
+      ],
+      "feature_path_count": 7,
+      "feature_paths": [
+        "per_label",
+        "per_label.{label}.components.component_count",
+        "per_label.{label}.components.component_sizes[]",
+        "per_label.{label}.components.fragmentation_index",
+        "per_label.{label}.components.largest_component_fraction",
+        "per_label.{label}.components.stray_component_sizes[]",
+        "per_label.{label}.level_name"
+      ],
+      "mode_less_reason": "",
+      "modes": [
+        2,
+        3
+      ],
+      "rule_id": "fragmentation"
+    },
+    "intensity": {
+      "declaration_state": "mode_less",
+      "evidence": [],
+      "feature_path_count": 5,
+      "feature_paths": [
+        "image_features.available",
+        "image_features.per_label.{label}.first_order.median",
+        "image_features.per_label.{label}.first_order.std",
+        "image_features.per_label.{label}.label",
+        "per_label"
+      ],
+      "mode_less_reason": "This rule judges tissue plausibility -- an implausibly low median HU reads as soft tissue/air, an implausibly high median reads as metal/implant, and a near-zero std reads as a degenerate/uniform region -- but §6's eight modes are geometric/topological/semantic and none of them names tissue plausibility as a failure mode. The rule is demonstrably useful and demonstrably exercised: tests/corpus/intensity/manifest.json's four cases (clean_hu, implausible_metal, implausible_soft_tissue, degenerate_uniform) drive it, and that manifest carries no failure_mode field at all -- the same gap, expressed in the corpus. The catalogue gap is recorded in docs/aide/insights.md rather than fixed here, because §6 is a root document.",
+      "modes": [],
+      "rule_id": "intensity"
+    },
+    "intensity_reference_delta": {
+      "declaration_state": "mode_less",
+      "evidence": [],
+      "feature_path_count": 8,
+      "feature_paths": [
+        "per_label",
+        "reference_delta.lower_pct",
+        "reference_delta.upper_pct",
+        "reference_delta.{label}.distribution_distance",
+        "reference_delta.{label}.features.physical_volume_mm3.percentile_rank",
+        "reference_delta.{label}.features.physical_volume_mm3.robust_z",
+        "reference_delta.{label}.features.physical_volume_mm3.value",
+        "reference_delta.{label}.out_of_range_features[]"
+      ],
+      "mode_less_reason": "This rule is the reference-relative form of the intensity rule's tissue-plausibility judgement: it thresholds how far a labelled region's intensity statistics deviate from a level-aware VerSe-derived reference distribution, which is still a tissue-plausibility claim, not a geometric, topological or semantic one. §6's eight modes are geometric/topological/semantic and name no tissue-plausibility mode, so this rule targets none of them. The catalogue gap is recorded in docs/aide/insights.md rather than fixed here, because §6 is a root document.",
+      "modes": [],
+      "rule_id": "intensity_reference_delta"
+    },
+    "mislabel": {
+      "declaration_state": "declared",
+      "evidence": [
+        "corpus"
+      ],
+      "feature_path_count": 9,
+      "feature_paths": [
+        "per_label",
+        "stage3.monotonic_consistency.non_monotonic_pairs[]",
+        "stage3.per_label_offsets[].dx_mm",
+        "stage3.per_label_offsets[].dy_mm",
+        "stage3.per_label_offsets[].dz_mm",
+        "stage3.per_label_offsets[].is_terminal",
+        "stage3.per_label_offsets[].label",
+        "stage3.per_label_offsets[].level_name",
+        "stage3.per_label_offsets[].offset_mm"
+      ],
+      "mode_less_reason": "",
+      "modes": [
+        1,
+        4
+      ],
+      "rule_id": "mislabel"
+    },
+    "overlap": {
+      "declaration_state": "declared",
+      "evidence": [
+        "corpus"
+      ],
+      "feature_path_count": 6,
+      "feature_paths": [
+        "overlaps[]",
+        "overlaps[].label_a",
+        "overlaps[].label_b",
+        "overlaps[].name_a",
+        "overlaps[].name_b",
+        "overlaps[].overlap_voxels"
+      ],
+      "mode_less_reason": "",
+      "modes": [
+        8
+      ],
+      "rule_id": "overlap"
+    },
+    "reference_delta": {
+      "declaration_state": "declared",
+      "evidence": [
+        "analytic",
+        "compute_reference_delta scores every feature the reference artifact tracks, not a single feature: both committed reference artifacts carry 21 per-label features, spanning physical_volume_mm3 and extent_{x,y,z}_mm -- the same §6 mode 2 magnitude signal 'bounds' targets, measured against a cohort instead of hand-set bounds -- and spline_offset_mm (from stage3.per_label_offsets[].offset_mm), which is §6 mode 1's own anchor feature, so an out-of-distribution verdict on that feature alone is a mode 1 detection."
+      ],
+      "feature_path_count": 11,
+      "feature_paths": [
+        "per_label",
+        "reference_delta.lower_pct",
+        "reference_delta.upper_pct",
+        "reference_delta.{label}.available",
+        "reference_delta.{label}.distribution_distance",
+        "reference_delta.{label}.features.physical_volume_mm3.percentile_rank",
+        "reference_delta.{label}.features.physical_volume_mm3.robust_z",
+        "reference_delta.{label}.features.physical_volume_mm3.value",
+        "reference_delta.{label}.label",
+        "reference_delta.{label}.level_name",
+        "reference_delta.{label}.out_of_range_features[]"
+      ],
+      "mode_less_reason": "",
+      "modes": [
+        1,
+        2
+      ],
+      "rule_id": "reference_delta"
+    },
+    "sequence": {
+      "declaration_state": "declared",
+      "evidence": [
+        "corpus"
+      ],
+      "feature_path_count": 5,
+      "feature_paths": [
+        "per_label",
+        "per_label.{label}.label",
+        "per_label.{label}.level_name",
+        "relationships",
+        "relationships.out_of_order_labels[]"
+      ],
+      "mode_less_reason": "",
+      "modes": [
+        7
+      ],
+      "rule_id": "sequence"
+    }
+  },
+  "schema_version": "1.0"
+}
