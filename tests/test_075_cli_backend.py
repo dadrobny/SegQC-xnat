@@ -64,6 +64,34 @@ _PLACEHOLDER_ARGV = {
 # =========================================================================== #
 
 
+@pytest.fixture(autouse=True)
+def _restore_backend_env():
+    """Undo the process-scoped ``SEGFACET_BACKEND`` mutation ``--backend`` makes.
+
+    ``_apply_backend_selection`` sets the variable on ``os.environ`` for the
+    rest of the process (A11, deliberate: the compute path reads it at call
+    time). A test that calls ``main()`` with the flag and does not go through
+    ``monkeypatch`` therefore leaves it set for whatever runs next in the same
+    worker -- and the tests below that assert the variable is *absent* then
+    depend on which of their siblings happened to run first.
+
+    That is not hypothetical. Before this fixture,
+    ``test_adv_env_hermeticity_after_explicit_backend_selection`` passed only
+    as a whole-file run (AC3/AC4/AC5 leak ``cpu`` ahead of it, so its
+    ``original_present`` branch was the one taken) and failed when run alone.
+    ``pytest -n 4`` schedules by test, not by file, which is what turned it red
+    on PR #63's two numpy legs while the serial legs stayed green.
+    """
+    before = os.environ.get("SEGFACET_BACKEND")
+    try:
+        yield
+    finally:
+        if before is None:
+            os.environ.pop("SEGFACET_BACKEND", None)
+        else:
+            os.environ["SEGFACET_BACKEND"] = before
+
+
 def _run_files(tmp_path):
     """A small real scan+seg pair for ``segfacet run`` (load_case is never
     mocked, so this must be a real, loadable fixture)."""
@@ -395,24 +423,28 @@ def test_ac14_existing_run_cli_behaviour_unchanged_without_backend_flag(tmp_path
 # =========================================================================== #
 
 
-def test_adv_env_hermeticity_after_explicit_backend_selection(tmp_path):
-    """After a --backend selection's monkeypatch context exits, the ambient
-    os.environ is restored -- no selection leaks across tests, even though
-    the process-scoped mutation is intentional for the run's own duration
-    (A11)."""
-    original_present = "SEGFACET_BACKEND" in os.environ
-    original_value = os.environ.get("SEGFACET_BACKEND")
+def test_adv_env_hermeticity_after_explicit_backend_selection(tmp_path, monkeypatch):
+    """A11: the process-scoped selection ``--backend`` makes does not outlive a
+    ``monkeypatch`` context that recorded the variable's prior value.
+
+    Both ``setenv`` calls are load-bearing. A context can only undo what it
+    recorded, and recording requires the name to be present -- so pinning the
+    ambient value to ``auto`` first is what gives the context something to
+    restore, and what makes this one assertion rather than a choice between
+    two. The earlier version instead deleted the variable and read its
+    pre-state off the inherited environment, which decided the outcome by
+    whichever sibling test the runner had scheduled first (see
+    ``_restore_backend_env`` above).
+    """
+    monkeypatch.setenv("SEGFACET_BACKEND", "auto")
 
     with pytest.MonkeyPatch.context() as mp:
-        mp.delenv("SEGFACET_BACKEND", raising=False)
+        mp.setenv("SEGFACET_BACKEND", "auto")
         argv, _out_target = _build_argv("run", tmp_path, extra=["--backend", "cpu"])
         main(argv)
         assert os.environ.get("SEGFACET_BACKEND") == "cpu"
 
-    if original_present:
-        assert os.environ.get("SEGFACET_BACKEND") == original_value
-    else:
-        assert "SEGFACET_BACKEND" not in os.environ
+    assert os.environ.get("SEGFACET_BACKEND") == "auto"
 
 
 def test_adv_explicit_backend_auto_overrides_ambient_cpu(tmp_path, monkeypatch):
