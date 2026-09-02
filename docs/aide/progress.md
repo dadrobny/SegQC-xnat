@@ -943,7 +943,7 @@ rule(s) and any features they need; features may be added alone, modes and rules
   stating its targeted §6 modes, its mode-less reason, or a pending reason. Six rules
   declared from corpus evidence; the four contested ones are **pending**, their disposition
   deliberately left to item 137. Does not itself close Stage 19's G8 shortfall. *(Item 136)*
-- 🚧 The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
+- 🔍 The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
   `intensity_reference_delta`) mapped to §6 modes, or recorded as targeting none with a
   reason — the root close of Stage 19's G8 shortfall. *(Item 137)*
 - 📋 Specificity assertion — no unintended rule may fire — adopted as a ratchet. *(Item 140)*
