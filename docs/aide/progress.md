@@ -967,7 +967,7 @@ rule(s) and any features they need; features may be added alone, modes and rules
 
 **Acceptance.**
 
-- [ ] Every §6 failure mode has ≥1 rule **and** a recorded evidence rung — never silent
+- [x] Every §6 failure mode has ≥1 rule **and** a recorded evidence rung — never silent *(Full suite run 2026-09-02 (.venv/bin/python -m pytest -q): 6900 passed, 60 skipped (all pre-known env-gated), 0 failed; test_ac1_all_ten_rules_declared_and_not_pending passed)*
   (**G2**).
 - [ ] Every registered rule maps to ≥1 §6 mode or is recorded as mode-less with a reason.
 - [ ] Every registered rule is exercised by ≥1 case or recorded as unexercised with a
