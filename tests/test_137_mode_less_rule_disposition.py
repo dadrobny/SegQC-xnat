@@ -1,16 +1,30 @@
 """Tests for item 137 -- disposition the four §6-mode-less rules (``bounds``,
-``reference_delta`` -> analytic mode 2; ``intensity``,
+``reference_delta`` -> analytic modes 1 and 2; ``intensity``,
 ``intensity_reference_delta`` -> mode-less, with the catalogue-gap finding
 captured) and the new ``"rule_mode_less"`` ``mode_evidence`` tag that closes
 Stage 19's G8 "statused but mode-unmapped" bucket honestly.
+
+Post-merge correction (2026-09-02, commit b1c593c): AC2/AC3 below and their
+tests originally pinned ``reference_delta`` at ``modes == (2,)`` on an
+evidence sentence that falsely claimed the committed reference artifact
+carries only ``physical_volume_mm3``. Measured directly, it carries 21
+per-label features, and ``compute_reference_delta`` scores every one it
+tracks -- including ``spline_offset_mm``, mode 1's own anchor feature
+(``feature_docs.MODE_ANCHOR_PATHS[1]``). The rule now declares
+``modes=(1, 2)``; the tests below assert that corrected shape, and a new
+adversarial test ties the declaration to the tracked-feature vocabulary
+itself so a re-narrowing to ``(2,)`` fails here even with nothing else
+changed.
 
 Covers Acceptance Criteria AC1-AC18:
 
 - AC1:  every one of the ten registered rules carries a declaration with
         ``pending_reason == ""`` -- nothing ships pending.
 - AC2:  ``bounds`` declares exactly ``(2,)``, analytic.
-- AC3:  ``reference_delta`` declares exactly ``(2,)``, analytic.
-- AC4:  both mode-2 declarations are analytic (``"analytic" in evidence``,
+- AC3:  ``reference_delta`` declares exactly ``(1, 2)``, analytic (corrected
+        2026-09-02, commit b1c593c -- originally ``(2,)`` on a false
+        evidence claim; see the module note above).
+- AC4:  both analytic declarations are analytic (``"analytic" in evidence``,
         ``"corpus" not in evidence``) and name the mechanism (>= 40 chars).
 - AC5:  ``intensity`` / ``intensity_reference_delta`` are mode-less, not
         pending.
@@ -43,14 +57,17 @@ still reachable (an undeclared stub rule, and a declaration monkeypatched
 back to ``pending``); a future corpus case still binds an analytic
 declaration (the escape-hatch guard); a ``"corpus"``-tagged analytic
 declaration is rejected by ``rule_declaration_conflicts()``; the measured
-artifact-movement counts from the item spec; determinism of
-``build_catalogue()`` and ``rule_declaration_conflicts()``; frozen-instance
-immutability; an entry with no ``consuming_rules`` gains neither
-``"rule_declaration"`` nor ``"rule_mode_less"``; an entry consumed by both a
-mode-2 declarer and a mode-less declarer carries both tags in canonical
-order and keeps ``failure_modes == (2,)``; the ``per_label`` container keeps
-its corpus-derived modes and gains ``"rule_mode_less"`` last; the insights
-search globs the archive files too.
+artifact-movement counts from the item spec, including the corrected
+mode-1-carrying-entry count; determinism of ``build_catalogue()`` and
+``rule_declaration_conflicts()``; frozen-instance immutability; an entry
+with no ``consuming_rules`` gains neither ``"rule_declaration"`` nor
+``"rule_mode_less"``; an entry consumed by both an analytic declarer and a
+mode-less declarer carries both tags in canonical order and keeps the
+declarer's own declared modes in ``failure_modes``; the ``per_label``
+container keeps its corpus-derived modes and gains ``"rule_mode_less"``
+last; the insights search globs the archive files too; ``reference_delta``'s
+declared modes are tied to its own tracked-feature vocabulary, not just
+pinned by value, so a re-narrowing to ``(2,)`` is caught structurally.
 """
 
 from __future__ import annotations
@@ -81,9 +98,12 @@ def _catalogue():
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 
-_ANALYTIC_MODE2 = ("bounds", "reference_delta")
+_ANALYTIC_RULES = ("bounds", "reference_delta")
+# bounds declares mode 2 alone; reference_delta declares modes 1 and 2
+# (corrected 2026-09-02, commit b1c593c -- see the module note above).
+_ANALYTIC_DECLARED_MODES = {"bounds": (2,), "reference_delta": (1, 2)}
 _MODE_LESS = ("intensity", "intensity_reference_delta")
-_DISPOSITIONED = _ANALYTIC_MODE2 + _MODE_LESS
+_DISPOSITIONED = _ANALYTIC_RULES + _MODE_LESS
 
 _CANONICAL_TAG_ORDER = (
     "per_mode_metric",
@@ -126,25 +146,76 @@ def test_ac1_all_ten_rules_declared_and_not_pending():
 
 
 # =========================================================================== #
-# AC2 / AC3: bounds and reference_delta declare exactly mode 2
+# AC2 / AC3: bounds declares exactly mode 2; reference_delta declares modes
+# 1 and 2 (corrected 2026-09-02, commit b1c593c)
 # =========================================================================== #
 
 
-@pytest.mark.parametrize("rule_id", sorted(_ANALYTIC_MODE2))
-def test_ac2_ac3_analytic_rule_declares_mode_two_only(rule_id):
+@pytest.mark.parametrize("rule_id, expected_modes", sorted(_ANALYTIC_DECLARED_MODES.items()))
+def test_ac2_ac3_analytic_rule_declares_its_expected_modes(rule_id, expected_modes):
     decl = _RULES[rule_id].mode_declaration
-    assert decl.modes == (2,)
+    assert decl.modes == expected_modes, rule_id
     assert decl.mode_less_reason == ""
     assert decl.pending_reason == ""
 
 
+def test_adv_reference_delta_declared_modes_cover_every_tracked_mode_anchor_feature():
+    """The defect this corrects (commit b1c593c) was an evidence sentence's
+    false factual claim about the committed reference artifact going
+    unchecked -- AC4 only pinned ``len(evidence) >= 40``, never its content.
+    This test instead ties ``reference_delta``'s declared modes to what
+    ``compute_reference_delta`` demonstrably reads, independent of prose: for
+    every feature name in ``reference.delta.INGESTED_FEATURES`` (the
+    vocabulary ``_case_features_for_label`` actually scores), map it onto the
+    record leaf path it is read from and, wherever that path is a §6
+    mode-anchor path (``feature_docs.MODE_ANCHOR_PATHS``), require the rule's
+    declared modes to include that mode. ``spline_offset_mm`` is read from
+    ``stage3.per_label_offsets[].offset_mm``, exactly mode 1's own anchor
+    path, so this fails the moment ``reference_delta``'s declaration is
+    re-narrowed to ``(2,)`` -- the original, false-premised shape -- even
+    though nothing else in this module or the rule's code changed."""
+    import segfacet.feature_docs as feature_docs_module
+    import segfacet.reference.delta as delta_module
+
+    tracked = delta_module.INGESTED_FEATURES
+    assert tracked, "expected a non-empty reference_delta tracked-feature vocabulary"
+
+    # The record leaf path each tracked feature name is read from -- mirrors
+    # _case_features_for_label's two read paths (reference/delta.py): the
+    # per-label geometry sub-block, keyed by name, and the one Stage 3
+    # exception (the spline offset lives in a different sub-block entirely).
+    feature_record_path = {
+        name: "per_label.{label}.geometry." + name for name in tracked if name != "spline_offset_mm"
+    }
+    feature_record_path["spline_offset_mm"] = "stage3.per_label_offsets[].offset_mm"
+    assert set(feature_record_path) == set(tracked)
+
+    anchor_modes_by_path: dict = {}
+    for mode, paths in feature_docs_module.MODE_ANCHOR_PATHS.items():
+        for path in paths:
+            anchor_modes_by_path.setdefault(path, set()).add(mode)
+
+    required_modes: set = set()
+    for feature_name in tracked:
+        required_modes |= anchor_modes_by_path.get(feature_record_path[feature_name], set())
+
+    assert required_modes, (
+        "expected at least one reference_delta-tracked feature to map onto "
+        "a §6 mode anchor path"
+    )
+    assert 1 in required_modes, required_modes  # spline_offset_mm -> mode 1
+
+    decl = _RULES["reference_delta"].mode_declaration
+    assert required_modes <= set(decl.modes), (required_modes, decl.modes)
+
+
 # =========================================================================== #
-# AC4: both mode-2 declarations are analytic, not corpus-corroborated
+# AC4: both analytic declarations are analytic, not corpus-corroborated
 # =========================================================================== #
 
 
-@pytest.mark.parametrize("rule_id", sorted(_ANALYTIC_MODE2))
-def test_ac4_mode_two_declaration_is_analytic_with_named_mechanism(rule_id):
+@pytest.mark.parametrize("rule_id", sorted(_ANALYTIC_RULES))
+def test_ac4_analytic_declaration_is_analytic_with_named_mechanism(rule_id):
     decl = _RULES[rule_id].mode_declaration
     assert "analytic" in decl.evidence
     assert "corpus" not in decl.evidence
@@ -236,7 +307,7 @@ def test_ac9_analytic_modes_are_within_the_mode_anchor_key_set():
     import segfacet.feature_docs as feature_docs_module
 
     anchor_modes = set(feature_docs_module.MODE_ANCHOR_PATHS.keys())
-    for rule_id in _ANALYTIC_MODE2:
+    for rule_id in _ANALYTIC_RULES:
         decl = _RULES[rule_id].mode_declaration
         assert set(decl.modes) <= anchor_modes, rule_id
 
@@ -294,11 +365,13 @@ def test_adv_entry_with_no_consuming_rules_has_neither_declaration_tag():
         assert "rule_mode_less" not in entry.mode_evidence, entry.path
 
 
-def test_adv_shared_mode2_and_mode_less_entry_carries_both_tags_ordered():
+def test_adv_shared_reference_delta_and_mode_less_entry_carries_both_tags_ordered():
     """The per-label physical_volume_mm3 path (and its reference_delta
-    counterpart) is consumed by both an analytic mode-2 declarer and a
-    mode-less declarer; it must carry both tags, in canonical order, and
-    keep failure_modes == (2,) (the mode-less rule contributes no mode)."""
+    counterpart) is consumed by both the analytic ``reference_delta``
+    declarer and a mode-less declarer; it must carry both tags, in
+    canonical order, and keep failure_modes == (1, 2) -- reference_delta's
+    own two declared modes (corrected 2026-09-02, commit b1c593c; the
+    mode-less rule itself contributes no mode)."""
     catalogue = _catalogue()
     cat = catalogue.build_catalogue(strict=True)
 
@@ -306,7 +379,7 @@ def test_adv_shared_mode2_and_mode_less_entry_carries_both_tags_ordered():
         e
         for e in cat.entries
         if e.path.startswith("reference_delta.")
-        and set(e.consuming_rules) & set(_ANALYTIC_MODE2)
+        and set(e.consuming_rules) & set(_ANALYTIC_RULES)
         and set(e.consuming_rules) & set(_MODE_LESS)
     ]
     assert candidates, (
@@ -319,7 +392,7 @@ def test_adv_shared_mode2_and_mode_less_entry_carries_both_tags_ordered():
         decl_idx = entry.mode_evidence.index("rule_declaration")
         less_idx = entry.mode_evidence.index("rule_mode_less")
         assert decl_idx < less_idx, entry.mode_evidence
-        assert entry.failure_modes == (2,), entry.path
+        assert entry.failure_modes == (1, 2), entry.path
 
 
 def test_adv_per_label_container_keeps_corpus_modes_and_gains_mode_less_last():
@@ -372,7 +445,7 @@ def test_ac13_bounds_or_reference_delta_consumers_carry_mode_two():
     catalogue = _catalogue()
     cat = catalogue.build_catalogue(strict=True)
     candidates = [
-        e for e in cat.entries if set(e.consuming_rules) & set(_ANALYTIC_MODE2)
+        e for e in cat.entries if set(e.consuming_rules) & set(_ANALYTIC_RULES)
     ]
     assert candidates, "expected at least one entry consumed by bounds/reference_delta"
     for entry in candidates:
@@ -435,7 +508,14 @@ def test_adv_measured_artifact_movement_counts_from_spec():
     proposed declarations in place): of 138 entries, 21 carry mode 2 and the
     mode_evidence distribution is the eight-way split named in the item
     description, with zero rule_unmapped (supersedes item 136's 32/18/86/2
-    figures, which this item's A6/A4 deliberately invalidate)."""
+    figures, which this item's A6/A4 deliberately invalidate).
+
+    Also checks the post-merge correction's own measured movement (2026-09-02,
+    commit b1c593c): reference_delta's corrected modes=(1, 2) declaration
+    lifts the mode-1-carrying entry count from 9 to 19, while the
+    mode_evidence tag-composition distribution below is unchanged -- only
+    the failure_modes integer sets moved, not which evidence mechanisms
+    fired."""
     catalogue = _catalogue()
     cat = catalogue.build_catalogue(strict=True)
     entries = cat.entries
@@ -443,6 +523,9 @@ def test_adv_measured_artifact_movement_counts_from_spec():
 
     mode2_count = sum(1 for e in entries if 2 in e.failure_modes)
     assert mode2_count == 21
+
+    mode1_count = sum(1 for e in entries if 1 in e.failure_modes)
+    assert mode1_count == 19
 
     distribution = Counter(e.mode_evidence for e in entries)
     expected = {
