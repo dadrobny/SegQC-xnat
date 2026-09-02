@@ -4,7 +4,10 @@ Enforced **only** inside `aide claim` / `aide merge`; agent instructions are
 identical across modes.
 
 - **`auto-merge`** (default) — claim branch pushed; on validator PASS `aide merge`
-  direct-merges to `main`, re-runs the test command, deletes the claim branch.
+  direct-merges to `main`, deletes the claim branch, then re-runs the test
+  command. That run is a **gate**: green earns the ✅ and the push, red leaves
+  the merge local, the item 🔍 and the claim branch back where it was, and says
+  so. The branch goes before the run so the run sees what a fresh clone sees.
 - **`pr`** — claim identical; on PASS `aide merge` pushes the branch and **stops**
   ("open a PR"). The human opens the PR (`gh pr create` stays `ask`-gated).
 - **`local`** — no pushes at all (offline). Claim is a local branch only (no

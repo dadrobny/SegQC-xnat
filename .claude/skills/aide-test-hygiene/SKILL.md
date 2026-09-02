@@ -35,15 +35,32 @@ paths:
      - A test must be deterministic and pass on Windows, macOS and Linux, with
        no network access
      - Never write the repo's own working-directory path literally into a test
-     - the one rule here a script can decide
      - Any `Path` entering a hash, comparison, or match must be `.as_posix()`
      - an identical tree hashes differently on Windows
      - A committed byte-exact fixture needs a `.gitattributes` `text eol=lf` pin
      - Treat a warning as authoritative and its silence as partial
+     - the lint decides a *read shape*, not whether a file needs a pin
+     - The immunity is a property of the reader, not of parsing
+     - never write "the eol-pin lint passes" as an acceptance criterion
+     - `binary` and `-text` count as pins alongside `eol=lf`
+     - A test that captures subprocess output as text must pass
+       `encoding="utf-8"`
+     - It sees only direct calls: a suite that wraps its subprocess calls in a
+       helper shows this lint one call site and hides the rest
+     - The codec is the producing side's job too
+     - a script that writes non-ASCII to stdout or stderr inherits the console
+       codepage on Windows, so it must reconfigure its own streams
      - Prefer calling the function over shelling out to the command that calls
        it
+     - a test asserting on `aide check`'s own output should call `run_checks`
+       in-process
+     - Never pin an exact warning or error count from a module that itself
+       trips the lint being counted
+     - a measurement that includes the measurer
      - Assert a derived value is recognisable *before* asserting anything about
        it
+     - A scope claim about a diff belongs on the branch, not in the suite
+     - Deriving the base from `aide scope` is not the repair
 -->
 
 # Test hygiene
@@ -71,7 +88,7 @@ regardless.
   this general statement binds a case none of them names.
 - **Never write the repo's own working-directory path literally into a test.**
   Resolve from the test file: `Path(__file__).resolve().parents[N]`. `aide
-  check` warns on this — the one rule here a script can decide.
+  check` warns on this.
 - **Any `Path` entering a hash, comparison, or match must be `.as_posix()`.**
   `str(Path)` renders the OS-native separator — including a `Path` interpolated
   into an f-string, which calls `str()` — so an identical tree hashes
@@ -79,11 +96,44 @@ regardless.
 - **A committed byte-exact fixture needs a `.gitattributes` `text eol=lf` pin**,
   or `core.autocrlf` rewrites it on checkout and every byte comparison fails on
   Windows only. `aide check` warns on the cases it can decide. Treat a warning
-  as authoritative and its silence as partial.
+  as authoritative and its silence as partial. The lint decides a *read shape*,
+  not whether a file needs a pin: `read_text()` applies universal-newline
+  translation, so an artifact read that way and parsed draws no warning whether
+  or not it is pinned, while **any** `read_bytes()` on a committed path is
+  reported. The immunity is a property of the reader, not of parsing. So never
+  write "the eol-pin lint passes" as an acceptance criterion: assert the pin
+  itself. `binary` and `-text` count as pins alongside `eol=lf`.
+- **A test that captures subprocess output as text must pass
+  `encoding="utf-8"`.** `text=True` names no codec, so Python decodes with the
+  platform's locale codec — UTF-8 on a Linux runner, cp1252 on a Windows one.
+  `aide check` warns on this. It sees only direct calls: a suite that wraps its
+  subprocess calls in a helper shows this lint one call site and hides the
+  rest. The codec is the producing side's job too: a script that writes
+  non-ASCII to stdout or stderr inherits the console codepage on Windows, so it
+  must reconfigure its own streams. When the reader and the writer disagree the
+  read comes back **`None`** rather than raising — the decode runs in
+  `subprocess.run`'s reader thread — so assert the value is there before
+  asserting anything about it.
 - **Prefer calling the function over shelling out to the command that calls
   it.** The CLI's logic is importable and returns structured data; a subprocess
   boundary adds stdout encoding, platform quirks, and a re-parse of what was
-  structured a moment earlier.
+  structured a moment earlier. A test asserting on `aide check`'s own output
+  should call `run_checks` in-process, which returns `(errors, warnings)` as
+  structured data.
+- **Never pin an exact warning or error count from a module that itself trips
+  the lint being counted.** The module raises the count by one the moment it is
+  committed — a measurement that includes the measurer. Assert on the warning
+  you mean by matching it, not on how many there are.
+- **A scope claim about a diff belongs on the branch, not in the suite.** "This
+  item did not touch X" is decided by `aide scope` against the item's declared
+  paths (§1 → authorised paths); written as a test it asserts something that
+  stops being true the moment the item merges — and on a stacked queue, where
+  the item's base is the queue branch and not `main`, it reports every sibling
+  item's legitimate change as this item's violation. **Deriving the base from
+  `aide scope` is not the repair**: the verb reads the *current* branch's
+  recorded base, and `aide merge` re-runs the suite from the merge target. Nor
+  is a skip guard, which leaves the test permanently skipped once the claim
+  branch is deleted. `aide check` warns on both literal shapes.
 - **Assert a derived value is recognisable *before* asserting anything about
   it.** A glob that matched nothing, a capture that came back empty, a slice
   taken from a failed `find()` — each yields a value that flows into the

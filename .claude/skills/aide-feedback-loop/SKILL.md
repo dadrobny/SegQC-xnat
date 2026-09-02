@@ -35,38 +35,61 @@ For each **unchecked** entry, by type:
 
 - **knowledge** → fold the fact into its owning document (`docs/`, `CLAUDE.md`,
   a living document, code comments) — smallest edit that preserves it.
-- **defect / gap** → make it a **candidate item for the queue being authored**
-  (or note it for the next `/aide-create-queue` run) so the queue PR reviews
-  it. Do not fix it inline here.
+- **defect / gap** → a **candidate item for the next queue**, which the queue
+  PR then reviews. Do not fix it inline here — and do not tick it here: you are
+  standing *at* the boundary, so the queue that would carry it does not exist
+  yet. **Leaving the entry unchecked is the routing**, because the open inbox
+  is an input to queue authoring (`.aide/conventions.md` §1 → `insights.md`):
+  the next `/aide-create-queue` run reads `insights list --open`, and either
+  queues the entry — ticking it with the item number it became — or says why it
+  passed over it.
 - **automation** → a candidate item that (a) implements the deterministic
   script/CLI verb and (b) edits the skill/agent prose to *mandate* it — both
   halves, or agents keep improvising. (Worked example: the `aide sync`/`aide
-  gc` verbs replacing improvised git recon.)
+  gc` verbs replacing improvised git recon.) It reaches the next queue the same
+  way a `defect`/`gap` entry does, and is ticked there, not here.
 - **framework** → belongs to AIDE itself, not this project. If
   `[framework] repo` is set in `aide.toml` and `gh` is available, hand it
-  over: `gh issue create --repo <owner/repo>` with a body naming the project,
-  the observation, a proposal, and **the engine version the observation was
-  made under** (this stays `ask`-gated — a human confirms).
+  over: `gh issue create --repo <owner/repo>` with a body carrying the
+  observation and a proposal, and **opening with the engine version the
+  observation was made under** (this stays `ask`-gated — a human confirms).
   Otherwise leave the entry unchecked with a `(pending handover)` note.
 
-  The version comes from the entry's own marker (`*(item 042, 2026-08-29,
-  engine 1.22.0)*`, `.aide/conventions.md` §1). If the entry carries none, read
-  `.aide/VERSION` and write it as *the version at triage time, not at capture* —
-  say so in the body. The framework repo cannot see this one, so an unmarked
-  guess reads there as an observed fact, and every claim about an older engine
-  is then re-verified by hand.
+  That version is the body's **first line**, before the observation
+  (`.aide/conventions.md` §1 → `insights.md`):
 
-Tick each routed entry with the verb, naming where it landed — never by
-editing the line by hand, which is how a claim gets silently reworded:
+  ```
+  **Project:** <this repo> (consumer). **Observed under engine X.Y.Z**
+  (<item ref>, YYYY-MM-DD).
+  ```
+
+  **Writing that header is yours; a form on the framework repo cannot reach
+  it** — `--body` bypasses any issue template that repo publishes, and no
+  template can reach a body composed here and passed on the command line. It
+  costs nothing, because **you already hold the fact**: the version comes from
+  the entry's own marker (`*(item 042, 2026-08-29, engine 1.22.0)*`). If the
+  entry carries none, read `.aide/VERSION` and write it as *the version at
+  triage time, not at capture* — say so in the body. The framework repo cannot
+  see this one, so an unmarked guess reads there as an observed fact, and every
+  claim about an older engine is then re-verified by hand.
+
+Tick each entry you routed *here* — a `knowledge` fold, a handed-over
+`framework` issue — with the verb, naming where it landed, never by editing the
+line by hand, which is how a claim gets silently reworded:
 
 ```
-python .aide/scripts/aide.py insights tick 7 --pointer "item 042"
+python .aide/scripts/aide.py insights tick 7 --pointer "docs/architecture.md"
 ```
 
-That appends `→ item 042` to the entry and flips its checkbox. Never reword,
-reorder or delete a captured claim — including one that turned out to be wrong;
-the correction goes *beneath* it, as a dated line in the entry's status trail,
-which is what the same command writes when the entry is **already** ticked:
+That appends `→ docs/architecture.md` to the entry and flips its checkbox.
+
+A `defect`, `gap` or `automation` entry is **not** one of those, so that command
+is not for it: it is ticked by the queue that absorbs it, and you leave it open.
+
+Never reword, reorder or delete a captured claim — including one that turned
+out to be wrong; the correction goes *beneath* it, as a dated line in the
+entry's status trail, which is what the same command writes when the entry is
+**already** ticked:
 
 ```
 - [x] defect — <the original claim, never touched> *(item 117, 2026-08-20)*

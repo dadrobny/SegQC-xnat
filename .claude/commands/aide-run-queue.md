@@ -85,7 +85,15 @@ Repeat until `aide claim` reports no remaining unclaimed 📋 item **in this que
 
 2. **Decide (orchestrator).**
    - **Item claimed** → go to step 3.
-   - **"none left"** → the queue is exhausted; go to **On queue exhaustion**.
+   - **`none left` alone on the line** → the queue is exhausted; go to
+     **On queue exhaustion**.
+   - **`none left — …` followed by per-item reasons** → the queue is still open
+     and nothing in it is offerable. This is **not** exhaustion. On exit 0 (a
+     gate, a claim already in flight, a dependency not landed) relay the reasons
+     verbatim and stop. On a **non-zero** exit an item is held by an
+     *unpublished claim* — an `aide claim` whose push failed — so surface it
+     verbatim and stop: publishing or releasing that branch is the human's call.
+   - **Any other non-zero exit** → surface the sentence and stop.
 
 3. **Run the item** — load `/aide-run-item NNN aide/NNN-short-name` inline as a
    skill in this session. It drives the full per-item workflow (spec → tests →

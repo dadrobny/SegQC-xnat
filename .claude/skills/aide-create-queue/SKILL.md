@@ -20,6 +20,24 @@ cohesive roadmap unit (a single stage, or a small phase), capped at
 Read vision, roadmap, and progress, then write the queue from the template
 **`.aide/templates/queue.md`**.
 
+### Read the open insight inbox first
+
+**The open inbox is an input to queue authoring, not only an output of triage**
+(`.aide/conventions.md` §1 → `insights.md`). Read it with the verb, never by
+opening the file — the file interleaves closed and open entries:
+
+```
+python .aide/scripts/aide.py insights list --open
+```
+
+Triage runs *at* the queue boundary, when the finished queue is closed and the
+next one is unwritten, so a `defect`, `gap` or `automation` entry routed there
+to "a candidate item" has been waiting for this run. Every open one is
+**considered, and either queued or explicitly passed over — never silently
+dropped**: an entry you queue becomes an item like any other and is ticked with
+the item number it became (below), and one you pass over stays open — still a
+candidate for the next queue — and is named, with why, in the hand-off.
+
 ### Requirements
 
 1. **Scope to one cohesive roadmap unit, capped at ~`loop.queue_cap` items**:
@@ -75,7 +93,10 @@ Read vision, roadmap, and progress, then write the queue from the template
    - Append to an existing reference when a deliverable maps to several items
      (`… *(Items 006, NNN)*`); add the reference to the bullet that has none; or,
      if the item delivers something not yet listed, add a new
-     `- 📋 <deliverable>. *(Item NNN)*` bullet under the right stage.
+     `- 📋 <deliverable>. *(Item NNN)*` bullet under the right stage. A shared
+     marker is shorthand, not a shared status cell: the first status change to
+     any of its items splits the bullet into one per item, so the siblings keep
+     📋 rather than being completed alongside.
    - **Never change a deliverable's status icon** — leave it 📋. This step only
      makes the item *trackable*; status transitions (📋→🚧→✅) are
      `aide progress set`'s job during execution.
@@ -118,10 +139,25 @@ git commit -m "docs(aide): add work queue NNN"
   only; the orchestrator pushes the `aide/queue-NNN` branch and opens the
   human-reviewed queue PR.
 
+### Tick every inbox entry you queued
+
+The verb owns that edit and commits the file when git can; `N` is the entry
+number `insights list --open` printed:
+
+```
+python .aide/scripts/aide.py insights tick N --pointer "item NNN"
+```
+
+Never flip the checkbox or reword the line by hand: **the claim is immutable and
+ticking the checkbox is the one in-place edit**. An entry passed over is left
+exactly as it stands.
+
 ## Hand-off
 
-Close your turn by naming both ways to proceed — in chat, and in the queue-PR
-body if one is opened:
+Close your turn by naming the inbox entries this queue absorbed (with the item
+numbers they became) and the ones you passed over with why — a pass-over is
+stated where the queue is reviewed, not left for the next reader to re-derive —
+then both ways to proceed, in chat and in the queue-PR body if one is opened:
 
 - **Spec the whole queue now** — run `/aide-spec-queue NNN` in one interactive
   sitting (clarify questions answered while a human is present), then let

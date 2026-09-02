@@ -57,7 +57,8 @@ One test per AC.
 
 def _run(args, cwd):
     return subprocess.run(args, cwd=str(cwd), check=True,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          encoding="utf-8")
 
 
 # --------------------------------------------------------------------------- #

@@ -95,18 +95,37 @@ record that half a claim has since been fixed, so the next reader re-derives all
 of it.
 
 **Triage** routes each unchecked entry by type — `knowledge` → the owning
-document; `defect`/`gap` → candidate items for the queue being authored (so the
-queue PR reviews them); `automation` → a candidate item that adds a CLI
-verb/script *and* the skill/agent edit mandating it; `framework` → a GitHub
-issue on `[framework] repo` from `aide.toml` (via `gh`; if unset/offline the
-entry stays pending).
+document; `defect`/`gap` → candidate items for the **next** queue (so the
+queue PR reviews them); `automation` → a candidate item for that same next
+queue, one that adds a CLI verb/script *and* the skill/agent edit mandating
+it; `framework` → a GitHub issue on `[framework] repo` from `aide.toml` (via
+`gh`; if unset/offline the entry stays pending).
 
-**A `framework` issue body names the engine version the observation was made
-under.** Take it from the entry; if the entry has none, read the consumer's
-current `.aide/VERSION` and say in the body that it is *the version at triage
-time, not at capture* — an unmarked fallback is worse than none, because it
-reads as an observed fact. The issue is triaged in a repo that cannot see this
-one, and "which engine was this?" is otherwise answered by hand, per issue.
+**A `framework` issue body opens with the engine version the observation was
+made under** — first line, before the observation:
+
+```
+**Project:** <consumer repo> (consumer). **Observed under engine X.Y.Z**
+(<item ref>, YYYY-MM-DD).
+```
+
+Triage at the destination begins by checking the claim against that engine's
+history, which is why the version leads rather than sits somewhere in the prose:
+a report triaged against the wrong version is closed as already-fixed when it is
+not, or re-fixed when it is. Take the version from the entry; if the entry has
+none, read the consumer's current `.aide/VERSION` and say in the body that it is
+*the version at triage time, not at capture* — an unmarked fallback is worse than
+none, because it reads as an observed fact. The issue is triaged in a repo that
+cannot see this one, and "which engine was this?" is otherwise answered by hand,
+per issue.
+
+**Writing that header is the filing role's job; a form on the destination cannot
+reach it.** An issue template binds a human composing in a browser and is
+silently bypassed when the body is composed by the role and passed on the command
+line (`gh issue create --body …`), which is how this handover files — no template
+can reach that path, and that is what a template is rather than a gap in one. The
+cost of writing it is nothing, because **the consumer already holds the fact**:
+it is in the entry's own marker, or one read of `.aide/VERSION` away.
 
 **When triage happens depends on the destination.** `knowledge`, `defect`,
 `gap` and `automation` all land in this project — a document it owns, or a
@@ -116,3 +135,23 @@ on another repo, and nothing about that destination needs a queue, so a
 `framework` entry may be triaged **on capture or on demand**. Routing it through
 the boundary too means the inbox accumulates for exactly as long as a queue
 runs, and a long queue is normal.
+
+**The open inbox is an input to queue authoring, not only an output of
+triage.** An entry routed to "a candidate item" is routed to a queue that does
+not exist yet — triage runs *at* the boundary, where the finished queue is
+closed and the next one is unwritten — so the inbox is where such an entry
+waits, and whoever authors the next queue reads it before choosing the batch:
+
+```
+python .aide/scripts/aide.py insights list --open
+```
+
+Every open `defect`, `gap` or `automation` entry is **considered, and either
+queued or explicitly passed over — never silently dropped**. Queueing one is a
+routing like any other, so the author who queued it ticks it with the item
+number it became (`aide insights tick N --pointer "item NNN"`, which commits the
+file when git can); a pass-over leaves the entry open and is stated where the queue
+is reviewed, rather than left for the next reader to re-derive. That is what
+makes leaving an entry unchecked at triage an honest move rather than a hope:
+**an unchecked entry is still a candidate**, and the next queue's author sees
+it.

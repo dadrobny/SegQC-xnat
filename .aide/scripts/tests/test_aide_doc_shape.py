@@ -237,6 +237,132 @@ def test_double_listing_matches_through_dot_slash_spelling(tmp_path: Path):
     assert len(w) == 1 and "both May change and Asserts against" in w[0]
 
 
+def _with_section(section: str) -> str:
+    return GOOD_SPEC + "\n## Authorised paths\n\n**May change:**\n\n" + section
+
+
+def test_extra_spans_on_a_bullet_are_reported(tmp_path: Path):
+    """The recorded shape (issue #119): three of one item's four bullets listed
+    several comma-separated paths, only the first was authorised, and the
+    narrowing surfaced much later as an `aide scope` FAIL naming paths the
+    spec's own prose plainly authorised."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md",
+               _with_section("- `src/a.py`, `src/b.py`, `src/c.py` — the extractors\n"))
+    w = aide.item_spec_warnings(repo / "docs" / "aide")
+    assert len(w) == 1 and "reads none of them" in w[0]
+    assert "'src/b.py'" in w[0] and "'src/c.py'" in w[0]
+
+
+def test_a_wrapped_path_list_is_reported(tmp_path: Path):
+    """The parser inspects bullet lines only, so a path list that wraps is not
+    narrowed to second place — everything below the first line is not read at
+    all. The continuation is in path position because no reason has started."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md",
+               _with_section("- `src/a.py`,\n  `src/b.py` — the extractor and its test\n"))
+    w = aide.item_spec_warnings(repo / "docs" / "aide")
+    assert len(w) == 1 and "'src/b.py'" in w[0]
+
+
+def test_a_backticked_name_in_the_reason_is_not_a_path_claim(tmp_path: Path):
+    """The limit that makes the lint worth reading. A bullet must carry a
+    reason, and reasons quote things: identifiers, config keys, sibling items'
+    deliverables. Reading those as dropped paths produced 82 and 224 findings
+    on two real consumers — and six on the very spec that reported issue #119,
+    which had already been split one-path-per-bullet and says so in its own
+    prose."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md", _with_section(
+        "- `docs/project/failure-taxonomy.md` — one of four, listed individually\n"
+        "  rather than as `docs/project/**` so this item cannot touch Item 006's\n"
+        "  `documentation-conventions.md`.\n"
+        "- `src/pins.py` — adds `normalise_name` and `EXPECTED_UPSTREAM_PINS`\n"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide") == []
+
+
+def test_the_lint_names_exactly_what_the_parser_drops(tmp_path: Path):
+    """The warning is only worth reading if it describes `aide scope`'s real
+    behaviour, so the two are checked against each other rather than separately.
+    """
+    text = _with_section(
+        "- `src/a.py`, `src/b.py` — two\n"
+        "- `docs/one.md`,\n  `docs/two.md` — a note\n"
+        "- `src/ok.py` — fine\n")
+    parsed = aide.parse_authorised_paths(text)
+    dropped = aide.dropped_bullet_spans(text)
+    assert parsed is not None and parsed.may_change == ["src/a.py", "docs/one.md", "src/ok.py"]
+    assert dropped == [("src/a.py", ["src/b.py"]), ("docs/one.md", ["docs/two.md"])]
+
+
+def test_one_path_per_bullet_is_silent(tmp_path: Path):
+    """Backticked prose after the path is ordinary — the reason a bullet is
+    required to carry. Only a span the parser DROPS is a finding, and on a
+    one-path bullet there is none."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md",
+               _with_section("- `src/a.py` — the extractor\n- `src/b.py` — its test\n"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide") == []
+
+
+def test_a_continuation_line_belongs_only_to_the_bullet_above_it(tmp_path: Path):
+    """A blank line and a sub-list label both close a bullet, so backticked
+    prose in the section's own paragraphs is attributed to nothing."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md",
+               _with_section("- `src/a.py` — the extractor\n\n"
+                             "Written against `src/legacy.py`, which stays put.\n"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide") == []
+
+
+def test_a_bullet_the_parser_declines_reports_nothing(tmp_path: Path):
+    """An unfilled `{{slot}}` is `aide check`'s error to raise; reporting the
+    same authoring slip twice is the failure mode issue #13 was filed for."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md",
+               _with_section("- {{path}} — `src/a.py`, `src/b.py`\n"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide") == []
+
+
+def test_a_reason_wrapped_under_a_line_final_dash_is_not_path_position(tmp_path: Path):
+    """`- `path` —` with the reason below is a normal way to write a long one.
+    Reading the line-final dash as "no reason yet" took the whole reason for
+    more path position, which is how a spec listing one path per bullet drew
+    seven findings on a real consumer."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md", _with_section(
+        "- `tests/test_a.py` —\n"
+        "  `test_ac5_the_long_name` and `test_ac6_the_other` are re-expressed\n"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide") == []
+
+
+def test_emphasis_opening_a_continuation_line_is_not_a_bullet(tmp_path: Path):
+    """`**not** in the project group …` starts with `*` and is emphasis, not a
+    list item. Reading it as a bullet invented a path (`docs/`) and then
+    reported the paragraph's own spans as dropped from it."""
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md", _with_section(
+        "- `docs/a.md` —\n"
+        "  **not** in the project group, staying flat under `docs/` with the\n"
+        "  expected set widened to include `positioning.md`.\n"))
+    assert aide.item_spec_warnings(repo / "docs" / "aide") == []
+
+
+def test_bullet_path_drops_a_line_final_dash():
+    """One definition of where a reason starts, shared with the lint — so a
+    non-backticked bullet whose dash ends the line no longer declares the dash.
+    `'src/a.py —'` matched no file git ever reports."""
+    assert aide._bullet_path("- src/a.py —") == "src/a.py"
+    assert aide._bullet_path("- src/a.py — the thing") == "src/a.py"
+
+
+def test_a_spec_with_no_authorised_paths_section_reports_nothing(tmp_path: Path):
+    repo = _repo(tmp_path)
+    _spec_file(repo, "027-bounds.md", GOOD_SPEC)
+    assert aide.dropped_bullet_spans(GOOD_SPEC) == []
+    assert aide.item_spec_warnings(repo / "docs" / "aide") == []
+
+
 def test_a_literal_pin_under_a_may_change_glob_is_silent(tmp_path: Path):
     """`May change: docs/**` with `Asserts against: docs/api.md` is the
     deliberate carve-out — "I may edit the tree but not this file" — and only
@@ -314,6 +440,29 @@ def test_shelling_out_to_the_cli_is_reported(tmp_path: Path):
         encoding="utf-8")
     w = aide.cli_subprocess_test_warnings(repo, _cfg(repo))
     assert len(w) == 1 and "call the function instead" in w[0]
+
+
+def test_the_self_referential_replay_is_still_flagged(tmp_path: Path):
+    """Issue #123, pinned as a refusal rather than left to be re-argued.
+
+    A test whose object under test *is* `aide check`'s own stdout trips this
+    rule, which reads like the verb flagging itself, and an exemption was
+    proposed for exactly that. Declined: `cmd_check` calls `run_checks`, which
+    hands back `(errors, warnings)` as structured data, so asserting on it
+    in-process is both the fix and the better test — the reporting consumer
+    rewrote it that way and said so. Exempting the shape would license the
+    worse test in the one place the argument for it sounds strongest.
+    """
+    repo = _repo(tmp_path)
+    (repo / "tests" / "test_check_output.py").write_text(
+        'import subprocess\n'
+        'def test_check_reports_the_warning():\n'
+        '    out = subprocess.run(["python", ".aide/scripts/aide.py", "check"],\n'
+        '                         capture_output=True, encoding="utf-8").stdout\n'
+        '    assert "warning:" in out\n',
+        encoding="utf-8")
+    w = aide.cli_subprocess_test_warnings(repo, _cfg(repo))
+    assert len(w) == 1 and "run_checks" in w[0]
 
 
 def test_a_docstring_mentioning_the_cli_is_not_flagged(tmp_path: Path):

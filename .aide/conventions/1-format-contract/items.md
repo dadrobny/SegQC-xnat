@@ -23,3 +23,30 @@
   "blocks:" excludes nothing, so an English sentence naming real blockers is
   never silently dropped. Keep a reach quote on one line — the exclusion does
   not extend past it. *(aide claim)*
+
+**An acceptance criterion is an invariant over the resulting content — never a
+bound on the diff that produced it, and never a premise about a sibling item's
+schedule.** *(spec-author, test-writer, validator)* The criterion outlives its
+item: its test is still in the suite long after the branch is gone, so a
+criterion that cannot be re-checked then is not one the suite can keep. Two
+shapes fail that, both recorded in one consumer's queue:
+
+- **A bounded diff against a pre-item baseline.** Once the item merges into the
+  branch its baseline is derived from, the two sides of the comparison are the
+  same tree: the test is then either vacuous — green while asserting nothing —
+  or red, a fixture-sanity guard correctly refusing to compare, and which of
+  the two it is depends only on whether the author happened to write the guard.
+  Under a stacked queue this arrives on the very next claim, since the queue
+  branch tip *is* the post-item state. Assert the property the edit was
+  supposed to produce instead. The diff-time half of such a claim — "this item
+  did not touch X" — is `aide scope`'s job on the claim branch, declared under
+  `## Asserts against`; §1 → authorised paths says what not to write, and
+  `aide check` warns on the two literal shapes.
+- **A premise about a sibling item's schedule.** "Item NNN has not landed yet"
+  is guaranteed to become false, and it breaks in a file the later item's
+  Authorised paths do not cover — so the repair needs a spec amendment before
+  it can be made at all. Where an earlier item's test must change when a later
+  one lands, the later item's spec lists that test file under **May change**
+  from the start, and the earlier item declares what it pins under **Asserts
+  against**, which is what makes the collision visible at spec time rather than
+  at first pytest.

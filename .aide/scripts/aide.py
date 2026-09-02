@@ -108,9 +108,32 @@ _ENCODING = "utf-8-sig"
 #: and (since the live queue is the lowest-numbered open one) stranding
 #: `aide claim` on a finished queue, while `aide progress set` acted on them
 #: happily.
-_ITEM_REF_GROUP_RE = re.compile(r"[Ii]tems?\s+(0*\d+(?:\s*[,/–-]\s*0*\d+)*)")
+#: A number that opens a `YYYY-MM-DD` date is not an item number, and this is
+#: the guard that says so. Without it the provenance shape AGENT-CONTEXT.md
+#: itself prescribes — `*(item NNN, YYYY-MM-DD, engine X.Y.Z)*` — parsed as the
+#: list `NNN, 2026, -08, -30`, and the unguarded `int()` below raised. The blast
+#: radius was the whole verb, not the line: `aide progress set` reads every line
+#: of progress.md, so four evidence annotations written in the documented
+#: convention took `progress set` down for EVERY item repo-wide until a human
+#: approved rewording them (issue #120).
+#:
+#: Two alternatives on purpose. `-\d{1,2}-\d{1,2}` recognises the date tail;
+#: the bare `\d` forbids the backtrack that would otherwise let `\d+` give back
+#: digits ("2026" → "202") until the tail no longer starts at the cursor and
+#: the lookahead passed anyway. A range keeps working: "-092" carries one
+#: hyphen group, not two.
+_ITEM_REF_NOT_A_DATE = r"(?!\d|-\d{1,2}-\d{1,2})"
+_ITEM_REF_NUM = r"0*\d+" + _ITEM_REF_NOT_A_DATE
+_ITEM_REF_GROUP_RE = re.compile(
+    r"[Ii]tems?\s+(" + _ITEM_REF_NUM + r"(?:\s*[,/–-]\s*" + _ITEM_REF_NUM + r")*)")
 _ITEM_REF_SPLIT_RE = re.compile(r"\s*[,/]\s*")
 _ITEM_REF_RANGE_RE = re.compile(r"^0*(\d+)\s*[–-]\s*0*(\d+)$")
+#: The second, independent hardening: what the split hands back must LOOK like
+#: an item number before it is read as one. Either fix alone stops the crash;
+#: both are kept because the regex is a statement about one known prose shape
+#: while this is the invariant — a part that is not a number is provenance
+#: prose to skip, never a traceback out of an unrelated verb.
+_ITEM_REF_NUMBER_RE = re.compile(r"^0*\d+$")
 
 #: An inclusive range wider than this is treated as a typo and contributes only
 #: its endpoints, so a stray "Items 6-9999" cannot invent thousands of items.
@@ -127,7 +150,8 @@ def _referenced_item_numbers(text: str) -> List[int]:
                 continue
             rng = _ITEM_REF_RANGE_RE.match(part)
             if rng is None:
-                nums.append(int(part))
+                if _ITEM_REF_NUMBER_RE.match(part):
+                    nums.append(int(part))
                 continue
             lo, hi = int(rng.group(1)), int(rng.group(2))
             if lo <= hi <= lo + _ITEM_RANGE_MAX_SPAN:
@@ -135,6 +159,26 @@ def _referenced_item_numbers(text: str) -> List[int]:
             else:
                 nums.extend((lo, hi))
     return nums
+
+
+def _has_typo_range(text: str) -> bool:
+    """Does ``text`` carry a range so wide the reader treats it as a typo?
+
+    `_referenced_item_numbers` keeps only such a range's ENDPOINTS, so what it
+    hands back is deliberately not what the author wrote — `Items 044-999` reads
+    as {44, 999}, and 999 is an artifact of the typo, not an item. That is a
+    safe misreading while it stays in memory. It is not safe for a caller that
+    writes the numbers back into the document, which is why the desugar asks.
+    """
+    for group in _ITEM_REF_GROUP_RE.finditer(text):
+        for part in _ITEM_REF_SPLIT_RE.split(group.group(1)):
+            rng = _ITEM_REF_RANGE_RE.match(part.strip())
+            if rng is None:
+                continue
+            lo, hi = int(rng.group(1)), int(rng.group(2))
+            if not lo <= hi <= lo + _ITEM_RANGE_MAX_SPAN:
+                return True
+    return False
 
 
 def _references_item(text: str, num: int) -> bool:
@@ -865,6 +909,68 @@ def insert_item_reference(text: str, number: int, stage: str, title: str) -> Opt
     return None
 
 
+def _split_multi_item_bullets(lines: List[str], num: int, status: str) -> List[str]:
+    """One bullet, one item: desugar a bullet that owns ``num`` *and* siblings.
+
+    A trailing marker may name several items — ``*(Items 016, 017)*``, the form
+    §1 → progress.md blesses and `/aide-create-queue` step 8 recommends — but a
+    bullet carries ONE icon, and that icon is the status cell. So flipping the
+    bullet for 016 also completed 017: never specced, never built, thereafter
+    read as ✅ by everything that parses the file, and silently discounted from
+    its queue's open count (issue #131). The engine's own writer had already
+    modelled one item per bullet — `insert_item_reference` appends a singular
+    marker — so the shape it told authors to write was one its status machinery
+    could not represent.
+
+    The form stays legal and desugars here: the bullet becomes one bullet per
+    item, same text, one ``*(Item NNN)*`` each, in the marker's order. The item
+    being flipped then moves alone and its siblings keep the status they had —
+    the sibling protection issue #99 gave a prose mention, given to the list
+    form that actually attributes.
+
+    Only a flip that would ADVANCE the bullet splits it. A `progress set` that
+    changes nothing must rewrite nothing: re-running one, or setting a status
+    the bullet already holds, is not a reason to reshape a consumer's file.
+    """
+    for start, last in reversed(_deliverable_bullet_spans(lines)):
+        marker = _BULLET_MARKER_RE.search(lines[last])
+        if marker is None:
+            continue
+        nums = list(dict.fromkeys(_referenced_item_numbers(marker.group(0))))
+        if num not in nums or len(nums) < 2:
+            continue
+        # A range wider than the typo limit contributes only its endpoints, so
+        # `nums` is not what the author wrote: `*(Items 044-999)*` would grow a
+        # bullet for a phantom item 999, indistinguishable from a real one and
+        # thereafter counted by `check`, `claim` and every queue rollup. Writing
+        # fiction into the tracked document is worse than the shared cell this
+        # function exists to remove, so a malformed marker keeps the old
+        # behaviour and this leaves it exactly as the author typed it.
+        #
+        # Whole-bullet, deliberately: in `*(Items 006, 044-999)*` the sound half
+        # keeps the shared cell too. Splitting the good elements while preserving
+        # the malformed one is a lot of machinery for a marker whose own author
+        # has already mistyped it, and the loud version — refusing the flip — is
+        # worse, since it would strand a real item behind a typo in prose.
+        if _has_typo_range(marker.group(0)):
+            continue
+        current = ICON_TO_STATUS[_BULLET_RE.match(lines[start]).group("icon")]
+        if not current or RANK[status] <= RANK[current]:
+            continue
+        head = lines[last][:marker.start()]
+        # Whatever followed the last `)*` — the sentence-ending period the
+        # marker regex tolerates — belongs to every copy, not just the first.
+        matched = marker.group(0)
+        tail = matched[len(matched.rstrip(" \t.")):]
+        block: List[str] = []
+        for n in nums:
+            copy = lines[start:last + 1]
+            copy[-1] = f"{head}*(Item {n:03d})*{tail}"
+            block.extend(copy)
+        lines[start:last + 1] = block
+    return lines
+
+
 def set_item_status(text: str, num: int, status: str) -> str:
     """Flip item NNN's deliverable bullet(s) to ``status`` and roll stages up.
 
@@ -872,8 +978,16 @@ def set_item_status(text: str, num: int, status: str) -> str:
     objective rows only for stages that fully complete. Never downgrades an
     existing status (additive log), and never touches an acceptance checkbox —
     those are human attestations, ticked only by ``aide progress accept``.
+
+    A bullet whose marker names several items is split into one bullet per item
+    first (see ``_split_multi_item_bullets``), so no sibling is carried along by
+    a flip it did not earn.
     """
     lines = text.splitlines()
+    # A marker naming several items is one status cell for all of them, so the
+    # bullet is desugared into one bullet per item BEFORE anything flips
+    # (issue #131). After this the flip below can only move `num`.
+    lines = _split_multi_item_bullets(lines, num, status)
     # Flip the icon of every bullet whose trailing marker names this item —
     # the same ownership rule `_parse_item_status` reads by (issue #99), so a
     # bullet that merely mentions the item in prose is never flipped.
@@ -1713,6 +1827,22 @@ def cli_subprocess_test_warnings(repo_root: Path,
     was structured a moment earlier. The recorded instance returned
     ``stdout is None`` on a Windows runner — and had it returned ``""`` the test
     would have passed while checking nothing.
+
+    **No exemption for the self-referential case**, asked for and declined
+    (issue #123). A test whose whole job is to replay `aide check`'s literal
+    stdout trips this rule, which reads like the verb flagging itself. It is
+    not: `cmd_check` calls `run_checks`, that function returns
+    ``(errors, warnings)`` as structured data, and asserting on it in-process
+    is both the fix and the better test — which is what the reporting consumer
+    did. Exempting the shape would license the worse test in the one place the
+    argument for it sounds strongest.
+
+    What the report actually found is a *measurement* defect, and it belongs to
+    the spec, not to this lint: a module that shells out to the CLI raises the
+    warning count by one the moment it is committed, so any baseline count
+    recorded before it existed is falsified by the act of adding it. Measured:
+    a spec recorded 3, the base commit already carrying the module reported 4,
+    and the 4th was the module. §6 now says never to pin a count that way.
     """
     out: List[str] = []
     for path in _test_files(repo_root, config):
@@ -1739,11 +1869,268 @@ def cli_subprocess_test_warnings(repo_root: Path,
     return out
 
 
-def _gitattributes_lf_patterns(repo_root: Path) -> Optional[List[str]]:
-    """Every pattern in `.gitattributes` carrying an `eol=lf` pin.
+#: Branch names a hardcoded diff range is written against. The configured
+#: `main_branch` is the honest one; `main` and `master` ride along because this
+#: shape is copied between projects — a consumer whose base is `develop` and
+#: whose test says `main...HEAD` has written the same wrong assertion, and the
+#: lint that only knew its own config would stay silent on it.
+_CONVENTIONAL_BASES = ("main", "master")
+
+
+def _scope_range_re(config: Dict[str, Dict[str, object]]) -> "re.Pattern":
+    names = {str(config["git"].get("main_branch", "main")), *_CONVENTIONAL_BASES}
+    alt = "|".join(re.escape(n) for n in sorted(names))
+    return re.compile(rf"\b(?:origin/)?(?:{alt})\.{{2,3}}HEAD\b"
+                      rf"|\bHEAD\.{{2,3}}(?:origin/)?(?:{alt})\b")
+
+
+def scope_claim_test_warnings(repo_root: Path,
+                              config: Dict[str, Dict[str, object]]) -> List[str]:
+    """Diff-time scope claims written as suite assertions.
+
+    §1 → authorised-paths says a *diff-time scope claim* — "item N did not touch
+    X" — belongs under **Asserts against** and is retired when its item merges,
+    and `cmd_scope` exists precisely so the claim is not "enshrined as a suite
+    assertion that outlives its truth". Both statements were already written
+    down, and reached neither the spec-author writing the criterion nor the
+    test-writer implementing it: two independent items in one consumer wrote the
+    same `git diff main...HEAD` guard (issue #132), which is the signature of a
+    missing check rather than a careless author.
+
+    The shape fails in the direction that wastes the most time. Under a stacked
+    queue the item's base is the **queue branch**, so `main` is stale by the
+    whole queue and every sibling item's legitimate change is reported as this
+    item's scope violation. The obvious repair is wrong too: deriving the base
+    from `aide scope` makes the assertion pass only while the suite runs on the
+    item's own claim branch, and `aide merge` re-runs that suite from the merge
+    target — so it fails by construction inside the loop's own post-merge run.
+    Skip-guarding is not an escape either: once the claim branch is deleted the
+    test is skipped forever, which §6 ("tests that can actually fail") forbids.
+
+    **Two literal shapes, deliberately, and no attempt at the general one.** A
+    hardcoded `<base>...HEAD` range, and a shell-out to `aide scope`. A test
+    that diffs the branch against a base it computes — `git merge-base HEAD
+    origin/main`, then `diff` — is NOT reported, and this framework's own
+    `tests/test_repo_versioning.py` is why: it is that shape, it is legitimate,
+    and it is a claim about the branch rather than about an item's scope. No
+    lint can tell those apart from the source, so this one decides only what is
+    literal, and §6's rule holds where it cannot look. An interpolated range
+    (`f"{base}...HEAD"`) is missed for the same reason.
+
+    The `aide scope` half also trips `cli_subprocess_test_warnings`, which says
+    "call the function instead". That advice is right about the boundary and
+    wrong about the fix — the assertion should not be in the suite at all — so
+    this warning is worth its line beside it.
+    """
+    out: List[str] = []
+    rng = _scope_range_re(config)
+    for path in _test_files(repo_root, config):
+        try:
+            tree = ast.parse(path.read_text(encoding=_ENCODING))
+        except (OSError, UnicodeDecodeError, SyntaxError):
+            continue
+        rel = _rel_display(path, repo_root)
+        hit = next((n for n in ast.walk(tree)
+                    if isinstance(n, ast.Constant) and isinstance(n.value, str)
+                    and rng.search(n.value)), None)
+        if hit is not None:
+            out.append(
+                f"{rel}:{hit.lineno}: a hardcoded '{rng.search(hit.value).group(0)}' "
+                f"range makes this test a diff-time scope claim — it asserts "
+                f"what an item did NOT touch, which stops being true the moment "
+                f"that item merges into the base, and is red by construction on "
+                f"a stacked queue where the real base is the queue branch. "
+                f"Declare the pinned file under '## Asserts against' in the item "
+                f"spec and let 'aide scope' decide it on the claim branch "
+                f"(conventions.md §1 → authorised-paths, §6)")
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
+            if name not in _SUBPROCESS_FUNCS:
+                continue
+            consts = [c.value for c in ast.walk(node)
+                      if isinstance(c, ast.Constant) and isinstance(c.value, str)]
+            if not any("aide.py" in c for c in consts):
+                continue
+            if not any(c == "scope" or c.endswith(" scope") or " scope " in c
+                       for c in consts):
+                continue
+            out.append(
+                f"{rel}:{node.lineno}: shells out to 'aide scope' from the "
+                f"suite — the verb resolves its base from the CURRENT branch's "
+                f"recorded base, so this passes only while the suite runs on "
+                f"the item's own claim branch and fails by construction in "
+                f"the post-merge run of 'aide merge', from the merge target. "
+                f"Scope is "
+                f"checked on the branch, not asserted in the suite: declare the "
+                f"pinned file under '## Asserts against' instead "
+                f"(conventions.md §1 → authorised-paths, §6)")
+            break
+    return out
+
+
+#: The subprocess entry points that can hand *decoded* text back to the caller.
+#: `call` and `check_call` return an exit status and never a capture, so a
+#: `text=` on one of those decodes nothing and flagging it would be exactly the
+#: false positive that stops a lint being read.
+_DECODING_SUBPROCESS_FUNCS = frozenset({"run", "Popen", "check_output"})
+
+#: Both spellings of "decode this for me". `universal_newlines=` is the pre-3.7
+#: name and is still accepted, so a lint that knows only `text=` sees half the
+#: shape — and the older spelling is the one an author copies from an old
+#: answer, which is where this class comes from in the first place.
+_TEXT_MODE_KWARGS = frozenset({"text", "universal_newlines"})
+
+
+def _subprocess_names(tree: ast.AST) -> Tuple[set, Dict[str, str]]:
+    """How this module spells `subprocess`: `(module aliases, name -> real)`.
+
+    Matching on the method name alone flags `Runner().run(text=True)`, which has
+    nothing to do with `subprocess` — caught in review, and the reason the
+    docstring below can claim precision it would otherwise only assert. Both
+    import forms are followed, aliases included:
+
+        import subprocess              -> {"subprocess"}
+        import subprocess as sp        -> {"sp"}
+        from subprocess import run     -> {"run": "run"}
+        from subprocess import run as r-> {"r": "run"}
+
+    A star import binds every name at once and is treated as binding exactly
+    the ones this lint cares about — caught in review, where resolving imports
+    had turned `from subprocess import *` from a reported call into a silent
+    one. Trading a false positive for a false negative is the wrong direction
+    here, and this section says why.
+
+    A binding made any other way — `run = subprocess.run`, or the module object
+    re-exported through a sibling (`from helpers import subprocess`) — is not
+    followed, and the lint stays quiet on it rather than guessing.
+    """
+    modules: set = set()
+    funcs: Dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "subprocess":
+                    modules.add(alias.asname or alias.name)
+        elif isinstance(node, ast.ImportFrom) and node.module == "subprocess":
+            for alias in node.names:
+                if alias.name == "*":
+                    funcs.update({f: f for f in _DECODING_SUBPROCESS_FUNCS})
+                    continue
+                funcs[alias.asname or alias.name] = alias.name
+    return modules, funcs
+
+
+def _asks_for_text(node: ast.Call) -> bool:
+    """Does this call ask for decoded output, as far as the source can say?
+
+    `text=False` and `universal_newlines=None` ask for bytes and are not the
+    defect. Anything else — `True`, a name, an expression — is treated as
+    asking, because a call that may decode and names no codec is wrong in
+    exactly the way a call that certainly decodes is.
+    """
+    for kw in node.keywords:
+        if kw.arg not in _TEXT_MODE_KWARGS:
+            continue
+        if isinstance(kw.value, ast.Constant) and not kw.value.value:
+            continue
+        return True
+    return False
+
+
+def subprocess_encoding_test_warnings(repo_root: Path,
+                                      config: Dict[str, Dict[str, object]]) -> List[str]:
+    """Tests decoding subprocess output with whatever codec the platform guesses.
+
+    conventions.md §6: a test that captures subprocess output as text passes
+    `encoding="utf-8"`. Without it Python decodes with
+    `locale.getpreferredencoding()` — UTF-8 on a Linux runner, **cp1252** on a
+    Windows one — so the same bytes become different strings on the two legs of
+    the same CI run.
+
+    The recorded instance is the reason this is a lint and not advice. Six
+    items in one consumer queue independently wrote
+    `subprocess.run(..., capture_output=True, text=True)`; all six passed the
+    Linux-only validator, and `windows-latest` returned a `KeyError` on a
+    cp1252-mangled em-dash heading in one test and — worse — an **emoji-diff
+    guard that matched nothing and reported PASS** in another. The second is a
+    false negative: a gate that reports green having verified nothing, which is
+    the worst outcome this loop has available and is invisible to every gate
+    inside it (§7). Six independent authors reproducing one shape in one queue
+    is the signature of a missing rule, not of a careless author.
+
+    Decidable by AST, in the same shape as the eol-pin lint next door: a call
+    to `run` / `Popen` / `check_output` carrying a `text=` or
+    `universal_newlines=` keyword and no `encoding=` keyword. Three narrowings
+    put together mean every warning this emits names a call that really would
+    decode — the function set above, a literal-false `text=`, and the call
+    having to reach `subprocess` through an import this module actually makes
+    (`_subprocess_names`), without which `Runner().run(text=True)` is reported
+    for sharing a method name.
+
+    **The limit, stated rather than left to be discovered:** only a direct
+    call is seen. A project that has wrapped its subprocess calls in a helper
+    — which is the fix a consumer reached for — presents one call site to this
+    lint and silence for the rest, and a `**kwargs` spread hides the keyword
+    entirely. Silence here means "no call of the recorded shape", never "this
+    suite decodes safely".
+    """
+    out: List[str] = []
+    for path in _test_files(repo_root, config):
+        try:
+            tree = ast.parse(path.read_text(encoding=_ENCODING))
+        except (OSError, UnicodeDecodeError, SyntaxError):
+            continue
+        modules, funcs = _subprocess_names(tree)
+        if not modules and not funcs:
+            continue                      # this module never imports subprocess
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if isinstance(func, ast.Attribute):
+                # `subprocess.run(...)`, or whatever this module called it.
+                if not (isinstance(func.value, ast.Name)
+                        and func.value.id in modules):
+                    continue
+                name = func.attr
+            elif isinstance(func, ast.Name):
+                name = funcs.get(func.id, "")
+            else:
+                continue
+            if name not in _DECODING_SUBPROCESS_FUNCS:
+                continue
+            if any(kw.arg == "encoding" for kw in node.keywords):
+                continue
+            if not _asks_for_text(node):
+                continue
+            out.append(
+                f"{_rel_display(path, repo_root)}:{node.lineno}: captures "
+                f"subprocess output as text with no encoding= — Python then "
+                f"decodes with the platform's locale codec, UTF-8 here and "
+                f"cp1252 on a Windows runner, which mangles non-ASCII and has "
+                f"defeated a guard silently rather than failing. Pass "
+                f'encoding="utf-8". See conventions.md §6')
+            break
+    return out
+
+
+def _gitattributes_no_rewrite_patterns(repo_root: Path) -> Optional[List[str]]:
+    """Every pattern in `.gitattributes` that stops the CRLF rewrite.
 
     ``None`` (not ``[]``) when the file is absent, so the caller can tell "no
     pins" from "no file" and say the more useful of the two.
+
+    **Three spellings, not one.** `eol=lf` is the one §6 names, but `binary`
+    (git's macro for `-text -diff`) and a bare `-text` both switch the
+    conversion off outright, and a file under either is exactly as safe. Only
+    accepting `eol=lf` made the lint warn about a `*.png binary` fixture and
+    tell its author to add a pin that would be wrong for it — a wolf-cry on
+    code that had already done the right thing, which is how a lint stops being
+    read.
     """
     path = repo_root / ".gitattributes"
     if not path.is_file():
@@ -1759,8 +2146,11 @@ def _gitattributes_lf_patterns(repo_root: Path) -> Optional[List[str]]:
             continue
         parts = line.split()
         # `eol=lf` alone is enough: `text eol=lf` and a bare `eol=lf` both stop
-        # core.autocrlf rewriting the file, which is the whole point here.
-        if len(parts) > 1 and any(a == "eol=lf" for a in parts[1:]):
+        # core.autocrlf rewriting the file, which is the whole point here — as
+        # do `binary` and an unsetting `-text`. A bare `text` is NOT in the
+        # list: it *enables* the conversion.
+        if len(parts) > 1 and any(a in ("eol=lf", "binary", "-text")
+                                  for a in parts[1:]):
             out.append(parts[0])
     return out
 
@@ -1895,12 +2285,21 @@ class _LiteralPathResolver(ast.NodeVisitor):
 _BYTE_EXACT_READS = ("read_bytes", "read_text")
 
 
-def _read_call_name(node: ast.AST) -> Optional[Tuple[str, int]]:
-    """`(name, lineno)` if *node* is `NAME.read_bytes()` / `NAME.read_text()`."""
+def _read_call_name(node: ast.AST,
+                    readers: Tuple[str, ...] = _BYTE_EXACT_READS
+                    ) -> Optional[Tuple[str, int]]:
+    """`(name, lineno)` if *node* is `NAME.read_bytes()` / `NAME.read_text()`.
+
+    *readers* narrows which of the two counts. The comparison and hash sites
+    pass `("read_text",)`: `read_bytes()` is collected unconditionally a few
+    lines below, so letting them match it too appended every such read twice.
+    Harmless downstream — the caller dedupes by resolved path — but the two
+    rules are disjoint by construction and the code should say so.
+    """
     if not isinstance(node, ast.Call):
         return None
     func = node.func
-    if isinstance(func, ast.Attribute) and func.attr in _BYTE_EXACT_READS \
+    if isinstance(func, ast.Attribute) and func.attr in readers \
             and isinstance(func.value, ast.Name):
         return func.value.id, func.lineno
     return None
@@ -1925,16 +2324,65 @@ def _byte_exact_reads(tree: ast.AST) -> List[Tuple[str, int]]:
     it. A read stored in a local and compared later is missed on purpose: that
     indirection is the shape of a determinism check between two generated
     files, which needs no pin at all.
+
+    **The two readers are not equally safe, and the split above is drawn on
+    exactly that** (issue #124). `read_text()` applies universal-newline
+    translation, so a CRLF-rewritten file arrives with `\n` either way: a
+    *parsed* text read — `json.loads`, a Markdown table walked cell by cell —
+    is immune to the rewrite, and covering it would be wrong rather than merely
+    noisy. `read_bytes()` translates nothing, so that immunity does not exist
+    for it and **any** use of it on a committed path is byte-sensitive; the
+    `\r` survives into whatever parses the result. Hence: `read_bytes()`
+    anywhere counts, `read_text()` only where its result is compared or hashed.
+
+    Review caught the earlier version of this docstring claiming the immunity
+    for the whole "parses rather than byte-compares" class. It is a property of
+    `read_text()`, not of parsing — measured: `p.read_bytes().decode()` on a
+    CRLF checkout leaves `' value\r'` in the last cell of a Markdown row where
+    `read_text()` leaves `' value'`.
+
+    What stays silent is a `read_text()` parse, and that silence is still not
+    coverage: the file may need a pin for a byte-reproducibility claim asserted
+    somewhere this lint cannot see — a regenerate-and-diff, a digest kept
+    elsewhere — and that claim is the project's to assert directly.
     """
+    # Reads sitting directly under a membership or ordering test — `b"{" in
+    # p.read_bytes()`. Kept exempt from the blanket `read_bytes()` rule below:
+    # the needle is what decides there, and a literal one carrying no newline
+    # is immune to the rewrite. Collected first because `ast.walk` reaches the
+    # inner call without the Compare that gives it its meaning.
+    loose_operands: set = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Compare):
+            continue
+        sides = [node.left, *node.comparators]
+        for i, side in enumerate(sides):
+            # `a == b < c` is one node meaning `a == b and b < c`, so an
+            # operand is exempt only when *neither* comparison it takes part
+            # in is an equality. Judging the node as a whole exempted `b` here,
+            # which really is on one side of an `==`.
+            adjacent = [op for j, op in enumerate(node.ops) if j in (i - 1, i)]
+            if not any(isinstance(op, (ast.Eq, ast.NotEq)) for op in adjacent):
+                loose_operands.add(id(side))
+
     out: List[Tuple[str, int]] = []
     for node in ast.walk(tree):
+        # `read_bytes()` in any other position. It translates nothing, so there
+        # is no context in which the CRLF rewrite passes through it harmlessly
+        # — the `\r` survives into whatever parses the result.
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "read_bytes"
+                and isinstance(node.func.value, ast.Name)
+                and id(node) not in loose_operands):
+            out.append((node.func.value.id, node.func.lineno))
+            continue
         if isinstance(node, ast.Compare):
             # Only `==` / `!=`: an ordering or membership test on file contents
             # is not a byte-exactness claim.
             if not all(isinstance(op, (ast.Eq, ast.NotEq)) for op in node.ops):
                 continue
             for side in [node.left, *node.comparators]:
-                found = _read_call_name(side)
+                found = _read_call_name(side, ("read_text",))
                 if found is not None:
                     out.append(found)
         elif isinstance(node, ast.Call):
@@ -1952,7 +2400,7 @@ def _byte_exact_reads(tree: ast.AST) -> List[Tuple[str, int]]:
             if not is_hash_sink:
                 continue
             for arg in node.args:
-                found = _read_call_name(arg)
+                found = _read_call_name(arg, ("read_text",))
                 if found is not None:
                     out.append(found)
     return out
@@ -1983,11 +2431,23 @@ def gitattributes_eol_pin_warnings(repo_root: Path,
     A resolved path is only reported if it **exists** in the checkout, which is
     the cheap proxy for "committed": a path that resolves but is not there is a
     generated artifact, not a fixture.
+
+    **Two causes of silence, and only one of them is the one above.** The first
+    is resolution: a path this lint cannot follow is skipped. The second is
+    shape, in `_byte_exact_reads` — a committed artifact whose tests
+    `read_text()` and *parse* draws no warning whether or not it is pinned,
+    because universal newlines make that read immune. The second is the one
+    that misleads, because such a file looks exactly like the kind this lint
+    exists for. Recorded (issue #124): a spec wrote "the eol-pin lint passes"
+    as an acceptance criterion for a committed generated JSON artifact its
+    tests `json.loads`; the criterion was vacuous by construction, and the pin
+    had to be asserted by a project-side test instead. Read a warning here as
+    authoritative and silence as *no reading taken*.
     """
     files = _test_files(repo_root, config)
     if not files:
         return []
-    patterns = _gitattributes_lf_patterns(repo_root)
+    patterns = _gitattributes_no_rewrite_patterns(repo_root)
     out: List[str] = []
     seen: set = set()
     root = repo_root.resolve()
@@ -2298,6 +2758,19 @@ def item_spec_warnings(ddir: Path, ddir_rel: str = "docs/aide") -> List[str]:
         # (issue #94). Exact double-listing only: a literal pin under a May
         # change glob is the legitimate carve-out shape ("I may edit docs/**
         # but not docs/api.md") and scope stays the judge of whether it held.
+        # Silent narrowing, made loud where it is authored (issue #119): the
+        # spans after a bullet's first are dropped, and so is anything on a
+        # continuation line, so the item is authorised for less than its spec
+        # says and only an `aide scope` FAIL much later reveals it.
+        for declared, dropped in dropped_bullet_spans(text):
+            shown = ", ".join(f"'{d}'" for d in dropped)
+            out.append(
+                f"items/{path.name}: the Authorised paths bullet for "
+                f"'{declared}' also names {shown}, and `aide scope` reads none "
+                f"of them — a bullet declares ONE path, the first backtick "
+                f"span of its opening line, and a continuation line is not "
+                f"read at all. Give each path its own bullet, or the item is "
+                f"authorised for less than its spec says")
         may_normalised = {_strip_dot_slash(p.strip())
                          for p in (parsed.may_change if parsed else [])}
         for pin in (parsed.asserts_against if parsed else []):
@@ -2381,10 +2854,11 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
                branches: Optional[List[str]] = None) -> Tuple[List[str], List[str]]:
     """Return ``(errors, warnings)``. Empty errors == pass.
 
-    The first ten checks all run before, and survive, the two early returns
-    below, but for two different reasons. Four of them —
+    The first twelve checks all run before, and survive, the two early returns
+    below, but for two different reasons. Six of them —
     `absolute_path_test_warnings`, `separator_dependent_test_warnings`,
-    `cli_subprocess_test_warnings`, `gitattributes_eol_pin_warnings` — read
+    `cli_subprocess_test_warnings`, `subprocess_encoding_test_warnings`,
+    `gitattributes_eol_pin_warnings`, `scope_claim_test_warnings` — read
     `tests_dir` and never touch `docs_dir`, so they are the ones that make this
     function worth calling in a repo with no document set. The other six *are* document checks; they
     simply find nothing to say when `docs_dir` is absent, so keeping them costs
@@ -2408,7 +2882,9 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
     warnings.extend(absolute_path_test_warnings(repo_root, config))
     warnings.extend(separator_dependent_test_warnings(repo_root, config))
     warnings.extend(cli_subprocess_test_warnings(repo_root, config))
+    warnings.extend(subprocess_encoding_test_warnings(repo_root, config))
     warnings.extend(gitattributes_eol_pin_warnings(repo_root, config))
+    warnings.extend(scope_claim_test_warnings(repo_root, config))
     warnings.extend(header_blockquote_warnings(ddir))
     warnings.extend(root_document_warnings(ddir))
     # A docs_dir outside the repo falls back to its absolute spelling, which
@@ -2563,8 +3039,18 @@ def run_checks(repo_root: Path, config: Dict[str, Dict[str, object]],
     if branches is None:
         branches = _list_claim_branches(repo_root, prefix)
     _, _, item_status = _parse_item_status(lines)
+    unpublished = (set(_unpublished_branches(repo_root, config, prefix))
+                   if branches else set())
     for br in branches:
         n = _branch_item_number(br, prefix)
+        if br in unpublished:
+            # Read against the last fetch, like every other remote question
+            # here, and a warning rather than an error for that reason.
+            warnings.append(
+                f"unpublished branch {br}: this checkout has it and origin "
+                f"does not, so it is invisible to every other checkout — a "
+                f"failed 'aide claim' or 'aide queue start' push is the usual "
+                f"cause. Publish it ('git push -u origin {br}') or delete it.")
         if n is None:
             # Not a claim branch. A queue branch is expected and silent; anything
             # else carrying the prefix is reported rather than ignored, so a real
@@ -2621,10 +3107,48 @@ def _parse_item_status(lines: List[str]) -> Tuple[List[str], List[str], Dict[int
 # git plumbing
 # --------------------------------------------------------------------------- #
 def git(args: List[str], repo_root: Path, check: bool = True) -> subprocess.CompletedProcess:
+    """Run git and hand back its output decoded as UTF-8, never as the locale.
+
+    conventions.md §6, applied to the engine that states it. `text=True` alone
+    decodes with `locale.getpreferredencoding()` — cp1252 on a Windows
+    consumer — so a branch name, a changed path or a commit subject carrying a
+    non-ASCII character came back as different characters there than here, and
+    a prefix match against it quietly stopped matching. Git speaks UTF-8 for
+    refs and paths, so this says so.
+
+    `errors="replace"` rather than strict: a stray byte in one branch name must
+    not raise out of `aide claim`. The replacement character fails the same
+    match a mangled one did, and does it identically on every platform.
+    """
     return subprocess.run(
         ["git", *args], cwd=str(repo_root), check=check,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        encoding="utf-8", errors="replace",
     )
+
+
+def _push_new_branch(repo_root: Path, branch: str) -> Optional[str]:
+    """``git push -u origin <branch>``: None on success, else a sentence.
+
+    Three verbs publish a branch they have just created — `queue start`,
+    `claim`, and `merge` under `pr` mode — and all three pushed with git()'s
+    default `check=True`, so every cause of a failed push (no remote at all,
+    origin unreachable, expired credentials, a rejecting server-side hook)
+    left `main()` on a `CalledProcessError`: a raw traceback in a flow whose
+    whole point is to run unattended. `cmd_queue_start` guarded exactly one
+    cause in prose — the branch already on origin — and let the rest crash.
+
+    The push is the *last* thing each of those verbs does, so its local half is
+    already on disk when it fails. Handing back git's own words lets each
+    caller say what survives and how to finish it by hand, which is the
+    difference between a stall a person can act on and a stack trace.
+    """
+    res = git(["push", "-u", "origin", branch], repo_root, check=False)
+    if res.returncode == 0:
+        return None
+    detail = (res.stderr.strip() or res.stdout.strip()
+              or f"git exited {res.returncode} without a message")
+    return f"pushing {branch} to origin FAILED:\n{detail}"
 
 
 def _list_claim_branches(repo_root: Path, prefix: str) -> List[str]:
@@ -3647,7 +4171,15 @@ def _queue_start(args: argparse.Namespace) -> int:
     # the inbox is guaranteed at the same point `claim` guarantees it.
     ensure_insights_inbox(repo_root, config, verb="queue start")
     if mode != "local":
-        git(["push", "-u", "origin", branch], repo_root)
+        failure = _push_new_branch(repo_root, branch)
+        if failure is not None:
+            print(f"aide queue start: {failure}\n"
+                  f"{branch} exists locally, branched from {base}, and is "
+                  f"checked out — nothing is lost. Publish it with "
+                  f"'git push -u origin {branch}' once the remote is "
+                  f"reachable, or start over with 'git switch {base} && "
+                  f"git branch -D {branch}'.", file=sys.stderr)
+            return 1
     note = "" if base == str(config["git"].get("main_branch", "main")) else f" (base {base})"
     print(f"started {branch}{note}")
     return 0
@@ -3702,8 +4234,11 @@ def cmd_env(args: argparse.Namespace) -> int:
         vpy = venv_python(repo_root, config)
         interpreter = str(vpy) if vpy.exists() else sys.executable
         code = f"import sys\nsys.exit(0 if ({expr}) else 1)"
+        # §6: name the codec — a traceback carrying a non-ASCII path decodes
+        # differently under a Windows locale, and this text is reported to a user.
         res = subprocess.run([interpreter, "-c", code], cwd=str(repo_root),
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             encoding="utf-8", errors="replace")
         if res.returncode == 0:
             print(f"aide env: profile '{args.profile}' satisfied")
             return 0
@@ -3880,6 +4415,115 @@ def _live_queue_text(repo_root: Path, config, number: Optional[int]) -> Optional
     return None
 
 
+def _report_nothing_claimable(repo_root: Path, config, prefix: str,
+                              candidates: List[str],
+                              claim_branches: List[str]) -> int:
+    """Say why `claim` found nothing, and exit non-zero when that is a defect.
+
+    "none left" is a claim about the ground checked, not the repository
+    (conventions.md §2), and `/aide-run-queue` reads it as "the queue is
+    finished — stop and report". Every reason a queue can be open while
+    nothing in it is offerable therefore has to be said out loud, because the
+    alternative is a run that ends reporting success over work it never
+    started: issue #137, where a failed push left a claim branch behind and
+    the next run called the queue exhausted.
+
+    Two of the reasons are ordinary — a claim in flight, a dependency not
+    landed — and keep exit 0. An **unpublished** claim is not: it is a `claim`
+    whose push failed, holding an item on evidence no other checkout can see,
+    so it exits 1 and says how to finish or release it.
+    """
+    ppath = docs_dir(repo_root, config) / "progress.md"
+    plines = ppath.read_text(encoding=_ENCODING).splitlines() if ppath.is_file() else []
+    _, _, item_status = _parse_item_status(plines) if plines else ([], [], {})
+    # Queue scan order, not numeric order: `_pick_item` walks the candidate
+    # queues in order and each queue in its own order, so a report that
+    # renumbered the items it rejected would not be describing the same walk.
+    # It shows under `loop.claim_scope = "all-open"`, where sorting numerically
+    # interleaves two queues that were scanned one after the other.
+    scan_order: List[int] = []
+    seen = set()
+    titles: Dict[int, str] = {}
+    for qt in candidates:
+        titles.update(_queue_titles(qt))
+        for n in queue_item_numbers(qt):
+            if n not in seen:
+                seen.add(n)
+                scan_order.append(n)
+    open_items = {n for n in seen
+                  if item_status.get(n, "planned") == "planned"}
+    open_ordered = [n for n in scan_order if n in open_items]
+
+    # Attribute the empty result to a gate ONLY when a gate actually explains
+    # it: an `all` gate, or a gate reaching an item that is still open in a
+    # queue we just scanned. A gate holding unrelated items — or naming
+    # nothing — is not why this run found no work, and blaming it would be a
+    # false explanation, which is worse than none.
+    def _reached(g):
+        if g.blocks_all:
+            return set(open_items)
+        if g.stage is not None:
+            return set(stage_item_numbers(plines, g.stage)) & open_items
+        return set(g.blocks) & open_items
+
+    relevant = [(n, g) for n, g in enumerate(human_gates(plines), start=1)
+                if g.kind != "approved" and (g.blocks_all or _reached(g))]
+    if relevant:
+        print("none left — held by an unresolved human gate:")
+        for n, g in relevant:
+            held = sorted(_reached(g))
+            where = "everything" if g.blocks_all else (
+                f"{g.reach} — holding " + ", ".join(f"{i:03d}" for i in held))
+            print(f"  gate {n}: {g.text} — blocks {where}")
+        print("  A person decides these, never an agent. Once decided: "
+              "aide gate approve <n> --evidence \"…\" (or gate decline <n>).")
+        return 0
+
+    if not open_items:
+        print("none left")
+        return 0
+
+    # Open items, none offered. Give the reason per item, in the order
+    # `_pick_item` rejects them, so the two cannot drift into disagreeing
+    # about why an item was skipped.
+    claimed: Dict[int, str] = {}
+    for br in claim_branches:
+        num = _branch_item_number(br, prefix)
+        if num is not None:
+            claimed.setdefault(num, br)
+    stranded = {n: br for n, br
+                in _unpublished_claim_branches(repo_root, config, prefix).items()
+                if n in open_items}
+
+    print(f"none left — {len(open_ordered)} item(s) still open, none claimable:")
+    for num in open_ordered:
+        head = f"  {num:03d} {titles.get(num, 'item ' + str(num))} —"
+        br = claimed.get(num)
+        if num in stranded:
+            print(f"{head} claimed by {stranded[num]}, WHICH ORIGIN HAS NEVER "
+                  f"SEEN — the claim's push did not land, so this item is held "
+                  f"by a claim no other checkout can see")
+        elif br is not None:
+            print(f"{head} claimed by {br}, already in flight")
+        else:
+            blockers = [d for d in _item_dependencies(repo_root, config, num)
+                        if item_status.get(d, "planned") in BLOCKING_STATUSES]
+            if blockers:
+                print(f"{head} waiting on "
+                      + ", ".join(f"{d:03d} ({item_status.get(d, 'planned')})"
+                                  for d in blockers))
+            else:
+                print(f"{head} open and unblocked, yet not offered — please "
+                      f"report this")
+
+    if stranded:
+        print("  An unpublished claim is a failed 'aide claim' push, not work "
+              "in flight. Publish it ('git push -u origin <branch>') or "
+              "release the item ('git branch -D <branch>'), then claim again.")
+        return 1
+    return 0
+
+
 def cmd_claim(args: argparse.Namespace) -> int:
     repo_root = find_repo_root(args.repo)
     config = load_config(repo_root)
@@ -3905,43 +4549,8 @@ def cmd_claim(args: argparse.Namespace) -> int:
         if pick is not None:
             break
     if pick is None:
-        # "none left" is a claim about the ground checked, not the repository —
-        # an unresolved gate is the one reason nothing is claimable that a
-        # reader would otherwise have no way to see (conventions.md §8).
-        ppath = docs_dir(repo_root, config) / "progress.md"
-        plines = ppath.read_text(encoding=_ENCODING).splitlines() if ppath.is_file() else []
-        # Attribute the empty result to a gate ONLY when a gate actually
-        # explains it: an `all` gate, or a gate reaching an item that is still
-        # open in a queue we just scanned. A gate holding unrelated items — or
-        # naming nothing — is not why this run found no work, and blaming it
-        # would be a false explanation, which is worse than none.
-        _, _, gate_item_status = _parse_item_status(plines) if plines else ([], [], {})
-        queued = set()
-        for qt in candidates:
-            queued.update(queue_item_numbers(qt))
-        open_items = {n for n in queued
-                      if gate_item_status.get(n, "planned") == "planned"}
-        def _reached(g):
-            if g.blocks_all:
-                return set(open_items)
-            if g.stage is not None:
-                return set(stage_item_numbers(plines, g.stage)) & open_items
-            return set(g.blocks) & open_items
-
-        relevant = [(n, g) for n, g in enumerate(human_gates(plines), start=1)
-                    if g.kind != "approved" and (g.blocks_all or _reached(g))]
-        if relevant:
-            print("none left — held by an unresolved human gate:")
-            for n, g in relevant:
-                held = sorted(_reached(g))
-                where = "everything" if g.blocks_all else (
-                    f"{g.reach} — holding " + ", ".join(f"{i:03d}" for i in held))
-                print(f"  gate {n}: {g.text} — blocks {where}")
-            print("  A person decides these, never an agent. Once decided: "
-                  "aide gate approve <n> --evidence \"…\" (or gate decline <n>).")
-            return 0
-        print("none left")
-        return 0
+        return _report_nothing_claimable(repo_root, config, prefix,
+                                         candidates, branches)
     number, title = pick
     branch = claim_branch_name(prefix, number, title)
 
@@ -3977,7 +4586,25 @@ def cmd_claim(args: argparse.Namespace) -> int:
     # base is left exactly as it was.
     ensure_insights_inbox(repo_root, config, verb="claim")
     if mode != "local":
-        git(["push", "-u", "origin", branch], repo_root)
+        failure = _push_new_branch(repo_root, branch)
+        if failure is not None:
+            # The branch is KEPT, not rolled back. The push may have reached
+            # origin before the client gave up, and deleting here would then
+            # leave a remote claim branch blocking the item with nothing local
+            # left to explain it. What must not happen is the half-claim
+            # reading as a claim: `_pick_item` skips any item with a claim
+            # branch, so before this the next run said "none left" and an
+            # unattended loop finished, successfully, having built nothing.
+            # `claim`, `status` and `check` all name an unpublished
+            # claim now, so it cannot pass for work in flight.
+            print(f"aide claim: {failure}\n"
+                  f"Item {number:03d} is claimed LOCALLY ONLY: {branch} exists "
+                  f"here (base {base}) and origin has never seen it, so no "
+                  f"other checkout can see the claim. Publish it with "
+                  f"'git push -u origin {branch}' once the remote is "
+                  f"reachable, or release the item with 'git switch {base} && "
+                  f"git branch -D {branch}'.", file=sys.stderr)
+            return 1
     note = "" if base == str(config["git"].get("main_branch", "main")) else f" (base {base})"
     print(f"claimed item {number:03d}: {branch} — {title}{note}")
     return 0
@@ -3988,6 +4615,138 @@ def _find_claim_branch(repo_root: Path, prefix: str, number: int) -> Optional[st
         if _branch_item_number(br, prefix) == number:
             return br
     return None
+
+
+def _git_dir(repo_root: Path) -> Path:
+    """The repository's git directory, resolved.
+
+    Not ``repo_root / ".git"``: that is a *file* in a linked worktree or a
+    submodule, so probing `.git/MERGE_HEAD` there answers "no in-progress
+    merge" for every such consumer — the exact reading the caller below must
+    not get wrong.
+    """
+    out = git(["rev-parse", "--git-dir"], repo_root, check=False).stdout.strip()
+    if not out:
+        return repo_root / ".git"
+    path = Path(out)
+    return path if path.is_absolute() else repo_root / path
+
+
+#: In-progress git operations, and how git names each one's marker in the git
+#: directory. `switch` and `pull --rebase` on top of any of them either refuse
+#: (leaving a half-merge the loop cannot read) or rewrite commits the human is
+#: mid-way through authoring.
+_INTERRUPTED_OPS: Tuple[Tuple[str, str], ...] = (
+    ("rebase-merge", "a rebase is in progress"),
+    ("rebase-apply", "a rebase or 'git am' is in progress"),
+    ("MERGE_HEAD", "a merge is in progress with conflicts unresolved"),
+    ("CHERRY_PICK_HEAD", "a cherry-pick is in progress"),
+    ("REVERT_HEAD", "a revert is in progress"),
+)
+
+
+def _dirty_paths(repo_root: Path) -> List[str]:
+    """Tracked paths carrying uncommitted changes, as git reports them.
+
+    `-z`, not plain `--porcelain`: without it git **quotes and escapes** a path
+    holding a space or a non-ASCII byte — `"docs/h\303\251llo/progress.md"` —
+    which is neither the path on disk nor anything a caller can compare one
+    against. NUL-terminated records never quote and never escape, so a consumer
+    whose docs directory has a space in it reads the same as everyone else.
+
+    Paths are relative to the git **worktree top level**, not to the cwd and not
+    to `repo_root` — git is consistent about that, and a caller resolving them
+    must be too.
+    """
+    out = git(["status", "--porcelain", "-z"], repo_root, check=False).stdout
+    fields = out.split("\0")
+    paths: List[str] = []
+    i = 0
+    while i < len(fields):
+        record, i = fields[i], i + 1
+        if len(record) < 4:                     # the empty tail after the last NUL
+            continue
+        code, path = record[:2], record[3:]
+        if code[0] in "RC":
+            i += 1                              # a rename/copy's SOURCE is its own field
+        if code == "??":                        # untracked — see _unsafe_tree_state
+            continue
+        paths.append(path)
+    return paths
+
+
+def _unsafe_tree_state(repo_root: Path,
+                       tick_path: Optional[Path] = None) -> Optional[str]:
+    """Why this tree must not be switched/pulled/merged, or None if it may be.
+
+    `aide merge` exists so that agents do not improvise git (§3), which means a
+    consumer obeying §3 has no remaining place to be careful: whatever the verb
+    does unconditionally is what happens. It already refuses one adjacent
+    footgun with a precise diagnosis — a base that resolves but is not a local
+    branch — and this is the same class, an operation that silently produces a
+    wrong result while reporting success (issue #133).
+
+    Untracked files are deliberately NOT dirty here. They survive `switch` and
+    `pull` untouched, a loop leaves them around constantly, and a merge that
+    genuinely collides with one aborts with git's own message through the merge
+    path below. Refusing on them would block the common case to catch nothing.
+    """
+    gdir = _git_dir(repo_root)
+    for marker, what in _INTERRUPTED_OPS:
+        if (gdir / marker).exists():
+            return what
+    paths = _dirty_paths(repo_root)
+    if not paths:
+        return None
+    # The one dirty tree this verb is likely to have caused itself: `--no-commit`
+    # (on `merge` or on `progress set`) writes the tick and deliberately leaves
+    # it uncommitted, and the NEXT merge — of any item — then meets this check.
+    # The state is genuinely unsafe (git refuses `pull --rebase` over ANY
+    # unstaged change, not merely a conflicting one), so it is still a refusal;
+    # what it must not be is a mystery.
+    #
+    # Compared as resolved paths against the worktree top, never as strings
+    # against `repo_root`: `aide.toml` may sit BELOW git's top level, and there
+    # git's `docs/aide/progress.md` is this repo's `sub/docs/aide/progress.md`.
+    if tick_path is not None and len(paths) == 1:
+        top = git(["rev-parse", "--show-toplevel"], repo_root, check=False).stdout.strip()
+        try:
+            is_tick = (Path(top or repo_root) / paths[0]).resolve() == tick_path.resolve()
+        except OSError:                          # an unresolvable path is not the tick
+            is_tick = False
+        if is_tick:
+            return (f"{paths[0]} carries an uncommitted status tick — a "
+                    f"`--no-commit` run wrote it and left committing to you. It "
+                    f"is the only change in the tree; commit or discard it")
+    shown = ", ".join(paths[:3])
+    more = f" (+{len(paths) - 3} more)" if len(paths) > 3 else ""
+    return f"the working tree has uncommitted changes: {shown}{more}"
+
+
+def _has_unpushed_merge(repo_root: Path) -> bool:
+    """Does HEAD carry a merge commit its upstream has not seen?
+
+    The one shape `git pull --rebase` must not run over: rebasing DROPS the
+    merge and replays both parents' commits individually, so a conflict a human
+    resolved by hand inside that merge comes back (issue #133). No upstream
+    means nothing to rebase against, which is not this shape.
+    """
+    res = git(["rev-list", "--merges", "@{u}..HEAD"], repo_root, check=False)
+    return res.returncode == 0 and bool(res.stdout.strip())
+
+
+def _restore_claim_branch(repo_root: Path, branch: str, tip: str) -> None:
+    """Put back a claim branch deleted ahead of a step that then failed.
+
+    `merge` deletes the claim branch BEFORE the post-merge test run (so the run
+    sees the refs a fresh clone would). Every exit after that point must
+    therefore be re-runnable: without the ref, `_find_claim_branch` finds
+    nothing and the retry dies at "no claim branch found" — with the work
+    merged, un-ticked and unpushed, which is the state a human least wants to
+    meet a refusal in.
+    """
+    if tip and branch not in _local_branches(repo_root):
+        git(["branch", branch, tip], repo_root, check=False)
 
 
 def _promote_item_to_complete(repo_root: Path, config, number: int,
@@ -4041,20 +4800,98 @@ def cmd_merge(args: argparse.Namespace) -> int:
         return 1
 
     if mode == "pr":
-        git(["push", "-u", "origin", branch], repo_root)
+        failure = _push_new_branch(repo_root, branch)
+        if failure is not None:
+            print(f"aide merge (pr mode): {failure}\n"
+                  f"Nothing else was done — item {args.number:03d} is NOT "
+                  f"ticked, and no PR can be opened over a branch origin does "
+                  f"not have. The work is intact on {branch}. Resolve the "
+                  f"push, then re-run 'aide merge {args.number:03d}'.",
+                  file=sys.stderr)
+            return 1
         print(f"aide merge (pr mode): pushed {branch}. Open a PR against {main} "
               f"to land it (e.g. 'gh pr create'); merge is left to the human "
               f"review gate. Item {args.number:03d} stays 🔍 until it merges — "
               f"then run 'aide progress set {args.number:03d} done'.")
         return 0
 
-    git(["switch", main], repo_root)
-    if mode != "local":
-        git(["pull", "--rebase"], repo_root, check=False)
-    merge_res = git(["merge", "--no-edit", branch], repo_root, check=False)
-    if merge_res.returncode != 0:
-        print(f"aide merge: merge of {branch} failed:\n{merge_res.stdout}{merge_res.stderr}", file=sys.stderr)
+    unsafe = _unsafe_tree_state(repo_root, docs_dir(repo_root, config) / "progress.md")
+    if unsafe:
+        print(f"aide merge: refusing to merge item {args.number:03d} — {unsafe}. "
+              f"`git switch` and `git pull --rebase` from here rewrite or "
+              f"discard work this process did not create. Finish or abort that "
+              f"state first (`git rebase --abort` / `git merge --abort`, or "
+              f"commit the changes), then re-run.", file=sys.stderr)
         return 1
+
+    git(["switch", main], repo_root)
+
+    # Already an ancestor? Then the merge is not the missing step, and doing it
+    # again can only churn. This is the case that bit a consumer: a conflict
+    # resolved by hand left a merge commit on the base that had not been
+    # pushed, and the re-run's `pull --rebase` linearised it — dropping the
+    # merge, replaying both parents, and reintroducing the very conflict the
+    # human had just resolved (issue #133). Asking git first costs one call and
+    # is what makes the verb re-runnable, which a loop needs it to be.
+    landed = git(["merge-base", "--is-ancestor", branch, main],
+                 repo_root, check=False).returncode == 0
+    if landed:
+        print(f"aide merge: {branch} is already merged into {main} — skipping "
+              f"the merge; the tick, the push and the cleanup still run.")
+    else:
+        if mode != "local":
+            # `--rebase` is right for a linear local divergence and WRONG over
+            # an unpushed merge commit (above). `--ff-only` integrates origin
+            # where it can and refuses instead of rewriting where it cannot.
+            if _has_unpushed_merge(repo_root):
+                ff = git(["pull", "--ff-only"], repo_root, check=False)
+                if ff.returncode != 0:
+                    print(f"aide merge: {main} carries a merge commit origin "
+                          f"has not seen, and origin has moved on. Rebasing "
+                          f"over it would linearise the merge and bring back "
+                          f"the conflicts it resolved, so this verb stops "
+                          f"rather than choosing for you: push that merge "
+                          f"('git push'), or integrate origin by hand, then "
+                          f"re-run.\n{ff.stdout}{ff.stderr}", file=sys.stderr)
+                    return 1
+            else:
+                git(["pull", "--rebase"], repo_root, check=False)
+        merge_res = git(["merge", "--no-edit", branch], repo_root, check=False)
+        if merge_res.returncode != 0:
+            print(f"aide merge: merge of {branch} failed:\n{merge_res.stdout}{merge_res.stderr}", file=sys.stderr)
+            return 1
+
+    # The claim branch goes BEFORE the test run, so the run sees the refs a
+    # fresh clone would (issue #125). With it still present, a consumer whose
+    # test command includes `aide check` got "stale claim branch … item NNN is
+    # already ✅" — a failure class the item's acceptance baseline had never
+    # seen, produced by nothing but this ordering. Its tip is remembered so any
+    # later exit can put the branch back exactly as it was.
+    branch_tip = git(["rev-parse", branch], repo_root, check=False).stdout.strip()
+    # `-d` can refuse even though the work landed (e.g. `pull --rebase` rewrote
+    # main so the branch tip is no longer an ancestor); this process just
+    # established that the branch is merged, so escalating to -D is safe. VERIFY
+    # the outcome, never assume it.
+    del_res = git(["branch", "-d", branch], repo_root, check=False)
+    if del_res.returncode != 0:
+        del_res = git(["branch", "-D", branch], repo_root, check=False)
+    local_gone = branch not in _local_branches(repo_root)
+
+    if not args.no_test:
+        cmd = resolve_test_command(repo_root, config)
+        test_res = subprocess.run(cmd, cwd=str(repo_root))
+        if test_res.returncode != 0:
+            _restore_claim_branch(repo_root, branch, branch_tip)
+            print(f"aide merge: the post-merge test run FAILED, so item "
+                  f"{args.number:03d} is NOT ✅ and nothing was pushed — the "
+                  f"tick and the push are what this run refuses, not the merge "
+                  f"itself. {branch} is merged into {main} in THIS repository "
+                  f"only, and the claim branch is back. Fix the failures on "
+                  f"{main}, commit, then re-run 'merge {args.number:03d}': the "
+                  f"merge is already an ancestor, so the retry only re-tests, "
+                  f"ticks and pushes.", file=sys.stderr)
+            return 1
+
     # ✅ is set HERE, by the process that just did the merge, so it always means
     # "merged" — not "an agent said so before attempting one". The validator
     # marks the item 🔍 before this call; whether it becomes ✅ is a fact about
@@ -4066,29 +4903,27 @@ def cmd_merge(args: argparse.Namespace) -> int:
     # under-reported — and on a queue's last item nothing would ever push it.
     _promote_item_to_complete(repo_root, config, args.number,
                               getattr(args, "no_commit", False))
-    if mode != "local":
-        git(["push"], repo_root, check=False)
-
-    if not args.no_test:
-        cmd = resolve_test_command(repo_root, config)
-        test_res = subprocess.run(cmd, cwd=str(repo_root))
-        if test_res.returncode != 0:
-            print(f"aide merge: merged {branch} but the post-merge test run FAILED — investigate", file=sys.stderr)
-            return 1
-
-    # Clean up the merged claim branch — and VERIFY it, never assume. `-d` can
-    # refuse even though the work landed (e.g. `pull --rebase` rewrote main so
-    # the branch tip is no longer an ancestor); this process just merged the
-    # branch, so escalating to -D is safe.
-    del_res = git(["branch", "-d", branch], repo_root, check=False)
-    if del_res.returncode != 0:
-        del_res = git(["branch", "-D", branch], repo_root, check=False)
-    local_gone = branch not in _local_branches(repo_root)
     remote_gone = True
     if mode != "local":
-        push_res = git(["push", "origin", "--delete", branch], repo_root, check=False)
-        remote_gone = (push_res.returncode == 0
-                       or "remote ref does not exist" in (push_res.stderr or ""))
+        push_res = git(["push"], repo_root, check=False)
+        if push_res.returncode != 0:
+            # Reported, not swallowed: a silent failure here leaves ✅ on a
+            # merge origin never received, which is the same class of lie as
+            # ticking an item whose tests fail. The remote claim branch is
+            # deliberately NOT deleted, so the work still exists somewhere
+            # other than this checkout.
+            _restore_claim_branch(repo_root, branch, branch_tip)
+            print(f"aide merge: item {args.number:03d} is merged and ✅ here, "
+                  f"but pushing {main} to origin FAILED, so neither the merge "
+                  f"nor the tick has left this repository and the claim branch "
+                  f"is kept. Resolve the push, then re-run "
+                  f"'merge {args.number:03d}'.\n"
+                  f"{push_res.stdout}{push_res.stderr}", file=sys.stderr)
+            return 1
+        del_remote = git(["push", "origin", "--delete", branch], repo_root, check=False)
+        remote_gone = (del_remote.returncode == 0
+                       or "remote ref does not exist" in (del_remote.stderr or ""))
+
     if local_gone and remote_gone:
         print(f"aide merge: item {args.number:03d} merged to {main} and claim branch {branch} deleted")
     else:
@@ -4118,6 +4953,51 @@ def _remote_branches(repo_root: Path) -> List[str]:
         if name.startswith("origin/") and "HEAD" not in name:
             names.append(name.split("/", 1)[1])
     return names
+
+
+def _unpublished_branches(repo_root: Path, config, prefix: str) -> List[str]:
+    """Branches under *prefix* that this checkout has and origin has not.
+
+    Read against the remote-tracking refs, so it reports what the last fetch
+    saw — `claim` fetches first and `status` does too unless asked not to.
+
+    No origin at all is deliberately *not* an exemption. Off ``local`` mode
+    the engine pushes every branch it creates, so a repository with no remote
+    fails every push; issue #137's own reproduction is exactly that, and a
+    claim branch there is unpublished in the strongest sense — there is
+    nowhere for it to have gone. ``local`` mode is the one configuration where
+    an unpushed claim branch is the design rather than a failure.
+    """
+    if str(config["git"].get("mode", "auto-merge")) == "local":
+        return []
+    remote = set(_remote_branches(repo_root))
+    out = [line.strip() for line
+           in git(["branch", "--format=%(refname:short)"],
+                  repo_root, check=False).stdout.splitlines()]
+    return sorted(br for br in out if br.startswith(prefix) and br not in remote)
+
+
+def _unpublished_claim_branches(repo_root: Path, config,
+                                prefix: str) -> Dict[int, str]:
+    """Item number -> a claim branch this checkout has that origin has not.
+
+    Off ``local`` mode a claim is published by construction: `claim` creates
+    the branch and pushes it in the same breath, and refuses out loud when the
+    push does not land. So a claim branch origin has never seen is a claim
+    that did not finish — visible here, invisible to every other checkout, and
+    counted as a claim by `_pick_item` regardless. That is the half-claim of
+    issue #137, and naming it is what stops it reading as work in flight.
+
+    ``local`` mode is the one configuration that reports nothing: there, an
+    unpushed claim branch is the design. A repository with no origin at all is
+    *not* an exemption — see `_unpublished_branches`, which this narrows.
+    """
+    out: Dict[int, str] = {}
+    for br in _unpublished_branches(repo_root, config, prefix):
+        num = _branch_item_number(br, prefix)
+        if num is not None:
+            out.setdefault(num, br)
+    return out
 
 
 def _branch_item_number(branch: str, prefix: str) -> Optional[int]:
@@ -4357,11 +5237,128 @@ def _bullet_path(line: str) -> Optional[str]:
     if m:
         candidate = m.group(1)
     else:
-        candidate = re.split(r"\s+[—–-]\s+|:", body, maxsplit=1)[0]
+        candidate = _BULLET_REASON_RE.split(body, maxsplit=1)[0]
     candidate = candidate.strip().strip("`").strip()
     if not candidate or candidate.rstrip(".").lower() == "none":
         return None
     return _strip_dot_slash(candidate)
+
+
+#: Every backtick span on a line, and where a bullet's reason starts. The two
+#: together locate the bullet's PATH POSITION — the run before the reason
+#: separator — which is the only place a span is a path claim. `_bullet_path`
+#: splits on the same separator for a bullet written without backticks, so the
+#: two readings of "where the path ends" cannot drift apart.
+_BACKTICK_SPAN_RE = re.compile(r"`([^`]+)`")
+#: The dash may END the line — `- `path` —` with the reason wrapped below is a
+#: common way to write a long one, and reading it as "no reason yet" would take
+#: the whole reason for more path position.
+_BULLET_REASON_RE = re.compile(r"\s+[—–-](?:\s+|$)|:")
+
+#: A Markdown list marker, which `_bullet_path` tests only by its first
+#: character. The lint needs the stricter form: a continuation line opening
+#: `**not** in the project group …` is emphasis, not a bullet, and reading it
+#: as one attributes the reason's own spans to a path it invented. The parser
+#: is left alone — its looser test yields a junk pattern that matches no file,
+#: while a lint that reports MORE than the parser reads is a lint nobody
+#: believes twice.
+_LIST_MARKER_RE = re.compile(r"[-*+]\s")
+
+
+def _authorised_section_lines(text: str) -> Optional[List[str]]:
+    """The lines under ``## Authorised paths``, or None when it is absent.
+
+    One slicer for the parser and the spec-time lint below, so the lint cannot
+    warn about a bullet the parser never looked at, or stay silent about one it
+    did — the whole point of the warning is to describe what `aide scope` will
+    actually do with the section.
+    """
+    lines = text.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if line.strip() == _AUTHORISED_HEADING:
+            start = i + 1
+            break
+    if start is None:
+        return None
+
+    end = len(lines)
+    for i in range(start, len(lines)):
+        if _ANY_HEADER_RE.match(lines[i]) and lines[i].strip() != _AUTHORISED_HEADING:
+            end = i
+            break
+    return lines[start:end]
+
+
+def _path_position(line: str) -> Tuple[str, bool]:
+    """The run of *line* before its reason separator, and whether one was seen.
+
+    Everything after the separator is the reason, and a bullet is required to
+    carry one — so a backticked name there is prose about the work, not a path
+    claim. Measured on two real consumers, treating it as a path claim produced
+    82 and 224 findings, almost all of them identifiers and TOML keys quoted in
+    reasons; the spec that *reported* issue #119 would have raised six.
+    """
+    m = _BULLET_REASON_RE.search(line)
+    return (line[: m.start()], True) if m else (line, False)
+
+
+def dropped_bullet_spans(text: str) -> List[Tuple[str, List[str]]]:
+    """``(path read, spans dropped)`` for each over-full Authorised-paths bullet.
+
+    The contract is one path per bullet (conventions.md §1 → authorised-paths),
+    and until issue #119 the two ways to break it were both silent: a bullet
+    listing several comma-separated `` `path` `` spans authorised only the
+    first, and a path list wrapped onto a continuation line lost everything
+    below the first line, since the parser only ever inspects bullet lines. The
+    narrowing surfaced much later as an `aide scope` FAIL naming paths the
+    spec's own prose plainly authorised — three of one item's four bullets had
+    that shape.
+
+    Only the **path position** is read: the bullet's opening line up to its
+    reason separator, plus the continuation lines while no separator has been
+    seen yet, which is exactly the wrapped-list shape. That limit is what makes
+    the lint worth reading rather than a source of noise to page past, and it
+    is a limit: a path named after the separator is not distinguishable from a
+    reason that mentions a file, so a second path written there stays silent.
+    The bullet is closed by a blank line, a sub-list label, or the next bullet
+    — the same shape a Markdown reader sees, so an author can predict what the
+    lint attributes where.
+
+    Silently narrowing an authorisation is the worst of the three behaviours
+    available, so what IS found is reported where it is authored. A *warning*,
+    not an error: the bullet is legible to a human, existing specs carry the
+    shape, and the remedy (split the bullet) is the author's to apply.
+    """
+    section = _authorised_section_lines(text)
+    if section is None:
+        return []
+    found: List[Tuple[str, List[str]]] = []
+    open_bullet: Optional[Tuple[str, List[str]]] = None
+    for line in section:
+        stripped = line.strip()
+        if not stripped or _sub_list_label(line) is not None:
+            open_bullet = None
+            continue
+        if _LIST_MARKER_RE.match(stripped):
+            open_bullet = None
+            path = _bullet_path(line)
+            # A bullet the parser declines — an unfilled `{{slot}}`, a literal
+            # "None." — is somebody else's finding (`aide check` errors on the
+            # slot), and nothing under it was going to be read anyway.
+            if path is None:
+                continue
+            head, reason = _path_position(stripped[1:].strip())
+            entry = (path, _BACKTICK_SPAN_RE.findall(head)[1:])
+            found.append(entry)
+            if not reason:
+                open_bullet = entry
+        elif open_bullet is not None:
+            head, reason = _path_position(line)
+            open_bullet[1].extend(_BACKTICK_SPAN_RE.findall(head))
+            if reason:
+                open_bullet = None
+    return [(path, dropped) for path, dropped in found if dropped]
 
 
 def declares_nothing(parsed: Optional[AuthorisedPaths]) -> bool:
@@ -4387,25 +5384,14 @@ def parse_authorised_paths(text: str) -> Optional[AuthorisedPaths]:
     which is what makes the flat single-list form — the shape consumers wrote
     before the labels existed — parse correctly rather than silently empty.
     """
-    lines = text.splitlines()
-    start = None
-    for i, line in enumerate(lines):
-        if line.strip() == _AUTHORISED_HEADING:
-            start = i + 1
-            break
-    if start is None:
+    section = _authorised_section_lines(text)
+    if section is None:
         return None
-
-    end = len(lines)
-    for i in range(start, len(lines)):
-        if _ANY_HEADER_RE.match(lines[i]) and lines[i].strip() != _AUTHORISED_HEADING:
-            end = i
-            break
 
     may_change: List[str] = []
     asserts_against: List[str] = []
     current = may_change
-    for line in lines[start:end]:
+    for line in section:
         label = _sub_list_label(line)
         if label is not None:
             current = may_change if label == _MAY_CHANGE_LABEL else asserts_against
@@ -4730,12 +5716,18 @@ def cmd_status(args: argparse.Namespace) -> int:
             print(f"  target: {t.text}{objs} — {label}")
 
     branches = _list_claim_branches(repo_root, prefix)
+    # Guarded the way `run_checks` guards it: two git spawns are not worth
+    # paying on every `status` in the common "claims: none" case, and the
+    # windows leg spends ~13x on a spawn (issue #74).
+    unpublished = (set(_unpublished_branches(repo_root, config, prefix))
+                   if branches else set())
     if branches:
         for br in branches:
             num = _branch_item_number(br, prefix)
             if num is None:
                 kind = "queue branch" if _is_queue_branch(br, prefix) else "unrecognised"
-                print(f"  branch: {br} ({kind} — not an item claim)")
+                extra = " — NOT on origin" if br in unpublished else ""
+                print(f"  branch: {br} ({kind} — not an item claim){extra}")
                 continue
             st = item_status.get(num, "planned")
             note = ""
@@ -4746,6 +5738,12 @@ def cmd_status(args: argparse.Namespace) -> int:
                 # an open PR's head branch. It is awaiting a human, not stale.
                 note = " — awaiting review (merge the PR, then 'aide progress "
                 note += f"set {num:03d} done')"
+            # Composes with the status note rather than replacing it: a branch
+            # can be both stale and unpublished, and a reader needs both.
+            if br in unpublished:
+                note += (f" — NOT on origin: the claim's push did not land, so "
+                         f"no other checkout can see this claim "
+                         f"('git push -u origin {br}' to publish it)")
             print(f"  claim: {br} (item {num:03d}: {st}){note}")
     else:
         print("  claims: none")
@@ -4756,9 +5754,11 @@ def cmd_status(args: argparse.Namespace) -> int:
 
     # Open PRs, best effort — informative only, silently skipped without `gh`.
     try:
+        # §6: PR titles are arbitrary UTF-8 and are printed straight through.
         res = subprocess.run(["gh", "pr", "list", "--state", "open"],
                              cwd=str(repo_root), stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, text=True, timeout=20)
+                             stderr=subprocess.PIPE, encoding="utf-8",
+                             errors="replace", timeout=20)
         if res.returncode == 0:
             prs = res.stdout.strip()
             if prs:

@@ -24,8 +24,8 @@ reference form earlier in the bullet's prose — "- ✅ Consolidate parsers,
 absorbing *(Item 095)*'s scope *(Item 094)*" — is free text: here 094 is the
 bullet's item and the mention of 095 moves nothing, so a ✅ bullet cannot mark a
 live sibling complete just by naming it. A bullet whose references all sit
-mid-prose tracks nothing, and `aide check` warns about it. Four forms are
-accepted for the marker, and all four mean the same thing to every command:
+mid-prose tracks nothing, and `aide check` warns about it. These forms are all
+accepted for the marker, and all mean the same thing to every command:
 
 | Form | Reads as |
 |---|---|
@@ -39,6 +39,15 @@ accepted for the marker, and all four mean the same thing to every command:
 Spacing around a separator does not matter. A range spanning more than 50 is
 read as a typo and contributes only its endpoints. Prefer the explicit list when
 the items are not contiguous; a range is only shorthand for one.
+
+**A marker naming several items is shorthand, never a shared status cell.** One
+bullet carries one icon, so while items share a marker they share a status —
+and the first flip would otherwise carry the siblings with it. It does not:
+`aide progress set` and `aide merge` **desugar** the bullet first, into one
+bullet per item with the same text and one `*(Item NNN)*` each, and move only
+the item named. The others keep the status they had. Nothing is asked of the
+author — write the shared marker freely; the file simply grows a row the first
+time its items diverge.
 
 **Rollup rule (deterministic — `aide progress` and `aide check` both apply it):**
 a stage is ✅ if *every* Deliverables bullet in it is ✅; then its summary-table

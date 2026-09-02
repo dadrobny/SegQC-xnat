@@ -24,6 +24,21 @@ shape is not a cosmetic problem: `aide claim` infers an item's base only from a
 `main_branch` instead of the queue branch, silently. `queue start` also records
 the branch's own base, which `claim` alone could not do.
 
+**A push that does not land is not a claim.** The signal is the branch *on
+origin*, so `claim` fails when it cannot publish one — as a sentence naming the
+branch, the remote and git's own words, never a traceback — and leaves the local
+branch for you to push or delete. Off `local` mode a claim branch origin has
+never seen is reported as an **unpublished claim** by `claim`, `status` and
+`check`, never counted as work in flight: it holds an item on evidence no other
+checkout can see. `queue start` and `merge`'s `pr`-mode push fail the same way.
+
+**`none left` means the ground checked was empty, and nothing else.** A queue
+still open while nothing in it is offerable is a different answer, and `claim`
+gives the reason per item — an unresolved gate, a claim already in flight, a
+dependency not landed, an unpublished claim. The first three are ordinary and
+exit 0; an unpublished claim exits non-zero, because a run that reads it as
+exhaustion finishes reporting success over work it never started.
+
 One person (or one loop) owns an item at a time. Abandoning an item means
 deleting its remote branch so the item returns to the pool; `aide check` flags a
 claim branch whose item is already ✅ (stale claim), and `aide gc` deletes such
