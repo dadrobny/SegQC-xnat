@@ -427,13 +427,14 @@ def test_adv_env_hermeticity_after_explicit_backend_selection(tmp_path, monkeypa
     """A11: the process-scoped selection ``--backend`` makes does not outlive a
     ``monkeypatch`` context that recorded the variable's prior value.
 
-    The ambient value is pinned to ``auto`` first, deliberately: ``delenv``
-    records an undo entry only for a name that is actually present, so a
-    context that merely deletes an already-absent variable has nothing to
-    restore and the CLI's later ``os.environ[...] = ...`` survives it. Reading
-    the pre-state off the inherited environment instead -- which is what this
-    test used to do -- makes the assertion depend on whichever sibling test the
-    runner scheduled first (see ``_restore_backend_env`` above).
+    Both ``setenv`` calls are load-bearing. A context can only undo what it
+    recorded, and recording requires the name to be present -- so pinning the
+    ambient value to ``auto`` first is what gives the context something to
+    restore, and what makes this one assertion rather than a choice between
+    two. The earlier version instead deleted the variable and read its
+    pre-state off the inherited environment, which decided the outcome by
+    whichever sibling test the runner had scheduled first (see
+    ``_restore_backend_env`` above).
     """
     monkeypatch.setenv("SEGFACET_BACKEND", "auto")
 
