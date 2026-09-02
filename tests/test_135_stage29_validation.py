@@ -915,7 +915,25 @@ _BRANCH_STATE_WARNING_PREFIXES = ("stale claim branch", "unrecognised branch")
 # them -- a recurrence reads as its class, not as 'unclassified' -- but none is
 # a tolerated baseline class: the baseline is the assumptions backlog, the two
 # human gates, and transient branch state, exactly as before the update.
-_BASELINE_WARNING_CLASSES = ("assumptions-block", "awaiting-a-decision", "branch-state")
+#
+# "retracted-criterion" added 2026-09-02: during item 137's validation, a
+# validator ticked all five Stage 20 acceptance criteria and then correctly
+# retracted criteria 1, 3, 4 and 5 as mis-mapped attestations. By the
+# engine's deliberate design (`.aide/scripts/aide.py`, "A withdrawn
+# attestation is normal, not a defect ... the point is that it stays
+# visible"), each retraction leaves a permanent `progress.md` warning naming
+# the criterion and the retraction reason -- unlike the transient
+# human-gate and branch-state classes above, this one does not clear on its
+# own; a genuinely new retraction later still classifies here rather than as
+# 'unclassified', which is the point of classifying by shape (the
+# "criterion N was retracted on" phrase) rather than pinning the four exact
+# messages.
+_BASELINE_WARNING_CLASSES = (
+    "assumptions-block",
+    "awaiting-a-decision",
+    "branch-state",
+    "retracted-criterion",
+)
 
 
 def _classify_warning(message: str) -> str:
@@ -927,6 +945,8 @@ def _classify_warning(message: str) -> str:
         return "untracked-bullet-marker"
     if "marked completed but still has open items" in message:
         return "queue-completed-open-items"
+    if re.search(r"criterion \d+ was retracted on \d{4}-\d{2}-\d{2}", message):
+        return "retracted-criterion"
     if "assumptions" in message.lower():
         return "assumptions-block"
     if "awaiting a decision" in message.lower():

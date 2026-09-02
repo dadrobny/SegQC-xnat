@@ -482,7 +482,66 @@ def test_adv_missing_acceptance_box_raises_assertion():
 # backlog, pending human gates) are the whole of what is tolerated. Add an
 # entry here only for a document state that genuinely cannot be fixed, with
 # the reason beside it.
-_PINNED_BASELINE_WARNINGS: Counter = Counter()
+#
+# Four entries added 2026-09-02: during item 137's validation, a validator
+# ticked all five Stage 20 acceptance criteria and then correctly retracted
+# criteria 1, 3, 4 and 5 as mis-mapped attestations. By the engine's
+# deliberate design (`.aide/scripts/aide.py`, "A withdrawn attestation is
+# normal, not a defect ... the point is that it stays visible"), each
+# retraction leaves a permanent `progress.md` warning naming the criterion
+# and the retraction reason -- it does not clear when the criterion is later
+# genuinely satisfied by the items that actually deliver it (138-140, 142),
+# because a NEW attestation produces a new ticked box, not a retroactive
+# erasure of this record. These four are therefore standing, not transient
+# like the human-gate warnings above, and belong in the baseline rather than
+# the exclusion patterns.
+_PINNED_BASELINE_WARNINGS: Counter = Counter(
+    {
+        (
+            "progress.md",
+            "stage 20 criterion 1 was retracted on 2026-09-02 (Retracting an "
+            "attestation-mapping error: this criterion (every mode has >=1 rule "
+            "and a recorded evidence rung) requires the mode->rule direction "
+            "with evidence rungs, which is Item 138's traceability-matrix "
+            "deliverable (still open, marked pending in this stage's "
+            "Deliverables); item 137 only disposed the four previously-"
+            "undeclared rules, it did not build the evidence-rung matrix.) "
+            "— the box is open again, and the original attestation is kept "
+            "above the correction",
+        ): 1,
+        (
+            "progress.md",
+            "stage 20 criterion 3 was retracted on 2026-09-02 (Retracting an "
+            "attestation-mapping error: this criterion (every registered rule "
+            "exercised by >=1 case or recorded unexercised with reason) was "
+            "mistakenly ticked by positional mismapping to item 137's AC3 "
+            "test; per-rule corpus-exercise reporting is Item 139's future "
+            "deliverable, not verified by item 137's tests.) — the box is "
+            "open again, and the original attestation is kept above the "
+            "correction",
+        ): 1,
+        (
+            "progress.md",
+            "stage 20 criterion 4 was retracted on 2026-09-02 (Retracting an "
+            "attestation-mapping error: this criterion (specificity assertion "
+            "enforced for every corpus case) was mistakenly ticked by "
+            "positional mismapping to item 137's AC4 test; the specificity "
+            "assertion is Item 140's future deliverable, not yet built, so "
+            "this criterion does not hold.) — the box is open again, and "
+            "the original attestation is kept above the correction",
+        ): 1,
+        (
+            "progress.md",
+            "stage 20 criterion 5 was retracted on 2026-09-02 (Retracting an "
+            "attestation-mapping error: this criterion (end-to-end detection "
+            "count stated honestly) was mistakenly ticked using item 137's "
+            "AC5 test as evidence by positional mismapping; that test "
+            "verifies mode-less declarations, not this stage-level claim, "
+            "which remains open (Item 142).) — the box is open again, and "
+            "the original attestation is kept above the correction",
+        ): 1,
+    }
+)
 
 #: Splits `path:lineno: text` into the parts the baseline keys on and the one
 #: it deliberately discards. The path may itself contain no colon (it is a
