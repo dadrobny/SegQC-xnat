@@ -587,10 +587,12 @@
             "bounds"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            2
+          ],
           "measures": "Physical span of the label along image axis x.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -648,10 +650,12 @@
             "bounds"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            2
+          ],
           "measures": "Physical span of the label along image axis y.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -709,10 +713,12 @@
             "bounds"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            2
+          ],
           "measures": "Physical span of the label along image axis z.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -771,10 +777,12 @@
             "bounds"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            2
+          ],
           "measures": "Physical volume of the label.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -5564,7 +5572,7 @@
           "failure_modes": [],
           "measures": "Median scan intensity under the label mask.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_mode_less"
           ],
           "observed": {
             "corpus": {
@@ -5976,7 +5984,7 @@
           "failure_modes": [],
           "measures": "Spread of scan intensity under the label mask.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_mode_less"
           ],
           "observed": {
             "corpus": {
@@ -6132,7 +6140,7 @@
           "failure_modes": [],
           "measures": "Whether intensity/radiomics features were attempted and succeeded for this case.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_mode_less"
           ],
           "observed": {
             "corpus": {
@@ -6270,7 +6278,7 @@
           "failure_modes": [],
           "measures": "The integer label this image_features entry describes.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_mode_less"
           ],
           "observed": {
             "corpus": {
@@ -6371,10 +6379,13 @@
             "reference_delta"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            2
+          ],
           "measures": "The lower percentile bound defining the reference in-range band.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_declaration",
+            "rule_mode_less"
           ],
           "observed": {
             "corpus": {
@@ -6604,10 +6615,13 @@
             "reference_delta"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            2
+          ],
           "measures": "The upper percentile bound defining the reference in-range band.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_declaration",
+            "rule_mode_less"
           ],
           "observed": {
             "corpus": {
@@ -6664,10 +6678,12 @@
             "reference_delta"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            2
+          ],
           "measures": "Whether this label's level (and stratum) is covered by the reference.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -6717,10 +6733,13 @@
             "reference_delta"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            2
+          ],
           "measures": "Per-label aggregate anomaly score against the reference.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_declaration",
+            "rule_mode_less"
           ],
           "observed": {
             "corpus": {
@@ -6821,10 +6840,13 @@
             "reference_delta"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            2
+          ],
           "measures": "Where the case's value falls in the reference's percentile grid.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_declaration",
+            "rule_mode_less"
           ],
           "observed": {
             "corpus": {
@@ -6878,10 +6900,13 @@
             "reference_delta"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            2
+          ],
           "measures": "Outlier-resistant z-score against the reference.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_declaration",
+            "rule_mode_less"
           ],
           "observed": {
             "corpus": {
@@ -6939,10 +6964,13 @@
             "reference_delta"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            2
+          ],
           "measures": "The case's own value for this tracked feature.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_declaration",
+            "rule_mode_less"
           ],
           "observed": {
             "corpus": {
@@ -7038,10 +7066,12 @@
             "reference_delta"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            2
+          ],
           "measures": "The integer label this reference-delta entry describes.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -7090,10 +7120,12 @@
             "reference_delta"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            2
+          ],
           "measures": "Anatomical vertebra name for this reference-delta entry.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -7143,10 +7175,13 @@
             "reference_delta"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            2
+          ],
           "measures": "Feature names whose case value falls outside the reference's percentile band.",
           "mode_evidence": [
-            "rule_unmapped"
+            "rule_declaration",
+            "rule_mode_less"
           ],
           "observed": {
             "corpus": {
@@ -7282,7 +7317,8 @@
           "measures": "The per-label feature map, keyed by integer label.",
           "mode_evidence": [
             "rule_mode_map",
-            "rule_declaration"
+            "rule_declaration",
+            "rule_mode_less"
           ],
           "observed": {
             "corpus": {

@@ -41,6 +41,9 @@ and two calls with the same ``(record, config)`` return equal finding lists
 in the same order. Findings are emitted ascending by integer label; within a
 label, in fixed condition order (distribution-distance -> out-of-range ->
 robust-z), with per-feature findings in ascending feature-name order.
+
+Targets §6 mode 2 (over-/under-segmentation), declared on analytic grounds
+(item 137) -- see ``ReferenceDeltaRule.mode_declaration``.
 """
 
 from __future__ import annotations
@@ -108,18 +111,26 @@ class ReferenceDeltaRule(Rule):
 
     rule_id = "reference_delta"
 
-    # §6 disposition pending (item 136): no committed synth corpus case
-    # designates "reference_delta" for any §6 mode, so the existing
-    # corpus-derived mechanism attributes it to nothing by construction --
-    # the disposition is item 137's analytic judgement, not derivable here.
+    # §6 disposition (item 137): declares mode 2 (over-/under-segmentation)
+    # on analytic grounds, the same grounds as "bounds" -- no committed
+    # corpus case designates "reference_delta" for any mode, so evidence
+    # carries "analytic" plus the mechanism sentence, never "corpus". This
+    # is the distributional form of the same magnitude judgement: the only
+    # per-label feature the committed reference artifact carries is
+    # physical_volume_mm3, so "out of distribution" here means "implausible
+    # volume" measured against a cohort instead of against hand-set bounds.
     mode_declaration = RuleModeDeclaration(
-        pending_reason=(
-            "disposition deferred to item 137: no committed synth corpus case "
-            "designates 'reference_delta' for any §6 mode, so the "
-            "corpus-derived mechanism attributes it to nothing by construction; "
-            "whether it targets a mode on analytic grounds (or none) is item "
-            "137's judgement."
-        )
+        modes=(2,),
+        evidence=(
+            "analytic",
+            "the only per-label feature the committed reference artifact "
+            "carries is physical_volume_mm3 (z-score, robust-z, percentile "
+            "rank, out-of-range, plus the label-level distribution_distance "
+            "computed over it), so an out-of-distribution verdict here is an "
+            "implausible-volume judgement, the same §6 mode 2 magnitude "
+            "signal 'bounds' targets, measured against a cohort instead of "
+            "hand-set bounds.",
+        ),
     )
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]

@@ -49,6 +49,11 @@ robust-z), with per-feature findings in ascending feature-name order.
 
 Reason tags are distinct from item 047's geometric ``"Reference ..."`` tags
 so a reader can tell the two reference-delta families apart.
+
+Mode-less (item 137): the reference-relative form of "intensity"'s tissue-
+plausibility judgement, which §6 names no mode for -- see
+``IntensityReferenceDeltaRule.mode_declaration`` and the catalogue-gap
+finding captured in ``docs/aide/insights.md``.
 """
 
 from __future__ import annotations
@@ -116,17 +121,25 @@ class IntensityReferenceDeltaRule(Rule):
 
     rule_id = "intensity_reference_delta"
 
-    # §6 disposition pending (item 136): no committed synth corpus case
-    # designates "intensity_reference_delta" for any §6 mode, so the existing
-    # corpus-derived mechanism attributes it to nothing by construction --
-    # the disposition is item 137's analytic judgement, not derivable here.
+    # §6 disposition (item 137): mode-less, for the same reason as
+    # "intensity" -- it is the reference-relative form of the same tissue-
+    # plausibility judgement, and §6's eight modes are
+    # geometric/topological/semantic and name no such failure. The gap is
+    # captured in docs/aide/insights.md rather than fixed here, because §6
+    # is a root document (vision.md) that changes only through
+    # /aide-create-vision and a reviewed PR.
     mode_declaration = RuleModeDeclaration(
-        pending_reason=(
-            "disposition deferred to item 137: no committed synth corpus case "
-            "designates 'intensity_reference_delta' for any §6 mode, so "
-            "the corpus-derived mechanism attributes it to nothing by "
-            "construction; whether it targets a mode on analytic grounds (or "
-            "none) is item 137's judgement."
+        mode_less_reason=(
+            "This rule is the reference-relative form of the intensity "
+            "rule's tissue-plausibility judgement: it thresholds how far a "
+            "labelled region's intensity statistics deviate from a "
+            "level-aware VerSe-derived reference distribution, which is "
+            "still a tissue-plausibility claim, not a geometric, "
+            "topological or semantic one. §6's eight modes are "
+            "geometric/topological/semantic and name no tissue-plausibility "
+            "mode, so this rule targets none of them. The catalogue gap is "
+            "recorded in docs/aide/insights.md rather than fixed here, "
+            "because §6 is a root document."
         )
     )
 

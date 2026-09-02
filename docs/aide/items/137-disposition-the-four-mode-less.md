@@ -451,4 +451,46 @@ records that `intensity` is exercised by the second committed corpus; item 142
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+- Implemented exactly the disposition the spec prescribes: `bounds` and
+  `reference_delta` declare `modes=(2,)` with `evidence=("analytic", "<mechanism
+  sentence>")`; `intensity` and `intensity_reference_delta` declare
+  `mode_less_reason=…` (≥120 chars, containing `"§6"`; `intensity`'s additionally
+  cites `tests/corpus/intensity/manifest.json`). Each rule module gained a short
+  comment recording the A2 rejection of modes 3/5/6 for `bounds` (or the
+  mode-less/reference-relative rationale for its sibling), plus one module
+  docstring line naming the disposition.
+- `catalogue.py`: added `mode_less_by_rule` (rule_ids with a non-empty
+  `mode_less_reason`) alongside `declared_modes_by_rule`; narrowed
+  `had_unmapped_rule` to fire only when a consuming rule has neither
+  corpus-derived modes, nor declared modes, nor a mode-less reason; appended
+  `"rule_mode_less"` to `mode_evidence_parts` last (after `"rule_declaration"`).
+  Restructured the final branch to `if all_modes: … elif mode_evidence_parts:
+  … elif rule_ids and had_unmapped_rule: ("rule_unmapped",) … else: ()` so the
+  mode-less-only case (a path consumed solely by a mode-less-declaring rule)
+  reports `("rule_mode_less",)` honestly instead of falling through to
+  `("rule_unmapped",)`. Extended the module docstring's derivation-mechanisms
+  section and `rule_declaration_conflicts`'s docstring with the `"analytic"`
+  evidence convention (A8), per the Implementation Steps.
+- Regenerated both committed catalogue artifacts via
+  `.venv/bin/python -m segfacet.catalogue`; measured movement matches the
+  spec's Description exactly: 138 entries, 21 carry mode 2 (14 gained),
+  `mode_evidence` distribution 86 `()` · 25 `("rule_mode_map",
+  "rule_declaration")` · 7 `("rule_declaration",)` · 7 `("rule_declaration",
+  "rule_mode_less")` · 6 `("per_mode_metric", "rule_mode_map",
+  "rule_declaration")` · 4 `("rule_mode_less",)` · 2 `("per_mode_metric",)` · 1
+  `("rule_mode_map", "rule_declaration", "rule_mode_less")`, 0
+  `("rule_unmapped",)`. `rule_declaration_conflicts()` returns `()`.
+- Appended the AC16 catalogue-gap finding to `docs/aide/insights.md` as a
+  plain append (never a tick, never a reword of an existing line), naming
+  `intensity`/`intensity_reference_delta`, the missing tissue-plausibility
+  mode, the intensity manifest's absent `failure_mode` field as
+  corroboration, and that a ninth §6 mode needs `/aide-create-vision` plus a
+  reviewed PR — provenance `*(item 137, 2026-09-02, engine 1.37.0)*`.
+- The two pre-137 test premises named in Authorised paths
+  (`tests/test_136_rule_mode_declarations.py`,
+  `tests/test_103_feature_catalogue.py`) were already reconciled by the
+  test-writer's commit (`tests: 137 mode-less rule disposition`), which this
+  item's builder pass did not need to touch further.
+- `vision.md`/`feature_docs.MODE_ANCHOR_PATHS` were read only, never edited
+  (AC17); no rule's `evaluate()` logic, threshold, or return shape changed
+  (AC18) — the disposition is metadata-only, exactly as scoped.

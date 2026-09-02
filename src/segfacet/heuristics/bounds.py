@@ -19,6 +19,8 @@ Design decisions (recorded per item 027 spec):
 - Missing geometry keys are silently skipped (not crashed) so partially-
   populated records remain safe to evaluate.
 - The caller's record is never mutated.
+- Targets §6 mode 2 (over-/under-segmentation), declared on analytic grounds
+  (item 137) -- see ``BoundsRule.mode_declaration``.
 """
 
 from __future__ import annotations
@@ -286,17 +288,26 @@ class BoundsRule(Rule):
 
     rule_id = "bounds"
 
-    # §6 disposition pending (item 136): no committed synth corpus case
-    # designates "bounds" for any §6 mode, so the existing corpus-derived
-    # mechanism attributes it to nothing by construction -- the disposition
-    # is item 137's analytic judgement, not derivable here.
+    # §6 disposition (item 137): declares mode 2 (over-/under-segmentation)
+    # on analytic grounds -- no committed corpus case designates "bounds" for
+    # any mode, so evidence carries "analytic" plus the mechanism sentence,
+    # never "corpus". Modes 3, 5 and 6 were considered and rejected: mode 5
+    # is structurally out of reach (evaluate() iterates labels *present* in
+    # per_label and can never observe an absent one -- coverage owns mode 5);
+    # mode 3 is a component-count signal, not a magnitude one (fragmentation
+    # owns it); mode 6 is detected by its own designated feature/rule
+    # (border), and declaring it here would overstate this rule's coverage.
+    # See item 137 Assumptions A2.
     mode_declaration = RuleModeDeclaration(
-        pending_reason=(
-            "disposition deferred to item 137: no committed synth corpus case "
-            "designates 'bounds' for any §6 mode, so the corpus-derived "
-            "mechanism attributes it to nothing by construction; whether it "
-            "targets a mode on analytic grounds (or none) is item 137's judgement."
-        )
+        modes=(2,),
+        evidence=(
+            "analytic",
+            "per-label physical volume and x/y/z extent are compared against "
+            "level-aware plausible ranges: a fused pair of vertebrae reads "
+            "over the maximum and an under-segmented or partially-labelled "
+            "vertebra reads under the minimum, which is §6 mode 2's own "
+            "definition (over-/under-segmentation).",
+        ),
     )
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]

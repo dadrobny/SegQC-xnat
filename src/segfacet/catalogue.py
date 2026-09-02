@@ -44,21 +44,40 @@ A third source of ``mode_evidence`` (item 136) sits alongside C: each
 registered rule's own class-attribute ``RuleModeDeclaration``
 (:mod:`segfacet.heuristics.rule`) states the §6 mode(s) it targets (or that
 it targets none, or that its disposition is pending). ``mode_evidence`` gains
-the tag ``"rule_declaration"`` (ordered last) when at least one of an
-entry's ``consuming_rules`` carries a declaration with non-empty ``modes``.
-Because this item's declared modes are always a subset of mechanism C's
-corpus-derived map (:func:`segfacet.catalogue.rule_declaration_conflicts`
-enforces agreement), the declaration source contributes no mode
-``failure_modes`` would not already carry from C. Disagreement between the
-declaration and the corpus-derived map — in *either* direction — is reported
-by :func:`rule_declaration_conflicts`, never silently resolved here.
+the tag ``"rule_declaration"`` when at least one of an entry's
+``consuming_rules`` carries a declaration with non-empty ``modes``. Because
+declared modes may include an *analytic* attribution with no corpus
+corroboration (item 137's ``bounds``/``reference_delta``, tagged
+``"analytic"`` rather than ``"corpus"`` in the declaration's own
+``evidence``), a declared mode is **not** guaranteed to already be a subset
+of mechanism C's corpus-derived map — :func:`rule_declaration_conflicts`
+only enforces agreement in the corpus → declaration direction (a corpus
+case must be reflected in the declaration), never the reverse. Disagreement
+between the declaration and the corpus-derived map — in either enforced
+direction — is reported by :func:`rule_declaration_conflicts`, never
+silently resolved here.
+
+A fourth tag, ``"rule_mode_less"`` (item 137, ordered last — after
+``"rule_declaration"``), marks an entry with at least one consuming rule
+that has *declared itself mode-less* (a non-empty ``mode_less_reason``): a
+source that spoke and said "no mode", categorically different from
+``"rule_unmapped"`` ("nobody has said"). After item 137, ``"rule_unmapped"``
+means exactly that latter case — a consuming rule with no corpus-derived
+modes, no declared modes, and no mode-less declaration either — and is
+reachable only when a shipped rule carries no ``RuleModeDeclaration`` at all
+or an undischarged ``pending_reason`` (neither ships on this tree; both are
+exercised adversarially by the test suite).
 
 ``consuming_rules = A ∪ B``. ``failure_modes`` = (item-099 mode anchors) ∪
 (modes of ``consuming_rules`` under C) ∪ (modes of ``consuming_rules``
-declared per rule, item 136 — a subset of the C term on this tree).
-``status`` = an authored :data:`segfacet.feature_docs.STATUS_OVERRIDES`
-entry if present, else ``"keep"`` when A ∪ B ∪ D is non-empty, else
-**``"unwired"``**.
+declared per rule, item 136 — may include an analytic attribution outside
+the C term, item 137). ``mode_evidence`` is the ordered subsequence of
+``("per_mode_metric", "rule_mode_map", "rule_declaration",
+"rule_mode_less")`` whose sources fired, or exactly ``("rule_unmapped",)``
+when no source fired but a consuming rule said nothing, or ``()`` when
+neither applies. ``status`` = an authored
+:data:`segfacet.feature_docs.STATUS_OVERRIDES` entry if present, else
+``"keep"`` when A ∪ B ∪ D is non-empty, else **``"unwired"``**.
 
 Two tiers, one ``origin``
 --------------------------
@@ -842,6 +861,16 @@ def build_catalogue(*, strict: bool = True, reference: Any = None) -> FeatureCat
         if decl is not None and decl.modes
     }
 
+    # Mode-less declaration source (item 137): rule_ids whose declaration
+    # states, with a reason, that they target no §6 mode -- a source that
+    # has *spoken* and said "no mode", categorically different from
+    # "rule_unmapped" ("nobody has said").
+    mode_less_by_rule: Set[str] = {
+        rule_id
+        for rule_id, decl in iter_rule_declarations()
+        if decl is not None and decl.mode_less_reason
+    }
+
     # Mechanism D: non-rule consumers.
     consumers_map = _mechanism_d_consumers(
         driver_records, _feature_docs_module.PATH_ALIASES, leaf_union
@@ -896,15 +925,19 @@ def build_catalogue(*, strict: bool = True, reference: Any = None) -> FeatureCat
         anchor_modes = anchor_modes_by_path.get(path, set())
         mapped_rule_modes: Set[int] = set()
         declared_rule_modes: Set[int] = set()
+        had_mode_less_rule = False
         had_unmapped_rule = False
         for rule_id in rule_ids:
             modes_for_rule = rule_mode_map.get(rule_id)
             declared_for_rule = declared_modes_by_rule.get(rule_id)
+            is_mode_less = rule_id in mode_less_by_rule
             if modes_for_rule:
                 mapped_rule_modes.update(modes_for_rule)
             if declared_for_rule:
                 declared_rule_modes.update(declared_for_rule)
-            if not modes_for_rule and not declared_for_rule:
+            if is_mode_less:
+                had_mode_less_rule = True
+            if not modes_for_rule and not declared_for_rule and not is_mode_less:
                 had_unmapped_rule = True
 
         all_modes = anchor_modes | mapped_rule_modes | declared_rule_modes
@@ -915,9 +948,17 @@ def build_catalogue(*, strict: bool = True, reference: Any = None) -> FeatureCat
             mode_evidence_parts.append("rule_mode_map")
         if declared_rule_modes:
             mode_evidence_parts.append("rule_declaration")
+        if had_mode_less_rule:
+            mode_evidence_parts.append("rule_mode_less")
 
         if all_modes:
             failure_modes = tuple(sorted(all_modes))
+            mode_evidence = tuple(mode_evidence_parts)
+        elif mode_evidence_parts:
+            # Mode-less-only case (item 137): a consuming rule has declared
+            # itself mode-less and nothing else spoke -- honestly report the
+            # "rule_mode_less" tag, never "rule_unmapped".
+            failure_modes = ()
             mode_evidence = tuple(mode_evidence_parts)
         elif rule_ids and had_unmapped_rule:
             failure_modes = ()
@@ -1015,6 +1056,19 @@ def rule_declaration_conflicts() -> Tuple[str, ...]:
       case designates for that rule (naming both);
     - a declared mode outside :data:`segfacet.feature_docs.MODE_ANCHOR_PATHS`'s
       key set -- the in-code §6 mode catalogue (A5) -- (naming both).
+
+    The ``"corpus"`` tag in a declaration's ``evidence`` is a reserved
+    convention, not a validated field (item 136): it asserts "at least one
+    committed synthetic corpus case designates this rule for these modes",
+    and only a ``"corpus"``-tagged declaration is checked against the
+    corpus-derived map in the declaration -> corpus direction (the third
+    bullet above). A declaration whose ``evidence`` carries ``"analytic"``
+    instead (item 137's ``bounds``/``reference_delta``: a mode attributed on
+    the rule's own mechanism, with no committed corpus case designating it)
+    is bound only by the corpus -> declaration direction (the second
+    bullet): should a future corpus case designate that rule for a mode, this
+    checker still reports it, because that direction is unconditional. The
+    analytic route is not an escape hatch from that direction.
 
     Pure: never mutates the registry, never raises for a missing declaration
     (A3 -- absence is reported, not rejected).
