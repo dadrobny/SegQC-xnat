@@ -448,14 +448,16 @@ the demoted `principal_axis`, as `spline_closest_u`, `spline_tangent`,
   produced by `test_022`'s `_full_block_for_spine`, which passes no
   `tangent_orientations`; if it moves, `build_features_block`'s new parameter
   is not optional as AC17 requires.
-- `src/segfacet/reference/reference_default.json` and
-  `src/segfacet/reference/reference_verse_v1.json` — pinned byte-unchanged.
+- `src/segfacet/reference/reference_default.json` — pinned byte-unchanged.
   `reference/ingest.py` reads only `eigenvalue_ratio` out of the orientation
-  block, which AC12 pins unmoved; if either artifact moves, this item has
+  block, which AC12 pins unmoved; if this artifact moves, this item has
   exceeded its scope.
-- `src/segfacet/reference/ingest.py` and `src/segfacet/reference/delta.py` —
-  read, not changed; they name `eigenvalue_ratio` explicitly and must remain
-  blind to the new keys.
+- `src/segfacet/reference/reference_verse_v1.json` — pinned byte-unchanged, for
+  the same reason as `reference_default.json` above.
+- `src/segfacet/reference/ingest.py` — read, not changed; it names
+  `eigenvalue_ratio` explicitly and must remain blind to the new keys.
+- `src/segfacet/reference/delta.py` — read, not changed; same reason as
+  `ingest.py` above.
 - `tests/test_019_vertebra_orientation_curvature.py` — must stay green
   **unmodified** (AC11: Part A is untouched).
 - `tests/test_022_stage3_serialisation.py` — must stay green **unmodified**
@@ -464,12 +466,17 @@ the demoted `principal_axis`, as `spline_closest_u`, `spline_tangent`,
   (Part B is untouched).
 - `tests/test_120_leave_one_out_offset.py` — must stay green **unmodified**
   (`spline_offset.py` is untouched).
-- `tests/test_042_golden_determinism.py`,
-  `tests/test_089_fov_aware_coverage_border.py`,
-  `tests/test_090_reference_derived_defaults.py`,
-  `tests/test_094_tptbox_image_layer.py`,
-  `tests/test_098_stray_components.py` — pin the nine regenerated goldens
+- `tests/test_042_golden_determinism.py` — pins the nine regenerated goldens
+  against fresh builds (AC24). The four modules below do the same, each from
+  its own angle.
+- `tests/test_089_fov_aware_coverage_border.py` — pins the regenerated goldens
   against fresh builds (AC24).
+- `tests/test_090_reference_derived_defaults.py` — pins the regenerated goldens
+  against fresh builds (AC24).
+- `tests/test_094_tptbox_image_layer.py` — pins the regenerated goldens against
+  fresh builds (AC24).
+- `tests/test_098_stray_components.py` — pins the regenerated goldens against
+  fresh builds (AC24).
 - `tests/test_104_feature_catalogue_drift.py` — pins the regenerated catalogue
   against the realised record shape and `FEATURE_DOCS` (AC23).
 - `tests/test_105_golden_decision_table.py` — its AC7 recomputes the

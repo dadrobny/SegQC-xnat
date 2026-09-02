@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 from pathlib import Path
 
 import numpy
@@ -271,22 +270,6 @@ def test_ac11_fixture_identifies_a_committed_corpus_case():
     assert fixture["spacing_mm"] == [
         float(z) for z in seg_img.header.get_zooms()[:3]
     ]
-
-
-def test_ac11_no_new_binary_fixture_added_by_this_item():
-    result = subprocess.run(
-        ["git", "diff", "--name-only", "--diff-filter=A", "main...HEAD"],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        cwd=REPO_ROOT,
-    )
-    if result.returncode != 0:
-        pytest.skip("git diff against main unavailable in this environment")
-
-    added = [line for line in result.stdout.splitlines() if line.strip()]
-    assert not any(f.endswith((".nii", ".nii.gz")) for f in added), added
 
 
 # =========================================================================== #

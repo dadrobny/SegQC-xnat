@@ -283,7 +283,15 @@ from the local working tree):
   `.gitattributes` covers it. It is precise rather than exhaustive by design — a
   path reached through `tmp_path`, a function argument or an imported constant
   resolves to nothing and is skipped in silence — so a warning is authoritative
-  and its absence is not a clean bill of health.
+  and its absence is not a clean bill of health. Engine 1.29.1 documented a
+  **second** silence, and it is the one that misleads here: the lint decides a
+  *read shape*, not whether a file needs a pin, and `read_text()` applies
+  universal-newline translation — so a committed artifact read that way and then
+  parsed draws no warning whether or not it is pinned. Both fixtures named above
+  are exactly that shape (`json.loads` over `read_text()`), so their pins are
+  held by this rule and by `tests/test_111_golden_guard.py`, never by the lint;
+  removing either pin would fail on Windows in silence. `read_bytes()` has no
+  such immunity and is always reported.
 - **A test that reads the insight inbox must also search its archives.** `aide
   insights archive` moves closed entries from `docs/aide/insights.md` to
   `docs/aide/insights/archive-YYYY-QN.md` as routine housekeeping, so a test

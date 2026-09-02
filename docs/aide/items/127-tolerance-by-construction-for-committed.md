@@ -332,15 +332,20 @@ committed JSON):
 
 **Asserts against:**
 
-- `tests/corpus/manifest.json`, `tests/corpus/intensity/manifest.json`,
-  `tests/corpus/094_pre_migration_snapshot.json`,
-  `tests/corpus/fixtures/*.nii.gz`, `tests/corpus/intensity/fixtures/*.nii.gz`,
-  `docs/aide/feature_catalogue.generated.json`,
-  `docs/aide/feature_catalogue.generated.md`,
-  `tests/golden/report_format_contract.json`,
-  `src/segfacet/reference/reference_verse_v1.json` — AC13 pins that each
-  allowlist entry still matches a file present in the tree; read only, never
-  regenerated or edited.
+AC13 pins that each allowlist entry still matches a file present in the tree.
+All nine are read only, never regenerated or edited, and each takes its own
+bullet because `aide scope` reads one path per bullet:
+
+- `tests/corpus/manifest.json` — an allowlist entry AC13 pins.
+- `tests/corpus/intensity/manifest.json` — an allowlist entry AC13 pins.
+- `tests/corpus/094_pre_migration_snapshot.json` — an allowlist entry AC13 pins.
+- `tests/corpus/fixtures/*.nii.gz` — an allowlist entry AC13 pins.
+- `tests/corpus/intensity/fixtures/*.nii.gz` — an allowlist entry AC13 pins.
+- `docs/aide/feature_catalogue.generated.json` — an allowlist entry AC13 pins.
+- `docs/aide/feature_catalogue.generated.md` — an allowlist entry AC13 pins.
+- `tests/golden/report_format_contract.json` — an allowlist entry AC13 pins.
+- `src/segfacet/reference/reference_verse_v1.json` — an allowlist entry AC13
+  pins.
 - `src/segfacet/reference/reference_default.json` — read by AC2/AC10's helper
   cases and by AC16's synthetic violation; AC20 pins its absence from the
   allowlist. Never regenerated or edited.

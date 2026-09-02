@@ -444,8 +444,10 @@ them.
   `rules.mislabel.max_offset_mm == 13.0`; not changed.
 - `tests/corpus/manifest.json` — AC28/AC29 drive every corpus case from it;
   not changed.
-- `docs/aide/feature_catalogue.generated.json`, `docs/aide/feature_catalogue.generated.md`
-  — AC20 asserts the catalogue does not drift; not changed.
+- `docs/aide/feature_catalogue.generated.json` — AC20 asserts the catalogue
+  does not drift; not changed.
+- `docs/aide/feature_catalogue.generated.md` — read by the same AC20 drift
+  assertion; not changed.
 
 Two further files are read and pinned by this item's tests but are recorded here
 in prose rather than as bullets, because `aide check --queue`'s

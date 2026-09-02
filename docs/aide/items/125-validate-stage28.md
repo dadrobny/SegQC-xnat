@@ -320,15 +320,18 @@ prevent.
 - `src/segfacet/features/spline.py` — AC4 asserts against its source.
 - `src/segfacet/default_config.yaml` — AC9/AC11 read the shipped
   `rules.mislabel.max_offset_mm` (`13.0`).
-- `src/segfacet/reference/reference_verse_v1.json`,
-  `src/segfacet/reference/reference_default.json` — AC12 reads the calibration
+- `src/segfacet/reference/reference_verse_v1.json` — AC12 reads the calibration
   block and the per-level `spline_offset_mm` statistics.
+- `src/segfacet/reference/reference_default.json` — read by the same AC12, for
+  the same two blocks as `reference_verse_v1.json` above.
 - `tests/corpus/manifest.json` — AC7 pins mode 4's `detection`; AC15 reads every
   `detection`; AC16 reads mode 6's `expected_rule_ids`.
 - `tests/corpus/fixtures/*.nii.gz` — AC5/AC6/AC7/AC9/AC15/AC16 run the pipeline
   over them; recomputed live, never modified.
-- `tests/corpus/golden/*.json`, `tests/golden/022_stage3_report.json` — AC13
-  regenerates into scratch destinations and compares the two fresh runs.
+- `tests/corpus/golden/*.json` — AC13 regenerates into scratch destinations and
+  compares the two fresh runs.
+- `tests/golden/022_stage3_report.json` — regenerated and compared the same way
+  by the same AC13.
 - `tests/test_040_synthetic_corpus.py` — AC15 reads `_RECONSTRUCTED_MODES` /
   `_PIPELINE_ONLY_MODES` and asserts the recorded count agrees with them.
 - `scripts/compare_curve_candidates.py` — AC2/AC3/AC10 execute it and read

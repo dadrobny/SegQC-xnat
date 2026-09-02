@@ -438,3 +438,22 @@ as spec-author._ New module **`tests/test_074_benchmark.py`** (mirrors the
   project venv — returns a schema-shaped dict with a positive `cpu` timing and
   no `gpu` entry on this CuPy-absent host; confirmed `"cupy" not in
   vars(segqc.benchmark)`; confirmed `pyproject.toml` has no diff.
+- 2026-09-02, engine 1.34.0: AC11's second half — "no new binary fixture file is
+  added by this item (the diff adds no `.nii`/`.nii.gz`)" — is a **diff-time
+  scope claim**, and its test
+  (`tests/test_074_benchmark.py::test_ac11_no_new_binary_fixture_added_by_this_item`,
+  a hardcoded `git diff --name-only --diff-filter=A main...HEAD`) has been
+  retired. It went vacuous the moment this item merged: on `main` that range is
+  empty, so the assertion had passed against nothing since. Engine 1.32.0 made
+  the shape a decidable `aide check` warning (aide-loop#132) on the general
+  principle stated in §1 → `items.md` (aide-loop#121) — an acceptance criterion
+  is an invariant over the resulting *content*, because its test outlives the
+  branch, and a bounded diff against a pre-item baseline cannot be. What the
+  clause meant is decided on the claim branch by `aide scope` against this
+  spec's Authorised paths, which name no fixture path. AC11's first half is
+  unaffected and still tested by
+  `test_ac11_fixture_identifies_a_committed_corpus_case`, which asserts the
+  durable version of the same intent — the benchmark resolves its fixture out
+  of the *committed* corpus (`fixture["source"] == "corpus"`, `case_id`
+  resolvable, `shape`/`spacing_mm` matching the loaded image) rather than
+  writing one of its own.
