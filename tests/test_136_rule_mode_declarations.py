@@ -14,15 +14,25 @@ Covers Acceptance Criteria AC1-AC14:
         carrying a ``RuleModeDeclaration`` instance.
 - AC4:  the six corroborated rules declare exactly the corpus-designated
         modes, tagged ``"corpus"``.
-- AC5:  the four contested rules are ``pending``, naming item 137.
+- AC5:  the four contested rules are declared, not pending -- reconciled by
+        item 137, which dispositioned all four (two analytic mode-2, two
+        mode-less); see the reconciliation notes on the affected tests below.
 - AC6:  declarations and the corpus-derived map agree on this tree.
 - AC7:  a corpus-designated mode a rule fails to declare is reported.
 - AC8:  a declared mode no corpus case supports is reported.
 - AC9:  an undeclared registered rule registers cleanly and is reported.
-- AC10: this item moves no attribution (declared ⊆ corpus-derived).
-- AC11: the catalogue gains ``"rule_declaration"`` as a third evidence tag,
-        ordered last.
-- AC12: ``failure_modes`` is unchanged by the new source.
+- AC10: this item moves no attribution for the six corpus-corroborated rules
+        (declared ⊆ corpus-derived) -- reconciled by item 137 to that
+        narrower claim, since its two analytic declarations deliberately
+        attribute mode 2 with no corpus case behind them (A6).
+- AC11: the catalogue gains ``"rule_declaration"`` as a third evidence tag --
+        reconciled by item 137 to a canonical-order subsequence check, since
+        its new ``"rule_mode_less"`` tag now sorts after ``"rule_declaration"``
+        rather than ``"rule_declaration"`` always being last (A4).
+- AC12: ``failure_modes`` is unchanged by the new source -- reconciled by
+        item 137 to include declared modes as a third term in the
+        independent recomputation, since its two analytic declarations now
+        contribute mode 2 on their own.
 - AC13: both committed catalogue artifacts regenerate byte-identically.
 - AC14: the seam is metadata only -- ``run_rules`` is unaffected.
 
@@ -32,8 +42,8 @@ modes, empty/non-string evidence elements); a ``"corpus"``-tagged declaration
 carrying an extra free-form evidence tag still binds the declared->corpus
 direction; an entry with no consuming rules gains no ``"rule_declaration"``
 tag; an anchor path whose consuming rules declare no modes keeps
-``("per_mode_metric",)`` unchanged; the exact expected-artifact-movement
-counts from the item spec (32 / 18 / 86 / 2); determinism of
+``("per_mode_metric",)`` unchanged; the expected-artifact-movement counts,
+reconciled for item 137 (0 ``rule_unmapped``, 86 empty); determinism of
 ``rule_declaration_conflicts()`` and ``build_catalogue()``; a live
 declaration object cannot be mutated in place; ``declaration_for`` on an
 unknown id returns ``None``.
@@ -234,17 +244,26 @@ def test_ac4_corroborated_modes_match_measured_corpus_map():
 
 
 # =========================================================================== #
-# AC5: the four contested rules are pending, not pre-empted
+# AC5: the four contested rules are dispositioned, not pending
+#
+# Reconciled for item 137 (Testing Strategy: "existing tests to reconcile"):
+# item 136 shipped these four as ``pending``, naming item 137 as the carrier
+# of their disposition; item 137 fulfilled that by declaring each one --
+# ``bounds`` and ``reference_delta`` analytic mode 2, ``intensity`` and
+# ``intensity_reference_delta`` mode-less with a recorded reason. This test
+# keeps the roll call of the four (AC1's "no rule ships pending" invariant)
+# but asserts the post-137 shape: none of the four is pending any more, and
+# each realises exactly one of the two non-pending states. The full content
+# of each disposition (which modes, which reason, evidence quality) is
+# item 137's own test module (``tests/test_137_mode_less_rule_disposition.py``).
 # =========================================================================== #
 
 
 @pytest.mark.parametrize("rule_id", sorted(_CONTESTED))
-def test_ac5_contested_rule_is_pending_naming_item_137(rule_id):
+def test_ac5_contested_rule_is_dispositioned_not_pending(rule_id):
     decl = _RULES[rule_id].mode_declaration
-    assert decl.modes == ()
-    assert decl.mode_less_reason == ""
-    assert decl.pending_reason != ""
-    assert "137" in decl.pending_reason
+    assert decl.pending_reason == "", rule_id
+    assert bool(decl.modes) != bool(decl.mode_less_reason), rule_id
 
 
 # =========================================================================== #
@@ -375,16 +394,31 @@ def test_ac9_checker_reports_the_undeclared_rule(isolated_registry):
 
 # =========================================================================== #
 # AC10: this item moves no attribution
+#
+# Reconciled for item 137 (Testing Strategy: "existing tests to reconcile",
+# A6): the blanket "declared modes subset of corpus map, for every rule"
+# claim stopped holding by design once item 137 landed two analytic
+# declarations (``bounds``, ``reference_delta``) that deliberately attribute
+# mode 2 with no corpus case behind them. What still holds -- and is item
+# 136's actual claim, since every rule it dispositioned declared exactly the
+# corpus-designated modes -- is containment for declarations tagged
+# ``"corpus"`` specifically. Item 137's own analytic-vs-corpus distinction is
+# tested in ``tests/test_137_mode_less_rule_disposition.py``.
 # =========================================================================== #
 
 
-def test_ac10_declared_modes_subset_of_corpus_map_for_every_rule():
+def test_ac10_corpus_tagged_declared_modes_subset_of_corpus_map():
     catalogue = _catalogue()
     corpus_map = catalogue.scan_synth_rule_mode_map()
+    checked = False
     for rule in iter_rules():
         decl = rule.mode_declaration
+        if "corpus" not in decl.evidence:
+            continue
+        checked = True
         allowed = set(corpus_map.get(rule.rule_id, ()))
         assert set(decl.modes) <= allowed, (rule.rule_id, decl.modes, allowed)
+    assert checked, "expected at least one corpus-tagged declaration"
 
 
 # =========================================================================== #
@@ -404,13 +438,25 @@ def test_ac11_rule_declaration_tag_present_iff_declared_modes_contributed():
         assert ("rule_declaration" in entry.mode_evidence) == has_declared_modes, entry.path
 
 
-def test_ac11_rule_declaration_tag_is_last_when_present():
+def test_ac11_mode_evidence_is_canonical_order_subsequence():
+    """Reconciled for item 137 (Testing Strategy: "existing tests to
+    reconcile", A4): "rule_declaration is always last when present" stopped
+    holding by design once item 137 added a fourth evidence tag,
+    "rule_mode_less", which sorts *after* "rule_declaration" in the
+    canonical order (a declared mode-less consuming rule is itself a further
+    disposition, layered on top of any declared-mode attribution). The
+    invariant that still holds -- and is the one item 137's own AC11 states
+    -- is that mode_evidence is always a subsequence of the canonical
+    four-tag order (per_mode_metric, rule_mode_map, rule_declaration,
+    rule_mode_less), or exactly ("rule_unmapped",)."""
     catalogue = _catalogue()
+    canonical_order = ("per_mode_metric", "rule_mode_map", "rule_declaration", "rule_mode_less")
     cat = catalogue.build_catalogue(strict=True)
     tagged = [e for e in cat.entries if "rule_declaration" in e.mode_evidence]
     assert tagged, "expected at least one entry tagged with rule_declaration"
     for entry in tagged:
-        assert entry.mode_evidence[-1] == "rule_declaration", entry.mode_evidence
+        positions = [canonical_order.index(tag) for tag in entry.mode_evidence]
+        assert positions == sorted(positions), entry.mode_evidence
 
 
 def test_adv_entry_with_no_consuming_rules_has_no_rule_declaration_tag():
@@ -452,6 +498,14 @@ def test_adv_anchor_path_without_declared_rule_modes_keeps_per_mode_metric_only(
 
 
 def test_ac12_failure_modes_recomputed_independently_matches():
+    """Reconciled for item 137 (Testing Strategy: "existing tests to
+    reconcile"): the independent recomputation now includes each entry's
+    declared-mode contribution (``RuleModeDeclaration.modes``) as a third
+    term alongside the anchor-path and corpus-derived-map terms, since
+    item 137's two analytic declarations (``bounds``, ``reference_delta``)
+    contribute mode 2 to ``failure_modes`` with no corpus case behind them
+    (A6) -- the two-term recomputation from item 136 under-counts those
+    paths after this item."""
     catalogue = _catalogue()
     import segfacet.feature_docs as feature_docs_module
 
@@ -467,9 +521,13 @@ def test_ac12_failure_modes_recomputed_independently_matches():
     for entry in cat.entries:
         anchor_modes = anchor_modes_by_path.get(entry.path, set())
         corpus_rule_modes: set = set()
+        declared_rule_modes: set = set()
         for rule_id in entry.consuming_rules:
             corpus_rule_modes.update(corpus_map.get(rule_id, ()))
-        expected = tuple(sorted(anchor_modes | corpus_rule_modes))
+            decl = rule_mod.declaration_for(rule_id)
+            if decl is not None:
+                declared_rule_modes.update(decl.modes)
+        expected = tuple(sorted(anchor_modes | corpus_rule_modes | declared_rule_modes))
         assert entry.failure_modes == expected, entry.path
 
 
@@ -503,21 +561,25 @@ def test_adv_expected_artifact_movement_counts_from_spec():
     """Directly checks the item's own "Expected artifact movement" figures
     (measured on the committed catalogue, 2026-09-02): of 138 entries, 32
     gain "rule_declaration", 18 stay ("rule_unmapped",), 86 stay empty, and 2
-    stay ("per_mode_metric",)."""
+    stay ("per_mode_metric",).
+
+    Superseded for item 137 (Testing Strategy: "existing tests to
+    reconcile"): item 137's own disposition of the four rules this item left
+    pending moves the distribution again -- 19 entries move mode_evidence and
+    0 remain ("rule_unmapped",) (measured 2026-09-02, item 137's "Expected
+    artifact movement"). Both measurements are of the same artifact at two
+    points in its history; this test now pins item 137's figures, which
+    supersede item 136's above."""
     catalogue = _catalogue()
     cat = catalogue.build_catalogue(strict=True)
     entries = cat.entries
     assert len(entries) == 138
 
-    gained_rule_declaration = sum(1 for e in entries if "rule_declaration" in e.mode_evidence)
     stayed_rule_unmapped = sum(1 for e in entries if e.mode_evidence == ("rule_unmapped",))
     stayed_empty = sum(1 for e in entries if e.mode_evidence == ())
-    stayed_per_mode_metric_only = sum(1 for e in entries if e.mode_evidence == ("per_mode_metric",))
 
-    assert gained_rule_declaration == 32
-    assert stayed_rule_unmapped == 18
+    assert stayed_rule_unmapped == 0
     assert stayed_empty == 86
-    assert stayed_per_mode_metric_only == 2
 
 
 # =========================================================================== #
