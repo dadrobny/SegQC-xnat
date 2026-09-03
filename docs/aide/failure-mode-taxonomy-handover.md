@@ -1,6 +1,7 @@
 # Handover: the §6 failure-mode catalogue needs a specification
 
-> **Status:** 📋 Open — input to a feedback-loop re-plan · **Created:** 2026-09-03
+> **Status:** 🔍 Consumed by `/aide-feedback-loop` on 2026-09-03 — §12 records the
+> disposition; the §10 decisions await gate 3 · **Created:** 2026-09-03
 > Records why queue-019 was cut short after item 138, what the eight §6 failure
 > modes actually are today (five partial sources, no specification), the measured
 > ground truth as of 2026-09-03, and a proposed shape for a per-mode
@@ -264,3 +265,179 @@ Open entries in [`insights.md`](insights.md) bearing directly on this re-plan:
   the declaration seam express;
 - the roadmap recording supersession only forward, so Stage 20 read top-down
   still yields the stale plan (queue-019, 2026-09-02).
+
+---
+
+## 12. Feedback-loop disposition (2026-09-03, engine 1.37.0)
+
+`/aide-feedback-loop` consumed §1–§11 after PR #70 merged queue-019 into
+`main`. This section records the scheduling answer, the re-reading of Stage
+20's acceptance, a recommended answer for each §10 decision, and the order of
+the root-document work. The §10 decisions stay the human's — gate 3 in
+[`progress.md`](progress.md) is resolved only by `aide gate approve 3`; what
+follows is the proposal a single approval can adopt or amend.
+
+### 12.1 Scheduling: a new Stage 30, run before the remainder of Stage 20
+
+Three shapes were weighed.
+
+| Shape | Why not / why |
+|---|---|
+| **Add the specification items to Stage 20** | Stage 20 is an *audit* stage by its own scope fence ("not a rule-writing stage … records the finding and hands back"), and it is 🚧 with three merged items and two ticked criteria against it. A stage in progress is immutable in the roadmap, and authoring the thing being audited inside the stage that audits it is the shape that produced the defect class in §1: the same item writes the claim and the check. |
+| **Move items 139–142 into the new stage and close Stage 20** | Items 136–138 built the conformance machinery (§5), and items 139–142 are more of the same — exercise reporting, the specificity ceiling, the honest count. They are the *harness*, and the harness is what Stage 20 is. Moving them empties Stage 20's acceptance of anything that could satisfy criteria 3–5 and rewrites a stage with merged work against it. |
+| **New Stage 30, runs next; Stage 20 stays open and resumes after** *(recommended)* | Same construction as Stages 26, 28 and 29: numbered for stability, run before Stage 20 because it changes what Stage 20 audits. Stage 30 authors the specification; Stage 20 then measures conformance to it. Items 136–138 stay delivered, criteria 1–2 stay attested, items 139–142 are re-specced against the specification and re-queued. |
+
+**Stage 30 — Failure-Mode Specification (the §6 catalogue as an authored
+source).** Proposed scope, for the create-roadmap entry point to refine:
+
+- One authored source per mode with the §6 schema (`id`, `name`,
+  `definition`, `discriminator`, `observability`, `evidence_rung`,
+  `candidate_features`, `intended_rules`, `corpus_cases` with expected firing
+  sets, `severity`, `status`, `provenance`), and the §7 lifecycle
+  (`proposed` → `specified` → `implemented` → `validated`). A Python module of
+  frozen declarations in the shape of `RuleModeDeclaration`, with a generated
+  human-readable rendering as the review surface, keeps it in the repo's
+  existing idiom and importable by the conformance generator.
+- The five partial sources in §2 collapsed onto it: `FAILURE_MODE_NAMES` and
+  `MODE_RUNGS` retired or derived from the specification; `MODE_ANCHOR_PATHS`
+  kept only as what it actually is — the Stage-18 per-mode *metric*'s read
+  path (`feature_docs.py:350`), rendered under that label beside the rule's
+  read path (§12.3, decision 1). `Expectation` and `RuleModeDeclaration`
+  stay as the two operational claims the specification is checked against.
+- Item 138's matrix re-pointed at the specification as its primary record,
+  so it becomes the conformance report §6 describes: a mode whose expected
+  firing set differs from the measured one fails, which is the check that no
+  shape test in §1 could express.
+- The tissue-plausibility mode that `insights.md` entry 51 records as missing
+  (the `intensity` / `intensity_reference_delta` rules and the four-case
+  intensity corpus already exist for it) added as the first mode to enter
+  through the lifecycle — it arrives at `implemented`, or `validated` once
+  its corpus cases carry expected firing sets, and demonstrates that the
+  lifecycle admits a mode the eight-mode list did not.
+- A **human sign-off of the specification** as the stage's checkpoint, in the
+  sense Stages 19 and 27 use: the definitions and discriminators are the
+  ground truth every later check consults, so they are read by a person
+  before anything is measured against them.
+
+**Queues.** Stage 30 is one queue (about five items, under the cap of 10).
+The remainder of Stage 20 — items 139, 140, 141, 142, re-specced — is the
+queue after it, not the same one: running the harness against a
+specification nobody has signed off repeats §1 one level up. Item 139 is the
+least specification-dependent of the four (its "unexercised, with reason"
+records are measured facts about harness inputs, not about modes) and can
+open that queue. Whether item 141 belongs in Stage 20 at all is decided at
+that queue's planning: it is a Stage 18 metric-surface fix, and it stays only
+if the mode-1 / mode-6 discriminator makes "mode 6 clears on its own" a
+meaningful claim.
+
+**Run order from here: 30 → 20 (remainder) → 27 → 21 → 16.** Stage 24
+(discovery) is unaffected; the `provenance` field is what keeps a discovered
+mode distinguishable from a hypothesised one (§8).
+
+### 12.2 Stage 20's acceptance, re-read
+
+None of the five criteria is rewritten. Criteria 1 and 2 are attested and
+immutable; criteria 3–5 carry retraction trails, and the engine's guard
+refuses `progress reword` on a trail-bearing box. What changes is the
+*reading*, recorded in the roadmap's Stage 20 section as a backward
+supersession marker (the edit `insights.md` entry 46 already asks for) and in
+Stage 30's own acceptance:
+
+| # | Criterion | Reading after Stage 30 |
+|---|---|---|
+| 1 | every §6 mode has ≥1 rule and a recorded evidence rung | Holds as attested on the eight modes. Under the lifecycle it is scoped to modes at `implemented` or above; a `proposed` mode has no rule by definition and is not silent, because the specification says so. The rung moves to the mode↔rule edge (decision 3) and the mode's rung is derived from its edges. |
+| 2 | every registered rule maps to ≥1 mode or is recorded mode-less with a reason | Holds as attested. Unchanged in substance. |
+| 3 | every registered rule is exercised by ≥1 case or recorded unexercised with a reason | Unchanged. Item 139's spec stands; "reason" means a harness-input mechanism or a specification-recorded absence. |
+| 4 | the specificity assertion is enforced for every corpus case | Unchanged wording; "unintended" is now defined by the specification's per-case expected firing set, not by the assertion's own allowlist. Item 140's adjudication of mode 6 becomes a specification entry (decision 2), and the allowlist is derived from the specification rather than authored beside it. |
+| 5 | the end-to-end detection count is stated honestly | Unchanged. The count is stated per lifecycle status and per rung (n `validated` at `synthetic-demonstrable`, m at `needs-real-data`, …), never as one number over a list that mixes hypothesised and demonstrated modes. |
+
+### 12.3 Recommended answers to the six §10 decisions
+
+1. **§4.1, modes 4 and 7 anchors** — carry both, separately labelled.
+   `MODE_ANCHOR_PATHS` is documented as the *Stage-18 metric's* read path,
+   not the rule's, so "re-anchor to the read field" would erase a real
+   distinction. The specification's `candidate_features` names the metric
+   path; the rule's read paths derive from `RuleModeDeclaration` and the
+   catalogue's `consuming_rules`; the matrix renders "metric path" and "rule
+   reads" as two columns. Item 138's mode-4 sentence was false because prose
+   had one column; two columns leave nothing to transcribe.
+2. **§4.2, mode 6 firing `mislabel`** — a true co-detection, recorded, not
+   suppressed. Cropping L3's anterior face moves the label's centroid by a
+   measured 17.5 mm (`heuristics/mislabel.py:81`), which is a real
+   displacement of the label relative to the curve. The specification
+   records `expected_firing = {border, mislabel}` for `mode6_crop_at_border`
+   with that reason, and the *discriminator* between modes 1 and 6 is written
+   down at the same time: mode 6 has a border-touching face, mode 1 has none.
+   Whether a later rule should let mode 6 explain away the mode-1 reading is a
+   rule change, out of scope for both stages, and is recorded as such.
+3. **§4.3, where the rung attaches** — to the mode↔rule edge, authored; the
+   mode's rung is derived as the strongest of its edges. That makes the
+   analytic-only edges of §4.3 (`reference_delta` on modes 1 and 2, `bounds`
+   on mode 2) visibly weaker than the demonstrated ones without inventing a
+   fourth rung.
+4. **§6/§7, schema and lifecycle** — adopt as proposed, with two additions:
+   `corpus_cases` carries `expected_firing` per case (the measured set is
+   never authored, only compared), and `status` is derived where it can be —
+   `implemented` from a registered rule declaring the mode, `validated` from a
+   corpus case whose measured firing equals its expected firing — so only
+   `proposed` and `specified` are ever set by hand.
+5. **Scope** — new Stage 30, run before the remainder of Stage 20 (§12.1).
+6. **`vision.md` §6 wording** — yes, and as part of a re-issued vision rather
+   than a point edit (§12.4). The growth contract survives as "a mode is
+   *claimed covered* only with the rule(s) that detect it"; listing a mode as
+   `proposed` is not a claim of coverage.
+
+### 12.4 The re-vision: now, scoped, not the full one
+
+[`vision.md`](vision.md) §0 defers the full re-vision until real segmenter
+failures have been measured. That condition is Stage 16, which sits behind
+gates 1 and 2 with no date, so the deferral has no horizon. Meanwhile the
+document's body still describes an XNAT QC gate, its §6 must change now for
+decision 6, and every queue since 2026-07-25 has been derived from a
+superseded body read through an override header. Re-issuing the vision now is
+the smaller cost: §6 is the root of the defect class in §1, and editing it
+inside a provenance trail is worse than editing it in a document that is
+current.
+
+What the re-issue does and does not do:
+
+- **Does:** rewrite §1–§12 to describe FACET (the failure-analysis toolkit
+  §0 already defines), keep the G-numbers and their retyped targets, restate
+  §6 as the *principles* of the catalogue — the growth contract, the lifecycle,
+  the evidence rungs, the observability classes — and point at the authored
+  specification Stage 30 owns for the catalogue itself, so the vision never
+  again carries a per-mode list that drifts from code.
+- **Does not:** specify Stages 22–25. Their content still depends on
+  measurements that do not exist; they stay placeholders, and the deferral
+  narrows from "the whole document" to "those four stages".
+
+Order of work, each in a fresh session per the entry points' own hand-offs:
+
+1. Approve or amend gate 3 (`aide gate approve 3 --evidence "…"`), citing
+   this section or the decisions that differ from it.
+2. `/aide-create-vision` — interactive; produces vision v3 as a draft.
+3. `/aide-create-roadmap` — incremental update: Stage 30 added; Stage 20's
+   section gains the backward supersession markers (`insights.md` 46) and
+   the §12.2 reading; a "run order" statement placed once, at the top, so
+   the roadmap reads top-down again.
+4. `/aide-create-progress` — Stage 30 section and summary row.
+5. Both root documents in one reviewed PR, then `/aide-create-queue` for
+   queue-020 (Stage 30).
+
+### 12.5 Process findings outside the taxonomy
+
+Two systemic points, for the next framework hand-over rather than this
+repo:
+
+- **A stage criterion was ticked by position.** Item 137's validator mapped
+  its item ACs onto Stage 20's criteria by index and ticked four boxes the
+  item had not established (`insights.md` entries 52–55). `aide progress
+  accept --criterion N` is positional by design; the fix is that an item
+  ticks a stage criterion only when its spec names that criterion explicitly,
+  which is a spec-template and validator-prose change in `aide-loop`.
+- **An acceptance criterion that asserts a fact about code must be a measured
+  equality against live state, never a shape check** — a length floor
+  (item 137), a token-presence check (item 138) and a declaration-state
+  completeness flag (item 138) each passed a false claim. `REVIEW.md` names
+  the class; the spec-author and test-writer prose do not yet forbid it at
+  authoring time.

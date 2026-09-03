@@ -86,7 +86,12 @@
       "Bash(cmp:*)",
       "Bash(printf:*)",
       "Bash(git merge-base:*)",
-      "Bash(git check-attr:*)"
+      "Bash(git check-attr:*)",
+      "Bash(git cat-file:*)",
+      "Bash(git diff-tree:*)",
+      "Bash(git merge-tree:*)",
+      "Bash(date:*)",
+      "Bash(md5sum:*)"
     ],
     "ask": [
       "Bash(git push --force:*)",

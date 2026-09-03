@@ -39,7 +39,16 @@
       "create a file there stalled on the prompt to edit it (37 and 12 grants,",
       "0 denies). Machine-specific shapes seen in the same review — an",
       "absolute-path gh or .venv python, a scratchpad Write — belong in the",
-      "personal .claude/settings.local.json, never here."
+      "personal .claude/settings.local.json, never here.",
+      "",
+      "Promoted at the 2026-09-03 feedback-loop review of 4,540 logged prompts",
+      "(engine 1.37.0, queue-019): three more read-only git inspection verbs",
+      "(cat-file, diff-tree, merge-tree) and two read-only utilities (date,",
+      "md5sum). Declined in the same review: bare `sed`",
+      "(would admit `sed -i`), `git -C` (a §3 hygiene violation by definition —",
+      "the hook is what should bounce it, not a prompt), `git cherry-pick`,",
+      "`rm`, `rmdir`, `mv` (destructive), and the machine-specific absolute",
+      "paths again."
     ],
     "allow": {
       "add": [
@@ -58,7 +67,12 @@
         "Bash(cmp:*)",
         "Bash(printf:*)",
         "Bash(git merge-base:*)",
-        "Bash(git check-attr:*)"
+        "Bash(git check-attr:*)",
+        "Bash(git cat-file:*)",
+        "Bash(git diff-tree:*)",
+        "Bash(git merge-tree:*)",
+        "Bash(date:*)",
+        "Bash(md5sum:*)"
       ]
     }
   }
