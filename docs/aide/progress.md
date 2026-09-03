@@ -946,7 +946,12 @@ rule(s) and any features they need; features may be added alone, modes and rules
 - ✅ The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
   `intensity_reference_delta`) mapped to §6 modes, or recorded as targeting none with a
   reason — the root close of Stage 19's G8 shortfall. *(Item 137)*
-- 📋 Specificity assertion — no unintended rule may fire — adopted as a ratchet. *(Item 140)*
+- 📋 Specificity assertion — no unintended rule may fire — adopted as a ratchet.
+  ⚠️ **Deferred, 2026-09-03:** queue-019 was cut short after item 138. The ratchet's first
+  real case is mode 6's corpus case firing `mislabel` alongside `border` (measured
+  2026-09-03), and whether that is a true positive or cross-talk is not decidable before
+  the §6 modes carry a definition and a discriminator. See
+  [`failure-mode-taxonomy-handover.md`](failure-mode-taxonomy-handover.md) §4.2. *(Item 140)*
 - ✅ Reachability hole closed *with its mechanism named per mode*: mode 8 is
   single-channel-unobservable, mode 1's ladder is FOV-capped, mode 4's cause TBD. Made
   detectable where the mechanism allows, recorded where it does not. Not both silent.
@@ -956,14 +961,28 @@ rule(s) and any features they need; features may be added alone, modes and rules
   (mean `2.9e-05` mm), so no field of view produces a non-zero offset and the FOV-headroom
   remedy named here could not have worked. Mode 8 stays this stage's to record. *(Item 138)*
 - 📋 Per-rule **and per-operator** corpus-exercise reporting (the registered `fuse` operator
-  generates no corpus case at all). *(Item 139)*
+  generates no corpus case at all).
+  ⚠️ **Deferred, 2026-09-03:** queue-019 was cut short after item 138. The item's spec was
+  authored and is preserved at [`items/139-per-rule-and-per-operator.md`](items/139-per-rule-and-per-operator.md),
+  including its measurements: the `fuse` claim above holds, 7 of 10 rules are exercised
+  across both corpora, and `intensity_reference_delta` is driven by nothing because no
+  harness attaches a reference. Its "unexercised, with reason" records need a mode
+  specification first. See
+  [`failure-mode-taxonomy-handover.md`](failure-mode-taxonomy-handover.md) §9. *(Item 139)*
 - 📋 The mode-1 severity-ladder base (`tests/test_100_severity_ladder.py`, Stage 18)
   widened so mode 1's metric swing is set by the
   perturbation rather than the fixture's FOV walls — the recorded root cause of mode 6's
-  Stage-18 specificity shortfall. *(Item 141)*
+  Stage-18 specificity shortfall.
+  ⚠️ **Deferred, 2026-09-03:** queue-019 was cut short after item 138. This turns on
+  mode-1-vs-mode-6 semantics, which is the discriminator field the §6 modes do not yet
+  carry. See
+  [`failure-mode-taxonomy-handover.md`](failure-mode-taxonomy-handover.md) §4.1. *(Item 141)*
 - 📋 Stage 20 end-to-end validation: traceability artifact regenerated from a clean tree,
   the specificity assertion driven over every corpus case, the cross-mode margins
-  re-measured, and the end-to-end detection count stated honestly here. *(Item 142)*
+  re-measured, and the end-to-end detection count stated honestly here.
+  ⚠️ **Deferred, 2026-09-03:** queue-019 was cut short after item 138. Stating the
+  detection count honestly requires a mode↔rule story that is not yet defined. See
+  [`failure-mode-taxonomy-handover.md`](failure-mode-taxonomy-handover.md). *(Item 142)*
 
 **Acceptance.**
 
