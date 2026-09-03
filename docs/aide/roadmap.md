@@ -1,6 +1,6 @@
 # FACET — Development Roadmap
 
-> **Status:** Draft v3 · **Created:** 2026-06-24 · **Re-issued:** 2026-09-03 against
+> **Status:** v3 (approved 2026-09-03) · **Created:** 2026-06-24 · **Re-issued:** 2026-09-03 against
 > [`vision.md`](vision.md) v3 (incremental update; every completed or in-progress stage is
 > carried over unchanged). Stages 0–14 are history and are not reopened; Stage 15 is
 > `❌ Excluded`; Stage 16 was retargeted in place; Stages 22–25 remain placeholders,
