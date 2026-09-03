@@ -44,7 +44,7 @@
 | 17    | Foreign-Convention Interop & Orientation-Safe Image Layer               | G2, G6          | ✅     |
 | 18    | Failure-Mode-Specific Metric Surface                                    | G2, G7          | ✅     |
 | 19    | Generated Feature & Rule Catalogue + Steering Review                    | G7, G8          | ✅     |
-| 20    | Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness      | G2, G7          | 📋     |
+| 20    | Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness      | G2, G7          | 🚧     |
 | 21    | Real-GT Perturbation Corpus                                             | G3, G7          | 📋     |
 | 22    | *(placeholder)* Unified `(scan, seg)` Extraction                    | —              | 📋     |
 | 23    | *(placeholder)* Multivariate Normative Model                          | G3              | 📋     |
@@ -204,6 +204,7 @@ may resolve one._
 |------|--------|--------|---------------------|
 | Real segmenter output on real CT handed over to this repo — SPINEPS (primary) and/or TotalSegmentator label maps + manifest, produced in the programme repo, sufficient to build the real candidate-vs-GT cohort | stage 16 | ⏳ Awaiting | Blocks the whole of Stage 16, and transitively Stage 25, whose deliverables are "deliberately unspecified until Stage 16 has characterised real failures". Closes the "Real automatic-segmentation failure corpus" Environment-Gated row and the G2 Outcome target. Not the same prerequisite as the Stage 21 rung-2 corpus, which needs only real VerSe GT — already ✅ Verified and **not** gated. |
 | Access approved for the curated challenging-case source data — real pathology / post-op / atypical anatomy ([`vision.md`](vision.md) §8), `VerSe_fracture_grading.xlsx` a natural seed, plus any clinical cohort requiring an ethics/data-sharing sign-off | stage 16 | ⏳ Awaiting | Independent of the row above: real *segmenter output* does not supply the *challenging cases*, and either arriving alone leaves a Stage 16 deliverable unbuildable. Kept a separate row so approving one does not silently read as approving both. |
+| §6 failure-mode taxonomy — the modes need a specification before the rest of Stage 20 can be built. Six decisions are owed, listed in [`failure-mode-taxonomy-handover.md`](failure-mode-taxonomy-handover.md) §10: the anchor semantics for modes 4 and 7, whether mode 6's `mislabel` firing is a true positive or cross-talk, whether the evidence rung attaches to the mode or the edge, the per-mode schema and lifecycle, whether this becomes a new stage or a Stage 20 rescope, and the `vision.md` §6 wording that currently forbids a `proposed` mode | 139, 140, 141, 142 | ⏳ Awaiting | Raised 2026-09-03 on cutting queue-019 short after item 138. Queue-019 produced three defects of one class in four items — a factual claim authored as prose and accepted by a check testing its shape, not its truth (items 137 and 138; corrections `b1c593c`, `0db0fca`, `b090822`). Two of the five corrected mechanism sentences are provably uncatchable by any such check. The root cause is that no document defines the eight modes: they exist in five partial sources, none of which states what distinguishes one mode from its neighbours or what evidence constitutes a detection. Items 136–138's machinery is unaffected and becomes the conformance check once a specification exists. |
 | Spinal curve model — the deformity envelope the fit must represent without flagging it. How much scoliotic / kyphotic curvature is normal anatomy the model must follow, versus deviation it must report; and the accepted false-negative cost of a stiffer fit | 119, 120, 121, 123, 125 | ✅ Approved (2026-08-27) | Adopt item 118's proposal: smoothing_spline at s = n_points, chord-length u, leave-one-out evaluation, and max_offset_mm raised 15.0 -> 25.0. Envelope set above the 21.073357 mm leave-one-out ceiling measured across VerSe19 GT including the most coronally-deviated cases, and below the ~5 mm leave-one-out separation a small displacement produces. Accepted cost: a genuine displacement smaller than the envelope may be missed. Expected to be revised into separate normal and scoliotic envelopes later -- see docs/spinal-curve-model.md. *(Superseded 2026-08-29 by a second human decision during item 123: terminal vertebrae (first/last of each subject's ordered sequence) are excluded from the mislabel rule and threshold derivation, and the shipped threshold is `max_offset_mm = 13.0` (interior-only p99 12.91 mm at T10, real 80-subject VerSe19 cohort). Full record in `docs/reference-build.md`'s rebuild records and item 123's spec Decisions log.)* |
 
 ---
@@ -910,7 +911,7 @@ verifies they agree, and no document records which failure mode each feature ser
 
 ---
 
-## Stage 20 — Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness (G2, G7) — 📋
+## Stage 20 — Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness (G2, G7) — 🚧
 
 **Goal.** Close the gap between "the suite is green" and "the rules are specific".
 Measured 2026-07-25 on the committed corpus: **10 rules registered and enabled, 4 ever
@@ -936,37 +937,69 @@ rule(s) and any features they need; features may be added alone, modes and rules
 
 **Deliverables.**
 
-- 📋 Traceability matrix, *generated* (not hand-maintained): 8 failure modes × 10 rules ×
+- ✅ Traceability matrix, *generated* (not hand-maintained): 8 failure modes × 10 rules ×
   the features each rule consumes, scored in all three directions, every mode row carrying
-  its evidence rung.
-- 📋 The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
+  its evidence rung. *(Item 138)*
+- ✅ Rule-layer declaration seam: every registered rule carries a `RuleModeDeclaration`
+  stating its targeted §6 modes, its mode-less reason, or a pending reason. Six rules
+  declared from corpus evidence; the four contested ones are **pending**, their disposition
+  deliberately left to item 137. Does not itself close Stage 19's G8 shortfall. *(Item 136)*
+- ✅ The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
   `intensity_reference_delta`) mapped to §6 modes, or recorded as targeting none with a
-  reason — the root close of Stage 19's G8 shortfall.
+  reason — the root close of Stage 19's G8 shortfall. *(Item 137)*
 - 📋 Specificity assertion — no unintended rule may fire — adopted as a ratchet.
-- 📋 Reachability hole closed *with its mechanism named per mode*: mode 8 is
+  ⚠️ **Deferred, 2026-09-03:** queue-019 was cut short after item 138. The ratchet's first
+  real case is mode 6's corpus case firing `mislabel` alongside `border` (measured
+  2026-09-03), and whether that is a true positive or cross-talk is not decidable before
+  the §6 modes carry a definition and a discriminator. See
+  [`failure-mode-taxonomy-handover.md`](failure-mode-taxonomy-handover.md) §4.2. *(Item 140)*
+- ✅ Reachability hole closed *with its mechanism named per mode*: mode 8 is
   single-channel-unobservable, mode 1's ladder is FOV-capped, mode 4's cause TBD. Made
   detectable where the mechanism allows, recorded where it does not. Not both silent.
   ⚠️ **Superseded in part, 2026-08-27:** modes 1 and 4 are **one** defect, the interpolating
   spline fit (`splprep(..., s=0)`), and are owned by **Stage 28**. `offset_mm` is zero on
   every committed golden (max `6.8e-04` mm vs a 15.0 mm threshold) and on real VerSe GT
   (mean `2.9e-05` mm), so no field of view produces a non-zero offset and the FOV-headroom
-  remedy named here could not have worked. Mode 8 stays this stage's to record.
+  remedy named here could not have worked. Mode 8 stays this stage's to record. *(Item 138)*
 - 📋 Per-rule **and per-operator** corpus-exercise reporting (the registered `fuse` operator
   generates no corpus case at all).
+  ⚠️ **Deferred, 2026-09-03:** queue-019 was cut short after item 138. The item's spec was
+  authored and is preserved at [`items/139-per-rule-and-per-operator.md`](items/139-per-rule-and-per-operator.md),
+  including its measurements: the `fuse` claim above holds, 7 of 10 rules are exercised
+  across both corpora, and `intensity_reference_delta` is driven by nothing because no
+  harness attaches a reference. Its "unexercised, with reason" records need a mode
+  specification first. See
+  [`failure-mode-taxonomy-handover.md`](failure-mode-taxonomy-handover.md) §9. *(Item 139)*
 - 📋 The mode-1 severity-ladder base (`tests/test_100_severity_ladder.py`, Stage 18)
   widened so mode 1's metric swing is set by the
   perturbation rather than the fixture's FOV walls — the recorded root cause of mode 6's
   Stage-18 specificity shortfall.
+  ⚠️ **Deferred, 2026-09-03:** queue-019 was cut short after item 138. This turns on
+  mode-1-vs-mode-6 semantics, which is the discriminator field the §6 modes do not yet
+  carry. See
+  [`failure-mode-taxonomy-handover.md`](failure-mode-taxonomy-handover.md) §4.1. *(Item 141)*
+- 📋 Stage 20 end-to-end validation: traceability artifact regenerated from a clean tree,
+  the specificity assertion driven over every corpus case, the cross-mode margins
+  re-measured, and the end-to-end detection count stated honestly here.
+  ⚠️ **Deferred, 2026-09-03:** queue-019 was cut short after item 138. Stating the
+  detection count honestly requires a mode↔rule story that is not yet defined. See
+  [`failure-mode-taxonomy-handover.md`](failure-mode-taxonomy-handover.md). *(Item 142)*
 
 **Acceptance.**
 
-- [ ] Every §6 failure mode has ≥1 rule **and** a recorded evidence rung — never silent
+- [x] Every §6 failure mode has ≥1 rule **and** a recorded evidence rung — never silent *(Full suite run 2026-09-02 (.venv/bin/python -m pytest -q): 6900 passed, 60 skipped (all pre-known env-gated), 0 failed; test_ac1_all_ten_rules_declared_and_not_pending passed)* *(Validation round 2, 2026-09-02: .venv/bin/python -m pytest -q -> 7006 passed, 60 skipped (all pre-known env-gated), 0 failed. Verified mode->rule direction directly: json.load(traceability_matrix.generated.json)['directions']['mode_to_rule'] == {complete: True, holes: []}; every one of the 8 mode rows in the generated markdown carries a rung (synthetic-demonstrable x6, structurally-unobservable for mode 8). Covered by test_ac10_mode_to_rule_direction_complete_and_every_mode_has_a_rule, test_ac11_mode_rule_lists_are_derived_from_shipped_declarations, test_ac12_mode_rung_is_member_of_closed_vocabulary, test_ac13_mode8_rung_and_mechanism_name_the_single_channel_mechanism, test_ac14_mode8_not_pipeline_detected_names_reconstructed_case, test_ac15_rung_and_pipeline_detected_cross_check, test_ac16_modes_one_and_four_are_synthetic_demonstrable, test_ac17_mode7_rung_records_its_own_cap (item 138).)*
+  - **2026-09-02** → retracted: Retracting an attestation-mapping error: this criterion (every mode has >=1 rule and a recorded evidence rung) requires the mode->rule direction with evidence rungs, which is Item 138's traceability-matrix deliverable (still open, marked pending in this stage's Deliverables); item 137 only disposed the four previously-undeclared rules, it did not build the evidence-rung matrix.
+  - **2026-09-03** → Correction (code review): the rung enumeration omitted mode 7's needs-real-data rung from the 8-mode accounting -- it read 8 modes as (synthetic-demonstrable x6, structurally-unobservable for mode 8) = 7 accounted, not 8. Corrected reading: synthetic-demonstrable x6 (modes 1-6), needs-real-data x1 (mode 7), structurally-unobservable x1 (mode 8) = 8. The underlying claim (every mode has >=1 rule and a recorded evidence rung) is unaffected and remains true; only the evidence note's own arithmetic was wrong.
   (**G2**).
-- [ ] Every registered rule maps to ≥1 §6 mode or is recorded as mode-less with a reason.
-- [ ] Every registered rule is exercised by ≥1 case or recorded as unexercised with a
+- [x] Every registered rule maps to ≥1 §6 mode or is recorded as mode-less with a reason. *(Full suite run 2026-09-02: test_ac2_ac3_analytic_rule_declares_mode_two_only[bounds] passed)*
+  - **2026-09-02** → Full suite run 2026-09-02 (.venv/bin/python -m pytest -q): 6900 passed, 0 failed. Combined with item 136's six corpus-derived declarations, item 137 disposes the remaining four rules (bounds, reference_delta -> mode 2 analytic; intensity, intensity_reference_delta -> mode-less with recorded reason), verified by test_ac1_all_ten_rules_declared_and_not_pending, test_ac2_ac3_analytic_rule_declares_mode_two_only[bounds/reference_delta], and test_ac5_mode_less_rule_declares_no_modes_not_pending[intensity/intensity_reference_delta] — every registered rule now maps to >=1 mode or is recorded mode-less with a reason.
+- [ ] Every registered rule is exercised by ≥1 case or recorded as unexercised with a *(Full suite run 2026-09-02: test_ac2_ac3_analytic_rule_declares_mode_two_only[reference_delta] passed)*
+  - **2026-09-02** → retracted: Retracting an attestation-mapping error: this criterion (every registered rule exercised by >=1 case or recorded unexercised with reason) was mistakenly ticked by positional mismapping to item 137's AC3 test; per-rule corpus-exercise reporting is Item 139's future deliverable, not verified by item 137's tests.
   reason (**G2**).
-- [ ] The specificity assertion is enforced for every corpus case.
-- [ ] The end-to-end detection count is stated honestly here rather than implied (**G7**).
+- [ ] The specificity assertion is enforced for every corpus case. *(Full suite run 2026-09-02: test_ac4_mode_two_declaration_is_analytic_with_named_mechanism passed for both rules)*
+  - **2026-09-02** → retracted: Retracting an attestation-mapping error: this criterion (specificity assertion enforced for every corpus case) was mistakenly ticked by positional mismapping to item 137's AC4 test; the specificity assertion is Item 140's future deliverable, not yet built, so this criterion does not hold.
+- [ ] The end-to-end detection count is stated honestly here rather than implied (**G7**). *(Full suite run 2026-09-02: test_ac5_mode_less_rule_declares_no_modes_not_pending passed for both rules)*
+  - **2026-09-02** → retracted: Retracting an attestation-mapping error: this criterion (end-to-end detection count stated honestly) was mistakenly ticked using item 137's AC5 test as evidence by positional mismapping; that test verifies mode-less declarations, not this stage-level claim, which remains open (Item 142).
 
 > **Not required:** feature→rule completeness. Unwired features are a designed state.
 

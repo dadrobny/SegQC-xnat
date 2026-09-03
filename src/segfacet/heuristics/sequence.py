@@ -31,7 +31,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, register_rule
+from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
 from segfacet.verdict import Severity
 
 __all__ = ["SequenceRule"]
@@ -100,6 +100,12 @@ class SequenceRule(Rule):
     """
 
     rule_id = "sequence"
+
+    # §6 mode 7 (item 136): SequenceBreakPerturbation
+    # (src/segfacet/synth/identity_ordering_alignment.py) designates
+    # "sequence" for mode 7 via its Expectation(failure_mode=7,
+    # expected_rule_ids={"sequence"}).
+    mode_declaration = RuleModeDeclaration(modes=(7,), evidence=("corpus",))
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate sequence continuity for *record*.

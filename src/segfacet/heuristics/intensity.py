@@ -52,6 +52,10 @@ Determinism / non-mutation contract: ``evaluate`` never mutates ``record``,
 and two calls with the same ``(record, config)`` return equal finding lists in
 the same order. Findings are emitted ascending by integer label; within a
 label, in fixed condition order (low -> high -> degenerate).
+
+Mode-less (item 137): this rule judges tissue plausibility, which §6 names no
+mode for -- see ``IntensityRule.mode_declaration`` and the catalogue-gap
+finding captured in ``docs/aide/insights.md``.
 """
 
 from __future__ import annotations
@@ -59,7 +63,7 @@ from __future__ import annotations
 from typing import Dict, List
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, register_rule
+from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
 from segfacet.verdict import Severity
 
 __all__ = ["IntensityRule"]
@@ -120,6 +124,29 @@ class IntensityRule(Rule):
     """
 
     rule_id = "intensity"
+
+    # §6 disposition (item 137): mode-less. §6's eight modes are
+    # geometric/topological/semantic and none names tissue plausibility, so
+    # this rule targets no §6 mode -- the catalogue is short a mode, not the
+    # rule speculative. The gap is captured in docs/aide/insights.md rather
+    # than fixed here, because §6 is a root document (vision.md) that
+    # changes only through /aide-create-vision and a reviewed PR.
+    mode_declaration = RuleModeDeclaration(
+        mode_less_reason=(
+            "This rule judges tissue plausibility -- an implausibly low "
+            "median HU reads as soft tissue/air, an implausibly high median "
+            "reads as metal/implant, and a near-zero std reads as a "
+            "degenerate/uniform region -- but §6's eight modes are "
+            "geometric/topological/semantic and none of them names tissue "
+            "plausibility as a failure mode. The rule is demonstrably useful "
+            "and demonstrably exercised: tests/corpus/intensity/manifest.json's "
+            "four cases (clean_hu, implausible_metal, implausible_soft_tissue, "
+            "degenerate_uniform) drive it, and that manifest carries no "
+            "failure_mode field at all -- the same gap, expressed in the "
+            "corpus. The catalogue gap is recorded in docs/aide/insights.md "
+            "rather than fixed here, because §6 is a root document."
+        )
+    )
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate implausible-intensity signals for *record*.

@@ -41,6 +41,10 @@ and two calls with the same ``(record, config)`` return equal finding lists
 in the same order. Findings are emitted ascending by integer label; within a
 label, in fixed condition order (distribution-distance -> out-of-range ->
 robust-z), with per-feature findings in ascending feature-name order.
+
+Targets §6 modes 1 and 2 (spline-offset displacement, and over-/under-
+segmentation), declared on analytic grounds (item 137, corrected 2026-09-02)
+-- see ``ReferenceDeltaRule.mode_declaration``.
 """
 
 from __future__ import annotations
@@ -48,7 +52,7 @@ from __future__ import annotations
 from typing import Dict, List
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, register_rule
+from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
 from segfacet.verdict import Severity
 
 __all__ = ["ReferenceDeltaRule"]
@@ -107,6 +111,38 @@ class ReferenceDeltaRule(Rule):
     """
 
     rule_id = "reference_delta"
+
+    # §6 disposition (item 137, corrected 2026-09-02): declares modes 1 and 2
+    # on analytic grounds -- no committed corpus case designates
+    # "reference_delta" for any mode, so evidence carries "analytic" plus the
+    # mechanism sentence, never "corpus". compute_reference_delta scores
+    # every feature the reference artifact tracks
+    # (`tracked_features = tuple(sorted(reference.features))`,
+    # segfacet/reference/delta.py), not physical_volume_mm3 alone: both
+    # committed reference artifacts (reference_verse_v1.json,
+    # reference_default.json) track 21 per-label features. That set spans
+    # physical_volume_mm3 and extent_{x,y,z}_mm -- the same magnitude
+    # features "bounds" targets verbatim (§6 mode 2), here measured against a
+    # cohort instead of hand-set bounds -- and also spline_offset_mm, read
+    # from stage3.per_label_offsets[].offset_mm, which is §6 mode 1's own
+    # anchor path (feature_docs.MODE_ANCHOR_PATHS[1]). A displaced-but-
+    # plausibly-sized label can therefore fire this rule on spline_offset_mm
+    # alone, a mode-1 detection, so mode 1 is declared alongside mode 2.
+    mode_declaration = RuleModeDeclaration(
+        modes=(1, 2),
+        evidence=(
+            "analytic",
+            "compute_reference_delta scores every feature the reference "
+            "artifact tracks, not a single feature: both committed reference "
+            "artifacts carry 21 per-label features, spanning "
+            "physical_volume_mm3 and extent_{x,y,z}_mm -- the same §6 mode 2 "
+            "magnitude signal 'bounds' targets, measured against a cohort "
+            "instead of hand-set bounds -- and spline_offset_mm (from "
+            "stage3.per_label_offsets[].offset_mm), which is §6 mode 1's own "
+            "anchor feature, so an out-of-distribution verdict on that "
+            "feature alone is a mode 1 detection.",
+        ),
+    )
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate delta-to-reference signals for *record*.

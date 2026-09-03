@@ -31,7 +31,7 @@ from __future__ import annotations
 from typing import Dict, List
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, register_rule
+from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
 from segfacet.verdict import Severity
 
 __all__ = ["OverlapRule"]
@@ -90,6 +90,11 @@ class OverlapRule(Rule):
     """
 
     rule_id = "overlap"
+
+    # §6 mode 8 (item 136): ForceOverlapPerturbation
+    # (src/segfacet/synth/coverage_border_overlap.py) designates "overlap"
+    # for mode 8 via its Expectation(failure_mode=8, expected_rule_ids={"overlap"}).
+    mode_declaration = RuleModeDeclaration(modes=(8,), evidence=("corpus",))
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate overlap findings for *record*.

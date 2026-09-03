@@ -34,6 +34,17 @@ Public API
     or from an explicit list), executes them deterministically, and returns the
     aggregated ``list[Finding]``.
 
+``RuleModeDeclaration``
+    Frozen dataclass (item 136): a rule's own class-attribute statement of the
+    §6 failure mode(s) it targets — or that it targets none, or that its
+    disposition is pending a named downstream item. Metadata only; never read
+    during ``evaluate``.
+
+``declaration_for(rule_or_id)`` / ``iter_rule_declarations()``
+    Look up a registered rule's ``RuleModeDeclaration`` (item 136), by
+    instance or ``rule_id``, or iterate ``(rule_id, declaration)`` pairs in
+    ascending ``rule_id`` order.
+
 Config plumbing lives in ``segfacet.config.HeuristicConfig``:
 
 - ``rule_enabled(rule_id, default=True) -> bool``
@@ -68,7 +79,15 @@ Usage example::
 """
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, get_rule, iter_rules, register_rule
+from segfacet.heuristics.rule import (
+    Rule,
+    RuleModeDeclaration,
+    declaration_for,
+    get_rule,
+    iter_rule_declarations,
+    iter_rules,
+    register_rule,
+)
 from segfacet.heuristics.runner import run_rules
 from segfacet.heuristics import bounds  # noqa: F401 — registers BoundsRule (item 027)
 from segfacet.heuristics import fragmentation  # noqa: F401 — registers FragmentationRule (item 028)
@@ -88,4 +107,7 @@ __all__ = [
     "get_rule",
     "iter_rules",
     "run_rules",
+    "RuleModeDeclaration",
+    "declaration_for",
+    "iter_rule_declarations",
 ]

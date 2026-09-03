@@ -27,15 +27,106 @@ Design decisions:
 from __future__ import annotations
 
 import abc
-from typing import Dict, Iterator, List, Type
+import dataclasses
+from typing import Dict, Iterator, List, Optional, Tuple, Type, Union
 
 from segfacet.heuristics.finding import Finding
 
-__all__ = ["Rule", "register_rule", "get_rule", "iter_rules"]
+__all__ = [
+    "Rule",
+    "register_rule",
+    "get_rule",
+    "iter_rules",
+    "RuleModeDeclaration",
+    "declaration_for",
+    "iter_rule_declarations",
+]
 
 # Module-level registry: rule_id → Rule instance.
 # Deliberately exposed (not name-mangled) so tests can snapshot/restore it.
 _RULES: Dict[str, "Rule"] = {}
+
+
+@dataclasses.dataclass(frozen=True)
+class RuleModeDeclaration:
+    """A rule's own statement of the §6 failure mode(s) it targets (item 136).
+
+    Exactly one of three states must be realised:
+
+    - **Targeted**: ``modes`` is a non-empty, strictly ascending tuple of
+      ``int`` mode numbers (``>= 1``, no duplicates), with non-empty
+      ``evidence`` (a tuple of non-empty strings; the reserved tag
+      ``"corpus"`` means "at least one committed synthetic corpus case
+      designates this rule for these modes" — see
+      ``segfacet.catalogue.rule_declaration_conflicts``)::
+
+          RuleModeDeclaration(modes=(6,), evidence=("corpus",))
+
+    - **Mode-less**: the rule deliberately targets no §6 mode, with the
+      reason recorded in ``mode_less_reason``::
+
+          RuleModeDeclaration(mode_less_reason="structural sanity check, not a failure-mode detector")
+
+    - **Pending**: the disposition is deferred to a named downstream item, in
+      ``pending_reason``::
+
+          RuleModeDeclaration(pending_reason="disposition deferred to item 137: ...")
+
+    All four fields default to empty; constructing a declaration that
+    realises none of the three states (or more than one at once) raises
+    ``ValueError``. Frozen: an existing instance cannot be mutated in place.
+    """
+
+    modes: Tuple[int, ...] = ()
+    evidence: Tuple[str, ...] = ()
+    mode_less_reason: str = ""
+    pending_reason: str = ""
+
+    def __post_init__(self) -> None:
+        states_realised = sum(
+            1
+            for realised in (bool(self.modes), bool(self.mode_less_reason), bool(self.pending_reason))
+            if realised
+        )
+        if states_realised == 0:
+            raise ValueError(
+                "RuleModeDeclaration: exactly one of 'modes', 'mode_less_reason' or "
+                "'pending_reason' must be non-empty; all three are empty."
+            )
+        if states_realised > 1:
+            raise ValueError(
+                "RuleModeDeclaration: at most one of 'modes', 'mode_less_reason' and "
+                "'pending_reason' may be non-empty at once; more than one is set."
+            )
+
+        if self.modes:
+            if not self.evidence:
+                raise ValueError(
+                    "RuleModeDeclaration: 'evidence' must be non-empty when 'modes' is set."
+                )
+            for mode in self.modes:
+                if isinstance(mode, bool) or not isinstance(mode, int):
+                    raise ValueError(
+                        f"RuleModeDeclaration: 'modes' elements must be int, got {mode!r}."
+                    )
+                if mode < 1:
+                    raise ValueError(
+                        f"RuleModeDeclaration: 'modes' elements must be >= 1, got {mode!r}."
+                    )
+            if len(set(self.modes)) != len(self.modes):
+                raise ValueError(
+                    f"RuleModeDeclaration: 'modes' must not contain duplicates, got {self.modes!r}."
+                )
+            if list(self.modes) != sorted(self.modes):
+                raise ValueError(
+                    f"RuleModeDeclaration: 'modes' must be strictly ascending, got {self.modes!r}."
+                )
+
+        for element in self.evidence:
+            if not isinstance(element, str) or not element:
+                raise ValueError(
+                    f"RuleModeDeclaration: 'evidence' elements must be non-empty str, got {element!r}."
+                )
 
 
 class Rule(abc.ABC):
@@ -64,6 +155,15 @@ class Rule(abc.ABC):
     """
 
     rule_id: str  # class attribute — must be set by every concrete subclass
+
+    mode_declaration: Optional["RuleModeDeclaration"] = None
+    """Every concrete rule must set this (item 136): a class-attribute
+    ``RuleModeDeclaration`` stating the §6 failure mode(s) this rule targets,
+    that it targets none (with a reason), or that its disposition is
+    pending (naming the carrier item). Registration does **not** enforce
+    this (A3) — ``segfacet.catalogue.rule_declaration_conflicts()`` and the
+    test suite over the shipped registry do. Read-only metadata: no rule may
+    read its own ``mode_declaration`` inside ``evaluate``."""
 
     @abc.abstractmethod
     def evaluate(self, record, config) -> List[Finding]:
@@ -174,3 +274,27 @@ def iter_rules() -> Iterator[Rule]:
     """
     for rule_id in sorted(_RULES.keys()):
         yield _RULES[rule_id]
+
+
+def declaration_for(rule_or_id: Union[str, Rule]) -> Optional[RuleModeDeclaration]:
+    """Return the ``RuleModeDeclaration`` for a registered rule, or ``None``.
+
+    Accepts either a ``rule_id`` string or a ``Rule`` instance. Returns
+    ``None`` when the id is unknown, or when the rule is registered but
+    carries no declaration (A3).
+    """
+    if isinstance(rule_or_id, Rule):
+        return rule_or_id.mode_declaration
+    rule = _RULES.get(rule_or_id)
+    if rule is None:
+        return None
+    return rule.mode_declaration
+
+
+def iter_rule_declarations() -> Iterator[Tuple[str, Optional[RuleModeDeclaration]]]:
+    """Iterate ``(rule_id, declaration)`` pairs in ascending ``rule_id`` order.
+
+    ``declaration`` is ``None`` for a registered rule that sets none (A3).
+    """
+    for rule_id in sorted(_RULES.keys()):
+        yield rule_id, _RULES[rule_id].mode_declaration
