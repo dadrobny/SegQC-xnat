@@ -1495,7 +1495,7 @@ sources onto it, and closes with a maintainer sign-off that gates the remainder 
 
 **Deliverables.**
 
-- 🔍 **D0** Synthetic corpus S-axis stacking corrected before anything is measured
+- ✅ **D0** Synthetic corpus S-axis stacking corrected before anything is measured
   (`build_clean_spine` advances caudally like real VerSe input), every committed corpus
   value and both reference artifacts regenerated, expected firing sets recorded only
   after it. Carried defect recorded 2026-08-31 (spec 131). *(Item 143)*
