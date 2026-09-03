@@ -45,7 +45,7 @@
 | 17    | Foreign-Convention Interop & Orientation-Safe Image Layer               | G2, G6          | ✅     |
 | 18    | Failure-Mode-Specific Metric Surface                                    | G2, G7          | ✅     |
 | 19    | Generated Feature & Rule Catalogue + Steering Review                    | G7, G8          | ✅     |
-| 20    | Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness      | G2, G7          | 🚧     |
+| 20    | Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness      | G2, G7          | ✅     |
 | 21    | Real-GT Perturbation Corpus                                             | G3, G7          | 📋     |
 | 22    | *(placeholder)* Unified `(scan, seg)` Extraction                    | —              | 📋     |
 | 23    | *(placeholder)* Multivariate Normative Model                          | G3              | 📋     |
@@ -55,7 +55,7 @@
 | 27    | Feature Schema Taxonomy & Coordinate System                             | G8              | 📋     |
 | 28    | Spinal Curve Model: Formulation, Offset & Orientation                   | G2, G7          | ✅     |
 | 29    | Golden Retirement & Test-Artifact Hygiene                               | G2, G7          | ✅     |
-| 30    | Failure-Mode Specification: the §6 catalogue as an authored source *(runs next)* | G2, G7, G8 | 📋     |
+| 30    | Failure-Mode Specification: the §6 catalogue as an authored source *(runs next)* | G2, G7, G8 | 🚧     |
 
 > **Supersession 2026-07-25.** Stages 0–14 are history and are not reopened. Stage 15 is
 > `❌ Excluded` (deployment left scope — see [`vision.md`](vision.md) §0). Stages 17–21
@@ -931,7 +931,7 @@ verifies they agree, and no document records which failure mode each feature ser
 
 ---
 
-## Stage 20 — Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness (G2, G7) — 🚧
+## Stage 20 — Failure-Mode ↔ Feature ↔ Rule Traceability & Specificity Harness (G2, G7) — ✅
 
 **Goal.** Close the gap between "the suite is green" and "the rules are specific".
 Measured 2026-07-25 on the committed corpus: **10 rules registered and enabled, 4 ever
@@ -1480,7 +1480,7 @@ per-deliverable provenance.
 
 ---
 
-## Stage 30 — Failure-Mode Specification: the §6 catalogue as an authored source (G2, G7, G8) — 📋
+## Stage 30 — Failure-Mode Specification: the §6 catalogue as an authored source (G2, G7, G8) — 🚧
 
 **Goal.** Queue-019 produced three defects of one class in four items — a factual claim
 about the failure modes authored as prose, shipped into a committed artifact, and accepted
@@ -1495,7 +1495,7 @@ sources onto it, and closes with a maintainer sign-off that gates the remainder 
 
 **Deliverables.**
 
-- 📋 **D0** Synthetic corpus S-axis stacking corrected before anything is measured
+- 🚧 **D0** Synthetic corpus S-axis stacking corrected before anything is measured
   (`build_clean_spine` advances caudally like real VerSe input), every committed corpus
   value and both reference artifacts regenerated, expected firing sets recorded only
   after it. Carried defect recorded 2026-08-31 (spec 131). *(Item 143)*
