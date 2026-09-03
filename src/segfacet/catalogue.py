@@ -1054,8 +1054,14 @@ def rule_declaration_conflicts() -> Tuple[str, ...]:
       not carry in ``modes`` (naming both);
     - a ``"corpus"``-tagged declaration carrying a mode no committed corpus
       case designates for that rule (naming both);
-    - a declared mode outside :data:`segfacet.feature_docs.MODE_ANCHOR_PATHS`'s
-      key set -- the in-code §6 mode catalogue (A5) -- (naming both).
+    - a declared mode outside :data:`segfacet.failure_modes.SPECIFICATION`'s
+      key set -- the authored failure-mode specification (item 144), which
+      since item 146 is the in-code §6 mode catalogue -- (naming both).
+      Before item 146 this check sourced its known-mode set from
+      :data:`segfacet.feature_docs.MODE_ANCHOR_PATHS`'s keys instead; the two
+      agreed exactly while both were 1-8, and the specification is the one
+      that grows when a mode enters through the lifecycle (item 147 completes
+      the collapse of the remaining partial sources onto it).
 
     The ``"corpus"`` tag in a declaration's ``evidence`` is a reserved
     convention, not a validated field (item 136): it asserts "at least one
@@ -1073,10 +1079,10 @@ def rule_declaration_conflicts() -> Tuple[str, ...]:
     Pure: never mutates the registry, never raises for a missing declaration
     (A3 -- absence is reported, not rejected).
     """
-    from segfacet import feature_docs as _feature_docs_module
+    from segfacet import failure_modes as _failure_modes_module
     from segfacet.heuristics.rule import iter_rule_declarations
 
-    known_modes = set(_feature_docs_module.MODE_ANCHOR_PATHS.keys())
+    known_modes = set(_failure_modes_module.SPECIFICATION.keys())
     corpus_map = _scan_synth_rule_mode_map()
 
     messages: List[str] = []
@@ -1107,7 +1113,8 @@ def rule_declaration_conflicts() -> Tuple[str, ...]:
         for mode in sorted(declared_modes - known_modes):
             messages.append(
                 f"rule {rule_id!r}: declared §6 mode {mode} is outside "
-                f"MODE_ANCHOR_PATHS's key set {sorted(known_modes)!r}."
+                f"segfacet.failure_modes.SPECIFICATION's key set "
+                f"{sorted(known_modes)!r}."
             )
 
     return tuple(sorted(messages))

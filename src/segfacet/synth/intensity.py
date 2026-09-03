@@ -37,7 +37,7 @@ import argparse
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import nibabel as nib
 import numpy as np
@@ -58,6 +58,7 @@ __all__ = [
     "INTENSITY_MANIFEST_PATH",
     "INTENSITY_FIXTURES_DIRNAME",
     "INTENSITY_MANIFEST_VERSION",
+    "INTENSITY_DETECTION",
     "IntensityCase",
     "CASE_RECIPE",
     "build_intensity_corpus",
@@ -279,6 +280,27 @@ _TARGET_LABEL: int = 22
 # --------------------------------------------------------------------------- #
 
 
+#: The one legal value of an intensity manifest case's ``detection`` field
+#: (item 146): the intensity corpus is driven end-to-end through
+#: ``segfacet.synth.regression.intensity_pipeline_findings``. It mirrors the
+#: geometric manifest's ``detection`` discriminator, and an unrecognised value
+#: must raise rather than be silently skipped.
+INTENSITY_DETECTION: str = "intensity_pipeline"
+
+#: The clean control's failure-mode number, matching the geometric manifest's
+#: ``clean_control`` convention (``segfacet.synth.perturbation.CLEAN_CONTROL_MODE``).
+_CLEAN_MODE_ID: int = 0
+_CLEAN_MODE_NAME: str = "clean control (no failure)"
+
+#: The ninth failure mode (item 146), authored in
+#: ``segfacet.failure_modes.SPECIFICATION[9]``. Written here as a literal, not
+#: imported: this generator is the corpus's declared ground truth and must not
+#: acquire a dependency on the specification module it feeds. AC23 pins the two
+#: against each other.
+_IMPLAUSIBLE_TISSUE_MODE_ID: int = 9
+_IMPLAUSIBLE_TISSUE_MODE_NAME: str = "Implausible tissue under a label"
+
+
 @dataclass(frozen=True)
 class _RecipeEntry:
     case_id: str
@@ -286,6 +308,14 @@ class _RecipeEntry:
     plausible: bool
     target_label: Optional[int]
     fill_name: Optional[str]
+    #: Declared ground truth, exactly as ``expected_label_hu_bands`` is: which
+    #: catalogued failure mode this case exhibits, its name, and the full set
+    #: of ``rule_id``s the intensity pipeline raises on it -- measured through
+    #: ``segfacet.synth.regression.intensity_pipeline_findings`` and recorded
+    #: literally (item 146's Decisions log carries the measurement transcript).
+    failure_mode: int
+    failure_mode_name: str
+    expected_firing: Tuple[str, ...]
     seed: int = 0
     base: Dict[str, Any] = field(default_factory=lambda: dict(_DEFAULT_BASE_PARAMS))
 
@@ -299,6 +329,9 @@ CASE_RECIPE: List[_RecipeEntry] = [
         plausible=True,
         target_label=None,
         fill_name=None,
+        failure_mode=_CLEAN_MODE_ID,
+        failure_mode_name=_CLEAN_MODE_NAME,
+        expected_firing=(),
     ),
     _RecipeEntry(
         case_id="implausible_metal",
@@ -306,6 +339,9 @@ CASE_RECIPE: List[_RecipeEntry] = [
         plausible=False,
         target_label=_TARGET_LABEL,
         fill_name="metal",
+        failure_mode=_IMPLAUSIBLE_TISSUE_MODE_ID,
+        failure_mode_name=_IMPLAUSIBLE_TISSUE_MODE_NAME,
+        expected_firing=("intensity",),
     ),
     _RecipeEntry(
         case_id="implausible_soft_tissue",
@@ -313,6 +349,9 @@ CASE_RECIPE: List[_RecipeEntry] = [
         plausible=False,
         target_label=_TARGET_LABEL,
         fill_name="soft_tissue",
+        failure_mode=_IMPLAUSIBLE_TISSUE_MODE_ID,
+        failure_mode_name=_IMPLAUSIBLE_TISSUE_MODE_NAME,
+        expected_firing=("intensity",),
     ),
     _RecipeEntry(
         case_id="degenerate_uniform",
@@ -320,6 +359,9 @@ CASE_RECIPE: List[_RecipeEntry] = [
         plausible=False,
         target_label=_TARGET_LABEL,
         fill_name="degenerate_uniform",
+        failure_mode=_IMPLAUSIBLE_TISSUE_MODE_ID,
+        failure_mode_name=_IMPLAUSIBLE_TISSUE_MODE_NAME,
+        expected_firing=("intensity",),
     ),
 ]
 
@@ -344,6 +386,9 @@ class IntensityCase:
     seg_img: nib.Nifti1Image
     scan_img: nib.Nifti1Image
     expected_label_hu_bands: Dict[str, List[float]]
+    failure_mode: int = _CLEAN_MODE_ID
+    failure_mode_name: str = _CLEAN_MODE_NAME
+    expected_firing: Tuple[str, ...] = ()
 
 
 def _clean_case_bands(seg_data: np.ndarray) -> Dict[str, List[float]]:
@@ -396,6 +441,9 @@ def build_intensity_corpus() -> List[IntensityCase]:
                     seg_img=seg_img,
                     scan_img=clean_scan_img,
                     expected_label_hu_bands=clean_bands,
+                    failure_mode=entry.failure_mode,
+                    failure_mode_name=entry.failure_mode_name,
+                    expected_firing=tuple(entry.expected_firing),
                 )
             )
         else:
@@ -420,6 +468,9 @@ def build_intensity_corpus() -> List[IntensityCase]:
                     seg_img=seg_img,
                     scan_img=variant_img,
                     expected_label_hu_bands={str(entry.target_label): band},
+                    failure_mode=entry.failure_mode,
+                    failure_mode_name=entry.failure_mode_name,
+                    expected_firing=tuple(entry.expected_firing),
                 )
             )
     return cases
@@ -480,6 +531,10 @@ def write_intensity_corpus(dest: Path) -> Path:
             "scan_fixture": f"{INTENSITY_FIXTURES_DIRNAME}/{scan_fixture_name}",
             "seg_fixture": f"{INTENSITY_FIXTURES_DIRNAME}/{_SEG_FIXTURE_NAME}",
             "expected_label_hu_bands": case.expected_label_hu_bands,
+            "failure_mode": case.failure_mode,
+            "failure_mode_name": case.failure_mode_name,
+            "detection": INTENSITY_DETECTION,
+            "expected_firing": sorted(case.expected_firing),
         }
         manifest_cases.append(manifest_case)
 

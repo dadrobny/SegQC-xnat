@@ -27,8 +27,15 @@ Public surface
 ``loaded_seg_image``, ``pipeline_findings``, ``pipeline_verdict_label``,
 ``reconstructed_findings``, ``designated_findings``, ``designated_rule_fired``,
 ``offending_labels_match``, ``pipeline_hides_designated_rule``, ``verify_case``,
-and the ``RECONSTRUCTIONS`` technique registry. Additively re-exported from
-``segfacet.synth``.
+and the ``RECONSTRUCTIONS`` technique registry -- plus, since item 146, the
+**intensity** sibling pair ``loaded_intensity_case`` /
+``intensity_pipeline_findings``, which drives a case from the second committed
+corpus (``tests/corpus/intensity/``) through
+:func:`segfacet.pipeline.run_qc_with_intensity`. The second corpus had no
+public harness at all until item 146; every consumer that needs one (today
+``segfacet.failure_modes.measured_firing``) composes it here rather than
+privately, so there is exactly one intensity composition in production.
+Additively re-exported from ``segfacet.synth``.
 """
 
 from __future__ import annotations
@@ -48,10 +55,11 @@ from segfacet.feature_report import overlap_to_dict
 from segfacet.heuristics.mislabel import MislabelRule
 from segfacet.heuristics.overlap import OverlapRule
 from segfacet.io import load_case
-from segfacet.pipeline import extract_feature_record, run_qc
+from segfacet.pipeline import extract_feature_record, run_qc, run_qc_with_intensity
 from segfacet.synth.axes import si_axis
 from segfacet.synth.clean_gt import build_clean_spine
 from segfacet.synth.corpus import CORPUS_DIR
+from segfacet.synth.intensity import INTENSITY_CORPUS_DIR
 
 __all__ = [
     "RECONSTRUCTIONS",
@@ -64,6 +72,8 @@ __all__ = [
     "offending_labels_match",
     "pipeline_hides_designated_rule",
     "verify_case",
+    "loaded_intensity_case",
+    "intensity_pipeline_findings",
 ]
 
 
@@ -107,6 +117,75 @@ def pipeline_verdict_label(case: dict, config=None) -> str:
     config = config or bundled_default_config()
     case_result, _block = run_qc(loaded_seg_image(case), config)
     return case_result.verdict.overall.label
+
+
+# --------------------------------------------------------------------------- #
+# Intensity path -- the second committed corpus (item 146)
+# --------------------------------------------------------------------------- #
+
+
+def loaded_intensity_case(
+    case: dict, corpus_dir: Path = INTENSITY_CORPUS_DIR
+) -> Tuple["nib.Nifti1Image", "nib.Nifti1Image"]:
+    """Load one intensity-corpus manifest case's committed seg **and** scan
+    fixtures via :func:`segfacet.io.load_case`, returning
+    ``(seg_img, scan_img)`` rebuilt as fresh ``Nifti1Image`` objects.
+
+    The intensity sibling of :func:`loaded_seg_image`, and the same
+    contract: the explicit ``dtype=`` is mandatory, because ``load_case``
+    returns an ``int64`` label array and nibabel 5.3.3 hard-errors on
+    ``Nifti1Image(int64_array, affine)`` without it (item 040's Decisions
+    log).
+    """
+    corpus_dir = Path(corpus_dir)
+    scan_path = corpus_dir / case["scan_fixture"]
+    seg_path = corpus_dir / case["seg_fixture"]
+    loaded = load_case(scan_path, seg_path)
+    seg = loaded.seg
+    scan = loaded.scan
+    seg_img = nib.Nifti1Image(seg.data, seg.affine, dtype=seg.data.dtype)
+    scan_img = nib.Nifti1Image(scan.data, scan.affine, dtype=scan.data.dtype)
+    return seg_img, scan_img
+
+
+def intensity_pipeline_findings(
+    case: dict,
+    config=None,
+    *,
+    reference=None,
+    enable_pyradiomics: bool = False,
+    corpus_dir: Path = INTENSITY_CORPUS_DIR,
+) -> Tuple:
+    """``run_qc_with_intensity(*loaded_intensity_case(case), config,
+    reference=..., enable_pyradiomics=...).findings`` for one intensity-corpus
+    manifest case.
+
+    ``enable_pyradiomics`` defaults to ``False``, **not** to
+    :func:`segfacet.pipeline.run_qc_with_intensity`'s own ``True`` (item 146
+    A2): a firing set measured here is committed into
+    ``tests/corpus/intensity/manifest.json`` and into the failure-mode
+    specification, and must not depend on whether the optional PyRadiomics
+    backend happens to be installed. It stays a keyword so a caller can opt
+    in deliberately.
+
+    ``reference`` defaults to ``None`` (A3): the synthetic intensity corpus
+    is not built against any reference distribution.
+
+    Neither *case* nor any file on disk is mutated; two calls with the same
+    case return equal findings in the same order.
+    """
+    config = config or bundled_default_config()
+    seg_img, scan_img = loaded_intensity_case(case, corpus_dir)
+    case_result, _block, _image_features, _delta, _intensity_delta = (
+        run_qc_with_intensity(
+            seg_img,
+            scan_img,
+            config,
+            reference=reference,
+            enable_pyradiomics=enable_pyradiomics,
+        )
+    )
+    return case_result.findings
 
 
 # --------------------------------------------------------------------------- #

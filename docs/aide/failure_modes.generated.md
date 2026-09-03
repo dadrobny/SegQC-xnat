@@ -190,3 +190,54 @@ Intended rules:
 Corpus cases:
 
 - `mode8_force_overlap` (geometric): expected firing = [overlap]; agrees with live measurement: True. reconstructed-record-detected; overlap is the sole rule that fires on this corpus case, measured live via segfacet.synth.regression.reconstructed_findings on the item-143-corrected corpus (2026-09-03). A voxel in a single-channel integer label map holds exactly one label, so overlaps[] can only populate when the record is deliberately corrupted to violate that invariant -- which this case's reconstruction does.
+
+## Mode 9: Implausible tissue under a label
+
+- Definition: On CT, the voxels a vertebra label claims do not carry bone-plausible Hounsfield-unit statistics: the label's median HU is implausibly low (soft tissue or air), implausibly high (metal or an implant), or its intensity spread is degenerate -- a near-zero standard deviation over a uniform region, which no real trabecular/cortical bone produces. The label map's geometry may be entirely well-formed; the failure is that the tissue underneath it is not the tissue the label names.
+- Discriminator: Distinguishes from modes 1-8 by requiring the paired intensity scan: every one of those eight is decidable from the label map alone, whereas mode 9 is invisible without the scan (observability = needs-paired-scan). Distinguishes from mode 1 in particular by what is wrong with an otherwise correctly-shaped, correctly-placed label -- mode 1's centroid is displaced from the fitted curve, while mode 9's label may sit exactly where it belongs and still cover the wrong tissue.
+- Observability: needs-paired-scan
+- Severity: flagged-for-review
+- Provenance: hypothesised
+- Status, authored: specified
+- Status, derived (live): validated
+- Derived rung (strongest edge, live): synthetic-demonstrable
+
+Candidate features:
+
+- `hypothesised` candidate path: `image_features.per_label[].median_hu`
+- `hypothesised` candidate path: `image_features.per_label[].std_hu`
+- `hypothesised` candidate path: `intensity_reference_delta.per_label[].robust_z`
+
+Intended rules:
+
+- `intensity` (detector: Implausible intensity (too low): / (too high): / (degenerate/uniform):) -- evidence rung: synthetic-demonstrable
+- `intensity_reference_delta` (detector: (none)) -- evidence rung: needs-real-data
+
+Corpus cases:
+
+- `implausible_metal` (intensity): expected firing = [intensity]; agrees with live measurement: True. intensity-pipeline-detected; intensity is the sole rule that fires on this case, measured live via segfacet.synth.regression.intensity_pipeline_findings over tests/corpus/intensity/manifest.json (2026-09-04): label 22 (L3)'s median reads 2999 HU, above the plausible bone band's 2000 HU ceiling. intensity_reference_delta cannot fire here because the synthetic intensity corpus is built against no reference distribution and the harness attaches none (item 146 A3), which is why its mode-9 edge stays at needs-real-data.
+- `implausible_soft_tissue` (intensity): expected firing = [intensity]; agrees with live measurement: True. intensity-pipeline-detected; intensity is the sole rule that fires on this case, measured live via segfacet.synth.regression.intensity_pipeline_findings over tests/corpus/intensity/manifest.json (2026-09-04): label 22 (L3)'s median reads 40 HU, below the plausible bone band's 100 HU floor -- soft tissue under a vertebra label. intensity_reference_delta attaches no reference here (item 146 A3), so it stays needs-real-data.
+- `degenerate_uniform` (intensity): expected firing = [intensity]; agrees with live measurement: True. intensity-pipeline-detected; intensity is the sole rule that fires on this case, measured live via segfacet.synth.regression.intensity_pipeline_findings over tests/corpus/intensity/manifest.json (2026-09-04). It raises two findings, both from the same rule: the degenerate/uniform detector (std 0.00 HU, at or below the 1.00 HU threshold) and, because the constant fill is 0 HU, the too-low detector as well -- so the firing SET is still {intensity}. intensity_reference_delta attaches no reference here (item 146 A3), so it stays needs-real-data.
+
+## Mode 10: Collapsed or duplicated label set
+
+- Definition: Two or more labels share an exact centroid -- the degenerate case a collapsed or duplicated label set produces. The Stage 3 spline fit cannot be computed over coincident centroids, so the record carries a stage3_unavailable reason instead of a stage3 block, every stage3-reading rule short-circuits on the missing block, and no finding of any kind is raised: the case passes silently (carried defect, item 129, 2026-08-31). The failure is the silence, not any single rule's verdict.
+- Discriminator: Distinguishes from mode 2 (fused or fragmented segments) by what the labels do rather than what the components do: mode 2's labels keep distinct centroids and its detectors fire, whereas mode 10's labels collapse onto one point and every stage3 detector goes quiet. Distinguishes from mode 8 (overlapping segments) by not requiring any shared voxel -- two disjoint labels can still share a centroid.
+- Observability: single-channel-observable
+- Severity: flagged-for-review
+- Provenance: hypothesised
+- Status, authored: proposed
+- Status, derived (live): proposed
+- Derived rung (strongest edge, live): none
+
+Candidate features:
+
+- `hypothesised` candidate path: `stage3_unavailable.reason`
+
+Intended rules:
+
+- (none)
+
+Corpus cases:
+
+- (none)

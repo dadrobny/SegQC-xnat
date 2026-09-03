@@ -17,6 +17,8 @@
         ]
       },
       "case_id": "clean_hu",
+      "detection": "intensity_pipeline",
+      "expected_firing": [],
       "expected_label_hu_bands": {
         "20": [
           100,
@@ -39,6 +41,8 @@
           1500
         ]
       },
+      "failure_mode": 0,
+      "failure_mode_name": "clean control (no failure)",
       "fill": null,
       "plausible": true,
       "scan_fixture": "fixtures/clean_hu_scan.nii.gz",
@@ -64,12 +68,18 @@
         ]
       },
       "case_id": "implausible_metal",
+      "detection": "intensity_pipeline",
+      "expected_firing": [
+        "intensity"
+      ],
       "expected_label_hu_bands": {
         "22": [
           2500,
           32767
         ]
       },
+      "failure_mode": 9,
+      "failure_mode_name": "Implausible tissue under a label",
       "fill": {
         "mean": 3000,
         "name": "metal",
@@ -99,12 +109,18 @@
         ]
       },
       "case_id": "implausible_soft_tissue",
+      "detection": "intensity_pipeline",
+      "expected_firing": [
+        "intensity"
+      ],
       "expected_label_hu_bands": {
         "22": [
           -200,
           100
         ]
       },
+      "failure_mode": 9,
+      "failure_mode_name": "Implausible tissue under a label",
       "fill": {
         "mean": 40,
         "name": "soft_tissue",
@@ -134,12 +150,18 @@
         ]
       },
       "case_id": "degenerate_uniform",
+      "detection": "intensity_pipeline",
+      "expected_firing": [
+        "intensity"
+      ],
       "expected_label_hu_bands": {
         "22": [
           0,
           0
         ]
       },
+      "failure_mode": 9,
+      "failure_mode_name": "Implausible tissue under a label",
       "fill": {
         "mean": 0,
         "name": "degenerate_uniform",

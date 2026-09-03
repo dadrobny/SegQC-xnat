@@ -18,8 +18,58 @@ entered the remaining six and re-authored those two, so :data:`SPECIFICATION`
 now carries all **eight** of vision.md §6's hypothesised modes, every schema
 field populated, each with the live-registry-declared edges, the
 per-corpus-case measured firing set, and (mode 6) a freshly measured
-centroid-displacement value. The ninth mode and the first ``proposed`` entry
-are item 146's.
+centroid-displacement value. Item 146 then added the **ninth** mode and the
+first ``proposed`` entry, so :data:`SPECIFICATION` now carries ten.
+
+Adding the ninth mode (item 146, 2026-09-04)
+--------------------------------------------
+Mode 9 ("Implausible tissue under a label") is deliberately **not** one of
+vision.md §6's numbered eight. It entered through this module's schema,
+acquired its rules by their declarations moving from mode-less to
+``modes=(9,)``, and derives ``"validated"`` from live state -- evidence for
+§6's own claim that a mode can be added **without everything being rebuilt**:
+neither the eight seed entries, the ``ModeSpec`` schema, the rule engine, nor
+any rule's ``evaluate`` body was touched. What had to change, and only this:
+
+* ``src/segfacet/failure_modes.py`` -- ``_MODE_9`` and ``_MODE_10`` authored
+  and appended to the ``_build_specification`` tuple; :func:`measured_firing`
+  gained a first-level dispatch on ``CorpusCaseExpectation.corpus``;
+  :func:`specification_conflicts` gained the ``proposed``-drift check;
+  :func:`render_markdown` gained ``- (none)`` for an empty section; and
+  :func:`derive_status` gained a declaring-rule precondition on
+  ``"validated"`` (the item-145 review finding, ``docs/aide/insights.md``,
+  2026-09-03).
+* ``src/segfacet/heuristics/intensity.py`` and
+  ``src/segfacet/heuristics/intensity_reference_delta.py`` -- the
+  ``mode_declaration`` **literal** only, from ``mode_less_reason=...`` to
+  ``modes=(9,)`` with an ``evidence`` tuple naming
+  ``tests/corpus/intensity/manifest.json``. No threshold, condition,
+  severity or ``evaluate`` line changed; ``run_rules``' output on a fixed
+  record is unchanged, because the declaration is metadata the engine never
+  reads.
+* ``src/segfacet/synth/regression.py`` -- ``loaded_intensity_case`` and
+  ``intensity_pipeline_findings``, the intensity sibling of
+  ``loaded_seg_image`` / ``pipeline_findings``. The second committed corpus
+  had no public harness at all until this item.
+* ``src/segfacet/synth/__init__.py`` -- both names re-exported, additively.
+* ``src/segfacet/synth/intensity.py`` -- the manifest's per-case
+  ``failure_mode`` / ``failure_mode_name`` / ``detection`` /
+  ``expected_firing`` fields, written by the generator (never hand-edited)
+  at an unchanged ``INTENSITY_MANIFEST_VERSION``, since the change is purely
+  additive.
+* ``src/segfacet/catalogue.py`` -- ``rule_declaration_conflicts``' known-mode
+  set now comes from :data:`SPECIFICATION`'s keys rather than
+  ``feature_docs.MODE_ANCHOR_PATHS``' (item 146 A7; item 147 completes the
+  collapse). ``MODE_ANCHOR_PATHS`` itself is untouched and its key set stays
+  exactly 1-8, which is why mode 9's candidate features carry
+  ``role="hypothesised"`` and never ``"stage18-metric-anchor"``.
+
+Mode 10 ("Collapsed or duplicated label set") is the catalogue's first
+``proposed`` entry: no rules, no corpus cases, one hypothesised candidate
+feature, and a status that derives ``"proposed"`` from that emptiness. It
+exists so the conformance report shows a listed, unimplemented mode, and so
+the rendering has to render one legibly. Its detector is explicitly item
+146's non-goal; nothing here fabricates one.
 
 Lifecycle status
 -----------------
@@ -844,6 +894,168 @@ _MODE_8 = ModeSpec(
 )
 
 
+# =========================================================================== #
+# The ninth mode and the first `proposed` entry (item 146).
+#
+# Mode 9 is deliberately NOT one of vision.md section 6's numbered eight: it
+# enters through the schema, acquires its rules by their declarations moving
+# from mode-less to modes=(9,), and derives its status from live state --
+# the exercise of section 6's own claim that a mode can be added without
+# everything being rebuilt. Mode 10 is the catalogue's first `proposed`
+# entry: listed, defined, and deliberately unimplemented.
+#
+# Mode 9's firing sets are measured through the item-146 harness
+# segfacet.synth.regression.intensity_pipeline_findings over the committed
+# intensity corpus (2026-09-04); see the item's Decisions log for the
+# transcript.
+# =========================================================================== #
+
+_MODE_9 = ModeSpec(
+    id=9,
+    name="Implausible tissue under a label",
+    definition=(
+        "On CT, the voxels a vertebra label claims do not carry "
+        "bone-plausible Hounsfield-unit statistics: the label's median HU "
+        "is implausibly low (soft tissue or air), implausibly high (metal "
+        "or an implant), or its intensity spread is degenerate -- a "
+        "near-zero standard deviation over a uniform region, which no real "
+        "trabecular/cortical bone produces. The label map's geometry may be "
+        "entirely well-formed; the failure is that the tissue underneath it "
+        "is not the tissue the label names."
+    ),
+    discriminator=(
+        "Distinguishes from modes 1-8 by requiring the paired intensity "
+        "scan: every one of those eight is decidable from the label map "
+        "alone, whereas mode 9 is invisible without the scan "
+        "(observability = needs-paired-scan). Distinguishes from mode 1 in "
+        "particular by what is wrong with an otherwise correctly-shaped, "
+        "correctly-placed label -- mode 1's centroid is displaced from the "
+        "fitted curve, while mode 9's label may sit exactly where it "
+        "belongs and still cover the wrong tissue."
+    ),
+    observability="needs-paired-scan",
+    candidate_features=(
+        CandidateFeature(
+            path="image_features.per_label[].median_hu",
+            role="hypothesised",
+        ),
+        CandidateFeature(
+            path="image_features.per_label[].std_hu",
+            role="hypothesised",
+        ),
+        CandidateFeature(
+            path="intensity_reference_delta.per_label[].robust_z",
+            role="hypothesised",
+        ),
+    ),
+    intended_rules=(
+        IntendedRule(
+            rule_id="intensity",
+            detector=(
+                "Implausible intensity (too low): / (too high): / "
+                "(degenerate/uniform):"
+            ),
+            evidence_rung="synthetic-demonstrable",
+        ),
+        IntendedRule(
+            rule_id="intensity_reference_delta",
+            detector="",
+            evidence_rung="needs-real-data",
+        ),
+    ),
+    corpus_cases=(
+        CorpusCaseExpectation(
+            case_id="implausible_metal",
+            corpus="intensity",
+            expected_firing=("intensity",),
+            reason=(
+                "intensity-pipeline-detected; intensity is the sole rule "
+                "that fires on this case, measured live via "
+                "segfacet.synth.regression.intensity_pipeline_findings over "
+                "tests/corpus/intensity/manifest.json (2026-09-04): label "
+                "22 (L3)'s median reads 2999 HU, above the plausible bone "
+                "band's 2000 HU ceiling. intensity_reference_delta cannot "
+                "fire here because the synthetic intensity corpus is built "
+                "against no reference distribution and the harness attaches "
+                "none (item 146 A3), which is why its mode-9 edge stays at "
+                "needs-real-data."
+            ),
+        ),
+        CorpusCaseExpectation(
+            case_id="implausible_soft_tissue",
+            corpus="intensity",
+            expected_firing=("intensity",),
+            reason=(
+                "intensity-pipeline-detected; intensity is the sole rule "
+                "that fires on this case, measured live via "
+                "segfacet.synth.regression.intensity_pipeline_findings over "
+                "tests/corpus/intensity/manifest.json (2026-09-04): label "
+                "22 (L3)'s median reads 40 HU, below the plausible bone "
+                "band's 100 HU floor -- soft tissue under a vertebra label. "
+                "intensity_reference_delta attaches no reference here "
+                "(item 146 A3), so it stays needs-real-data."
+            ),
+        ),
+        CorpusCaseExpectation(
+            case_id="degenerate_uniform",
+            corpus="intensity",
+            expected_firing=("intensity",),
+            reason=(
+                "intensity-pipeline-detected; intensity is the sole rule "
+                "that fires on this case, measured live via "
+                "segfacet.synth.regression.intensity_pipeline_findings over "
+                "tests/corpus/intensity/manifest.json (2026-09-04). It "
+                "raises two findings, both from the same rule: the "
+                "degenerate/uniform detector (std 0.00 HU, at or below the "
+                "1.00 HU threshold) and, because the constant fill is 0 HU, "
+                "the too-low detector as well -- so the firing SET is still "
+                "{intensity}. intensity_reference_delta attaches no "
+                "reference here (item 146 A3), so it stays needs-real-data."
+            ),
+        ),
+    ),
+    severity="flagged-for-review",
+    status="specified",
+    provenance="hypothesised",
+)
+
+_MODE_10 = ModeSpec(
+    id=10,
+    name="Collapsed or duplicated label set",
+    definition=(
+        "Two or more labels share an exact centroid -- the degenerate case "
+        "a collapsed or duplicated label set produces. The Stage 3 spline "
+        "fit cannot be computed over coincident centroids, so the record "
+        "carries a stage3_unavailable reason instead of a stage3 block, "
+        "every stage3-reading rule short-circuits on the missing block, and "
+        "no finding of any kind is raised: the case passes silently "
+        "(carried defect, item 129, 2026-08-31). The failure is the "
+        "silence, not any single rule's verdict."
+    ),
+    discriminator=(
+        "Distinguishes from mode 2 (fused or fragmented segments) by what "
+        "the labels do rather than what the components do: mode 2's labels "
+        "keep distinct centroids and its detectors fire, whereas mode 10's "
+        "labels collapse onto one point and every stage3 detector goes "
+        "quiet. Distinguishes from mode 8 (overlapping segments) by not "
+        "requiring any shared voxel -- two disjoint labels can still share "
+        "a centroid."
+    ),
+    observability="single-channel-observable",
+    candidate_features=(
+        CandidateFeature(
+            path="stage3_unavailable.reason",
+            role="hypothesised",
+        ),
+    ),
+    intended_rules=(),
+    corpus_cases=(),
+    severity="flagged-for-review",
+    status="proposed",
+    provenance="hypothesised",
+)
+
+
 def _build_specification(modes: Iterable[ModeSpec]) -> Mapping[int, ModeSpec]:
     """Index *modes* by ``id`` into an immutable, ascending mapping,
     rejecting a duplicate ``id`` rather than letting the later entry
@@ -872,6 +1084,8 @@ SPECIFICATION: Mapping[int, ModeSpec] = _build_specification(
         _MODE_6,
         _MODE_7,
         _MODE_8,
+        _MODE_9,
+        _MODE_10,
     )
 )
 
@@ -891,11 +1105,37 @@ def iter_modes() -> Iterator[ModeSpec]:
 def measured_firing(case: CorpusCaseExpectation) -> Tuple[str, ...]:
     """The full set of ``rule_id``s among the findings *case*'s manifest
     entry's detection path produces, measured live through
-    :mod:`segfacet.synth.regression` (A3) -- ``pipeline_findings`` for
-    ``detection == "pipeline"``, ``reconstructed_findings`` for
-    ``detection == "reconstructed_record"``. Only the geometric corpus is
-    readable this way today (A3); ``corpus`` on *case* is informational, not
-    a dispatch key."""
+    :mod:`segfacet.synth.regression`.
+
+    ``corpus`` is the **first** dispatch key (item 146): it selects which
+    committed manifest the ``case_id`` is resolved against, and the
+    vocabulary is closed and exact -- any value other than ``"geometric"``
+    or ``"intensity"`` raises ``ValueError`` naming both the case and the
+    unrecognised value, never a silent empty set. Within each corpus the
+    manifest case's own ``detection`` field is the second dispatch key:
+
+    * ``"geometric"`` -- ``tests/corpus/manifest.json``;
+      ``pipeline_findings`` for ``detection == "pipeline"``,
+      ``reconstructed_findings`` for ``detection == "reconstructed_record"``.
+    * ``"intensity"`` -- ``tests/corpus/intensity/manifest.json``;
+      ``intensity_pipeline_findings`` for
+      ``detection == "intensity_pipeline"`` (item 146's public harness, the
+      one intensity composition in production).
+    """
+    if case.corpus == "geometric":
+        return _measured_firing_geometric(case)
+    if case.corpus == "intensity":
+        return _measured_firing_intensity(case)
+    raise ValueError(
+        f"measured_firing: unrecognised corpus {case.corpus!r} for case_id="
+        f"{case.case_id!r}; the dispatch vocabulary is exactly "
+        f"('geometric', 'intensity')."
+    )
+
+
+def _measured_firing_geometric(case: CorpusCaseExpectation) -> Tuple[str, ...]:
+    """The ``corpus == "geometric"`` branch of :func:`measured_firing` --
+    today's body verbatim, over ``tests/corpus/manifest.json``."""
     from segfacet.synth.corpus import load_manifest
     from segfacet.synth.regression import pipeline_findings, reconstructed_findings
 
@@ -921,6 +1161,40 @@ def measured_firing(case: CorpusCaseExpectation) -> Tuple[str, ...]:
             f"measured_firing: unrecognised detection {detection!r} for "
             f"case_id={case.case_id!r}."
         )
+    return tuple(sorted({finding.rule_id for finding in findings}))
+
+
+def _measured_firing_intensity(case: CorpusCaseExpectation) -> Tuple[str, ...]:
+    """The ``corpus == "intensity"`` branch of :func:`measured_firing`, over
+    the committed ``tests/corpus/intensity/manifest.json``.
+
+    ``segfacet.synth.intensity.load_intensity_manifest`` is reached through
+    the module object rather than imported by name, so a test can substitute
+    a manifest whose ``detection`` is unrecognised and observe the raise."""
+    from segfacet.synth import intensity as intensity_module
+    from segfacet.synth.regression import intensity_pipeline_findings
+
+    manifest = intensity_module.load_intensity_manifest()
+    manifest_case = None
+    for candidate in manifest.get("cases", []):
+        if candidate.get("case_id") == case.case_id:
+            manifest_case = candidate
+            break
+    if manifest_case is None:
+        raise ValueError(
+            f"measured_firing: case_id {case.case_id!r} not found in the committed "
+            f"intensity corpus manifest tests/corpus/intensity/manifest.json "
+            f"(corpus={case.corpus!r})."
+        )
+
+    detection = manifest_case.get("detection")
+    if detection != "intensity_pipeline":
+        raise ValueError(
+            f"measured_firing: unrecognised detection {detection!r} for "
+            f"case_id={case.case_id!r} in the intensity corpus; the only "
+            f"recognised value is 'intensity_pipeline'."
+        )
+    findings = intensity_pipeline_findings(manifest_case)
     return tuple(sorted({finding.rule_id for finding in findings}))
 
 
@@ -967,16 +1241,32 @@ def _registry_declares(mode_id: int) -> bool:
 def derive_status(mode: ModeSpec) -> str:
     """The live-derived lifecycle status for *mode* (AC9, AC10).
 
-    ``"validated"`` iff *mode* carries >=1 corpus case and every one
-    :func:`case_agrees`; else ``"implemented"`` iff at least one registered
-    rule declares ``mode.id`` (:func:`_registry_declares`); else the
-    authored ``mode.status`` (``"proposed"`` or ``"specified"``) unchanged.
+    ``"validated"`` iff at least one **registered** rule declares
+    ``mode.id`` **and** *mode* carries >=1 corpus case, every one of which
+    :func:`case_agrees`; else ``"implemented"`` iff a registered rule
+    declares ``mode.id`` (:func:`_registry_declares`); else the authored
+    ``mode.status`` (``"proposed"`` or ``"specified"``) unchanged.
     The empty set never satisfies the "every case agrees" quantifier
     vacuously -- an empty ``corpus_cases`` cannot reach ``"validated"``.
+
+    The declaring-rule precondition on ``"validated"`` is item 146's
+    correction of an item-145 review finding (``docs/aide/insights.md``,
+    item 145, 2026-09-03): the layering used to test the corpus-agreement
+    clause first, so a mode with agreeing corpus cases and **no rule
+    declaring it anywhere** derived ``"validated"`` without ever passing
+    through ``"implemented"``. vision.md section 6's ladder is cumulative --
+    validated implies implemented -- so the rung below is now a
+    precondition, not merely the fallback. No shipped mode moves: all ten
+    entries that reach the corpus-agreement clause are declared.
     """
-    if mode.corpus_cases and all(case_agrees(case) for case in mode.corpus_cases):
+    declared = _registry_declares(mode.id)
+    if (
+        declared
+        and mode.corpus_cases
+        and all(case_agrees(case) for case in mode.corpus_cases)
+    ):
         return "validated"
-    if _registry_declares(mode.id):
+    if declared:
         return "implemented"
     return mode.status
 
@@ -1000,7 +1290,21 @@ def specification_conflicts(
     :data:`AUTHORED_STATUSES` (only reachable via ``object.__setattr__``
     forcing a value past ``__post_init__``, since construction itself
     already rejects it). Defaults to the shipped :data:`SPECIFICATION`
-    (via :func:`iter_modes`); returns ``()`` for it."""
+    (via :func:`iter_modes`); returns ``()`` for it.
+
+    Since item 146 it also reports **``proposed`` drift**: a mode authored
+    ``"proposed"`` -- listed, defined, deliberately unimplemented -- whose
+    :func:`derive_status` no longer returns ``"proposed"``, because a rule
+    has acquired it or a corpus case now demonstrates it. That is not an
+    error in the tree; it is the signal that the entry has outgrown its
+    authored status and wants re-authoring as ``"specified"``.
+
+    This check is deliberately **not** generalised to authored-vs-derived
+    equality across the board: ``"specified"`` is precisely the status that
+    is expected to derive further (every one of modes 1-9 is authored
+    ``"specified"`` and derives ``"implemented"`` or ``"validated"``), so a
+    blanket comparison would report the whole specification.
+    """
     if modes is None:
         modes = tuple(iter_modes())
     conflicts = []
@@ -1012,6 +1316,16 @@ def specification_conflicts(
                 f"'implemented'/'validated' must only ever be derived via "
                 f"derive_status(), never hand-set past construction."
             )
+            continue
+        if mode.status == "proposed":
+            derived = derive_status(mode)
+            if derived != "proposed":
+                conflicts.append(
+                    f"mode {mode.id}: authored status 'proposed' but derive_status() "
+                    f"now returns {derived!r} -- a proposed (listed, unimplemented) "
+                    f"entry has acquired a declaring rule or a demonstrating corpus "
+                    f"case, and wants re-authoring as 'specified'."
+                )
     return tuple(conflicts)
 
 
@@ -1077,7 +1391,14 @@ def render_markdown() -> str:
     """A deterministic Markdown rendering of the shipped specification --
     the review surface item 150 signs. Takes no argument. Lifecycle status
     is rendered as its word, never as one of the six AIDE status icons
-    (AC23)."""
+    (AC23).
+
+    An empty ``Candidate features:`` / ``Intended rules:`` / ``Corpus
+    cases:`` section renders one ``- (none)`` bullet rather than nothing at
+    all (item 146): the catalogue's first ``proposed`` entry has two empty
+    sections by design, and a bare heading followed by the next heading
+    reads to a reviewer as a hole in the document rather than as a
+    deliberate absence."""
     payload = specification_to_dict()
     lines = [
         "# Failure-Mode Specification",
@@ -1102,6 +1423,8 @@ def render_markdown() -> str:
         lines.append("")
         lines.append("Candidate features:")
         lines.append("")
+        if not mode["candidate_features"]:
+            lines.append("- (none)")
         for feature in mode["candidate_features"]:
             if feature["role"] == "stage18-metric-anchor":
                 lines.append(
@@ -1113,6 +1436,8 @@ def render_markdown() -> str:
         lines.append("")
         lines.append("Intended rules:")
         lines.append("")
+        if not mode["intended_rules"]:
+            lines.append("- (none)")
         for rule in mode["intended_rules"]:
             detector = rule["detector"] or "(none)"
             lines.append(
@@ -1122,6 +1447,8 @@ def render_markdown() -> str:
         lines.append("")
         lines.append("Corpus cases:")
         lines.append("")
+        if not mode["corpus_cases"]:
+            lines.append("- (none)")
         for case in mode["corpus_cases"]:
             expected = ", ".join(case["expected_firing"]) if case["expected_firing"] else "(none)"
             lines.append(

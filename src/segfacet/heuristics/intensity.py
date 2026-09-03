@@ -53,9 +53,13 @@ and two calls with the same ``(record, config)`` return equal finding lists in
 the same order. Findings are emitted ascending by integer label; within a
 label, in fixed condition order (low -> high -> degenerate).
 
-Mode-less (item 137): this rule judges tissue plausibility, which §6 names no
-mode for -- see ``IntensityRule.mode_declaration`` and the catalogue-gap
-finding captured in ``docs/aide/insights.md``.
+§6 mode 9 (item 146): this rule judges tissue plausibility. It was
+dispositioned mode-less by item 137, because §6's eight numbered modes name
+no tissue-plausibility failure; item 146 entered that mode into
+``segfacet.failure_modes.SPECIFICATION`` as mode 9 and moved this
+declaration onto it -- see ``IntensityRule.mode_declaration``. Nothing about
+this rule's thresholds, conditions, severities or ``evaluate`` body changed
+with it; the declaration is metadata the rule engine never reads.
 """
 
 from __future__ import annotations
@@ -125,27 +129,32 @@ class IntensityRule(Rule):
 
     rule_id = "intensity"
 
-    # §6 disposition (item 137): mode-less. §6's eight modes are
-    # geometric/topological/semantic and none names tissue plausibility, so
-    # this rule targets no §6 mode -- the catalogue is short a mode, not the
-    # rule speculative. The gap is captured in docs/aide/insights.md rather
-    # than fixed here, because §6 is a root document (vision.md) that
-    # changes only through /aide-create-vision and a reviewed PR.
+    # §6 disposition (item 146, superseding item 137's mode-less
+    # disposition): mode 9, "Implausible tissue under a label". The mode is
+    # not one of §6's numbered eight -- it entered through the failure-mode
+    # specification's own schema, which is what vision.md §6 says should
+    # happen when the catalogue is short a mode.
     mode_declaration = RuleModeDeclaration(
-        mode_less_reason=(
+        modes=(9,),
+        evidence=(
+            "intensity-corpus-manifest",
             "This rule judges tissue plausibility -- an implausibly low "
             "median HU reads as soft tissue/air, an implausibly high median "
             "reads as metal/implant, and a near-zero std reads as a "
-            "degenerate/uniform region -- but §6's eight modes are "
-            "geometric/topological/semantic and none of them names tissue "
-            "plausibility as a failure mode. The rule is demonstrably useful "
-            "and demonstrably exercised: tests/corpus/intensity/manifest.json's "
-            "four cases (clean_hu, implausible_metal, implausible_soft_tissue, "
-            "degenerate_uniform) drive it, and that manifest carries no "
-            "failure_mode field at all -- the same gap, expressed in the "
-            "corpus. The catalogue gap is recorded in docs/aide/insights.md "
-            "rather than fixed here, because §6 is a root document."
-        )
+            "degenerate/uniform region -- which is exactly mode 9 "
+            "(implausible tissue under a label), entered into "
+            "segfacet.failure_modes.SPECIFICATION by item 146. Three of "
+            "tests/corpus/intensity/manifest.json's four cases "
+            "(implausible_metal, implausible_soft_tissue, "
+            "degenerate_uniform) drive this rule end-to-end and now carry "
+            "failure_mode 9; clean_hu is the negative control at "
+            "failure_mode 0. The reserved 'corpus' evidence tag is "
+            "deliberately NOT bound: it is an exact-element membership test "
+            "against catalogue._scan_synth_rule_mode_map(), which AST-scans "
+            "the GEOMETRIC corpus's Expectation(...) literals only, so "
+            "tagging it here would report a false conflict (item 146 A6; "
+            "item 147 retires the tag)."
+        ),
     )
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]

@@ -425,8 +425,11 @@
       "rule_id": "fragmentation"
     },
     "intensity": {
-      "declaration_state": "mode_less",
-      "evidence": [],
+      "declaration_state": "declared",
+      "evidence": [
+        "intensity-corpus-manifest",
+        "This rule judges tissue plausibility -- an implausibly low median HU reads as soft tissue/air, an implausibly high median reads as metal/implant, and a near-zero std reads as a degenerate/uniform region -- which is exactly mode 9 (implausible tissue under a label), entered into segfacet.failure_modes.SPECIFICATION by item 146. Three of tests/corpus/intensity/manifest.json's four cases (implausible_metal, implausible_soft_tissue, degenerate_uniform) drive this rule end-to-end and now carry failure_mode 9; clean_hu is the negative control at failure_mode 0. The reserved 'corpus' evidence tag is deliberately NOT bound: it is an exact-element membership test against catalogue._scan_synth_rule_mode_map(), which AST-scans the GEOMETRIC corpus's Expectation(...) literals only, so tagging it here would report a false conflict (item 146 A6; item 147 retires the tag)."
+      ],
       "feature_path_count": 5,
       "feature_paths": [
         "image_features.available",
@@ -435,13 +438,18 @@
         "image_features.per_label.{label}.label",
         "per_label"
       ],
-      "mode_less_reason": "This rule judges tissue plausibility -- an implausibly low median HU reads as soft tissue/air, an implausibly high median reads as metal/implant, and a near-zero std reads as a degenerate/uniform region -- but §6's eight modes are geometric/topological/semantic and none of them names tissue plausibility as a failure mode. The rule is demonstrably useful and demonstrably exercised: tests/corpus/intensity/manifest.json's four cases (clean_hu, implausible_metal, implausible_soft_tissue, degenerate_uniform) drive it, and that manifest carries no failure_mode field at all -- the same gap, expressed in the corpus. The catalogue gap is recorded in docs/aide/insights.md rather than fixed here, because §6 is a root document.",
-      "modes": [],
+      "mode_less_reason": "",
+      "modes": [
+        9
+      ],
       "rule_id": "intensity"
     },
     "intensity_reference_delta": {
-      "declaration_state": "mode_less",
-      "evidence": [],
+      "declaration_state": "declared",
+      "evidence": [
+        "intensity-corpus-manifest",
+        "This rule is the reference-relative form of the intensity rule's tissue-plausibility judgement: it thresholds how far a labelled region's intensity statistics deviate from a level-aware VerSe-derived reference distribution, which is the same claim mode 9 (implausible tissue under a label) names, measured against a cohort instead of against a fixed HU band. It shares mode 9's corpus, tests/corpus/intensity/manifest.json, but fires on none of its four cases: that corpus is built against no reference distribution and the item-146 harness attaches none, so this rule's mode-9 edge sits at the needs-real-data rung -- the same analytic-only shape item 137 recorded for reference_delta. The reserved 'corpus' evidence tag is deliberately NOT bound (item 146 A6): it is checked against the GEOMETRIC corpus scan only, so tagging it here would report a false conflict."
+      ],
       "feature_path_count": 8,
       "feature_paths": [
         "per_label",
@@ -453,8 +461,10 @@
         "reference_delta.{label}.features.physical_volume_mm3.value",
         "reference_delta.{label}.out_of_range_features[]"
       ],
-      "mode_less_reason": "This rule is the reference-relative form of the intensity rule's tissue-plausibility judgement: it thresholds how far a labelled region's intensity statistics deviate from a level-aware VerSe-derived reference distribution, which is still a tissue-plausibility claim, not a geometric, topological or semantic one. §6's eight modes are geometric/topological/semantic and name no tissue-plausibility mode, so this rule targets none of them. The catalogue gap is recorded in docs/aide/insights.md rather than fixed here, because §6 is a root document.",
-      "modes": [],
+      "mode_less_reason": "",
+      "modes": [
+        9
+      ],
       "rule_id": "intensity_reference_delta"
     },
     "mislabel": {

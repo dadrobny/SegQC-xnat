@@ -804,4 +804,131 @@ reads modes 9 and 10 in the rendering. Item 151 replays the stage.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+### The measurement transcript (2026-09-04)
+
+Every `expected_firing` literal committed by this item — into
+`tests/corpus/intensity/manifest.json`'s `CASE_RECIPE` and into mode 9's
+`CorpusCaseExpectation`s — was measured first, through the new public harness
+`segfacet.synth.regression.intensity_pipeline_findings` (default
+`reference=None`, `enable_pyradiomics=False`), on this branch, and then
+transcribed. Measured firing sets:
+
+| case | `failure_mode` | measured rule-id set | findings raised |
+|---|---|---|---|
+| `clean_hu` | 0 | `[]` | none |
+| `implausible_metal` | 9 | `["intensity"]` | 1 — *(too high)*: label 22 median 2999.00 HU above the 2000.00 HU ceiling |
+| `implausible_soft_tissue` | 9 | `["intensity"]` | 1 — *(too low)*: label 22 median 40.00 HU below the 100.00 HU floor |
+| `degenerate_uniform` | 9 | `["intensity"]` | 2 — *(too low)*: median 0.00 HU, **and** *(degenerate/uniform)*: std 0.00 HU at/below the 1.00 HU threshold |
+
+Three consequences, all authored as measured rather than as assumed:
+
+- **A11 confirmed.** Every measured finding carries `severity.label ==
+  "flagged-for-review"`, so mode 9's `severity` is authored to match what the
+  rules actually emit.
+- **A12 confirmed.** `intensity` fires on all three implausible cases →
+  `evidence_rung="synthetic-demonstrable"`. `intensity_reference_delta` fires
+  on none — the synthetic intensity corpus is built against no reference
+  distribution and the harness attaches none (A3) — so its mode-9 edge is
+  authored `needs-real-data`, the same analytic-only shape item 145 recorded
+  for `reference_delta`.
+- **`degenerate_uniform` raises two findings from one rule.** Its constant 0 HU
+  fill trips both the degenerate/uniform detector and the too-low detector.
+  The firing *set* is still `{intensity}`, which is what both artifacts carry;
+  the two-finding detail is recorded in that case's `reason` so a later reader
+  does not mistake the single-element set for a single finding.
+
+`clean_hu` measures to the empty set and is **not** attached to mode 9 (A14):
+it is the negative control, carrying `failure_mode = 0` /
+`failure_mode_name = "clean control (no failure)"` at the manifest level,
+exactly as the geometric manifest's `clean_control` does.
+
+### What had to change to add a mode (AC35's record)
+
+The same list is written into `segfacet.failure_modes.__doc__` as an
+"Adding the ninth mode (item 146, 2026-09-04)" section, where a reader of the
+module finds it without this spec. Six production modules, and nothing else —
+in particular no rule's `evaluate` body, no threshold, no `ModeSpec` schema
+field, no seed mode, and neither root document:
+
+- `src/segfacet/failure_modes.py` — `_MODE_9` / `_MODE_10` authored and
+  appended to `_build_specification`; `measured_firing` gained a first-level
+  dispatch on `CorpusCaseExpectation.corpus`; `specification_conflicts` gained
+  the `proposed`-drift check; `render_markdown` gained `- (none)`;
+  `derive_status` gained the declaring-rule precondition (below).
+- `src/segfacet/heuristics/intensity.py`,
+  `src/segfacet/heuristics/intensity_reference_delta.py` — the
+  `mode_declaration` literal only, mode-less → `modes=(9,)` with an
+  `evidence` tuple naming `tests/corpus/intensity/manifest.json`. The two
+  now-false "mode-less (item 137)" sentences in each module's docstring and
+  the comment directly above each declaration were corrected in the same
+  edit: leaving prose that contradicts the literal beside it would have been
+  a worse outcome than the narrowest possible diff, and AC13 pins that
+  neither rule's *behaviour* moved (both threshold constants sets hold, and
+  `run_rules`' output on a fixed record is invariant to the declaration).
+- `src/segfacet/synth/regression.py` — `loaded_intensity_case` and
+  `intensity_pipeline_findings`. The `from segfacet.synth.intensity import
+  INTENSITY_CORPUS_DIR` module-level import raised no partially-initialised
+  package problem (Implementation Step 1's contingency), so no deferral was
+  needed.
+- `src/segfacet/synth/__init__.py` — both names re-exported, additively.
+- `src/segfacet/synth/intensity.py` — the four new per-case manifest fields,
+  written by the generator at an unchanged `INTENSITY_MANIFEST_VERSION`.
+- `src/segfacet/catalogue.py` — `rule_declaration_conflicts`' known-mode set
+  moved from `feature_docs.MODE_ANCHOR_PATHS`' keys to
+  `failure_modes.SPECIFICATION`' keys (A7), via a deferred import matching
+  the existing `feature_docs` one. The message prefix `rule '<id>': declared
+  §6 mode <n> is outside …` is byte-unchanged up to `is outside`, which is
+  all `traceability.build_matrix`'s regex matches.
+
+The regenerated artifact diffs are exactly what the spec predicted: the
+catalogue gains mode 9 on the intensity-consumed paths and loses the
+`rule_mode_less` tag; the matrix moves both intensity rules from `mode_less`
+to `declared` with `modes = 9`.
+
+### `derive_status`: `validated` now requires a declaring rule
+
+The item-145 review finding (`docs/aide/insights.md`, item 145, 2026-09-03)
+is fixed here rather than deferred, because this item is the first to add a
+mode whose rules arrive in the same change: `derive_status` tested the
+corpus-agreement clause first, so a mode with agreeing corpus cases and **no
+rule declaring it anywhere** derived `"validated"` without ever passing
+through `"implemented"`. vision §6's ladder is cumulative — validated implies
+implemented — so `_registry_declares(mode.id)` is now a precondition on
+`"validated"`, not merely the fallback below it. No shipped mode moves: modes
+1–9 all derive `validated` as before (verified live on this branch), and mode
+10 derives `proposed` from its empty edge and case sets. Recorded in the
+module docstring's `derive_status` entry.
+
+### One authorised test reconciliation beyond the spec's list
+
+`tests/test_145_eight_hypothesised_modes.py::test_ac23_fresh_matches_committed_structurally_and_carries_all_eight_ids`
+asserted `committed_ids == set(_EXPECTED_MODE_IDS)` against the committed
+`failure_modes.generated.json`. Item 146 regenerates that artifact to carry
+modes 9 and 10, so the equality would go red on a state this item
+deliberately created. It is narrowed to `set(_EXPECTED_MODE_IDS) <=
+committed_ids` — a value reconciliation that keeps the module's eight-id
+claim intact and stops it pinning the artifact's total mode count, which
+`test_146`'s AC32 asserts live instead. The test-writer captured this as a
+defect (`insights.md`, item 146, 2026-09-04) because it was outside their
+authorised scope; this is where it is acted on. No other test assertion was
+touched.
+
+### Validation
+
+1. **Backend independence of the committed firing sets (A2)** — **❓
+   Unverified.** The measurement above ran with `enable_pyradiomics=False`,
+   which is the value the harness pins precisely so a committed artifact
+   cannot move with an optional dependency. The `pyradiomics` profile's
+   availability on this machine was not established as part of this item, so
+   the `enable_pyradiomics=True` replay is recorded as unverified rather than
+   as a silent pass. CI's `verify-environment-gated` job is where the claim is
+   actually exercised.
+2. **The rendering a person will read** — mode 9's block in
+   `docs/aide/failure_modes.generated.md` shows `needs-paired-scan`, both
+   edges with their rungs (`intensity` at `synthetic-demonstrable`,
+   `intensity_reference_delta` at `needs-real-data`), and its three corpus
+   cases each with an expected firing set and `agrees with live measurement:
+   True`. Mode 10's block shows `Status, authored: proposed`, `Status, derived
+   (live): proposed`, `Derived rung (strongest edge, live): none`, and
+   `- (none)` under both `Intended rules:` and `Corpus cases:` — it reads as a
+   deliberate absence, not a hole.

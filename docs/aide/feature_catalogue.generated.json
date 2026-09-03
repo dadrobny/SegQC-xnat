@@ -5569,10 +5569,12 @@
             "intensity"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            9
+          ],
           "measures": "Median scan intensity under the label mask.",
           "mode_evidence": [
-            "rule_mode_less"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -5981,10 +5983,12 @@
             "intensity"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            9
+          ],
           "measures": "Spread of scan intensity under the label mask.",
           "mode_evidence": [
-            "rule_mode_less"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -6137,10 +6141,12 @@
             "intensity"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            9
+          ],
           "measures": "Whether intensity/radiomics features were attempted and succeeded for this case.",
           "mode_evidence": [
-            "rule_mode_less"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -6275,10 +6281,12 @@
             "intensity"
           ],
           "documented": true,
-          "failure_modes": [],
+          "failure_modes": [
+            9
+          ],
           "measures": "The integer label this image_features entry describes.",
           "mode_evidence": [
-            "rule_mode_less"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -6381,12 +6389,12 @@
           "documented": true,
           "failure_modes": [
             1,
-            2
+            2,
+            9
           ],
           "measures": "The lower percentile bound defining the reference in-range band.",
           "mode_evidence": [
-            "rule_declaration",
-            "rule_mode_less"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -6618,12 +6626,12 @@
           "documented": true,
           "failure_modes": [
             1,
-            2
+            2,
+            9
           ],
           "measures": "The upper percentile bound defining the reference in-range band.",
           "mode_evidence": [
-            "rule_declaration",
-            "rule_mode_less"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -6738,12 +6746,12 @@
           "documented": true,
           "failure_modes": [
             1,
-            2
+            2,
+            9
           ],
           "measures": "Per-label aggregate anomaly score against the reference.",
           "mode_evidence": [
-            "rule_declaration",
-            "rule_mode_less"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -6846,12 +6854,12 @@
           "documented": true,
           "failure_modes": [
             1,
-            2
+            2,
+            9
           ],
           "measures": "Where the case's value falls in the reference's percentile grid.",
           "mode_evidence": [
-            "rule_declaration",
-            "rule_mode_less"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -6907,12 +6915,12 @@
           "documented": true,
           "failure_modes": [
             1,
-            2
+            2,
+            9
           ],
           "measures": "Outlier-resistant z-score against the reference.",
           "mode_evidence": [
-            "rule_declaration",
-            "rule_mode_less"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -6972,12 +6980,12 @@
           "documented": true,
           "failure_modes": [
             1,
-            2
+            2,
+            9
           ],
           "measures": "The case's own value for this tracked feature.",
           "mode_evidence": [
-            "rule_declaration",
-            "rule_mode_less"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -7186,12 +7194,12 @@
           "documented": true,
           "failure_modes": [
             1,
-            2
+            2,
+            9
           ],
           "measures": "Feature names whose case value falls outside the reference's percentile band.",
           "mode_evidence": [
-            "rule_declaration",
-            "rule_mode_less"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {
@@ -7322,13 +7330,13 @@
             4,
             5,
             6,
-            7
+            7,
+            9
           ],
           "measures": "The per-label feature map, keyed by integer label.",
           "mode_evidence": [
             "rule_mode_map",
-            "rule_declaration",
-            "rule_mode_less"
+            "rule_declaration"
           ],
           "observed": {
             "corpus": {

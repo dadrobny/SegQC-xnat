@@ -303,6 +303,93 @@
       "severity": "flagged-for-review",
       "status_authored": "specified",
       "status_derived": "validated"
+    },
+    {
+      "candidate_features": [
+        {
+          "path": "image_features.per_label[].median_hu",
+          "role": "hypothesised"
+        },
+        {
+          "path": "image_features.per_label[].std_hu",
+          "role": "hypothesised"
+        },
+        {
+          "path": "intensity_reference_delta.per_label[].robust_z",
+          "role": "hypothesised"
+        }
+      ],
+      "corpus_cases": [
+        {
+          "agrees": true,
+          "case_id": "implausible_metal",
+          "corpus": "intensity",
+          "expected_firing": [
+            "intensity"
+          ],
+          "reason": "intensity-pipeline-detected; intensity is the sole rule that fires on this case, measured live via segfacet.synth.regression.intensity_pipeline_findings over tests/corpus/intensity/manifest.json (2026-09-04): label 22 (L3)'s median reads 2999 HU, above the plausible bone band's 2000 HU ceiling. intensity_reference_delta cannot fire here because the synthetic intensity corpus is built against no reference distribution and the harness attaches none (item 146 A3), which is why its mode-9 edge stays at needs-real-data."
+        },
+        {
+          "agrees": true,
+          "case_id": "implausible_soft_tissue",
+          "corpus": "intensity",
+          "expected_firing": [
+            "intensity"
+          ],
+          "reason": "intensity-pipeline-detected; intensity is the sole rule that fires on this case, measured live via segfacet.synth.regression.intensity_pipeline_findings over tests/corpus/intensity/manifest.json (2026-09-04): label 22 (L3)'s median reads 40 HU, below the plausible bone band's 100 HU floor -- soft tissue under a vertebra label. intensity_reference_delta attaches no reference here (item 146 A3), so it stays needs-real-data."
+        },
+        {
+          "agrees": true,
+          "case_id": "degenerate_uniform",
+          "corpus": "intensity",
+          "expected_firing": [
+            "intensity"
+          ],
+          "reason": "intensity-pipeline-detected; intensity is the sole rule that fires on this case, measured live via segfacet.synth.regression.intensity_pipeline_findings over tests/corpus/intensity/manifest.json (2026-09-04). It raises two findings, both from the same rule: the degenerate/uniform detector (std 0.00 HU, at or below the 1.00 HU threshold) and, because the constant fill is 0 HU, the too-low detector as well -- so the firing SET is still {intensity}. intensity_reference_delta attaches no reference here (item 146 A3), so it stays needs-real-data."
+        }
+      ],
+      "definition": "On CT, the voxels a vertebra label claims do not carry bone-plausible Hounsfield-unit statistics: the label's median HU is implausibly low (soft tissue or air), implausibly high (metal or an implant), or its intensity spread is degenerate -- a near-zero standard deviation over a uniform region, which no real trabecular/cortical bone produces. The label map's geometry may be entirely well-formed; the failure is that the tissue underneath it is not the tissue the label names.",
+      "derived_rung": "synthetic-demonstrable",
+      "discriminator": "Distinguishes from modes 1-8 by requiring the paired intensity scan: every one of those eight is decidable from the label map alone, whereas mode 9 is invisible without the scan (observability = needs-paired-scan). Distinguishes from mode 1 in particular by what is wrong with an otherwise correctly-shaped, correctly-placed label -- mode 1's centroid is displaced from the fitted curve, while mode 9's label may sit exactly where it belongs and still cover the wrong tissue.",
+      "id": 9,
+      "intended_rules": [
+        {
+          "detector": "Implausible intensity (too low): / (too high): / (degenerate/uniform):",
+          "evidence_rung": "synthetic-demonstrable",
+          "rule_id": "intensity"
+        },
+        {
+          "detector": "",
+          "evidence_rung": "needs-real-data",
+          "rule_id": "intensity_reference_delta"
+        }
+      ],
+      "name": "Implausible tissue under a label",
+      "observability": "needs-paired-scan",
+      "provenance": "hypothesised",
+      "severity": "flagged-for-review",
+      "status_authored": "specified",
+      "status_derived": "validated"
+    },
+    {
+      "candidate_features": [
+        {
+          "path": "stage3_unavailable.reason",
+          "role": "hypothesised"
+        }
+      ],
+      "corpus_cases": [],
+      "definition": "Two or more labels share an exact centroid -- the degenerate case a collapsed or duplicated label set produces. The Stage 3 spline fit cannot be computed over coincident centroids, so the record carries a stage3_unavailable reason instead of a stage3 block, every stage3-reading rule short-circuits on the missing block, and no finding of any kind is raised: the case passes silently (carried defect, item 129, 2026-08-31). The failure is the silence, not any single rule's verdict.",
+      "derived_rung": null,
+      "discriminator": "Distinguishes from mode 2 (fused or fragmented segments) by what the labels do rather than what the components do: mode 2's labels keep distinct centroids and its detectors fire, whereas mode 10's labels collapse onto one point and every stage3 detector goes quiet. Distinguishes from mode 8 (overlapping segments) by not requiring any shared voxel -- two disjoint labels can still share a centroid.",
+      "id": 10,
+      "intended_rules": [],
+      "name": "Collapsed or duplicated label set",
+      "observability": "single-channel-observable",
+      "provenance": "hypothesised",
+      "severity": "flagged-for-review",
+      "status_authored": "proposed",
+      "status_derived": "proposed"
     }
   ],
   "note": "Generated by `python -m segfacet.failure_modes` (item 144). Do not hand-edit this document -- edit the seed ModeSpec entries in src/segfacet/failure_modes.py (the authored fields), then regenerate. `status_authored` is the hand-set proposed/specified value; `status_derived` and `derived_rung` are computed live from the rule registry and the committed corpus on every regeneration -- never hand-set past construction (see specification_conflicts()).",

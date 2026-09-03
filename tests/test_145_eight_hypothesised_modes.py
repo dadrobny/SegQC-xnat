@@ -754,7 +754,14 @@ def test_ac23_fresh_matches_committed_structurally_and_carries_all_eight_ids():
     assert normalised_fresh == committed_payload
 
     committed_ids = {mode_record["id"] for mode_record in committed_payload["modes"]}
-    assert committed_ids == set(_EXPECTED_MODE_IDS), committed_ids
+    # Item 146 (2026-09-04): a value reconciliation, not a weakening. This
+    # module's claim is that the committed artifact carries all EIGHT seed
+    # ids; item 146 entered modes 9 and 10 into the same artifact through
+    # the lifecycle, so equality would go red on a state that item
+    # deliberately created. The subset check keeps the eight-id claim
+    # intact and stops pinning the artifact's total mode count here --
+    # which is what test_146's own AC32 asserts, live.
+    assert set(_EXPECTED_MODE_IDS) <= committed_ids, committed_ids
 
     committed_md = _COMMITTED_MD.read_text(encoding="utf-8")
     assert committed_md.strip(), "expected non-empty committed markdown"
