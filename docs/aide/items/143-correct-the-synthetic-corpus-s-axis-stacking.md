@@ -592,13 +592,47 @@ ratchet pins its baseline after this item, not before.
   `_PRE_ITEM_STATUS_OVERRIDES`; `test_115/125/135` — no hardcoded
   corpus-derived literals, or (`test_135`'s AC14 table) derived from a
   synthetic fixture independent of the corpus) was measured against the
-  corrected corpus. Only `test_131`'s `_PRE_ITEM_NET_ADVANCE_S_MM` table and
-  its `net > 0.0` assertion needed updating (AC6) — every other candidate's
-  values are numerically unmoved (floating-point noise under existing
-  tolerances at worst; item 131's traversal-direction normalisation and item
-  132's traversal-order-agnostic monotonicity are exactly what makes a
-  caudal-advancing corpus read the same as a superior-advancing one). This
-  matches AC7's own claim and is the evidence it is not vacuous.
+  corrected corpus. `test_131`'s `_PRE_ITEM_NET_ADVANCE_S_MM` table and its
+  `net > 0.0` assertion needed updating (AC6), and `_PRE_ITEM_TANGENT_ANGLES_DEG`
+  (the direction-normalised overall tangent angle) is genuinely unmoved, as
+  item 131's traversal-direction normalisation and item 132's
+  traversal-order-agnostic monotonicity predict.
+
+  **Correction (round 2, 2026-09-03):** the claim that "every other
+  candidate's values are numerically unmoved" was wrong for three tables the
+  original sweep either missed or mismeasured — the validator caught it via
+  three failing tests, and completing the sweep by that same failure class
+  found the same defect had gone unreported in a fourth spot the per-case
+  assertion loop never reached:
+  - `test_121_tangent_orientation.py`'s AC5 `expected` list (`coronal_deg` for
+    `clean_control`'s five levels) — this table was **never named** in the
+    original sweep at all. `coronal_deg` is the signed per-level R-S tilt
+    (unlike `_PRE_ITEM_TANGENT_ANGLES_DEG`'s direction-normalised magnitude),
+    so it flips sign under the S mirror: `[8.1644, 4.0746, 0.0000, -4.0746,
+    -8.1644]` → `[-8.1644, -4.0746, 0.0000, 4.0746, 8.1644]`.
+  - `test_131_tangent_direction_normalisation.py`'s
+    `_PRE_ITEM_OTHER_CURVATURE_FIELDS` table — every case's
+    `coronal_tangent_angles_deg` and `sagittal_tangent_angles_deg` entries
+    (the signed per-level component breakdown, not the normalised overall
+    angle in `_PRE_ITEM_TANGENT_ANGLES_DEG`) are exactly sign-flipped, for
+    all nine cases, not only `clean_control`; `total_curvature_deg`,
+    `coronal_curvature_deg`, `sagittal_curvature_deg` and `curvature_plane`
+    (unsigned magnitudes/labels) are genuinely unmoved. The per-case `for`
+    loop this test runs stops at the first mismatch, so only `clean_control`
+    surfaced as a validator failure even though all nine entries were stale.
+  - `test_132_monotonicity_against_traversal_order.py`'s `_PRE_ITEM_U_VALUES`
+    table — `mode6_crop_at_border`'s middle `u_value` moved by ~4.77e-8
+    (`0.500000024` → `0.499999976`), outside the test's `abs=1e-9` tolerance;
+    every other case's `u_values`, including `mode6`'s other four entries, are
+    unmoved within that tolerance and needed no change.
+
+  The lesson: a *signed component* of a normalised quantity (a per-axis
+  tangent angle, a per-level tilt) is not protected by the same
+  direction-normalisation invariant that protects the normalised quantity
+  itself, and a per-case assertion loop that stops at the first failure can
+  hide identical staleness in every later case. See
+  `docs/corpus-s-axis-correction.md`'s "Round-2 reconciled tests" section for
+  the full before/after values.
 
 - **`reference_default.json`, `feature_catalogue.generated.{json,md}` moved
   by floating-point noise only (~1e-9 relative), not by a substantive shift.**

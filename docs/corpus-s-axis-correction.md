@@ -47,3 +47,18 @@ item spec's Testing Strategy).
 | `docs/aide/traceability_matrix.generated.json` | `python -m segfacet.traceability` into `<tmp>` + `assert_matches_committed_artifact` | unmoved | byte-identical — the matrix records which features each rule reads and per-case firing-set structure, none of which moved (AC9: no rule's firing set moved). |
 | `docs/aide/traceability_matrix.generated.md` | `python -m segfacet.traceability` into `<tmp>` + `read_bytes()` | unmoved | byte-identical, the rendered form of the unmoved JSON artifact. |
 | `docs/aide/golden_evidence.generated.json` | `python -m segfacet.golden_evidence` into `<tmp>` + `assert_matches_committed_artifact` | unmoved | byte-identical — this artifact records per-case leaf-path *counts*, not measured values, and no case's leaf-path set moved. |
+
+## Round-2 reconciled tests (2026-09-03)
+
+The item's original "existing tests to reconcile" sweep (spec Decisions log)
+missed or mismeasured three hardcoded literal tables — all holding a *signed
+component* of a curvature/traversal quantity, which is not protected by item
+131/132's direction-normalisation invariants the way the corresponding
+normalised quantity is. Values below are the round-2 measured corrections;
+see the item spec's Decisions log for the full explanation.
+
+| test | table | what moved |
+|---|---|---|
+| `tests/test_121_tangent_orientation.py` | AC5 `expected` (`coronal_deg`, `clean_control`) | `[8.1644, 4.0746, 0.0, -4.0746, -8.1644]` → `[-8.1644, -4.0746, 0.0, 4.0746, 8.1644]` |
+| `tests/test_131_tangent_direction_normalisation.py` | `_PRE_ITEM_OTHER_CURVATURE_FIELDS[*]['coronal_tangent_angles_deg']` / `['sagittal_tangent_angles_deg']` | every one of the 9 cases' signed per-level component arrays sign-flipped element-wise (e.g. `clean_control` coronal `[8.165203, 4.072969, 0.0, -4.072969, -8.165203]` → `[-8.165203, -4.072969, 0.0, 4.072969, 8.165203]`); `total_curvature_deg`/`coronal_curvature_deg`/`sagittal_curvature_deg`/`curvature_plane` unmoved |
+| `tests/test_132_monotonicity_against_traversal_order.py` | `_PRE_ITEM_U_VALUES['mode6_crop_at_border']` | middle entry `0.500000024` → `0.499999976` (~4.77e-8 shift, outside `abs=1e-9`); other four entries and every other case's table unmoved |

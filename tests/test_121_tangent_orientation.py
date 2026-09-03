@@ -265,7 +265,7 @@ def test_ac5_clean_control_coronal_tilts_vary_across_levels():
     fit = fit_centroid_spline(centroids)
     result = compute_vertebra_tangent_orientations(fit, centroids)
     coronal = [r.coronal_deg for r in result]
-    expected = [8.1644, 4.0746, 0.0000, -4.0746, -8.1644]
+    expected = [-8.1644, -4.0746, 0.0000, 4.0746, 8.1644]
     assert coronal == pytest.approx(expected, abs=1e-3)
     spread = max(coronal) - min(coronal)
     assert spread == pytest.approx(16.3287, abs=1e-3)
