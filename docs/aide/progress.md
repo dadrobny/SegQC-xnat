@@ -871,6 +871,7 @@ verifies they agree, and no document records which failure mode each feature ser
   `per_label.{label}.geometry.zzz_drift_probe`; `git checkout --` restored a
   clean, green tree. See item 106's spec, "### Real-source drift rehearsal".)*
 - [x] Every feature carries a status and a named failure mode, or is marked `unwired`
+  - **2026-09-03** → Re-measured 2026-09-03 on the committed docs/aide/feature_catalogue.generated.json after items 136-138: the artifact now holds 138 entries (not 111), and the 72-entry statused-but-mode-unmapped bucket (mode_evidence == rule_unmapped) is empty - 0 entries. Split: 86 entries carry no mode evidence, 52 carry some (48 name at least one failure mode); 12 are attributed through a rule's recorded mode-less declaration (rule_mode_less: intensity, intensity_reference_delta). Status split: 66 retune, 34 keep, 30 unwired, 8 retire. The bucket shrank first because items 110/120/124/131/132 added leaf paths and moved attributions (138 entries, 18 rule_unmapped measured 2026-09-02 while specifying item 136), then closed because item 137 dispositioned the four mode-less rules. Stage 20's honest-count item should quote this split, not the attestation's.
   (**G8**). *(Measured on the committed artifact, `N = 111`: every entry
   carries a status from `{keep, retune, retire, unwired}`. Three-way partition:
   **35 moded** (statused, `failure_modes` non-empty), **4 unwired**, **72
