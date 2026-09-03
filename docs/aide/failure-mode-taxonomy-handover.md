@@ -426,18 +426,21 @@ Order of work, each in a fresh session per the entry points' own hand-offs:
 
 ### 12.5 Process findings outside the taxonomy
 
-Two systemic points, for the next framework hand-over rather than this
-repo:
+Two systemic points that belong to the framework, not this repo. Both were
+captured as `framework` entries in [`insights.md`](insights.md) and handed
+over as `aide-loop` issues on 2026-09-03, alongside the retract-warning entry
+from item 137 (`aide-loop#152`):
 
-- **A stage criterion was ticked by position.** Item 137's validator mapped
-  its item ACs onto Stage 20's criteria by index and ticked four boxes the
-  item had not established (`insights.md` entries 52–55). `aide progress
-  accept --criterion N` is positional by design; the fix is that an item
-  ticks a stage criterion only when its spec names that criterion explicitly,
-  which is a spec-template and validator-prose change in `aide-loop`.
+- **A stage criterion was ticked by position** → **`aide-loop#153`.** Item
+  137's validator mapped its item ACs onto Stage 20's criteria by index and
+  ticked four boxes the item had not established (the four retraction entries
+  in `insights.md`, dated 2026-09-02). `aide progress accept --criterion N` is
+  positional by design; the fix is that an item ticks a stage criterion only
+  when its spec names that criterion explicitly, which is a spec-template and
+  validator-prose change in `aide-loop`.
 - **An acceptance criterion that asserts a fact about code must be a measured
-  equality against live state, never a shape check** — a length floor
-  (item 137), a token-presence check (item 138) and a declaration-state
-  completeness flag (item 138) each passed a false claim. `REVIEW.md` names
-  the class; the spec-author and test-writer prose do not yet forbid it at
-  authoring time.
+  equality against live state, never a shape check** → **`aide-loop#154`.**
+  A length floor (item 137), a token-presence check (item 138) and a
+  declaration-state completeness flag (item 138) each passed a false claim.
+  `REVIEW.md` names the class; the spec-author and test-writer prose do not
+  yet forbid it at authoring time.
