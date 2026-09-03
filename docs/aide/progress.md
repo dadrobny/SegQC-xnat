@@ -1554,6 +1554,6 @@ sources onto it, and closes with a maintainer sign-off that gates the remainder 
   (**G8**).
 - [ ] The specification's rendering is signed off by the maintainer, with the date and
   outcome recorded in the module (**G8**).
-- [ ] `build_clean_spine` stacks labels caudally along +S like real VerSe input, every
+- [x] `build_clean_spine` stacks labels caudally along +S like real VerSe input, every *(item 143 validator round 3: full suite green (6273 passed, 60 environment-gated skips, 0 failed) in 4 foreground chunks 2026-09-03; AC1/AC2 verified via tests/test_143_s_axis_correction.py (build_clean_spine advances caudally along +S for all spans/spacings); AC11-AC13 verified via committed-artifact/determinism tests (corpus manifests, both reference artifacts, feature_catalogue/traceability_matrix/golden_evidence regenerated and matched); AC9 verified via test_098_stray_components.py (no rule firing set moved, corpus predates the specification module which item 144+ builds))*
   committed corpus value and both reference artifacts were regenerated after the
   correction, and no expected firing set in the specification predates it (**G7**).
