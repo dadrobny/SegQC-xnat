@@ -1,4 +1,12 @@
 # FACET — Work Queue 019
+> **Status:** ✅ Closed — superseded by queue-020 (2026-09-03). **Cut after item
+> 138.** Items 136, 137 and 138 merged. Items 139, 140, 141 and 142 are ⏸️
+> Deferred in [`../progress.md`](../progress.md): each rested on a definition of
+> the §6 failure modes that did not exist, so they are re-specified against
+> Stage 30's specification and re-queued after its maintainer sign-off (roadmap
+> Stage 20's 2026-09-03 annotation;
+> [`../failure-mode-taxonomy-handover.md`](../failure-mode-taxonomy-handover.md)
+> §9, §12.1). Their numbers are kept.
 
 > **Created:** 2026-09-02
 > Step 4 of the AIDE loop · derived from [`../vision.md`](../vision.md),

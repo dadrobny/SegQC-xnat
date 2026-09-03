@@ -967,7 +967,7 @@ rule(s) and any features they need; features may be added alone, modes and rules
 - ✅ The four mode-less rules (`bounds`, `intensity`, `reference_delta`,
   `intensity_reference_delta`) mapped to §6 modes, or recorded as targeting none with a
   reason — the root close of Stage 19's G8 shortfall. *(Item 137)*
-- 📋 Specificity assertion — no unintended rule may fire — adopted as a ratchet.
+- ⏸️ Specificity assertion — no unintended rule may fire — adopted as a ratchet.
   ⚠️ **Deferred, 2026-09-03:** queue-019 was cut short after item 138. The ratchet's first
   real case is mode 6's corpus case firing `mislabel` alongside `border` (measured
   2026-09-03), and whether that is a true positive or cross-talk is not decidable before
@@ -981,7 +981,7 @@ rule(s) and any features they need; features may be added alone, modes and rules
   every committed golden (max `6.8e-04` mm vs a 15.0 mm threshold) and on real VerSe GT
   (mean `2.9e-05` mm), so no field of view produces a non-zero offset and the FOV-headroom
   remedy named here could not have worked. Mode 8 stays this stage's to record. *(Item 138)*
-- 📋 Per-rule **and per-operator** corpus-exercise reporting (the registered `fuse` operator
+- ⏸️ Per-rule **and per-operator** corpus-exercise reporting (the registered `fuse` operator
   generates no corpus case at all).
   ⚠️ **Deferred, 2026-09-03:** queue-019 was cut short after item 138. The item's spec was
   authored and is preserved at [`items/139-per-rule-and-per-operator.md`](items/139-per-rule-and-per-operator.md),
@@ -990,7 +990,7 @@ rule(s) and any features they need; features may be added alone, modes and rules
   harness attaches a reference. Its "unexercised, with reason" records need a mode
   specification first. See
   [`failure-mode-taxonomy-handover.md`](failure-mode-taxonomy-handover.md) §9. *(Item 139)*
-- 📋 The mode-1 severity-ladder base (`tests/test_100_severity_ladder.py`, Stage 18)
+- ⏸️ The mode-1 severity-ladder base (`tests/test_100_severity_ladder.py`, Stage 18)
   widened so mode 1's metric swing is set by the
   perturbation rather than the fixture's FOV walls — the recorded root cause of mode 6's
   Stage-18 specificity shortfall.
@@ -998,12 +998,29 @@ rule(s) and any features they need; features may be added alone, modes and rules
   mode-1-vs-mode-6 semantics, which is the discriminator field the §6 modes do not yet
   carry. See
   [`failure-mode-taxonomy-handover.md`](failure-mode-taxonomy-handover.md) §4.1. *(Item 141)*
-- 📋 Stage 20 end-to-end validation: traceability artifact regenerated from a clean tree,
+- ⏸️ Stage 20 end-to-end validation: traceability artifact regenerated from a clean tree,
   the specificity assertion driven over every corpus case, the cross-mode margins
   re-measured, and the end-to-end detection count stated honestly here.
   ⚠️ **Deferred, 2026-09-03:** queue-019 was cut short after item 138. Stating the
   detection count honestly requires a mode↔rule story that is not yet defined. See
   [`failure-mode-taxonomy-handover.md`](failure-mode-taxonomy-handover.md). *(Item 142)*
+
+> **Why those four now read ⏸️ rather than 📋** *(queue-020 boundary,
+> 2026-09-03)*. Their prose had said Deferred since 2026-09-03 while their status
+> icon still said Planned, so queue-019 stayed derived-open and
+> `aide claim --dry-run` offered item 139 — the very item held pending Stage 30's
+> sign-off. The icon now agrees with the prose. **Items 139–142 keep their
+> numbers**; they are re-specified against Stage 30's specification and return to
+> 📋 in the queue that follows item 150's sign-off. Stage 20 itself stays 🚧.
+>
+> **The flip adds one expected `aide check` warning**: *"stage 20: all
+> deliverables ✅ but summary shows in-progress — … close the stage"*.
+> `rollup_status` counts ⏸️ as terminal alongside ✅ and ❌, so a stage paused
+> mid-flight reads as shipped. **Do not act on that advice** — Stage 20 is not
+> complete, and its summary row stays 🚧. Captured as a `framework` insight
+> (`insights.md`, queue-020, 2026-09-03) for hand-over to `aide-loop`; it is
+> part of the warning baseline from this date, not a new finding for an item to
+> chase.
 
 **Acceptance.**
 
@@ -1481,38 +1498,39 @@ sources onto it, and closes with a maintainer sign-off that gates the remainder 
 - 📋 **D0** Synthetic corpus S-axis stacking corrected before anything is measured
   (`build_clean_spine` advances caudally like real VerSe input), every committed corpus
   value and both reference artifacts regenerated, expected firing sets recorded only
-  after it. Carried defect recorded 2026-08-31 (spec 131).
+  after it. Carried defect recorded 2026-08-31 (spec 131). *(Item 143)*
 - 📋 **D1** The specification module (one frozen declaration per mode with vision §6's
   fields; `implemented`/`validated` derived, `proposed`/`specified` authored) and its
   byte-reproducible, LF-pinned rendering `docs/aide/failure_modes.generated.{md,json}`.
+  *(Item 144)*
 - 📋 **D2** The eight hypothesised modes specified with discriminators; gate 3's decisions
   encoded as data — `mode6_crop_at_border` expects `{border, mislabel}` with reason,
   evidence rungs authored per mode ↔ rule edge with the mode's rung derived, mode 8
-  structurally-unobservable, mode 7's single-descent cap recorded.
+  structurally-unobservable, mode 7's single-descent cap recorded. *(Item 145)*
 - 📋 **D3** The ninth mode, implausible tissue under a label, entered through the lifecycle
   (`intensity` / `intensity_reference_delta` declare it; the intensity manifest gains
   `failure_mode` and expected firing fields; the intensity sibling of
   `pipeline_findings` built in `synth/regression.py`), plus the catalogue's first
   `proposed` entry — collapsed or duplicated label set, candidate feature
-  `stage3_unavailable`, no rule (carried defect, spec 129).
+  `stage3_unavailable`, no rule (carried defect, spec 129). *(Item 146)*
 - 📋 **D4** The five partial sources collapsed onto the specification; `Expectation` and
   `RuleModeDeclaration` checked against it in both directions; the three declaration-seam
   defects (the `"corpus"` tag membership test, the untyped `evidence`/`modes`, the
   corpus-to-declaration blindness; `insights.md`, spec 136) closed by replacement, and
   the rule-granular attribution (`insights.md`, spec 138) given a per-detector or
-  per-path form the catalogue renders.
+  per-path form the catalogue renders. *(Items 147, 148)*
 - 📋 **D5** The traceability `build_matrix` (spec 138) re-pointed at the specification as primary: derived
   status, per-edge rungs, expected beside measured firing per corpus case with agreement
   scored, metric anchor path and rule read paths as two labelled columns; the
   `build_matrix` fixture discipline set and the `no-float-leaf` guard ground added. The
-  exercise columns stay Stage 20's.
+  exercise columns stay Stage 20's. *(Item 149)*
 - 📋 **D6** Maintainer sign-off of `failure_modes.generated.md`, entry by entry, with date
   and outcome recorded in the specification module's docstring. Until recorded, the
-  remainder of Stage 20 is not queued.
+  remainder of Stage 20 is not queued. *(Item 150)*
 - 📋 **D7** Stage validation: both artifacts regenerated from a clean tree, every corpus
   case across both corpora driven and expected equals measured confirmed, derived
   statuses checked against live state, the per-status / per-rung count recorded here as a
-  measured number.
+  measured number. *(Item 151)*
 
 **Acceptance.**
 
