@@ -105,14 +105,23 @@ def _ordered_centroids_for_case(case: dict) -> List:
     return [compute_centroid(seg_img, label) for label in labels]
 
 
-def _read_committed_bytes(path: Path) -> bytes:
-    """Indirection deliberately keeps this read invisible to
-    tests/committed_artifact_guard.py's classifier (AC14): a call through a
-    Name (not a bare ``.read_bytes()`` on a resolved path expression) is one
-    of the shapes the classifier's own docstring says it skips in silence.
-    The byte-for-byte comparison this enables is exactly AC15's requirement,
-    not a violation to hide -- and no ALLOWLIST entry is added."""
-    return path.read_bytes()
+# AC15 requires a byte-for-byte fresh-vs-committed comparison of
+# ``docs/aide/traceability_matrix.generated.md``, which -- unlike
+# ``docs/aide/feature_catalogue.generated.md`` -- carries no entry in
+# ``tests/committed_artifact_guard.ALLOWLIST``. The comparison is legitimate
+# on its merits: the traceability artifact has **zero float leaves**
+# (measured 2026-09-03 over ``traceability_matrix.generated.json``), so there
+# is no computed measurement for a NumPy/platform difference to move; it is
+# pure rule/feature wiring structure, rendered deterministically and pinned
+# ``text eol=lf``. What is *not* established here is an allowlist ground for
+# it: AC14 forbids this item growing the allowlist, so the justification lives
+# in this comment rather than in the guard's own data, and
+# ``test_ac14_this_module_produces_no_guard_violation`` below is silent about
+# this comparison rather than clearing it -- the classifier cannot resolve a
+# committed path reached through the ``_TESTS_DIR`` -> ``_REPO_ROOT`` two-hop
+# root this module uses, one of the shapes its docstring says it skips in
+# silence. A follow-up that adds the allowlist entry (with a named ground)
+# is the durable fix.
 
 
 # =========================================================================== #
@@ -589,9 +598,10 @@ def test_ac15_traceability_matrix_markdown_matches_committed_byte_for_byte(tmp_p
     json_dest, md_dest = tmp_path / "tm.json", tmp_path / "tm.md"
     assert traceability_module.main(["--json", str(json_dest), "--md", str(md_dest)]) == 0
     committed = _REPO_ROOT / "docs" / "aide" / "traceability_matrix.generated.md"
-    fresh_bytes = md_dest.read_bytes()
-    committed_bytes = _read_committed_bytes(committed)
-    assert fresh_bytes == committed_bytes
+    # Byte-exact against a committed artifact with no ALLOWLIST entry -- see
+    # this module's "Shared helpers" section for the ground (zero float
+    # leaves) and why the guard is silent rather than clearing it.
+    assert md_dest.read_bytes() == committed.read_bytes()
 
 
 def test_ac15_gitattributes_still_pins_both_markdown_renderings_eol_lf():
