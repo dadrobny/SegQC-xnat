@@ -156,10 +156,15 @@ def _pick_mode_with_unique_strongest_edge(fm):
 
 
 def test_ac1_all_eight_modes_present():
+    """Rescoped (item 146, 2026-09-03): item 146 adds modes 9 and 10, so
+    ``iter_modes()`` no longer yields exactly the eight seed ids -- restated
+    as "the eight seed ids are present, in ascending order, as the first
+    eight"."""
     import segfacet.failure_modes as fm
 
     ids = tuple(mode.id for mode in fm.iter_modes())
-    assert ids == _EXPECTED_MODE_IDS
+    assert ids[: len(_EXPECTED_MODE_IDS)] == _EXPECTED_MODE_IDS
+    assert ids == tuple(sorted(ids))
 
 
 # =========================================================================== #
@@ -186,12 +191,18 @@ def test_ac2_every_field_populated(mode_id):
 
 
 def test_ac3_names_match_vision_section_six_parsed_titles():
+    """Rescoped (item 146, 2026-09-03): "the eight seed modes' names equal
+    §6's list" -- item 147's one kept conformance check in the
+    vision->specification direction. Modes 9/10 are deliberately not in
+    §6's numbered list (that is the point of item 146), so this iterates
+    ``_EXPECTED_MODE_IDS`` rather than ``iter_modes()``."""
     import segfacet.failure_modes as fm
     import segfacet.traceability as traceability
 
     titles = traceability._vision_mode_titles()
     assert titles, "expected >=1 title parsed from vision.md section 6"
-    for mode in fm.iter_modes():
+    for mode_id in _EXPECTED_MODE_IDS:
+        mode = fm.SPECIFICATION[mode_id]
         assert mode.id in titles, mode.id
         assert mode.name == titles[mode.id], (mode.id, mode.name, titles[mode.id])
 
@@ -300,10 +311,16 @@ def test_ac7_weakening_the_single_strongest_edge_changes_derived_rung():
 
 
 def test_ac8_every_synthetic_demonstrable_edge_is_demonstrated(measured):
+    """Rescoped (item 146, 2026-09-03): resolves each case through
+    ``_manifest_case``, which reads the **geometric** manifest and would
+    raise on mode 9's intensity cases -- skip modes outside
+    ``_EXPECTED_MODE_IDS``."""
     import segfacet.failure_modes as fm
 
     checked = False
     for mode in fm.iter_modes():
+        if mode.id not in _EXPECTED_MODE_IDS:
+            continue
         pipeline_cases = [
             case
             for case in mode.corpus_cases
@@ -418,10 +435,16 @@ def test_ac12_mode8_records_the_single_channel_mechanism():
 
 
 def test_ac13_every_expected_firing_equals_fresh_measurement_and_all_validated(measured):
+    """Rescoped (item 146, 2026-09-03): asserts ``mode.corpus_cases``
+    non-empty and ``derive_status == "validated"`` for every shipped mode;
+    mode 10 has neither. Restricted to ``_EXPECTED_MODE_IDS`` -- mode 9's
+    equivalent is item 146's own AC20."""
     import segfacet.failure_modes as fm
 
     checked_cases = 0
     for mode in fm.iter_modes():
+        if mode.id not in _EXPECTED_MODE_IDS:
+            continue
         assert mode.corpus_cases, mode.id
         for case in mode.corpus_cases:
             checked_cases += 1
@@ -602,11 +625,17 @@ def test_ac19_named_discriminator_pairs(mode_id, sibling_id):
 
 
 def test_ac20_detector_names_the_detector_that_actually_fired(corpus):
+    """Rescoped (item 146, 2026-09-03): resolves each case through the
+    ``corpus`` fixture, which reads the **geometric** manifest and would
+    raise on mode 9's intensity cases; skip modes outside
+    ``_EXPECTED_MODE_IDS``."""
     import segfacet.failure_modes as fm
 
     checked_fired = 0
     checked_unfired = 0
     for mode in fm.iter_modes():
+        if mode.id not in _EXPECTED_MODE_IDS:
+            continue
         fired_findings = []
         for case in mode.corpus_cases:
             _detection, findings, _record = corpus(case.case_id)
@@ -636,9 +665,15 @@ def test_ac20_detector_names_the_detector_that_actually_fired(corpus):
 
 
 def test_ac21_severity_grounded_in_a_measured_finding(corpus):
+    """Rescoped (item 146, 2026-09-03): resolves each case through the
+    ``corpus`` fixture, which reads the **geometric** manifest and would
+    raise on mode 9's intensity cases; skip modes outside
+    ``_EXPECTED_MODE_IDS``."""
     import segfacet.failure_modes as fm
 
     for mode in fm.iter_modes():
+        if mode.id not in _EXPECTED_MODE_IDS:
+            continue
         rule_ids = {edge.rule_id for edge in mode.intended_rules}
         severities = set()
         for case in mode.corpus_cases:

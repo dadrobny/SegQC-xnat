@@ -614,21 +614,22 @@ def test_ac14_every_anchor_path_present_with_per_mode_metric_evidence(
 def test_ac15_declared_mode_less_rule_only_entry_is_honestly_mode_less(
     full_catalogue, feature_docs_module
 ):
-    """Reconciled for item 137 (Testing Strategy: "existing tests to
-    reconcile"): the four rules this test originally called "unmapped" --
-    ``bounds``, ``intensity``, ``reference_delta``,
+    """Reconciled for item 137, then item 146 (Testing Strategy: "existing
+    tests to reconcile"): the four rules this test originally called
+    "unmapped" -- ``bounds``, ``intensity``, ``reference_delta``,
     ``intensity_reference_delta`` -- are item 137's to disposition, and none
     of them is unmapped on this tree any more. ``bounds`` and
-    ``reference_delta`` now declare §6 mode 2 analytically; ``intensity`` and
-    ``intensity_reference_delta`` now declare themselves mode-less with a
-    recorded reason. An entry consumed only by the mode-less pair is honestly
-    reported as ``("rule_mode_less",)``, not ``("rule_unmapped",)`` -- the
-    AC15 honesty claim survives the disposition, restated for the state that
-    now exists. What ``mode_evidence == ("rule_unmapped",)`` means after
-    item 137 -- a consuming rule with no declaration at all -- is exercised
-    by ``tests/test_137_mode_less_rule_disposition.py``'s adversarial stub
-    -rule test, since no such rule ships on this tree (item 137 AC1)."""
-    mode_less_rules = {"intensity", "intensity_reference_delta"}
+    ``reference_delta`` declare §6 mode 2 analytically. Item 146
+    (2026-09-03) moves ``intensity``/``intensity_reference_delta`` from
+    mode-less to declaring §6 mode 9, so an entry consumed only by that pair
+    is now honestly reported as ``failure_modes == (9,)`` with
+    ``("rule_declaration",)``, not ``("rule_mode_less",)`` -- the AC15
+    honesty claim survives the second disposition too, restated for the
+    state that now exists. What ``mode_evidence == ("rule_unmapped",)``
+    means -- a consuming rule with no declaration at all -- is exercised by
+    ``tests/test_137_mode_less_rule_disposition.py``'s adversarial stub-rule
+    test, since no such rule ships on this tree (item 137 AC1)."""
+    intensity_rules = {"intensity", "intensity_reference_delta"}
     anchor_paths = {
         p for paths in feature_docs_module.MODE_ANCHOR_PATHS.values() for p in paths
     }
@@ -636,13 +637,13 @@ def test_ac15_declared_mode_less_rule_only_entry_is_honestly_mode_less(
         e
         for e in full_catalogue.entries
         if e.consuming_rules
-        and set(e.consuming_rules) <= mode_less_rules
+        and set(e.consuming_rules) <= intensity_rules
         and e.path not in anchor_paths
     ]
-    assert candidates, "expected at least one mode-less-rule-only, non-anchor entry"
+    assert candidates, "expected at least one intensity-rule-only, non-anchor entry"
     for entry in candidates:
-        assert entry.failure_modes == ()
-        assert entry.mode_evidence == ("rule_mode_less",), entry.path
+        assert entry.failure_modes == (9,), entry.path
+        assert entry.mode_evidence == ("rule_declaration",), entry.path
 
 
 # =========================================================================== #

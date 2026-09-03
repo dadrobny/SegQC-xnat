@@ -1415,17 +1415,35 @@ def test_adv_rule_declaring_only_an_uncatalogued_mode_makes_rule_to_mode_a_hole(
     'declared' by declaration_state alone, so rule_to_mode reported it
     complete though the rule targets no catalogued mode -- exactly this
     module's own definition of a rule -> mode hole. Registering such a rule
-    now must report the hole, naming the rule."""
+    now must report the hole, naming the rule.
+
+    Reconciled (item 146, 2026-09-03): mode 9 is now a key of
+    failure_modes.SPECIFICATION (item 146's A7 moves catalogue.py's
+    known-mode source there, from feature_docs.MODE_ANCHOR_PATHS), so a rule
+    declaring modes=(9,) is no longer outside the catalogue and
+    rule_declaration_conflicts() stops reporting it -- rule_to_mode would
+    stay complete. The stub moves to a mode absent from *both*
+    SPECIFICATION and MODE_ANCHOR_PATHS, derived live rather than assumed by
+    literal, so this test tracks whichever id is actually free."""
+    import segfacet.failure_modes as failure_modes_module
     import segfacet.feature_docs as feature_docs_module
     from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
     import segfacet.traceability as traceability
 
-    assert 9 not in feature_docs_module.MODE_ANCHOR_PATHS
+    uncatalogued_mode = 1
+    while (
+        uncatalogued_mode in failure_modes_module.SPECIFICATION
+        or uncatalogued_mode in feature_docs_module.MODE_ANCHOR_PATHS
+    ):
+        uncatalogued_mode += 1
+    assert uncatalogued_mode not in feature_docs_module.MODE_ANCHOR_PATHS
+    assert uncatalogued_mode not in failure_modes_module.SPECIFICATION
 
     class _UncataloguedModeRule(Rule):
         rule_id = "__item138_uncatalogued_mode__"
         mode_declaration = RuleModeDeclaration(
-            modes=(9,), evidence=("analytic", "AC-adjacent: mode 9 is outside the catalogue")
+            modes=(uncatalogued_mode,),
+            evidence=("analytic", "AC-adjacent: this mode is outside the catalogue"),
         )
 
         def evaluate(self, record, config):
@@ -1441,13 +1459,13 @@ def test_adv_rule_declaring_only_an_uncatalogued_mode_makes_rule_to_mode_a_hole(
     rules = _rule_records(d)
     record = rules["__item138_uncatalogued_mode__"]
     assert record["declaration_state"] == "declared"
-    assert record["modes"] == [9]
+    assert record["modes"] == [uncatalogued_mode]
 
-    # The mode -> rule direction is untouched by this defect: mode 9 is not
-    # catalogued at all, so it never appears as a mode -> rule hole (that
-    # direction's holes are catalogued-mode ids and unregistered
-    # corpus-designated rule ids, neither of which mode 9 is).
-    assert "9" not in d["directions"]["mode_to_rule"]["holes"]
+    # The mode -> rule direction is untouched by this defect: the picked
+    # mode is not catalogued at all, so it never appears as a mode -> rule
+    # hole (that direction's holes are catalogued-mode ids and unregistered
+    # corpus-designated rule ids, neither of which this mode is).
+    assert str(uncatalogued_mode) not in d["directions"]["mode_to_rule"]["holes"]
 
 
 # =========================================================================== #

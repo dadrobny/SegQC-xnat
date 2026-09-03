@@ -1130,11 +1130,15 @@ def test_ac15_each_accepted_severity_is_accepted(severity):
 
 def test_ac16_specification_carries_all_eight_modes():
     """Item 145 entered the remaining six §6 modes: the seed of two (3, 8)
-    this test used to pin becomes all eight (1-8)."""
+    this test used to pin becomes all eight (1-8). Rescoped (item 146,
+    2026-09-03): item 146 adds modes 9 and 10, so this no longer pins
+    ``ids == (1..8)`` exactly -- restated as "the eight seed ids are
+    present, in ascending order, as the first eight"."""
     import segfacet.failure_modes as fm
 
     ids = tuple(m.id for m in fm.iter_modes())
-    assert ids == (1, 2, 3, 4, 5, 6, 7, 8)
+    assert ids[:8] == (1, 2, 3, 4, 5, 6, 7, 8)
+    assert ids == tuple(sorted(ids))
 
 
 @pytest.mark.parametrize("mode_id", [1, 2, 3, 4, 5, 6, 7, 8])
@@ -1159,11 +1163,15 @@ def test_ac16_each_id_is_a_key_of_mode_anchor_paths(mode_id):
 
 
 def test_ac16_names_match_vision_section_six_parsed_titles():
+    """Rescoped (item 146, 2026-09-03): iterate the eight seed ids only, not
+    ``iter_modes()`` -- modes 9/10 are deliberately not in vision.md §6's
+    numbered list (that is the point of item 146)."""
     import segfacet.failure_modes as fm
 
     titles = _vision_mode_titles()
     assert titles
-    for mode in fm.iter_modes():
+    for mode_id in (1, 2, 3, 4, 5, 6, 7, 8):
+        mode = fm.SPECIFICATION[mode_id]
         assert mode.id in titles, mode.id
         assert mode.name == titles[mode.id], (mode.id, mode.name, titles[mode.id])
 
