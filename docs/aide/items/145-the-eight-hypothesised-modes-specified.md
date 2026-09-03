@@ -619,3 +619,5 @@ the case's `expected_firing`/`reason`, per AC5/AC14; mode 7: `sequence`
 No divergence from A3's cross-check, no spec defect requiring hand-back, and
 no `insights.md` entry was needed (the one flagged risk — a stale
 `heuristics/mislabel.py` docstring value — did not materialise).
+
+**A1 containment fix, resolved at the merge (2026-09-03).** The item-144 code review landed the same correction first on `aide/queue-020` (commits `51dff83`, `6acb88c`), renaming `_registry_declares_exactly` to `_registry_declares` and layering `derive_status` (validated iff >=1 corpus case and all agree, else implemented iff a registered rule declares the mode, else the authored status). Merging `aide/queue-020` into this item branch therefore kept the review's fuller version and dropped this item's duplicate minimal fix; its A1 rationale is folded into `_registry_declares`'s docstring. Both committed artifacts are byte-unchanged by the merge.

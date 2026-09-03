@@ -843,20 +843,36 @@ _MODE_8 = ModeSpec(
     provenance="hypothesised",
 )
 
-SPECIFICATION: Mapping[int, ModeSpec] = MappingProxyType(
-    {
-        mode.id: mode
-        for mode in (
-            _MODE_1,
-            _MODE_2,
-            _MODE_3,
-            _MODE_4,
-            _MODE_5,
-            _MODE_6,
-            _MODE_7,
-            _MODE_8,
-        )
-    }
+
+def _build_specification(modes: Iterable[ModeSpec]) -> Mapping[int, ModeSpec]:
+    """Index *modes* by ``id`` into an immutable, ascending mapping,
+    rejecting a duplicate ``id`` rather than letting the later entry
+    silently replace the earlier one -- a dict comprehension would drop a
+    hand-authored mode with a typo'd id with no diagnostic at all (items
+    145/146 author six more entries by hand)."""
+    by_id: Dict[int, ModeSpec] = {}
+    for mode in modes:
+        if mode.id in by_id:
+            raise ValueError(
+                f"SPECIFICATION: duplicate mode id {mode.id} "
+                f"({by_id[mode.id].name!r} and {mode.name!r}) -- every mode id must "
+                f"be unique."
+            )
+        by_id[mode.id] = mode
+    return MappingProxyType({mode_id: by_id[mode_id] for mode_id in sorted(by_id)})
+
+
+SPECIFICATION: Mapping[int, ModeSpec] = _build_specification(
+    (
+        _MODE_1,
+        _MODE_2,
+        _MODE_3,
+        _MODE_4,
+        _MODE_5,
+        _MODE_6,
+        _MODE_7,
+        _MODE_8,
+    )
 )
 
 
@@ -910,22 +926,36 @@ def measured_firing(case: CorpusCaseExpectation) -> Tuple[str, ...]:
 
 def case_agrees(case: CorpusCaseExpectation) -> bool:
     """``True`` iff *case*'s live :func:`measured_firing` set equals its
-    authored ``expected_firing`` set."""
-    return set(measured_firing(case)) == set(case.expected_firing)
+    authored ``expected_firing`` set.
+
+    ``expected_firing`` must be a tuple. A bare ``str`` reaching this
+    function -- a :class:`CorpusCaseExpectation` built standalone, outside
+    the :class:`ModeSpec` tree whose ``__post_init__`` enforces AC7 -- would
+    otherwise be compared character-wise (``set("border")``) and silently
+    return ``False``, so it is rejected here too."""
+    expected = case.expected_firing
+    if not isinstance(expected, tuple):
+        raise ValueError(
+            f"case_agrees: corpus case {case.case_id!r}'s 'expected_firing' must be "
+            f"a tuple, got {type(expected).__name__} -- a bare str or list would be "
+            f"compared element-wise against the measured firing set."
+        )
+    return set(measured_firing(case)) == set(expected)
 
 
-def _registry_declares_exactly(mode_id: int) -> bool:
-    """``True`` iff a rule is currently registered whose
-    ``RuleModeDeclaration.modes`` **contains** *mode_id* -- used only when
-    *mode* carries no corpus case to measure against (AC9).
+def _registry_declares(mode_id: int) -> bool:
+    """``True`` iff at least one **registered** rule's
+    ``RuleModeDeclaration`` lists *mode_id* among its ``modes``.
 
-    Item 145 A1: vision.md §6 and queue-020 both define ``"implemented"`` as
-    "at least one registered rule declares the mode" -- a containment
-    reading. Item 144 shipped a narrower exact-singleton reading
-    (``declaration.modes == (mode_id,)``); this is the minimal correction the
-    item 145 spec (A1) authorises, since no review fix had landed on
-    aide/queue-020 at implementation time (checked via `git log
-    aide/queue-020..origin/aide/queue-020`, 2026-09-03)."""
+    This is vision.md §6's lifecycle definition verbatim ("``implemented``
+    -- at least one registered rule declares the mode"), so a declaration
+    spanning several modes (the real ``heuristics.fragmentation`` declares
+    ``modes=(2, 3)``) counts for **every** mode it lists, not only for a
+    mode it declares alone.
+
+    Item 145 A1 authorised the same containment correction as a fallback;
+    the item-144 review (commit 51dff83) had already landed it here.
+    """
     from segfacet.heuristics.rule import iter_rule_declarations
 
     for _rule_id, declaration in iter_rule_declarations():
@@ -938,21 +968,15 @@ def derive_status(mode: ModeSpec) -> str:
     """The live-derived lifecycle status for *mode* (AC9, AC10).
 
     ``"validated"`` iff *mode* carries >=1 corpus case and every one
-    :func:`case_agrees`. Otherwise, if *mode* carries >=1 corpus case, at
-    least one measurement has run and disagreed --
-    ``"implemented"``. With no corpus case at all, ``"implemented"`` iff a
-    registered rule is dedicated to exactly this mode
-    (:func:`_registry_declares_exactly`); otherwise the authored
-    ``mode.status`` (``"proposed"`` or ``"specified"``) is returned
-    unchanged. The empty set never satisfies the "every case agrees"
-    quantifier vacuously -- an empty ``corpus_cases`` cannot reach
-    ``"validated"``.
+    :func:`case_agrees`; else ``"implemented"`` iff at least one registered
+    rule declares ``mode.id`` (:func:`_registry_declares`); else the
+    authored ``mode.status`` (``"proposed"`` or ``"specified"``) unchanged.
+    The empty set never satisfies the "every case agrees" quantifier
+    vacuously -- an empty ``corpus_cases`` cannot reach ``"validated"``.
     """
-    if mode.corpus_cases:
-        if all(case_agrees(case) for case in mode.corpus_cases):
-            return "validated"
-        return "implemented"
-    if _registry_declares_exactly(mode.id):
+    if mode.corpus_cases and all(case_agrees(case) for case in mode.corpus_cases):
+        return "validated"
+    if _registry_declares(mode.id):
         return "implemented"
     return mode.status
 

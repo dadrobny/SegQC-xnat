@@ -684,3 +684,39 @@ one guarantee actually available without touching
 `src/segfacet/__init__.py`. Deferring `segfacet/__init__.py`'s own eager
 import remains a separate item's authorised path, not this one's; the
 hand-back is not withdrawn, only reconciled with what the test now checks.
+
+**Correction (2026-09-03, post-merge code review) — the exact-singleton
+`implemented` gate is withdrawn; `derive_status` reads "contains".** The
+"`derive_status`'s 'implemented' gate for a mode with no corpus case (AC9)"
+entry above concluded that a literal "contains" reading of AC9
+(`mode.id in declaration.modes`) was unsatisfiable against the committed
+AC9 test and shipped `_registry_declares_exactly`, which counted a
+registered rule toward `implemented` only when its `RuleModeDeclaration.modes`
+was the exact singleton `(mode.id,)`. The premise was right about the test
+and wrong about the conclusion: the obstacle was the test's own registry
+isolation, not the semantics. `tests/test_144_failure_mode_specification.py`'s
+`isolated_registry` fixture snapshots and *restores* `_RULES` but never
+empties it, so the real `heuristics.fragmentation` (`modes=(2, 3)`) stayed
+registered throughout and the test's first assertion could only hold under a
+reading that excludes a multi-mode declaration.
+
+That reading contradicts the primary source. `docs/aide/vision.md` §6,
+Lifecycle, states it without qualification: "`implemented` — at least one
+registered rule declares the mode"; `queue-020` item 144 says the same, and
+this module's own docstring already said ">=1 **registered** rule declares
+the mode" while the code did something narrower. Under the singleton gate,
+mode 2 would report *not* implemented although `fragmentation` declares it,
+and items 145/146 enter every remaining mode through this derivation.
+
+Fixed on `review/144-findings`: `_registry_declares_exactly` becomes
+`_registry_declares` (`mode_id in declaration.modes`), and `derive_status`
+consults the registry for every mode rather than only for one with an empty
+`corpus_cases` — `validated` iff >=1 corpus case and all agree, else
+`implemented` iff a registered rule declares the mode, else the authored
+status. The AC9 test now empties the registry (the fixture still restores
+it) before asserting the "before" state, so the transition it measures is
+caused by the throwaway rule alone, and a new test asserts the live,
+unmodified registry derives `implemented` for mode 3 *because*
+`fragmentation` declares `(2, 3)`. No assertion was weakened, and both
+committed artifacts are byte-unchanged: modes 3 and 8 reach `validated`
+through their corpus cases under either reading.
