@@ -3308,7 +3308,7 @@
               "informative": true,
               "magnitude": 0.673278,
               "maximum": 0.673278,
-              "minimum": 7.67114e-08,
+              "minimum": 7.67113e-08,
               "population": "corpus",
               "source": [
                 "clean",
@@ -3366,7 +3366,7 @@
               "informative": true,
               "magnitude": 0.673278,
               "maximum": 0.673278,
-              "minimum": 7.67114e-08,
+              "minimum": 7.67113e-08,
               "population": "corpus",
               "source": [
                 "clean",

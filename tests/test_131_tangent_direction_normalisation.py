@@ -315,16 +315,21 @@ _PRE_ITEM_TANGENT_ANGLES_DEG = {
     "mode8_force_overlap": [13.2111, 6.9636, 0.6253, 4.9247, 5.7262],
 }
 
+#: Item 143 corrected the synthetic corpus's S-axis stacking so ascending
+#: labels advance caudally (descending S) instead of superiorly -- these
+#: values are the negation of the pre-item table (measured 2026-09-03,
+#: matching AC3's mirror-symmetry guarantee that the correction changes only
+#: the sign of the net advance, never its magnitude).
 _PRE_ITEM_NET_ADVANCE_S_MM = {
-    "clean_control": 160.0,
-    "mode1_displace": 160.0,
-    "mode2_fragment": 160.0,
-    "mode3_inject_islands": 160.0,
-    "mode4_relabel_swap": 160.0,
-    "mode5_remove_level": 160.0,
-    "mode6_crop_at_border": 160.0,
-    "mode7_sequence_break": 160.0,
-    "mode8_force_overlap": 142.0,
+    "clean_control": -160.0,
+    "mode1_displace": -160.0,
+    "mode2_fragment": -160.0,
+    "mode3_inject_islands": -160.0,
+    "mode4_relabel_swap": -160.0,
+    "mode5_remove_level": -160.0,
+    "mode6_crop_at_border": -160.0,
+    "mode7_sequence_break": -160.0,
+    "mode8_force_overlap": -142.0,
 }
 
 
@@ -347,11 +352,11 @@ def test_ac6_every_corpus_case_net_advance_positive():
     for case in manifest["cases"]:
         centroids = _ordered_centroids_for_case(case)
         net = float(centroids[-1].centroid_mm[2]) - float(centroids[0].centroid_mm[2])
-        assert net > 0.0, f"{case['case_id']}: net +S advance {net} is not positive"
+        assert net < 0.0, f"{case['case_id']}: net +S advance {net} is not negative"
         expected = _PRE_ITEM_NET_ADVANCE_S_MM[case["case_id"]]
         assert net == pytest.approx(expected, abs=1e-6), (
             f"{case['case_id']}: net advance {net} != measured {expected} -- "
-            f"AC5's table is no longer explained by every case advancing superiorly"
+            f"AC5's table is no longer explained by every case advancing caudally"
         )
 
 

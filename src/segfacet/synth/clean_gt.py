@@ -17,6 +17,13 @@ anterior-posterior. Loading a generated fixture through :mod:`segfacet.io`
 (which reorients every volume to RAS) is therefore an array-identity
 operation -- the fixture is already RAS-native.
 
+Stacking direction (item 143): ascending labels advance caudally
+(descending S), matching real VerSe input read through :mod:`segfacet.io`.
+The ``i``-th ascending label occupies slot ``n - 1 - i`` along axis 2, not
+slot ``i`` -- so ``labels[0]`` (the most cranial anatomical level, e.g. L1)
+sits at the *highest* S and ``labels[-1]`` (e.g. L5) at the *lowest*. The
+label order and the array-axis-2 slot order run opposite each other.
+
 Design (see the item 036 spec's Implementation Steps for the full rationale):
 
 * Each body is a solid rectangular block sized in **physical mm**, converted
@@ -216,6 +223,11 @@ def build_clean_spine(
 ) -> CleanSpine:
     """Build a deterministic, plausibly-spaced positive-control spine.
 
+    Item 143: ascending labels advance caudally (descending S) along the
+    stacking axis (axis 2), matching real VerSe input read through
+    :mod:`segfacet.io` -- the label order and the array-axis-2 slot order
+    run opposite each other.
+
     Parameters
     ----------
     levels:
@@ -277,7 +289,13 @@ def build_clean_spine(
 
     voxel_counts: Dict[int, int] = {}
     for i, label in enumerate(labels):
-        start2 = margin_vox_si + i * (body_vox_si + gap_vox_si)
+        # Ascending labels advance caudally (descending S): the i-th
+        # ascending label occupies slot n - 1 - i along the stacking axis,
+        # not slot i (item 143). The hump stays keyed on i (A2): it is
+        # symmetric in i, so this reassignment reverses only which label
+        # sits at which S -- the emitted geometry is bit-identical.
+        slot = n - 1 - i
+        start2 = margin_vox_si + slot * (body_vox_si + gap_vox_si)
         end2 = start2 + body_vox_si
 
         # Smooth, non-negative lateral hump: 0 at the ends, peaking at the

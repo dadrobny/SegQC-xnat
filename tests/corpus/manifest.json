@@ -306,7 +306,7 @@
         ]
       },
       "case_id": "mode8_force_overlap",
-      "detail": "force_overlap: shifted label 20 by 18 voxel(s) along the stacking axis (array axis 2) toward neighbour label 21, reassigning the contested overhang from 21 to 20.",
+      "detail": "force_overlap: shifted label 20 by -18 voxel(s) along the stacking axis (array axis 2) toward neighbour label 21, reassigning the contested overhang from 21 to 20.",
       "detection": "reconstructed_record",
       "expected_labels": [
         20,
