@@ -1029,9 +1029,10 @@ def test_ac29_no_heading_immediately_followed_by_blank_then_heading():
 
 def test_ac30_proposed_entry_acquiring_a_declaring_rule_is_reported(isolated_registry):
     import segfacet.failure_modes as fm
-    from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
+    from segfacet.heuristics.rule import _RULES, Rule, RuleModeDeclaration, register_rule
 
-    assert fm.specification_conflicts() == ()
+    before = fm.specification_conflicts()
+    assert before == ()
 
     class _FakeMode10Detector(Rule):
         rule_id = "__item146_fake_mode10_detector__"
@@ -1048,8 +1049,11 @@ def test_ac30_proposed_entry_acquiring_a_declaring_rule_is_reported(isolated_reg
         "10" in msg and "proposed" in msg and "implemented" in msg for msg in conflicts
     ), conflicts
 
-    # The shipped tree itself, without the stub, has none.
-    assert fm.specification_conflicts(tuple(fm.iter_modes())) != conflicts
+    # Retract the stub and confirm the conflict retracts with it -- the
+    # transition is attributed to the stub in both directions, not to a
+    # `specification_conflicts()` default-argument artefact.
+    del _RULES[_FakeMode10Detector.rule_id]
+    assert fm.specification_conflicts() == ()
 
 
 # =========================================================================== #
