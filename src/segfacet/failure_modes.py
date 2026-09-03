@@ -12,13 +12,14 @@ the object the rest of the stage (items 145-151) reads, writes into, and
 renders.
 
 **This module ships the schema, the validation, the derivation and the
-rendering -- not the entries.** :data:`SPECIFICATION` carries a **minimal
-seed set of two entries** (modes 3 and 8) chosen to exercise both derivation
-paths end-to-end (item spec A4): mode 3 is ``single-channel-observable`` with
-a ``pipeline``-detected corpus case, and mode 8 is
-``structurally-unobservable`` with a ``reconstructed_record``-detected corpus
-case. The remaining seven modes are item 145's; the ninth mode and the first
-``proposed`` entry are item 146's.
+rendering.** Item 144 shipped a minimal seed set of two entries (modes 3 and
+8) to exercise both derivation paths end-to-end (item spec A4); item 145
+entered the remaining six and re-authored those two, so :data:`SPECIFICATION`
+now carries all **eight** of vision.md §6's hypothesised modes, every schema
+field populated, each with the live-registry-declared edges, the
+per-corpus-case measured firing set, and (mode 6) a freshly measured
+centroid-displacement value. The ninth mode and the first ``proposed`` entry
+are item 146's.
 
 Lifecycle status
 -----------------
@@ -393,13 +394,143 @@ class ModeSpec:
 
 
 # =========================================================================== #
-# The shipped seed (A4): modes 3 and 8 only.
+# The shipped eight (item 145): every vision.md section 6 mode entered.
 #
-# expected_firing is measured live on the item-143-corrected corpus and
-# recorded literally here (transcribing a *computed* value would defeat AC1's
-# no-heavy-import-at-module-level contract) -- see this item's Decisions log
-# for the measurement transcript.
+# expected_firing, the detector tags and the mode-6 displacement are measured
+# live on the item-143-corrected corpus and recorded literally here
+# (transcribing a *computed* value would defeat AC1's no-heavy-import-at-
+# module-level contract) -- see this item's Decisions log for the
+# measurement transcript. The edge set/rung per mode is the live registry's
+# declaration (AC5, AC6) as it stood on 2026-09-03; names are the vision.md
+# section 6 parse (AC3), never hand-typed independently of it.
 # =========================================================================== #
+
+_MODE_1 = ModeSpec(
+    id=1,
+    name="Label not aligned with the anatomical vertebra it names",
+    definition=(
+        "A vertebra segment is present and carries the correct level's "
+        "label, but its measured position -- the centroid's offset from the "
+        "fitted spinal curve -- is displaced from where that vertebra "
+        "actually sits, with the label touching no image border and its "
+        "identity itself unquestioned."
+    ),
+    discriminator=(
+        "Distinguishes from mode 4 by whether the label's identity is wrong "
+        "(mode 4, an ordering/identity failure) or only its position along "
+        "the spine is wrong while the identity stays correct (mode 1); "
+        "distinguishes from mode 6 by whether a border-touching face "
+        "explains the displacement (mode 6, a crop) or none does (mode 1)."
+    ),
+    observability="single-channel-observable",
+    candidate_features=(
+        CandidateFeature(
+            path="stage3.per_label_offsets[].offset_mm",
+            role="stage18-metric-anchor",
+        ),
+    ),
+    intended_rules=(
+        IntendedRule(
+            rule_id="mislabel",
+            detector="Vertebra misaligned from spinal curve:",
+            evidence_rung="synthetic-demonstrable",
+        ),
+        IntendedRule(
+            rule_id="reference_delta",
+            detector="",
+            evidence_rung="needs-real-data",
+        ),
+    ),
+    corpus_cases=(
+        CorpusCaseExpectation(
+            case_id="mode1_displace",
+            corpus="geometric",
+            expected_firing=("mislabel",),
+            reason=(
+                "pipeline-detected; mislabel (Detector A, position/"
+                "alignment) is the sole rule that fires on this corpus "
+                "case, measured live via "
+                "segfacet.synth.regression.pipeline_findings on the "
+                "item-143-corrected corpus (2026-09-03): label 22 (L3)'s "
+                "centroid lies measurably off the fitted spinal curve while "
+                "touching no image face, so reference_delta stays "
+                "needs-real-data -- no committed corpus case designates it, "
+                "only a cohort reference artifact can (A9/A1's analytic-only "
+                "class)."
+            ),
+        ),
+    ),
+    severity="flagged-for-review",
+    status="specified",
+    provenance="hypothesised",
+)
+
+_MODE_2 = ModeSpec(
+    id=2,
+    name="Over-/under-segmentation — fused or fragmented vertebra segments",
+    definition=(
+        "A label's physical volume, x/y/z extent, or fragmentation index "
+        "departs from the plausible range for its level: fusion with a "
+        "neighbouring vertebra reads over the volume/extent range and "
+        "produces a fragmentation_index below the intact-body threshold "
+        "(two comparably-sized components), while an under-segmented or "
+        "partially-labelled vertebra reads under the range."
+    ),
+    discriminator=(
+        "Distinguishes from mode 3 by whether the dominant body itself "
+        "stays intact: mode 2's label splits into components of comparable "
+        "size (fragmentation_index below threshold, largest_component_"
+        "fraction well under 0.9), while mode 3's dominant body stays "
+        "largely intact (largest_component_fraction >= 0.9) with only a "
+        "small stray island splitting off."
+    ),
+    observability="single-channel-observable",
+    candidate_features=(
+        CandidateFeature(
+            path="per_label.{label}.components.fragmentation_index",
+            role="stage18-metric-anchor",
+        ),
+    ),
+    intended_rules=(
+        IntendedRule(
+            rule_id="fragmentation",
+            detector="Fragmentation:",
+            evidence_rung="synthetic-demonstrable",
+        ),
+        IntendedRule(
+            rule_id="bounds",
+            detector="",
+            evidence_rung="needs-real-data",
+        ),
+        IntendedRule(
+            rule_id="reference_delta",
+            detector="",
+            evidence_rung="needs-real-data",
+        ),
+    ),
+    corpus_cases=(
+        CorpusCaseExpectation(
+            case_id="mode2_fragment",
+            corpus="geometric",
+            expected_firing=("fragmentation",),
+            reason=(
+                "pipeline-detected; fragmentation (Fragmentation: the "
+                "label's fragmentation_index falls below threshold, two "
+                "comparably-sized components) is the sole rule that fires "
+                "on this corpus case, measured live via "
+                "segfacet.synth.regression.pipeline_findings on the "
+                "item-143-corrected corpus (2026-09-03). bounds and "
+                "reference_delta both stay needs-real-data: no committed "
+                "corpus case designates either for this mode, only "
+                "hand-set physical ranges or a cohort reference artifact "
+                "can (A1's analytic-only class)."
+            ),
+        ),
+    ),
+    severity="flagged-for-review",
+    status="specified",
+    provenance="hypothesised",
+)
 
 _MODE_3 = ModeSpec(
     id=3,
@@ -410,8 +541,12 @@ _MODE_3 = ModeSpec(
         "dominant body."
     ),
     discriminator=(
-        "Distinguishes from mode 2 (over-/under-segmentation) by whether the "
-        "dominant body itself stays intact."
+        "Distinguishes from mode 2 by whether the dominant body stays "
+        "intact: mode 3 keeps its largest component holding "
+        "largest_component_fraction >= 0.9 of the label's voxels, with a "
+        "small stray island elsewhere, while mode 2's largest component "
+        "holds a materially smaller share, reflecting genuine "
+        "fragmentation rather than a rogue island."
     ),
     observability="single-channel-observable",
     candidate_features=(
@@ -423,7 +558,7 @@ _MODE_3 = ModeSpec(
     intended_rules=(
         IntendedRule(
             rule_id="fragmentation",
-            detector="",
+            detector="Rogue island(s):",
             evidence_rung="synthetic-demonstrable",
         ),
     ),
@@ -433,10 +568,222 @@ _MODE_3 = ModeSpec(
             corpus="geometric",
             expected_firing=("fragmentation",),
             reason=(
-                "pipeline-detected; fragmentation is the sole rule that fires "
+                "pipeline-detected; fragmentation (Rogue island(s): a small "
+                "non-dominant component strictly below island_min_voxels) "
+                "is the sole rule that fires on this corpus case, measured "
+                "live via segfacet.synth.regression.pipeline_findings on "
+                "the item-143-corrected corpus (2026-09-03)."
+            ),
+        ),
+    ),
+    severity="flagged-for-review",
+    status="specified",
+    provenance="hypothesised",
+)
+
+_MODE_4 = ModeSpec(
+    id=4,
+    name="Semantic mislabelling (wrong vertebra identification)",
+    definition=(
+        "A vertebra is segmented with the label of a different vertebra "
+        "level: two adjacent labels are out of the anatomically expected "
+        "order along the fitted spinal curve, even though each label's own "
+        "geometry is otherwise plausible -- the labels' identities, not "
+        "their positions, are wrong."
+    ),
+    discriminator=(
+        "Distinguishes from mode 1 by whether the label's identity is "
+        "wrong (mode 4, an ordering/identity failure between two adjacent "
+        "labels) or only its position is wrong while the identity stays "
+        "correct (mode 1)."
+    ),
+    observability="single-channel-observable",
+    candidate_features=(
+        CandidateFeature(
+            path="stage3.monotonic_consistency.is_monotonic",
+            role="stage18-metric-anchor",
+        ),
+    ),
+    intended_rules=(
+        IntendedRule(
+            rule_id="mislabel",
+            detector="Vertebra ordering inconsistent with label:",
+            evidence_rung="synthetic-demonstrable",
+        ),
+    ),
+    corpus_cases=(
+        CorpusCaseExpectation(
+            case_id="mode4_relabel_swap",
+            corpus="geometric",
+            expected_firing=("mislabel",),
+            reason=(
+                "pipeline-detected; mislabel (Detector B, ordering/"
+                "identity) is the sole rule that fires on this corpus "
+                "case, measured live via "
+                "segfacet.synth.regression.pipeline_findings on the "
+                "item-143-corrected corpus (2026-09-03): labels 21 (L2) "
+                "and 22 (L3) are out of expected order along the spline."
+            ),
+        ),
+    ),
+    severity="flagged-for-review",
+    status="specified",
+    provenance="hypothesised",
+)
+
+_MODE_5 = ModeSpec(
+    id=5,
+    name="Not all vertebrae in the image are segmented",
+    definition=(
+        "One or more vertebrae expected to be present within the observed "
+        "span of present levels carry no label at all -- the level is "
+        "missing from the segmentation entirely, not merely misplaced or "
+        "malformed."
+    ),
+    discriminator=(
+        "Distinguishes from every other mode by being an absence rather "
+        "than a defect: no per-label geometry exists at all for the "
+        "missing level, whereas modes 1-4 and 6 all involve a mislocated, "
+        "malformed or displaced *existing* label."
+    ),
+    observability="single-channel-observable",
+    candidate_features=(
+        CandidateFeature(
+            path="relationships.present_levels[]",
+            role="stage18-metric-anchor",
+        ),
+    ),
+    intended_rules=(
+        IntendedRule(
+            rule_id="coverage",
+            detector="Missing interior level(s):",
+            evidence_rung="synthetic-demonstrable",
+        ),
+    ),
+    corpus_cases=(
+        CorpusCaseExpectation(
+            case_id="mode5_remove_level",
+            corpus="geometric",
+            expected_firing=("coverage",),
+            reason=(
+                "pipeline-detected; coverage (Missing interior level(s): "
+                "L3 absent within the observed present-level span) is the "
+                "sole rule that fires on this corpus case, measured live "
+                "via segfacet.synth.regression.pipeline_findings on the "
+                "item-143-corrected corpus (2026-09-03)."
+            ),
+        ),
+    ),
+    severity="flagged-for-review",
+    status="specified",
+    provenance="hypothesised",
+)
+
+_MODE_6 = ModeSpec(
+    id=6,
+    name="Partial vertebra at the image border whose appearance changes",
+    definition=(
+        "A vertebra at the edge of the imaging field of view is only "
+        "partially captured: its label touches an image face, and the "
+        "missing tissue displaces its measured centroid off the fitted "
+        "spinal curve, changing both its geometry and its apparent "
+        "position."
+    ),
+    discriminator=(
+        "Distinguishes from mode 1 by a border-touching face: mode 6's "
+        "clipped vertebra touches an image face, and that crop is what "
+        "explains the centroid displacement, while mode 1's displaced "
+        "vertebra touches no face at all -- the same misalignment "
+        "detector legitimately co-fires on mode 6's case (co-detection is "
+        "recorded, not suppressed), but the border-touch face is what "
+        "identifies mode 6 rather than mode 1."
+    ),
+    observability="single-channel-observable",
+    candidate_features=(
+        CandidateFeature(
+            path="per_label.{label}.geometry.touches_left",
+            role="stage18-metric-anchor",
+        ),
+    ),
+    intended_rules=(
+        IntendedRule(
+            rule_id="border",
+            detector="Partial vertebra clipped by FOV:",
+            evidence_rung="synthetic-demonstrable",
+        ),
+    ),
+    corpus_cases=(
+        CorpusCaseExpectation(
+            case_id="mode6_crop_at_border",
+            corpus="geometric",
+            expected_firing=("border", "mislabel"),
+            reason=(
+                "pipeline-detected; measured live via "
+                "segfacet.synth.regression.pipeline_findings on the "
+                "item-143-corrected corpus (2026-09-03), this case fires "
+                "two rules: border, because the cropped label 22 (L3) "
+                "touches the anterior image face; and mislabel, because "
+                "cropping the vertebra at the image border displaces its "
+                "centroid 17.51 mm off the fitted spinal curve (spline) -- "
+                "the legitimate co-detection this mode's discriminator "
+                "names. mislabel is deliberately not one of mode 6's own "
+                "intended_rules edges (AC5): only border is registered for "
+                "mode 6."
+            ),
+        ),
+    ),
+    severity="flagged-for-review",
+    status="specified",
+    provenance="hypothesised",
+)
+
+_MODE_7 = ModeSpec(
+    id=7,
+    name="Non-continuous label sequence (e.g. L1 → T12 → L2 → L5)",
+    definition=(
+        "The sequence of labelled vertebra levels departs from anatomical "
+        "order -- a level appears out of its expected cranio-caudal "
+        "sequence relative to its neighbours in the labelled sequence, "
+        "independent of any single label's own position or identity."
+    ),
+    discriminator=(
+        "Distinguishes from mode 4 by scope: mode 4 is a pairwise ordering "
+        "inconsistency between two adjacent labels along the fitted "
+        "spinal curve, while mode 7 is a sequence-level discontinuity in "
+        "the labelled level ordering itself, independent of any single "
+        "label's spatial position."
+    ),
+    observability="single-channel-observable",
+    candidate_features=(
+        CandidateFeature(
+            path="relationships.is_continuous",
+            role="stage18-metric-anchor",
+        ),
+    ),
+    intended_rules=(
+        IntendedRule(
+            rule_id="sequence",
+            detector="Non-continuous label sequence:",
+            evidence_rung="needs-real-data",
+        ),
+    ),
+    corpus_cases=(
+        CorpusCaseExpectation(
+            case_id="mode7_sequence_break",
+            corpus="geometric",
+            expected_firing=("sequence",),
+            reason=(
+                "pipeline-detected; sequence is the sole rule that fires "
                 "on this corpus case, measured live via "
                 "segfacet.synth.regression.pipeline_findings on the "
-                "item-143-corrected corpus (2026-09-03)."
+                "item-143-corrected corpus (2026-09-03). The rule's rank "
+                "cap admits only a single rank descent per pair "
+                "(rank(v) == v - 1 under the TPTBox default), so this "
+                "fixture is a degraded, single-descent instance -- it does "
+                "not represent section 6.7's own two-descent example "
+                "L1 -> T12 -> L2 -> L5, which needs real data to exercise, "
+                "hence the needs-real-data rung despite this case's "
+                "pipeline detection (item 145 A4)."
             ),
         ),
     ),
@@ -448,10 +795,17 @@ _MODE_3 = ModeSpec(
 _MODE_8 = ModeSpec(
     id=8,
     name="Overlapping segments",
-    definition="Two labels' foreground voxel sets intersect.",
+    definition=(
+        "Two labels' foreground voxel sets intersect -- the same voxel is "
+        "claimed by more than one label, a condition impossible in a valid "
+        "single-channel integer label map."
+    ),
     discriminator=(
-        "Distinguishes from every other mode by requiring a second label's "
-        "mask, unobservable from a single label map alone."
+        "Distinguishes from every other mode by requiring a second "
+        "label's mask: it is unobservable from any single label's "
+        "geometry alone, unlike modes 1-7, which are all detectable from "
+        "one label's own geometry or the whole label map's per-label "
+        "statistics."
     ),
     observability="structurally-unobservable",
     candidate_features=(
@@ -463,7 +817,7 @@ _MODE_8 = ModeSpec(
     intended_rules=(
         IntendedRule(
             rule_id="overlap",
-            detector="",
+            detector="Overlapping segments:",
             evidence_rung="structurally-unobservable",
         ),
     ),
@@ -473,10 +827,14 @@ _MODE_8 = ModeSpec(
             corpus="geometric",
             expected_firing=("overlap",),
             reason=(
-                "reconstructed-record-detected; overlap is the sole rule that "
-                "fires on this corpus case, measured live via "
+                "reconstructed-record-detected; overlap is the sole rule "
+                "that fires on this corpus case, measured live via "
                 "segfacet.synth.regression.reconstructed_findings on the "
-                "item-143-corrected corpus (2026-09-03)."
+                "item-143-corrected corpus (2026-09-03). A voxel in a "
+                "single-channel integer label map holds exactly one "
+                "label, so overlaps[] can only populate when the record "
+                "is deliberately corrupted to violate that invariant -- "
+                "which this case's reconstruction does."
             ),
         ),
     ),
@@ -486,7 +844,19 @@ _MODE_8 = ModeSpec(
 )
 
 SPECIFICATION: Mapping[int, ModeSpec] = MappingProxyType(
-    {mode.id: mode for mode in (_MODE_3, _MODE_8)}
+    {
+        mode.id: mode
+        for mode in (
+            _MODE_1,
+            _MODE_2,
+            _MODE_3,
+            _MODE_4,
+            _MODE_5,
+            _MODE_6,
+            _MODE_7,
+            _MODE_8,
+        )
+    }
 )
 
 
@@ -545,14 +915,21 @@ def case_agrees(case: CorpusCaseExpectation) -> bool:
 
 
 def _registry_declares_exactly(mode_id: int) -> bool:
-    """``True`` iff a rule is currently registered whose own
-    ``RuleModeDeclaration.modes`` is exactly ``(mode_id,)`` -- a rule
-    dedicated to this one mode, used only when *mode* carries no corpus case
-    to measure against (AC9)."""
+    """``True`` iff a rule is currently registered whose
+    ``RuleModeDeclaration.modes`` **contains** *mode_id* -- used only when
+    *mode* carries no corpus case to measure against (AC9).
+
+    Item 145 A1: vision.md §6 and queue-020 both define ``"implemented"`` as
+    "at least one registered rule declares the mode" -- a containment
+    reading. Item 144 shipped a narrower exact-singleton reading
+    (``declaration.modes == (mode_id,)``); this is the minimal correction the
+    item 145 spec (A1) authorises, since no review fix had landed on
+    aide/queue-020 at implementation time (checked via `git log
+    aide/queue-020..origin/aide/queue-020`, 2026-09-03)."""
     from segfacet.heuristics.rule import iter_rule_declarations
 
     for _rule_id, declaration in iter_rule_declarations():
-        if declaration is not None and declaration.modes == (mode_id,):
+        if declaration is not None and mode_id in declaration.modes:
             return True
     return False
 

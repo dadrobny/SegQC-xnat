@@ -551,4 +551,71 @@ item 151 replays the stage and attests its acceptance criteria.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+**A1/A2 resolution.** At sync time (`git log --oneline
+aide/queue-020..origin/aide/queue-020`, 2026-09-03) no review fix had landed
+on `aide/queue-020` and no `review/144-findings` branch existed on the
+remote. The builder therefore made the minimal containment correction itself:
+`_registry_declares_exactly` (`src/segfacet/failure_modes.py`) now returns
+`True` iff `mode_id in declaration.modes`, rather than requiring
+`declaration.modes == (mode_id,)`. The docstring/comment above the function
+names item 145 A1. `tests/test_144_failure_mode_specification.py`'s three
+reconciliation edits (AC9 probe rebuilt on mode id 99; the seed-size
+assertion widened to all eight ids; the two `[3, 8]` parametrize lists
+widened to all eight) were already present in the committed test file at
+implementation time, so no further test edit was needed.
+
+**Measurement transcript (A3, all eight cases, via `measured_firing`, run
+2026-09-03 on the item-143-corrected corpus through
+`segfacet.synth.regression.pipeline_findings` /
+`reconstructed_findings`):**
+
+| Case | detection | measured `rule_id`s | leading reason tag(s) | severity |
+|---|---|---|---|---|
+| `mode1_displace` | pipeline | `mislabel` | `Vertebra misaligned from spinal curve:` | flagged-for-review |
+| `mode2_fragment` | pipeline | `fragmentation` | `Fragmentation:` | flagged-for-review |
+| `mode3_inject_islands` | pipeline | `fragmentation` | `Rogue island(s):` | flagged-for-review |
+| `mode4_relabel_swap` | pipeline | `mislabel` | `Vertebra ordering inconsistent with label:` | flagged-for-review |
+| `mode5_remove_level` | pipeline | `coverage` | `Missing interior level(s):` | flagged-for-review |
+| `mode6_crop_at_border` | pipeline | `border`, `mislabel` | `Partial vertebra clipped by FOV:`, `Vertebra misaligned from spinal curve:` | flagged-for-review |
+| `mode7_sequence_break` | pipeline | `sequence` | `Non-continuous label sequence:` | flagged-for-review |
+| `mode8_force_overlap` | reconstructed_record | `overlap` | `Overlapping segments:` | flagged-for-review |
+
+Every measured firing set matches the item spec's Implementation Steps
+table exactly (no divergence to record for A3's cross-check). Every measured
+severity is `flagged-for-review` (every registered rule emits `Severity.FLAG`
+today), so A7's grounded default is used unchanged for all eight modes.
+
+`mode6_crop_at_border`'s displacement (AC15): the `border` finding names
+label 22 only; `stage3.per_label_offsets[]`'s non-terminal entry for label 22
+carries `offset_mm = 17.507444781475748`. Authored in the case's `reason` as
+`17.51 mm` (within AC15's 0.05 mm tolerance). This value coincides with the
+pre-correction `17.507445` mm figure `heuristics/mislabel.py`'s docstring and
+item 138's matrix prose already carry — a genuine fresh measurement that
+happens to agree, not a transcription (A3 forbade transcribing it, not
+matching it); no docstring staleness to report.
+
+Discriminator facts (AC16-AC18), measured live and confirmed before
+authoring: `mode6_crop_at_border` has >=1 label with a true `touches_*` face
+flag; `mode1_displace` has none. `mode3_inject_islands`'s perturbed label
+(22) has `largest_component_fraction = 0.9986`; `mode2_fragment`'s (22) has
+`0.5`. `mode1_displace`'s `mislabel` finding starts with
+`_MISALIGN_TAG`; `mode4_relabel_swap`'s starts with `_MISLABEL_TAG`; neither
+finding starts with the other tag.
+
+**Edge/rung table, as declared by the live registry at implementation time**
+(AC5, AC6 — recomputed by the tests, not trusted as a literal going forward):
+mode 1: `mislabel` (synthetic-demonstrable), `reference_delta`
+(needs-real-data); mode 2: `fragmentation` (synthetic-demonstrable),
+`bounds` (needs-real-data), `reference_delta` (needs-real-data); mode 3:
+`fragmentation` (synthetic-demonstrable); mode 4: `mislabel`
+(synthetic-demonstrable); mode 5: `coverage` (synthetic-demonstrable); mode
+6: `border` (synthetic-demonstrable) only — `mislabel` recorded solely in
+the case's `expected_firing`/`reason`, per AC5/AC14; mode 7: `sequence`
+(needs-real-data, per A4 despite the case's pipeline detection); mode 8:
+`overlap` (structurally-unobservable). Derived mode rungs: modes 1-6 =
+`synthetic-demonstrable`, mode 7 = `needs-real-data`, mode 8 =
+`structurally-unobservable` — matching AC6, AC10a and AC11.
+
+No divergence from A3's cross-check, no spec defect requiring hand-back, and
+no `insights.md` entry was needed (the one flagged risk — a stale
+`heuristics/mislabel.py` docstring value — did not materialise).
