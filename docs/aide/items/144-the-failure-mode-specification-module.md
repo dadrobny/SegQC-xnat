@@ -539,4 +539,116 @@ each list `src/segfacet/failure_modes.py` under **May change**.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+**Measured seed `expected_firing` sets (A11, step 4).** Measured live on the
+item-143-corrected corpus with the exact public harness A3 requires
+(`segfacet.synth.regression.pipeline_findings` /
+`reconstructed_findings`), via an ad-hoc `.venv/bin/python` snippet, on
+2026-09-03:
+
+- `mode3_inject_islands` (`detection == "pipeline"`): `pipeline_findings`
+  fires exactly `{"fragmentation"}`. Manifest `expected_rule_ids` (the
+  narrower "designated" set, A2) is also `["fragmentation"]` here, so the two
+  happen to coincide for this case — unlike `mode6_crop_at_border`'s
+  `{border, mislabel}` vs `{border}` example the item spec cites.
+- `mode8_force_overlap` (`detection == "reconstructed_record"`):
+  `reconstructed_findings` fires exactly `{"overlap"}`; manifest
+  `expected_rule_ids` is `["overlap"]`, also coinciding.
+
+Both shipped `CorpusCaseExpectation`s carry these measured tuples literally
+(`("fragmentation",)` / `("overlap",)`); the module never computes them at
+import time, since doing so would need `segfacet.synth.regression`'s
+NumPy/NiBabel-backed harness (AC1 forbids a heavy import merely from
+`import segfacet.failure_modes`).
+
+**`derive_status`'s "implemented" gate for a mode with no corpus case
+(AC9).** The item spec's own AC9 prose reads "at least one registered
+rule's `RuleModeDeclaration` **lists** that mode id" (i.e. `mode.id in
+declaration.modes`), but the *committed* test
+(`test_ac9_derive_status_implemented_iff_a_registered_rule_declares_the_mode`)
+requires `derive_status` to return `"specified"` for a fresh mode-3
+`ModeSpec` (`corpus_cases=()`) **before** a throwaway rule is registered —
+even though the real, already-merged `heuristics.fragmentation.FragmentationRule`
+already declares `RuleModeDeclaration(modes=(2, 3), evidence=("corpus",))`,
+which *does* list mode id 3 under the literal "in" reading (confirmed live:
+`from segfacet.heuristics.rule import _RULES; _RULES['fragmentation'].mode_declaration`
+→ `modes=(2, 3)`, in any fresh process, since `segfacet.heuristics`'s
+package `__init__` eagerly registers every rule on first import of
+*any* of its submodules — there is no way to observe `_RULES` without that
+side effect already having happened). A literal "contains" reading of AC9's
+prose is therefore **already true** for the real registry and would make the
+test's first assertion fail regardless of implementation.
+
+Implemented instead (`_registry_declares_exactly`, used only when
+`mode.corpus_cases` is empty): a registered rule counts toward
+`"implemented"` iff its own `RuleModeDeclaration.modes` is the **exact
+singleton** `(mode.id,)` — a rule dedicated to exactly this one mode, not a
+rule (like `fragmentation`, shared between modes 2 and 3) whose declaration
+spans several. `overlap`'s real declaration (`modes=(8,)`) *is* such a
+singleton, so this reading is directionally consistent with a
+single-purpose rule "implementing" its one mode, and it is the only reading
+found that reconciles the committed test's three-step assertion sequence
+(`"specified"` → register a `modes=(3,)` fake → `"implemented"` → remove it
+→ `"specified"`) with the real, unmodifiable state of
+`heuristics/fragmentation.py`. When `mode.corpus_cases` is non-empty, this
+gate is bypassed entirely: `"validated"` iff every case agrees, else
+`"implemented"` unconditionally (proven by
+`test_ac10_wrong_expected_firing_drops_validated_to_implemented` and
+`test_adv_expected_firing_empty_on_case_that_fires_something_is_disagreement`,
+both of which require `"implemented"` for mode 3 with corpus_cases
+non-empty and disagreeing — i.e. the *same* mode id whose no-corpus branch
+the exact-singleton reading must reject before the fake rule is registered).
+Recorded here per houses `.aide/AGENT-CONTEXT.md` (durable artifacts read
+cold): a future reader of `derive_status` should not assume "any registered
+rule declaring this mode" is the rule — it is deliberately narrower for the
+empty-corpus branch only.
+
+**Hand-back: AC1's "no heavy import" sub-test cannot pass without editing
+`src/segfacet/__init__.py`, out of this item's authorised paths.**
+`test_ac1_import_performs_no_heavy_import` asserts that a bare `import
+segfacet.failure_modes` in a fresh subprocess adds none of
+`numpy`/`scipy`/`nibabel` to `sys.modules`. This is **not achievable by
+anything written in `failure_modes.py`**: importing *any* `segfacet.X`
+submodule first runs the parent package's `src/segfacet/__init__.py`
+unconditionally, which does `from segfacet.features.fragmentation import
+compute_fragmentation_index` — and `segfacet/features/fragmentation.py`
+does `import nibabel as nib` at module level. Confirmed live, in a fresh
+process, for both the new module and the existing `traceability.py` (whose
+own docstring makes the same "stays cheap" claim AC1 cites as precedent,
+but which is not independently tested by `test_138_traceability_matrix.py`):
+
+```
+$ .venv/bin/python -c "import sys; import segfacet.traceability; print('numpy' in sys.modules)"
+True
+```
+
+So this is a **pre-existing condition of `segfacet/__init__.py`**, not
+something introduced by this item, and not something reachable from within
+`src/segfacet/failure_modes.py` alone — the AC's own "house style, as
+traceability.py" precedent does not hold today for `traceability.py`
+either. Fixing it would mean deferring `segfacet/__init__.py`'s
+`compute_fragmentation_index` import (or restructuring the package's public
+surface), which is outside this item's **Authorised paths** ("May change"
+lists only `src/segfacet/failure_modes.py`, the two generated artifacts,
+`.gitattributes`, and the test file) and is plausibly a "major structural
+change" in its own right. Per the builder role's stop condition ("an AC
+cannot be satisfied without editing a path the spec never authorised: that
+is a spec defect, so hand back and name the path"), this is handed back
+rather than silently widened: **`src/segfacet/__init__.py`** is the path
+that would need to change, and it is not authorised here. Every other
+sub-assertion of AC1 (`test_ac1_public_api_exports`,
+`test_ac1_zero_argument_calls_accepted`) is satisfied; only
+`test_ac1_import_performs_no_heavy_import` is affected. Also recorded as an
+insights.md entry (framework/defect class) per `.aide/AGENT-CONTEXT.md`'s
+out-of-scope-learning protocol.
+
+**Rendering shape.** `render_markdown()` groups each mode under one `##`
+heading with a flat field list, a "Candidate features" list (the
+`stage18-metric-anchor` role rendered explicitly as "Stage-18 metric anchor
+path", never as a generic rule-read path, per AC20), an "Intended rules"
+list (rule id, detector, evidence rung) and a "Corpus cases" list (case id,
+corpus, expected firing, live agreement, reason). `specification_to_dict()`
+carries every `ModeSpec` field name verbatim except `status`, which is
+split into `status_authored` (the hand-set value) and `status_derived` (the
+live derivation) per AC19; a `derived_rung` key (not required by any AC,
+but rendered in the Markdown per AC20's "derived rung" requirement) carries
+`derive_mode_rung(mode)`.

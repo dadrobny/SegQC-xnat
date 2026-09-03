@@ -54,6 +54,12 @@ docs/aide/golden-decision-table.md text eol=lf
 docs/aide/traceability_matrix.generated.json text eol=lf
 docs/aide/traceability_matrix.generated.md text eol=lf
 
+# Item 144's generated failure-mode specification rendering -- byte-
+# reproducible fixtures (AC21/AC22), same Windows core.autocrlf gotcha as the
+# pins above (see CLAUDE.md's Gotchas).
+docs/aide/failure_modes.generated.json text eol=lf
+docs/aide/failure_modes.generated.md text eol=lf
+
 # Item 111: 016_features_report.json and 022_stage3_report.json were the only
 # committed byte-reproducible text fixtures still unpinned -- latent only
 # because both consumers compare via read_text(), whose universal-newline
