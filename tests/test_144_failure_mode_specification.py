@@ -683,8 +683,16 @@ def test_ac9_derive_status_implemented_iff_a_registered_rule_declares_the_mode(
     import segfacet.failure_modes as fm
     from segfacet.heuristics.rule import Rule, RuleModeDeclaration, _RULES, register_rule
 
+    # Built *before* the registry is emptied: _mode3_kwargs measures the
+    # committed corpus live, which needs the real rules registered.
     # No corpus_cases so derive_status cannot reach "validated" via that path.
     mode = fm.ModeSpec(**_mode3_kwargs(corpus_cases=()))
+
+    # Empty the registry (the isolated_registry fixture restores it), so the
+    # transition below is caused by the throwaway rule and by nothing else.
+    # Without this, the real heuristics.fragmentation already declares mode 3
+    # (modes=(2, 3)) and the "before" state would not be observable.
+    _RULES.clear()
     assert fm.derive_status(mode) == "specified"
 
     class _FakeFragmentationDetector(Rule):
@@ -699,6 +707,23 @@ def test_ac9_derive_status_implemented_iff_a_registered_rule_declares_the_mode(
 
     del _RULES["__item144_fake_mode3_detector__"]
     assert fm.derive_status(mode) == "specified"
+
+
+def test_ac9_multi_mode_declaration_implements_every_mode_it_lists():
+    """vision.md §6's lifecycle: "``implemented`` -- at least one registered
+    rule declares the mode". The real ``heuristics.fragmentation`` declares
+    ``modes=(2, 3)``, so mode 3 is implemented by it even though that
+    declaration is not the singleton ``(3,)`` -- read live from the
+    unmodified registry, not transcribed."""
+    import segfacet.failure_modes as fm
+    from segfacet.heuristics.rule import _RULES
+
+    declaration = _RULES["fragmentation"].mode_declaration
+    assert 3 in declaration.modes, declaration.modes
+    assert declaration.modes != (3,), declaration.modes
+
+    mode = fm.ModeSpec(**_mode3_kwargs(corpus_cases=()))
+    assert fm.derive_status(mode) == "implemented"
 
 
 # =========================================================================== #
@@ -747,12 +772,21 @@ def test_adv_expected_firing_empty_on_case_that_fires_something_is_disagreement(
     assert fm.derive_status(mode) == "implemented"
 
 
-def test_adv_empty_corpus_cases_and_intended_rules_derives_specified_not_validated():
+def test_adv_empty_corpus_cases_and_intended_rules_derives_specified_not_validated(
+    isolated_registry,
+):
     """The empty set must never satisfy an "every case agrees" quantifier
-    vacuously into a stronger status."""
+    vacuously into a stronger status. Measured against an emptied registry so
+    that the asserted value is "specified" exactly -- with the real registry
+    the same mode is legitimately "implemented" (heuristics.fragmentation
+    declares mode 3), which is still not "validated"."""
     import segfacet.failure_modes as fm
+    from segfacet.heuristics.rule import _RULES
 
     mode = fm.ModeSpec(**_mode3_kwargs(intended_rules=(), corpus_cases=()))
+    assert fm.derive_status(mode) != "validated"
+
+    _RULES.clear()
     assert fm.derive_status(mode) == "specified"
 
 
@@ -938,6 +972,41 @@ def test_adv_duplicate_case_id_within_corpus_cases_rejected():
     message = str(excinfo.value)
     assert "3" in message
     assert "mode3_inject_islands" in message
+
+
+def test_adv_duplicate_mode_ids_rejected_rather_than_silently_dropped():
+    """A dict comprehension keyed by ``id`` would let the later of two
+    entries with the same ``id`` replace the earlier one with no diagnostic
+    -- items 145/146 author six more entries by hand."""
+    import segfacet.failure_modes as fm
+
+    first = fm.ModeSpec(**_mode3_kwargs())
+    second = fm.ModeSpec(**_mode3_kwargs(name="a different mode wearing id 3"))
+    with pytest.raises(ValueError) as excinfo:
+        fm._build_specification((first, second))
+    message = str(excinfo.value)
+    assert "3" in message
+    assert "duplicate" in message.lower()
+
+
+def test_adv_case_agrees_rejects_a_bare_string_expected_firing():
+    """``case_agrees`` is public API and takes a ``CorpusCaseExpectation``
+    directly, so ``expected_firing="overlap"`` would otherwise be compared
+    character-wise against the measured set and silently return ``False``
+    -- the AC7 defect class, one level outside ``ModeSpec``."""
+    import segfacet.failure_modes as fm
+
+    case = fm.CorpusCaseExpectation(
+        case_id="mode8_force_overlap",
+        corpus="geometric",
+        expected_firing="overlap",
+        reason="adversarial: bare string reaching the public derivation directly",
+    )
+    with pytest.raises(ValueError) as excinfo:
+        fm.case_agrees(case)
+    message = str(excinfo.value)
+    assert "expected_firing" in message
+    assert "mode8_force_overlap" in message
 
 
 # =========================================================================== #
