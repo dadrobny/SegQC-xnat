@@ -66,7 +66,7 @@
       ],
       "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
       "granularity": "rule",
-      "mechanism": "Item 120's held-out spline-offset measurement demonstrates label displacement end-to-end on the committed corpus case mode1_displace; mislabel and reference_delta both flag it, the latter because compute_reference_delta scores spline_offset_mm alongside every other tracked feature.",
+      "mechanism": "Item 120's held-out spline-offset measurement demonstrates label displacement end-to-end on the committed corpus case mode1_displace; under plain run_qc (no reference attached) it is caught solely by mislabel's Detector A via stage3.per_label_offsets[].offset_mm (measured: findings == ['mislabel']). reference_delta additionally scores spline_offset_mm, but only once a reference is attached, which this corpus case's plain-pipeline detection is not.",
       "mode": 1,
       "pipeline_detected": true,
       "rule_attribution": {
@@ -116,7 +116,7 @@
       ],
       "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
       "granularity": "rule",
-      "mechanism": "The corpus case mode2_fragment demonstrates over-/under-segmentation end-to-end, caught independently by bounds' magnitude thresholds, fragmentation's component-count checks, and reference_delta's cohort-relative scoring.",
+      "mechanism": "The corpus case mode2_fragment demonstrates over-/under-segmentation end-to-end; under plain run_qc (no reference attached) it is caught solely by fragmentation's component-count checks (measured: findings == ['fragmentation']). bounds and reference_delta fire only once a reference is attached, and then fire identically on clean_control -- the documented uncalibrated-baseline noise (CLAUDE.md Gotchas, item 125) -- not evidence of mode-2-specific detection.",
       "mode": 2,
       "pipeline_detected": true,
       "rule_attribution": {
@@ -191,7 +191,7 @@
       ],
       "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
       "granularity": "rule",
-      "mechanism": "Item 132 closed the interpolating-spline-fit defect for semantic mislabelling, and the corpus case mode4_relabel_swap demonstrates a relabel-swap end-to-end, caught by mislabel's Detector B via stage3.monotonic_consistency.is_monotonic.",
+      "mechanism": "Item 132 closed the interpolating-spline-fit defect for semantic mislabelling, and the corpus case mode4_relabel_swap demonstrates a relabel-swap end-to-end, caught by mislabel's Detector B via stage3.monotonic_consistency.non_monotonic_pairs[] -- the field Detector B actually reads; MODE_ANCHOR_PATHS anchors this mode instead on the neighbouring is_monotonic field by design (feature_docs.py), not on the field the rule reads.",
       "mode": 4,
       "pipeline_detected": true,
       "rule_attribution": {
@@ -222,7 +222,7 @@
       ],
       "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
       "granularity": "rule",
-      "mechanism": "The corpus case mode5_remove_level demonstrates a missing vertebra end-to-end, caught by the coverage rule against relationships.present_levels[].",
+      "mechanism": "The corpus case mode5_remove_level demonstrates a missing vertebra end-to-end, caught by the coverage rule against relationships.missing_levels[] -- the field the rule actually reads; relationships.present_levels[] is read only by coverage's opt-in expected-levels span check, which ships disabled (expected_levels=[]).",
       "mode": 5,
       "pipeline_detected": true,
       "rule_attribution": {
@@ -258,7 +258,7 @@
       ],
       "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
       "granularity": "rule",
-      "mechanism": "The corpus case mode6_crop_at_border demonstrates a border-cropped vertebra end-to-end, caught by the border rule reading per_label.{label}.geometry.touches_left.",
+      "mechanism": "The corpus case mode6_crop_at_border demonstrates a border-cropped vertebra end-to-end -- the corpus operator crops the anterior face -- caught by the border rule reading per_label.{label}.geometry.touches_anterior.",
       "mode": 6,
       "pipeline_detected": true,
       "rule_attribution": {

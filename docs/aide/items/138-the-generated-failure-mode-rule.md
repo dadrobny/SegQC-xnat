@@ -760,3 +760,95 @@ recorded here.
   inheritance was rejected as misreadable. The matrix labels the list
   `granularity: "rule"` and prints the qualifier, and the underlying finding
   stays with item 136 via `insights.md`.
+
+### Correction (2026-09-03, post-merge code review)
+
+A code review of this item's committed `MODE_RUNGS` mechanisms found that
+**four of the eight sentences were false**, despite AC31's token-presence
+check passing on all eight — the check only requires a mechanism to name a
+token that resolves against live state (an anchor path, a `case_id`, or a
+`rule_id`), never that the surrounding claim about *how* that token fires is
+true. The original reasoning above (Implementation and A14) is left standing;
+what it got wrong is recorded here, each measured directly against this tree
+before being rewritten:
+
+- **Mode 1.** Claimed "mislabel and reference_delta both flag it". Measured:
+  `run_qc` (no reference attached) on the corpus case `mode1_displace` yields
+  `findings == ['mislabel']` only — `reference_delta` fires only once a
+  reference is attached, a separate path this corpus case's plain-pipeline
+  detection does not exercise. Rewritten to state the single-detector
+  mechanism and name `reference_delta`'s scope as conditional, not additive.
+- **Mode 2.** Claimed bounds, fragmentation and reference_delta "independently
+  catch it". Measured: `run_qc` on `mode2_fragment` yields
+  `findings == ['fragmentation']` only. `bounds` and `reference_delta` fire
+  only with a reference attached, and then fire identically on
+  `clean_control` — the documented uncalibrated-baseline noise (CLAUDE.md
+  Gotchas, item 125), not mode-2-specific detection. Rewritten accordingly.
+- **Mode 4.** Claimed mislabel's Detector B fires "via
+  `stage3.monotonic_consistency.is_monotonic`". Measured:
+  `src/segfacet/heuristics/mislabel.py:330` reads `non_monotonic_pairs`;
+  `is_monotonic` appears nowhere in the module. `feature_docs.py:59-68`
+  already documents that `is_monotonic` is the *anchor* precisely because it
+  is not what Detector B reads — the sentence had the anchor and the read
+  path backwards. Rewritten to name `non_monotonic_pairs[]` as the field the
+  rule reads and `is_monotonic` as the (deliberately different) anchor.
+- **Mode 5.** Claimed the coverage rule fires "against
+  `relationships.present_levels[]`". Measured:
+  `src/segfacet/heuristics/coverage.py:182,189-190` shows the check that
+  fires on `mode5_remove_level` reads `missing_levels`; `present_levels` is
+  read only by the opt-in expected-levels span check
+  (`expected_levels`, default `[]`, so disabled on this tree). Rewritten to
+  name `missing_levels[]` as the field the rule reads.
+- **Mode 6.** Claimed the border rule reads
+  `per_label.{label}.geometry.touches_left`. Measured:
+  `src/segfacet/synth/corpus.py:160` crops the **anterior** face for
+  `mode6_crop_at_border`, and the border rule (`heuristics/border.py`) reads
+  all four in-plane faces including `touches_anterior`. Rewritten to name
+  `touches_anterior`, matching the corpus operator's actual crop face.
+- **Modes 3, 7 and 8** were checked against the same measurements
+  (`run_qc` findings for 3 and 7; the manifest's `detection` field for 8) and
+  found accurate as written; left unchanged.
+
+**A second defect, in `build_matrix()` itself (not `MODE_RUNGS`):** the
+`rule_to_mode` direction decided completeness solely on
+`declaration_state in ("declared", "mode_less")`, never checking a declared
+mode against `feature_docs.MODE_ANCHOR_PATHS`. A stub rule declaring
+`modes=(9,)` — a mode outside the catalogue — would report
+`rule_to_mode: {complete: True, holes: []}` while
+`catalogue.rule_declaration_conflicts()` already reports the same
+disagreement (its "declared §6 mode ... is outside MODE_ANCHOR_PATHS's key
+set" message), and `rules_by_mode` (built from `mode_anchor_paths`, which
+never contains 9) would silently drop the rule from every mode row. This is
+exactly this module's own definition of a rule → mode hole ("a registered
+rule targeting no catalogued mode"), so `build_matrix()` now folds
+`catalogue.rule_declaration_conflicts()`'s uncatalogued-mode messages into
+the `rule_to_mode_holes` computation: a `"declared"` rule whose declared
+modes are *entirely* outside `MODE_ANCHOR_PATHS` is now a hole; a rule
+declaring a mix of catalogued and uncatalogued modes still targets ≥1
+catalogued mode and is not. No stub rule exists on this tree today, so
+`rule_to_mode` still reports `complete: True, holes: []` after the fix — the
+change only closes the blind spot for a future rule, verified by re-running
+`build_matrix()` and confirming both directions unchanged.
+
+**`progress.md`'s Stage 20 ticks, re-examined against the corrected
+artifact.** This item's own "What this item is NOT" states it "does not tick
+a `progress.md` acceptance box (item 142)", yet the merged commit ticked the
+Stage 20 G2 acceptance box ("Every §6 failure mode has ≥1 rule and a
+recorded evidence rung — never silent") and flipped two Stage 20 deliverable
+bullets to ✅, outside this item's authorised paths. Re-examined post-fix:
+- The G2 acceptance box's claim — every mode has ≥1 declaring rule and a
+  recorded evidence rung from the closed vocabulary — holds independently of
+  mechanism-sentence wording (it is `mode_to_rule.complete` plus AC12's
+  vocabulary check, neither of which the four false sentences affected) and
+  remains true after the fix; kept ticked. Its evidence note's rung
+  enumeration ("synthetic-demonstrable x6, structurally-unobservable for
+  mode 8") omitted mode 7's `needs-real-data` rung from the eight-mode
+  accounting — corrected in `progress.md` to name all three rungs actually
+  present (6 · 1 · 1 = 8).
+- Both Stage 20 deliverable bullets ("Traceability matrix, generated…" and
+  "Reachability hole closed with its mechanism named per mode…") describe
+  claims unaffected by the four corrected sentences (artifact existence, and
+  the mode 1/4/8 supersession narrative already carrying its own
+  "⚠️ Superseded in part" annotation) and remain true; kept ticked.
+- No `progress retract` was needed as a result of this correction, since
+  none of the three re-examined ticks turned out false.

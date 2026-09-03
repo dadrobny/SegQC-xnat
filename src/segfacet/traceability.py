@@ -149,18 +149,26 @@ MODE_RUNGS: Dict[int, ModeRung] = {
         mechanism=(
             "Item 120's held-out spline-offset measurement demonstrates "
             "label displacement end-to-end on the committed corpus case "
-            "mode1_displace; mislabel and reference_delta both flag it, the "
-            "latter because compute_reference_delta scores spline_offset_mm "
-            "alongside every other tracked feature."
+            "mode1_displace; under plain run_qc (no reference attached) it "
+            "is caught solely by mislabel's Detector A via "
+            "stage3.per_label_offsets[].offset_mm (measured: findings == "
+            "['mislabel']). reference_delta additionally scores "
+            "spline_offset_mm, but only once a reference is attached, which "
+            "this corpus case's plain-pipeline detection is not."
         ),
     ),
     2: ModeRung(
         rung="synthetic-demonstrable",
         mechanism=(
             "The corpus case mode2_fragment demonstrates over-/"
-            "under-segmentation end-to-end, caught independently by "
-            "bounds' magnitude thresholds, fragmentation's component-count "
-            "checks, and reference_delta's cohort-relative scoring."
+            "under-segmentation end-to-end; under plain run_qc (no "
+            "reference attached) it is caught solely by fragmentation's "
+            "component-count checks (measured: findings == "
+            "['fragmentation']). bounds and reference_delta fire only once "
+            "a reference is attached, and then fire identically on "
+            "clean_control -- the documented uncalibrated-baseline noise "
+            "(CLAUDE.md Gotchas, item 125) -- not evidence of mode-2-"
+            "specific detection."
         ),
     ),
     3: ModeRung(
@@ -177,7 +185,11 @@ MODE_RUNGS: Dict[int, ModeRung] = {
             "Item 132 closed the interpolating-spline-fit defect for "
             "semantic mislabelling, and the corpus case mode4_relabel_swap "
             "demonstrates a relabel-swap end-to-end, caught by mislabel's "
-            "Detector B via stage3.monotonic_consistency.is_monotonic."
+            "Detector B via "
+            "stage3.monotonic_consistency.non_monotonic_pairs[] -- the "
+            "field Detector B actually reads; MODE_ANCHOR_PATHS anchors "
+            "this mode instead on the neighbouring is_monotonic field by "
+            "design (feature_docs.py), not on the field the rule reads."
         ),
     ),
     5: ModeRung(
@@ -185,15 +197,19 @@ MODE_RUNGS: Dict[int, ModeRung] = {
         mechanism=(
             "The corpus case mode5_remove_level demonstrates a missing "
             "vertebra end-to-end, caught by the coverage rule against "
-            "relationships.present_levels[]."
+            "relationships.missing_levels[] -- the field the rule actually "
+            "reads; relationships.present_levels[] is read only by "
+            "coverage's opt-in expected-levels span check, which ships "
+            "disabled (expected_levels=[])."
         ),
     ),
     6: ModeRung(
         rung="synthetic-demonstrable",
         mechanism=(
             "The corpus case mode6_crop_at_border demonstrates a "
-            "border-cropped vertebra end-to-end, caught by the border rule "
-            "reading per_label.{label}.geometry.touches_left."
+            "border-cropped vertebra end-to-end -- the corpus operator "
+            "crops the anterior face -- caught by the border rule reading "
+            "per_label.{label}.geometry.touches_anterior."
         ),
     ),
     7: ModeRung(
@@ -334,8 +350,14 @@ def build_matrix() -> TraceabilityMatrix:
 
     Never mutates any input (the registry, the catalogue, the manifest);
     two calls return equal matrices. Deferred imports (house style)."""
+    import re
+
     from segfacet import feature_docs as feature_docs_module
-    from segfacet.catalogue import build_catalogue, scan_synth_rule_mode_map
+    from segfacet.catalogue import (
+        build_catalogue,
+        rule_declaration_conflicts,
+        scan_synth_rule_mode_map,
+    )
     from segfacet.heuristics.rule import iter_rule_declarations, iter_rules
     from segfacet.synth.corpus import load_manifest
 
@@ -394,13 +416,38 @@ def build_matrix() -> TraceabilityMatrix:
             evidence_by_rule[rule_id] = ()
 
     # rule -> mode direction: complete iff every registered rule is
-    # "declared" or "mode_less" (AC18, AC26).
+    # "declared" or "mode_less" (AC18, AC26) -- AND, for a "declared" rule,
+    # at least one of its declared modes is actually catalogued. A rule
+    # declaring only modes outside feature_docs.MODE_ANCHOR_PATHS (e.g. a
+    # stub declaring modes=(9,)) is "declared" by declaration_state alone
+    # but targets no catalogued mode, which is exactly a rule -> mode hole
+    # per this module's own completeness contract. catalogue's
+    # rule_declaration_conflicts() already reports this disagreement
+    # (its "declared §6 mode ... is outside MODE_ANCHOR_PATHS's key set"
+    # message); folded in here rather than re-derived, so the artifact's
+    # own completeness claim covers it too, and rules_by_mode (which is
+    # built from declared_modes_by_rule directly) never silently drops it.
+    _known_modes = set(mode_anchor_paths.keys())
+    _uncatalogued_mode_rule_ids = set()
+    _uncatalogued_mode_re = re.compile(
+        r"^rule '([^']+)': declared §6 mode \d+ is outside"
+    )
+    for _message in rule_declaration_conflicts():
+        _match = _uncatalogued_mode_re.match(_message)
+        if _match:
+            _uncatalogued_mode_rule_ids.add(_match.group(1))
+
     rule_to_mode_holes = tuple(
         sorted(
             rule_id
             for rule_id in registered_rule_ids
             if declaration_state_by_rule.get(rule_id, "undeclared")
             not in ("declared", "mode_less")
+            or (
+                declaration_state_by_rule.get(rule_id) == "declared"
+                and rule_id in _uncatalogued_mode_rule_ids
+                and not (set(declared_modes_by_rule.get(rule_id, ())) & _known_modes)
+            )
         )
     )
     rule_to_mode = DirectionReport(complete=not rule_to_mode_holes, holes=rule_to_mode_holes)
