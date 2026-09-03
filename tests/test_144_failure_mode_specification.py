@@ -680,16 +680,46 @@ def test_ac8_derived_only_status_rejected_at_construction(status):
 def test_ac9_derive_status_implemented_iff_a_registered_rule_declares_the_mode(
     isolated_registry,
 ):
+    """Reconciled per item 145's A2: the probe is built on mode id **99**,
+    which no registered rule declares, rather than mode 3 -- under the
+    containment reading item 145's A1 may bring, mode 3 is falsely
+    "specified" before registration because ``fragmentation`` already
+    declares ``modes=(2, 3)``, which would make this test's first assertion
+    false. The register/observe/unregister sequence itself is unchanged."""
     import segfacet.failure_modes as fm
     from segfacet.heuristics.rule import Rule, RuleModeDeclaration, _RULES, register_rule
 
+    # id=99 carries no MODE_ANCHOR_PATHS entry, so its candidate feature must
+    # be authored "hypothesised", not "stage18-metric-anchor" (A2).
+    kwargs = dict(
+        id=99,
+        name="adversarial probe mode (no registered rule declares it)",
+        definition=(
+            "A synthetic mode id used only to exercise derive_status's live "
+            "registry read; not one of vision.md section 6's eight modes."
+        ),
+        discriminator="Not a real section-6 mode; exists only for this test.",
+        observability="single-channel-observable",
+        candidate_features=(
+            fm.CandidateFeature(
+                path="per_label.{label}.geometry.touches_left",
+                role="hypothesised",
+            ),
+        ),
+        intended_rules=(),
+        corpus_cases=(),
+        severity="flagged-for-review",
+        status="specified",
+        provenance="hypothesised",
+    )
+
     # No corpus_cases so derive_status cannot reach "validated" via that path.
-    mode = fm.ModeSpec(**_mode3_kwargs(corpus_cases=()))
+    mode = fm.ModeSpec(**kwargs)
     assert fm.derive_status(mode) == "specified"
 
     class _FakeFragmentationDetector(Rule):
-        rule_id = "__item144_fake_mode3_detector__"
-        mode_declaration = RuleModeDeclaration(modes=(3,), evidence=("analytic",))
+        rule_id = "__item144_fake_mode99_detector__"
+        mode_declaration = RuleModeDeclaration(modes=(99,), evidence=("analytic",))
 
         def evaluate(self, record, config):
             return []
@@ -697,7 +727,7 @@ def test_ac9_derive_status_implemented_iff_a_registered_rule_declares_the_mode(
     register_rule(_FakeFragmentationDetector)
     assert fm.derive_status(mode) == "implemented"
 
-    del _RULES["__item144_fake_mode3_detector__"]
+    del _RULES["__item144_fake_mode99_detector__"]
     assert fm.derive_status(mode) == "specified"
 
 
@@ -1033,14 +1063,16 @@ def test_ac15_each_accepted_severity_is_accepted(severity):
 # =========================================================================== #
 
 
-def test_ac16_specification_carries_exactly_modes_three_and_eight():
+def test_ac16_specification_carries_all_eight_modes():
+    """Item 145 entered the remaining six §6 modes: the seed of two (3, 8)
+    this test used to pin becomes all eight (1-8)."""
     import segfacet.failure_modes as fm
 
     ids = tuple(m.id for m in fm.iter_modes())
-    assert ids == (3, 8)
+    assert ids == (1, 2, 3, 4, 5, 6, 7, 8)
 
 
-@pytest.mark.parametrize("mode_id", [3, 8])
+@pytest.mark.parametrize("mode_id", [1, 2, 3, 4, 5, 6, 7, 8])
 def test_ac16_every_field_non_empty(mode_id):
     import segfacet.failure_modes as fm
 
@@ -1052,7 +1084,7 @@ def test_ac16_every_field_non_empty(mode_id):
     assert mode.corpus_cases
 
 
-@pytest.mark.parametrize("mode_id", [3, 8])
+@pytest.mark.parametrize("mode_id", [1, 2, 3, 4, 5, 6, 7, 8])
 def test_ac16_each_id_is_a_key_of_mode_anchor_paths(mode_id):
     import segfacet.failure_modes as fm
     import segfacet.feature_docs as feature_docs
