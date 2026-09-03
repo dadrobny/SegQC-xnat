@@ -27,14 +27,12 @@ entry this item does not add. The byte-exact comparison stays run-to-run only
 from __future__ import annotations
 
 import dataclasses
+import importlib.util
 import json
 import re
-import sys
 from pathlib import Path
 
 import pytest
-
-from run_process import run_utf8
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _COMMITTED_JSON = _REPO_ROOT / "docs" / "aide" / "failure_modes.generated.json"
@@ -137,6 +135,33 @@ def _case(mode, case_id: str):
     return case
 
 
+def _live_declared_rule_ids(mode_id: int) -> set:
+    """The rule ids the **live** registry declares for *mode_id*, recomputed
+    from `iter_rule_declarations()` on every call."""
+    from segfacet.heuristics.rule import iter_rule_declarations
+
+    return {
+        rule_id
+        for rule_id, declaration in iter_rule_declarations()
+        if declaration is not None and mode_id in declaration.modes
+    }
+
+
+def _ac5_edge_set_matches_registry(mode) -> bool:
+    """AC5's predicate, as one function. Shared by the parametrised AC5 test
+    and by the adversarial test that feeds it a deliberately-broken mode --
+    otherwise the adversarial test re-implements the comparison inline and
+    can pass whatever the checker does."""
+    return {edge.rule_id for edge in mode.intended_rules} == _live_declared_rule_ids(mode.id)
+
+
+def _ac19_names_a_sibling(mode, all_ids: set) -> bool:
+    """AC19's predicate, as one function (same reason as
+    :func:`_ac5_edge_set_matches_registry`)."""
+    tokens = {int(token) for token in re.findall(r"\d+", mode.discriminator)}
+    return bool(tokens & (all_ids - {mode.id}))
+
+
 def _pick_mode_with_unique_strongest_edge(fm):
     """The first shipped mode whose derived rung comes from exactly one
     strongest edge -- picked live, never hardcoded to a particular mode id
@@ -234,17 +259,15 @@ def test_ac4_stage18_anchor_paths_carried_and_only_that(mode_id):
 @pytest.mark.parametrize("mode_id", _EXPECTED_MODE_IDS)
 def test_ac5_edge_set_equals_live_registry_declared_set(mode_id):
     import segfacet.failure_modes as fm
-    from segfacet.heuristics.rule import iter_rule_declarations
 
     mode = _mode(fm, mode_id)
-    declared = {
-        rule_id
-        for rule_id, declaration in iter_rule_declarations()
-        if declaration is not None and mode_id in declaration.modes
-    }
+    declared = _live_declared_rule_ids(mode_id)
     assert declared, f"expected >=1 registered rule to declare mode {mode_id}"
-    edge_ids = {edge.rule_id for edge in mode.intended_rules}
-    assert edge_ids == declared, (mode_id, edge_ids, declared)
+    assert _ac5_edge_set_matches_registry(mode), (
+        mode_id,
+        {edge.rule_id for edge in mode.intended_rules},
+        declared,
+    )
 
 
 def test_ac5_mode6_edge_set_is_exactly_border():
@@ -602,9 +625,7 @@ def test_ac19_every_discriminator_names_a_sibling_mode():
     all_ids = {mode.id for mode in fm.iter_modes()}
     assert all_ids, "expected >=1 mode"
     for mode in fm.iter_modes():
-        tokens = {int(t) for t in re.findall(r"\d+", mode.discriminator)}
-        siblings = tokens & (all_ids - {mode.id})
-        assert siblings, (mode.id, mode.discriminator)
+        assert _ac19_names_a_sibling(mode, all_ids), (mode.id, mode.discriminator)
 
 
 @pytest.mark.parametrize(
@@ -744,32 +765,105 @@ def test_ac23_fresh_matches_committed_structurally_and_carries_all_eight_ids():
 
 
 # =========================================================================== #
-# AC24: aide check stays at the baseline warning count
+# AC24: `aide check` introduces no new warning
+#
+# AC24 is worded as "OK reporting **7** warnings", and the count was 7 when
+# this item merged. The count itself is not what the AC is about, and pinning
+# it is the repo's number-one recurring defect class (`REVIEW.md`, "What
+# Important means here": *a test asserting state the loop's own verbs are
+# built to move ... `aide check`'s warning set*). Two of those seven are
+# `progress.md:NNN: human gate N (...) is awaiting a decision`, which
+# `aide gate approve` clears the moment a person decides -- so approving a
+# gate would turn this test red for a correct action, and item 150 raising
+# its sign-off gate would turn it red for an eighth warning that is the
+# stage working as designed. Branch-state warnings ("stale claim branch",
+# emitted transiently *during* `aide merge`'s own post-merge re-test, see
+# `test_135_stage29_validation.py`'s AC27 note) move it in the other
+# direction on any developer clone.
+#
+# What AC24 actually claims -- that this item introduced no new warning --
+# is preserved by classifying each warning by shape and rejecting any class
+# outside the recorded baseline, the mechanism
+# `test_135_stage29_validation.py::test_ac27_...` already uses, plus the two
+# item-specific negatives AC24 names (no `.gitattributes` warning for the
+# two regenerated artifacts, no `insights.md` entry-shape warning). The
+# whole-repo `(path, text)` multiset baseline stays where it was built:
+# `test_114_documentation_corrections.py::test_ac8_no_new_aide_check_warning_beyond_pinned_baseline`.
+#
+# `run_checks` is called in-process rather than through a subprocess for the
+# reason `test_114`'s `_aide_check_warnings` records: the subprocess form
+# returned `proc.stdout is None` on the Windows CI runner despite
+# `capture_output=True`, and structured `(errors, warnings)` needs no stdout,
+# no encoding and no re-parse.
 # =========================================================================== #
 
+_BRANCH_STATE_WARNING_PREFIXES = ("stale claim branch", "unrecognised branch")
 
-def test_ac24_aide_check_stays_at_baseline_warning_count():
-    result = run_utf8(
-        [sys.executable, str(_AIDE_SCRIPT), "check"],
-        cwd=_REPO_ROOT,
-        timeout=180,
+_BASELINE_WARNING_CLASSES = (
+    "assumptions-block",
+    "awaiting-a-decision",
+    "branch-state",
+    "retracted-criterion",
+)
+
+
+def _aide_module():
+    spec = importlib.util.spec_from_file_location("_aide_cli_145", _AIDE_SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    return module
+
+
+def _classify_warning(message: str) -> str:
+    """Classify by *shape*, so a genuinely new instance of a tolerated class
+    still classifies as that class while an unseen shape reports
+    ``"unclassified"`` and fails the check."""
+    if message.startswith(_BRANCH_STATE_WARNING_PREFIXES):
+        return "branch-state"
+    if re.search(r"criterion \d+ was retracted on \d{4}-\d{2}-\d{2}", message):
+        return "retracted-criterion"
+    if "assumptions" in message.lower():
+        return "assumptions-block"
+    if "awaiting a decision" in message.lower():
+        return "awaiting-a-decision"
+    return "unclassified"
+
+
+def test_ac24_aide_check_reports_no_error_and_no_new_warning_class():
+    aide = _aide_module()
+    errors, warnings = aide.run_checks(_REPO_ROOT, aide.load_config(_REPO_ROOT))
+    assert errors == [], errors
+    # A plumbing failure must fail loudly, not pass an empty loop vacuously:
+    # this repo always reports the baseline warnings.
+    assert warnings, "run_checks returned no warnings at all -- expected the baseline"
+
+    classes = {_classify_warning(warning) for warning in warnings}
+    assert classes <= set(_BASELINE_WARNING_CLASSES), (
+        f"aide check reports a warning class outside the recorded baseline: "
+        f"{classes - set(_BASELINE_WARNING_CLASSES)}"
     )
-    assert result.returncode == 0, result.stderr
-    assert result.stdout, "expected stdout from `aide check`"
 
-    lines = result.stdout.splitlines()
-    warning_lines = [line for line in lines if line.startswith("warning:")]
-    assert warning_lines, "expected >=1 pinned baseline warning"
-    for line in warning_lines:
-        assert "insights.md" not in line, line
-        assert ".gitattributes" not in line, line
 
-    ok_lines = [line for line in lines if line.startswith("aide check: OK")]
-    assert ok_lines, result.stdout
-    match = re.search(r"OK \((\d+) warning", ok_lines[0])
-    assert match, ok_lines[0]
-    assert int(match.group(1)) == 7, ok_lines[0]
-    assert int(match.group(1)) == len(warning_lines)
+def test_ac24_no_gitattributes_or_insights_warning_from_this_item():
+    """The two negatives AC24 names by hand: the item regenerated two
+    committed text artifacts (already pinned `text eol=lf`) and added no
+    `insights.md` entry, so neither lint may fire."""
+    aide = _aide_module()
+    _errors, warnings = aide.run_checks(_REPO_ROOT, aide.load_config(_REPO_ROOT))
+    for warning in warnings:
+        assert ".gitattributes" not in warning, warning
+        assert "insights.md" not in warning, warning
+
+
+def test_adv_unclassified_warning_would_be_caught():
+    """The classifier must be able to detect a new class -- otherwise the
+    AC24 check above passes on anything."""
+    assert _classify_warning("a brand new kind of warning nobody has seen") == (
+        "unclassified"
+    )
+    assert _classify_warning("progress.md:9: human gate 3 (x) is awaiting a decision") == (
+        "awaiting-a-decision"
+    )
 
 
 # =========================================================================== #
@@ -795,32 +889,34 @@ def test_adv_mode6_case_missing_mislabel_drops_status_to_implemented(measured):
 
 
 def test_adv_intended_rule_for_a_rule_not_declaring_the_mode_fails_ac5_check():
+    """Runs the **same** predicate the AC5 test runs
+    (:func:`_ac5_edge_set_matches_registry`) over a deliberately-broken copy,
+    so this asserts the checker rejects it rather than re-deriving the
+    comparison inline (which would pass no matter what AC5 checked)."""
     import segfacet.failure_modes as fm
-    from segfacet.heuristics.rule import iter_rule_declarations
 
     mode = fm.SPECIFICATION[1]
-    live_declared = {
-        rule_id
-        for rule_id, declaration in iter_rule_declarations()
-        if declaration is not None and 1 in declaration.modes
-    }
-    assert "border" not in live_declared, "adversarial precondition: 'border' must not declare mode 1"
+    assert _ac5_edge_set_matches_registry(mode), "precondition: mode 1 is clean today"
+    assert "border" not in _live_declared_rule_ids(1), (
+        "adversarial precondition: 'border' must not declare mode 1"
+    )
 
     bad_edge = fm.IntendedRule(rule_id="border", detector="", evidence_rung="needs-real-data")
     bad_mode = dataclasses.replace(mode, intended_rules=mode.intended_rules + (bad_edge,))
-    bad_edge_ids = {edge.rule_id for edge in bad_mode.intended_rules}
-    assert bad_edge_ids != live_declared, (bad_edge_ids, live_declared)
+    assert not _ac5_edge_set_matches_registry(bad_mode)
 
 
 def test_adv_discriminator_naming_no_sibling_fails_ac19_check():
+    """Same shape as the AC5 adversarial above: the AC19 predicate itself is
+    run over a broken copy, not re-derived here."""
     import segfacet.failure_modes as fm
 
     mode = fm.SPECIFICATION[1]
     all_ids = {m.id for m in fm.iter_modes()}
+    assert _ac19_names_a_sibling(mode, all_ids), "precondition: mode 1 is clean today"
+
     bad_mode = dataclasses.replace(mode, discriminator="Names no other mode at all.")
-    tokens = {int(t) for t in re.findall(r"\d+", bad_mode.discriminator)}
-    siblings = tokens & (all_ids - {bad_mode.id})
-    assert not siblings, siblings
+    assert not _ac19_names_a_sibling(bad_mode, all_ids)
 
 
 def test_adv_all_expected_firing_tuples_are_ascending():
