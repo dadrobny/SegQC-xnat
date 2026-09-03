@@ -1507,7 +1507,7 @@ sources onto it, and closes with a maintainer sign-off that gates the remainder 
   encoded as data — `mode6_crop_at_border` expects `{border, mislabel}` with reason,
   evidence rungs authored per mode ↔ rule edge with the mode's rung derived, mode 8
   structurally-unobservable, mode 7's single-descent cap recorded. *(Item 145)*
-- 📋 **D3** The ninth mode, implausible tissue under a label, entered through the lifecycle
+- 🚧 **D3** The ninth mode, implausible tissue under a label, entered through the lifecycle
   (`intensity` / `intensity_reference_delta` declare it; the intensity manifest gains
   `failure_mode` and expected firing fields; the intensity sibling of
   `pipeline_findings` built in `synth/regression.py`), plus the catalogue's first
