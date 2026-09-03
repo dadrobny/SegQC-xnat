@@ -1499,7 +1499,7 @@ sources onto it, and closes with a maintainer sign-off that gates the remainder 
   (`build_clean_spine` advances caudally like real VerSe input), every committed corpus
   value and both reference artifacts regenerated, expected firing sets recorded only
   after it. Carried defect recorded 2026-08-31 (spec 131). *(Item 143)*
-- 📋 **D1** The specification module (one frozen declaration per mode with vision §6's
+- 🚧 **D1** The specification module (one frozen declaration per mode with vision §6's
   fields; `implemented`/`validated` derived, `proposed`/`specified` authored) and its
   byte-reproducible, LF-pinned rendering `docs/aide/failure_modes.generated.{md,json}`.
   *(Item 144)*
