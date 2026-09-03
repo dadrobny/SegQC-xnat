@@ -16,13 +16,34 @@ contains both ``mislabel`` and ``reference_delta``, and the analytic edge set
 is three edges over two rules -- ``(1, reference_delta)``, ``(2, bounds)``,
 ``(2, reference_delta)`` -- not the pre-correction two-edge shape.
 
-AC31 -- no character-count threshold. Item 137's own defect (recorded in
-``docs/aide/insights.md``, 2026-09-02) was a mechanism sentence held to a
-character floor rather than to its content. This module checks every
-mechanism/rung/qualifier string against live state instead -- an anchor
-path, a corpus ``case_id``, or a listed ``rule_id``, each re-derived here --
-and a dedicated test (``test_ac31_no_character_count_threshold_assertions``)
-inspects this module's own source to confirm no such floor crept back in.
+AC31 -- no character-count threshold, and no shape-only substitute for it
+either. Item 137's own defect (recorded in ``docs/aide/insights.md``,
+2026-09-02) was a mechanism sentence held to a character floor rather than
+to its content; item 138 repeated the same failure shape one level up
+(0db0fca, 2026-09-03): four of eight authored mechanism sentences were
+false despite each naming a token that resolves against live state (a code
+review, not this suite, caught them), because token-presence alone proves
+only that the token exists, never that the claim built around it is true.
+This module now checks, beyond mere resolvability: (1) a mechanism naming a
+feature path is verified against the catalogue's own ``consuming_rules``
+derivation for the mode's *declared* rule(s), never against
+``MODE_ANCHOR_PATHS`` (``test_ac31_named_feature_path_is_consumed_by_one_of_
+the_modes_declared_rules``); (2) a mechanism carrying the machine-checkable
+``(measured: findings == [...])`` idiom the fix introduced is verified
+against a fresh ``run_qc`` over the named corpus case, via the same public
+harness ``tests/test_041_regression_suite.py`` drives
+(``test_ac31_measured_findings_claim_matches_the_live_pipeline_firing_set``).
+Both are demonstrated adversarially against the two defects they would have
+caught (modes 4 and 1/2 respectively); modes 5 and 6's pre-fix defects named
+a real, genuinely-consumed sibling path of the correctly-named rule, a
+distinction neither check -- nor anything else this codebase can measure --
+can decide, so that part is deliberately left unasserted rather than faked.
+A dedicated test (``test_ac31_no_character_count_threshold_assertions``)
+inspects this module's own source to confirm no length-threshold floor (any
+operand order, any of ``==``/``>=``/``<=``/``>``/``<``) crept back in for
+any of these prose fields. A separate adversarial test reproduces 0db0fca's
+other fix: a rule declaring only a mode outside ``MODE_ANCHOR_PATHS``' key
+set must make ``rule_to_mode`` report a hole, not ``complete: true``.
 
 Field-name note: the item spec pins the JSON's *content* precisely (per-AC)
 but leaves several container shapes unstated (e.g. whether ``modes``/
@@ -677,15 +698,28 @@ def test_ac19_every_mode_to_rule_edge_is_attributed_from_the_corpus_map():
 
 
 def test_ac20_analytic_edges_equal_edges_of_rules_the_corpus_map_never_designates():
+    """A9 -- the total edge count and the corpus/analytic split are both
+    derived here from ``iter_rules()`` directly (the same source
+    ``build_matrix`` reads), never pinned as a bare integer: a legitimate
+    future declaration change (a rule gaining or losing a mode) must redden
+    this test only via the derivation disagreeing with the matrix, not via a
+    stale magic number. ``witness`` stays as a dated, human-readable record
+    of what the derivation currently evaluates to -- informative, not the
+    assertion."""
     from segfacet.heuristics.rule import iter_rules
     import segfacet.catalogue as catalogue_module
     import segfacet.traceability as traceability
 
     corpus_map = catalogue_module.scan_synth_rule_mode_map()
+    expected_total_edges = set()
     expected_analytic = set()
     for rule in iter_rules():
         decl = rule.mode_declaration
-        if decl is None or rule.rule_id in corpus_map:
+        if decl is None:
+            continue
+        for mode in decl.modes:
+            expected_total_edges.add((mode, rule.rule_id))
+        if rule.rule_id in corpus_map:
             continue
         for mode in decl.modes:
             expected_analytic.add((mode, rule.rule_id))
@@ -701,12 +735,16 @@ def test_ac20_analytic_edges_equal_edges_of_rules_the_corpus_map_never_designate
                 actual_analytic.add((mode, rule_id))
 
     assert actual_all_edges, "expected at least one mode-to-rule edge"
+    assert actual_all_edges == expected_total_edges
     assert actual_analytic == expected_analytic
 
+    # 2026-09-02, item 138: what the derivation above currently evaluates to
+    # on this tree -- a dated witness, not a floor a future change must match.
     witness = {(1, "reference_delta"), (2, "bounds"), (2, "reference_delta")}
     assert actual_analytic == witness
-    assert len(actual_all_edges) == 11
-    assert len(actual_all_edges - actual_analytic) == 8
+
+    expected_corpus = expected_total_edges - expected_analytic
+    assert actual_all_edges - actual_analytic == expected_corpus
 
     by_rule: dict = {}
     for mode, rule_id in actual_analytic:
@@ -714,7 +752,7 @@ def test_ac20_analytic_edges_equal_edges_of_rules_the_corpus_map_never_designate
     for mode, rule_id in actual_all_edges - actual_analytic:
         by_rule.setdefault(rule_id, set()).add("corpus")
     for rule_id, tags in by_rule.items():
-        assert len(tags) == 1, (rule_id, tags)
+        assert tags in ({"analytic"}, {"corpus"}), (rule_id, tags)
 
 
 def test_adv_ac20_mistagged_corpus_evidence_changes_no_attribution(monkeypatch):
@@ -1066,14 +1104,31 @@ def test_ac31_mode_mechanism_names_a_resolvable_live_token(mode):
     )
 
 
-_LENGTH_THRESHOLD_RE = re.compile(r"len\([^)\n]*\)\s*(>=|<=|>|<)\s*\d+")
+# A14's forbidden shape, widened: the original pattern matched only a
+# length call first with a strict inequality, so an equality-style floor on
+# a mechanism sentence's character count, or the same comparison spelled
+# with the call on the right of a leading number, both slipped through
+# undetected. Both operand orders, and equality alongside the inequalities,
+# are covered now. Scoped to the prose-content fields A14 is actually about
+# (mechanism, rung label, qualifier, evidence, title) -- via a name/key
+# fragment inside the length call's parens, not to every such comparison in
+# the module, so an unrelated structural count elsewhere in this file (e.g.
+# a same-tag-only invariant, or another module's fixed-vocabulary length)
+# is not swept in
+# by a widening aimed at mechanism-sentence floors.
+_LENGTH_THRESHOLD_CONTENT_RE = r"(?:mechanism|evidence|rung\w*|qualifier\w*|label\w*|title\w*)"
+_LENGTH_THRESHOLD_RE = re.compile(
+    r"len\([^)\n]*\b" + _LENGTH_THRESHOLD_CONTENT_RE + r"\b[^)\n]*\)\s*(==|>=|<=|>|<)\s*\d+"
+    r"|\d+\s*(==|>=|<=|>|<)\s*len\([^)\n]*\b" + _LENGTH_THRESHOLD_CONTENT_RE + r"\b[^)\n]*\)"
+)
 
 
 def test_ac31_no_character_count_threshold_assertions_in_this_module():
     """A14 -- item 137's own defect was exactly this shape (a character-count
     floor standing in for a content check on a mechanism sentence). This
     module inspects its own source and must contain no such pattern for any
-    mechanism, rung label, or qualifier string -- or anything else."""
+    mechanism, rung label, qualifier, evidence, or title string -- in either
+    operand order and under any of ``==``/``>=``/``<=``/``>``/``<``."""
     source = Path(__file__).read_text(encoding="utf-8")
     offenders = _LENGTH_THRESHOLD_RE.findall(source)
     assert offenders == [], offenders
@@ -1125,6 +1180,274 @@ def test_adv_ac31_stale_mechanism_one_character_off_the_real_case_id_is_detectab
     candidate_tokens = anchors | case_ids_for_mode8 | rules_for_mode
     assert candidate_tokens, "expected at least one live token candidate for mode 8"
     assert not any(_token_in_mechanism(token, mode8["mechanism"]) for token in candidate_tokens)
+
+
+# =========================================================================== #
+# AC31 (real checks) -- item 138's own defect (0db0fca, 2026-09-03): the
+# token-presence test above proves a mechanism names *something* resolvable,
+# never that the claim built around that token is true. Four of eight
+# mechanism sentences shipped false despite passing every AC31 test above --
+# a code review, not this suite, caught them. These two checks verify the
+# two claim shapes a mechanism sentence actually makes that this codebase
+# can decide:
+#
+# 1. "rule R reads feature path P" -- cross-checked against the catalogue's
+#    own consuming_rules derivation (via each rule's AC23 feature_paths,
+#    itself catalogue-derived), never against MODE_ANCHOR_PATHS. Mode 4's
+#    pre-fix sentence named the mode's anchor path
+#    (stage3.monotonic_consistency.is_monotonic) as what mislabel reads;
+#    mislabel.py only ever reads non_monotonic_pairs, so that anchor path
+#    sits outside mislabel's catalogue-derived feature_paths -- exactly what
+#    this check would have failed on.
+# 2. "the corpus case demonstrates end-to-end, driving exactly these rules"
+#    -- verified by driving the named corpus case through
+#    segfacet.synth.regression.pipeline_findings (the same public harness
+#    tests/test_041_regression_suite.py drives) and comparing the fired
+#    rule_id set against the sentence's own machine-checkable
+#    "(measured: findings == [...])" annotation, the idiom 0db0fca's fix
+#    introduced. Modes 1 and 2's pre-fix sentences each claimed a rule fired
+#    (reference_delta / bounds) that cannot fire without an attached
+#    reference, which plain run_qc never attaches -- exactly what this
+#    check would have failed on.
+#
+# What this deliberately leaves unasserted: modes 5 and 6's pre-fix
+# sentences named the *correct* rule (coverage / border) against a real,
+# genuinely-consumed sibling path (present_levels[] instead of
+# missing_levels[]; touches_left instead of touches_anterior) -- both
+# siblings sit in that rule's own catalogue-derived feature_paths (coverage
+# reads present_levels[] unconditionally even though its consumer is an
+# opt-in check that ships disabled; border reads every face symmetrically),
+# so no path-consumption or rule-identity check this codebase can run
+# distinguishes "the field that happens to be read" from "the field that
+# drives detection for this corpus case". That distinction is a judgement
+# about the code's intent, not a measurable fact, so it is not asserted
+# here -- see the module docstring's discipline (Testing Strategy: "anything
+# checkable is checked, and nothing else is dressed up as checked").
+# =========================================================================== #
+
+
+def _paths_named_in_mechanism(mechanism: str, paths) -> set:
+    """Real (non-empty-string) catalogue paths that appear verbatim as a
+    substring of *mechanism*. Paths are already distinctive dotted/bracketed
+    strings (e.g. ``stage3.monotonic_consistency.non_monotonic_pairs[]``),
+    so plain substring containment is specific enough -- unlike a bare
+    rule_id or case_id, which needs the word-boundary guard in
+    :func:`_token_in_mechanism`."""
+    return {p for p in paths if p and p in mechanism}
+
+
+def test_ac31_named_feature_path_is_consumed_by_one_of_the_modes_declared_rules():
+    """Real check (1) above. The search universe per mode is that mode's own
+    ``anchor_paths`` (so a mechanism naming the anchor -- the pre-fix mode-4
+    shape -- is still recognised as a *named* path, not silently skipped
+    because no rule happens to consume it) union every rule's AC23
+    ``feature_paths`` (so a genuinely rule-consumed path is recognised too).
+    For every path a mechanism names from that universe, at least one of the
+    mode's own declared rules must actually consume it -- a path that is
+    only the mode's anchor, and consumed by none of the mode's declared
+    rules, fails here."""
+    import segfacet.traceability as traceability
+
+    d = traceability.matrix_to_dict(traceability.build_matrix())
+    modes = _mode_records(d)
+    rules = _rule_records(d)
+    assert modes and rules
+
+    all_rule_consumed_paths = {p for r in rules.values() for p in r["feature_paths"]}
+    assert all_rule_consumed_paths, "expected at least one rule-consumed feature path"
+
+    checked_any_path = False
+    for mode, record in modes.items():
+        mechanism = record["mechanism"]
+        declared_rules = set(record["rules"])
+        assert declared_rules, mode
+
+        search_universe = set(record["anchor_paths"]) | all_rule_consumed_paths
+        named_paths = _paths_named_in_mechanism(mechanism, search_universe)
+        for path in named_paths:
+            checked_any_path = True
+            consuming = {rid for rid in declared_rules if path in rules[rid]["feature_paths"]}
+            assert consuming, (mode, path, sorted(declared_rules))
+
+    assert checked_any_path, "expected >=1 mode mechanism to name a real, resolvable feature path"
+
+
+def test_adv_ac31_named_anchor_path_not_consumed_by_declared_rule_is_detectable(monkeypatch):
+    """Reproduces the pre-fix mode-4 defect directly: naming a real,
+    resolvable path (the mode's own anchor) that the mode's only declared
+    rule never actually consumes must be distinguishable from a genuine
+    claim -- demonstrating check (1) above would have failed it."""
+    import segfacet.traceability as traceability
+
+    d_before = traceability.matrix_to_dict(traceability.build_matrix())
+    mode4_before = _mode_record(d_before, 4)
+    declared_rules = set(mode4_before["rules"])
+    assert declared_rules == {"mislabel"}, declared_rules
+
+    bogus_path = mode4_before["anchor_paths"][0]
+    assert bogus_path == "stage3.monotonic_consistency.is_monotonic", bogus_path
+
+    rules_before = _rule_records(d_before)
+    assert bogus_path not in rules_before["mislabel"]["feature_paths"], (
+        "fixture assumption violated: mislabel now consumes its mode-4 anchor path"
+    )
+
+    bogus_mechanism = f"caught by mislabel's Detector B via {bogus_path}, on purpose, for a test."
+    _patch_mode_rungs(monkeypatch, traceability, 4, mechanism=bogus_mechanism)
+
+    d = traceability.matrix_to_dict(traceability.build_matrix())
+    mode4 = _mode_record(d, 4)
+    rules = _rule_records(d)
+    named_paths = _paths_named_in_mechanism(mode4["mechanism"], set(mode4["anchor_paths"]))
+    assert bogus_path in named_paths
+
+    consuming = {rid for rid in mode4["rules"] if bogus_path in rules[rid]["feature_paths"]}
+    assert not consuming, (
+        "check (1) must fail here: the mechanism names a path none of the "
+        "mode's declared rules consume"
+    )
+
+
+_MEASURED_FINDINGS_RE = re.compile(r"measured:\s*findings\s*==\s*\[([^\]]*)\]")
+
+
+def _parse_measured_findings_claim(mechanism: str):
+    """Extract the rule_id set from a mechanism's ``(measured: findings ==
+    [...])`` annotation -- the machine-checkable idiom 0db0fca's fix
+    introduced for modes 1 and 2 -- or ``None`` if the mechanism carries no
+    such annotation."""
+    match = _MEASURED_FINDINGS_RE.search(mechanism)
+    if match is None:
+        return None
+    inner = match.group(1)
+    return {item.strip().strip("'\"") for item in inner.split(",") if item.strip()}
+
+
+def test_ac31_measured_findings_claim_matches_the_live_pipeline_firing_set():
+    """Real check (2) above. For every mode whose mechanism carries a
+    ``(measured: findings == [...])`` claim, drive the corpus case the
+    mechanism names through the same public harness
+    tests/test_041_regression_suite.py drives
+    (segfacet.synth.regression.pipeline_findings) and assert the live fired
+    rule_id set equals exactly what the sentence claims. Modes 1 and 2 carry
+    this annotation today; a future mode's sentence adopting the same idiom
+    is verified automatically, with no per-mode literal in this test."""
+    from segfacet.synth.corpus import load_manifest
+    from segfacet.synth.regression import pipeline_findings
+    import segfacet.traceability as traceability
+
+    manifest = load_manifest()
+    cases_by_id = {c["case_id"]: c for c in manifest.get("cases", [])}
+    assert cases_by_id, "expected a non-empty corpus manifest"
+
+    d = traceability.matrix_to_dict(traceability.build_matrix())
+    modes = _mode_records(d)
+    assert modes
+
+    checked_any_claim = False
+    for mode, record in modes.items():
+        claim = _parse_measured_findings_claim(record["mechanism"])
+        if claim is None:
+            continue
+
+        case_ids_for_mode = {
+            cid for cid, case in cases_by_id.items() if case.get("failure_mode") == mode
+        }
+        named_case_ids = {
+            cid for cid in case_ids_for_mode if _token_in_mechanism(cid, record["mechanism"])
+        }
+        assert named_case_ids, (mode, record["mechanism"])
+
+        for case_id in named_case_ids:
+            case = cases_by_id[case_id]
+            if case.get("detection") != "pipeline":
+                continue
+            checked_any_claim = True
+            actual_rule_ids = {f.rule_id for f in pipeline_findings(case)}
+            assert actual_rule_ids == claim, (mode, case_id, sorted(actual_rule_ids), sorted(claim))
+
+    assert checked_any_claim, (
+        "expected >=1 mode mechanism to carry a measured findings claim "
+        "verifiable against a pipeline-detected corpus case"
+    )
+
+
+def test_adv_ac31_measured_findings_claim_overclaiming_a_rule_is_detectable(monkeypatch):
+    """Reproduces the pre-fix mode-2 defect directly: claiming a rule
+    ('bounds', 'reference_delta') fires on the plain-pipeline corpus case
+    when it structurally cannot without an attached reference --
+    demonstrating check (2) above would have failed it."""
+    from segfacet.synth.corpus import load_manifest
+    from segfacet.synth.regression import pipeline_findings
+
+    manifest = load_manifest()
+    cases_by_id = {c["case_id"]: c for c in manifest.get("cases", [])}
+    case = cases_by_id["mode2_fragment"]
+    assert case.get("detection") == "pipeline"
+
+    actual_rule_ids = {f.rule_id for f in pipeline_findings(case)}
+    assert actual_rule_ids == {"fragmentation"}, actual_rule_ids
+
+    overclaiming_mechanism = (
+        "caught independently by bounds' magnitude thresholds, "
+        "fragmentation's component-count checks, and reference_delta's "
+        "cohort-relative scoring on mode2_fragment (measured: findings == "
+        "['bounds', 'fragmentation', 'reference_delta'])."
+    )
+    claim = _parse_measured_findings_claim(overclaiming_mechanism)
+    assert claim == {"bounds", "fragmentation", "reference_delta"}
+    assert claim != actual_rule_ids, (
+        "check (2) must fail here: the mechanism claims a firing set the "
+        "live pipeline does not produce"
+    )
+
+
+# =========================================================================== #
+# Completeness gap (0db0fca): a rule declaring only modes outside
+# MODE_ANCHOR_PATHS' key set must make rule_to_mode report a hole, never
+# complete: true
+# =========================================================================== #
+
+
+def test_adv_rule_declaring_only_an_uncatalogued_mode_makes_rule_to_mode_a_hole(isolated_registry):
+    """Before 0db0fca, a rule declaring only modes outside
+    feature_docs.MODE_ANCHOR_PATHS' key set (e.g. modes=(9,)) was
+    'declared' by declaration_state alone, so rule_to_mode reported it
+    complete though the rule targets no catalogued mode -- exactly this
+    module's own definition of a rule -> mode hole. Registering such a rule
+    now must report the hole, naming the rule."""
+    import segfacet.feature_docs as feature_docs_module
+    from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
+    import segfacet.traceability as traceability
+
+    assert 9 not in feature_docs_module.MODE_ANCHOR_PATHS
+
+    class _UncataloguedModeRule(Rule):
+        rule_id = "__item138_uncatalogued_mode__"
+        mode_declaration = RuleModeDeclaration(
+            modes=(9,), evidence=("analytic", "AC-adjacent: mode 9 is outside the catalogue")
+        )
+
+        def evaluate(self, record, config):
+            return []
+
+    register_rule(_UncataloguedModeRule)
+
+    d = traceability.matrix_to_dict(traceability.build_matrix())
+    assert d["directions"]["rule_to_mode"]["complete"] is False
+    holes = d["directions"]["rule_to_mode"]["holes"]
+    assert any("__item138_uncatalogued_mode__" in str(hole) for hole in holes), holes
+
+    rules = _rule_records(d)
+    record = rules["__item138_uncatalogued_mode__"]
+    assert record["declaration_state"] == "declared"
+    assert record["modes"] == [9]
+
+    # The mode -> rule direction is untouched by this defect: mode 9 is not
+    # catalogued at all, so it never appears as a mode -> rule hole (that
+    # direction's holes are catalogued-mode ids and unregistered
+    # corpus-designated rule ids, neither of which mode 9 is).
+    assert "9" not in d["directions"]["mode_to_rule"]["holes"]
 
 
 # =========================================================================== #
