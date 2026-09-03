@@ -1,6 +1,6 @@
 # FACET — Project Vision
 
-> **Status:** Draft v3 · **Created:** 2026-06-24 · **Re-issued:** 2026-09-03
+> **Status:** v3 (approved 2026-09-03) · **Created:** 2026-06-24 · **Re-issued:** 2026-09-03
 > Step 1 of the AIDE loop · the root document: [`roadmap.md`](roadmap.md),
 > [`progress.md`](progress.md), every queue and every work item derive from this.
 > Its guiding principles, out-of-scope list and success criteria are the mandatory
