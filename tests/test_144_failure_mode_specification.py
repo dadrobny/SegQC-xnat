@@ -19,6 +19,7 @@ member.
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 import json
 import re
@@ -34,6 +35,48 @@ _COMMITTED_JSON = _REPO_ROOT / "docs" / "aide" / "failure_modes.generated.json"
 _COMMITTED_MD = _REPO_ROOT / "docs" / "aide" / "failure_modes.generated.md"
 _VISION_PATH = _REPO_ROOT / "docs" / "aide" / "vision.md"
 _MANIFEST_PATH = _REPO_ROOT / "tests" / "corpus" / "manifest.json"
+_FAILURE_MODES_SOURCE = _REPO_ROOT / "src" / "segfacet" / "failure_modes.py"
+
+_HEAVY_ROOTS = {"numpy", "scipy", "nibabel"}
+
+
+def _top_level_heavy_imports(source):
+    """Return the subset of ``{numpy, scipy, nibabel}`` imported at module
+    scope in ``source`` (a root package, not a submodule name).
+
+    Walks the module's top-level statements, descending into top-level
+    ``try``/``if`` bodies (a defensive ``try: import numpy ... except
+    ImportError`` at module scope still counts) but never into a function or
+    class body -- a heavy import deferred inside a function is exactly what
+    AC1 requires and must not be flagged.
+    """
+    tree = ast.parse(source)
+    found = set()
+
+    def _scan(stmts):
+        for node in stmts:
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    root = alias.name.split(".")[0]
+                    if root in _HEAVY_ROOTS:
+                        found.add(root)
+            elif isinstance(node, ast.ImportFrom):
+                if node.module and node.level == 0:
+                    root = node.module.split(".")[0]
+                    if root in _HEAVY_ROOTS:
+                        found.add(root)
+            elif isinstance(node, ast.Try):
+                _scan(node.body)
+                for handler in node.handlers:
+                    _scan(handler.body)
+                _scan(node.orelse)
+                _scan(node.finalbody)
+            elif isinstance(node, ast.If):
+                _scan(node.body)
+                _scan(node.orelse)
+
+    _scan(tree.body)
+    return found
 
 
 # =========================================================================== #
@@ -245,23 +288,66 @@ def test_ac1_zero_argument_calls_accepted(monkeypatch):
     assert calls, "expected main([]) to attempt at least one write"
 
 
-def test_ac1_import_performs_no_heavy_import():
-    result = run_utf8(
+def test_ac1_no_module_level_heavy_import():
+    """AC1's "no heavy import" clause, honestly scoped: ``failure_modes.py``
+    itself has no top-level ``numpy``/``scipy``/``nibabel`` import. A bare
+    ``import segfacet.X`` cannot be asserted heavy-module-free at all --
+    ``src/segfacet/__init__.py`` unconditionally imports
+    ``segfacet.features.fragmentation``, which imports ``nibabel`` at module
+    level, before any submodule's own body runs (see this item's Decisions
+    log; not a path this item may edit)."""
+    source = _FAILURE_MODES_SOURCE.read_text(encoding="utf-8")
+    assert source, "expected non-empty source for failure_modes.py"
+    heavy = _top_level_heavy_imports(source)
+    assert heavy == set(), sorted(heavy)
+
+
+def test_ac1_heavy_import_helper_flags_a_positive_case():
+    """Negative control for the AST helper above: without this, a helper
+    that always returns ``set()`` would make the previous test pass while
+    checking nothing."""
+    snippet = "import numpy\n\n\ndef f():\n    return 1\n"
+    heavy = _top_level_heavy_imports(snippet)
+    assert heavy == {"numpy"}
+
+
+def test_ac1_import_adds_no_heavy_module_beyond_the_package_init():
+    """``import segfacet.failure_modes`` may load whatever
+    ``import segfacet`` already loads (the package init's own cost, out of
+    this item's authorised paths) but must add no *further* heavy module."""
+    bare = run_utf8(
         [
             sys.executable,
             "-c",
-            "import sys, json\n"
-            "import segfacet.failure_modes\n"
-            "print(json.dumps(sorted(sys.modules)))",
+            "import sys, json\nimport segfacet\nprint(json.dumps(sorted(sys.modules)))",
         ],
         cwd=_REPO_ROOT,
         timeout=60,
     )
-    assert result.returncode == 0, result.stderr
-    assert result.stdout, "expected stdout from the subprocess"
-    loaded = set(json.loads(result.stdout))
-    for heavy in ("numpy", "scipy", "nibabel"):
-        assert heavy not in loaded, (heavy, sorted(loaded))
+    assert bare.returncode == 0, bare.stderr
+    assert bare.stdout, "expected stdout from the bare-package subprocess"
+    bare_loaded = set(json.loads(bare.stdout))
+
+    with_module = run_utf8(
+        [
+            sys.executable,
+            "-c",
+            "import sys, json\nimport segfacet.failure_modes\nprint(json.dumps(sorted(sys.modules)))",
+        ],
+        cwd=_REPO_ROOT,
+        timeout=60,
+    )
+    assert with_module.returncode == 0, with_module.stderr
+    assert with_module.stdout, "expected stdout from the failure_modes subprocess"
+    module_loaded = set(json.loads(with_module.stdout))
+
+    heavy_bare = {m for m in bare_loaded if m.split(".")[0] in _HEAVY_ROOTS}
+    heavy_module = {m for m in module_loaded if m.split(".")[0] in _HEAVY_ROOTS}
+    assert heavy_bare, "expected the bare package import to already load a heavy module"
+    assert heavy_module == heavy_bare, (
+        sorted(heavy_module - heavy_bare),
+        sorted(heavy_bare - heavy_module),
+    )
 
 
 # =========================================================================== #

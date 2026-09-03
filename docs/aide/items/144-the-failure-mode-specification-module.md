@@ -61,8 +61,11 @@ them by replacement; this module simply does not reproduce them (AC7).
   `derive_status`, `derive_mode_rung`, `specification_conflicts`,
   `specification_to_dict`, `render_markdown` and `main`; `iter_modes()`,
   `specification_to_dict()` and `main([])` each take no required argument.
-  Importing the module alone performs no heavy import (no NumPy / SciPy /
-  NiBabel at module import time) — house style, as `traceability.py`.
+  `src/segfacet/failure_modes.py` itself contains no module-scope (top-level)
+  `numpy` / `scipy` / `nibabel` import — house style, as `traceability.py` —
+  checked on the module's own source, not on what a bare `import segfacet.X`
+  additionally pulls in through the package `__init__` (see the Decisions
+  log entry dated 2026-09-03).
 
 - [ ] **AC2: one frozen declaration per mode, carrying exactly §6's fields.**
   `ModeSpec` is a frozen dataclass whose field-name tuple is exactly
@@ -652,3 +655,32 @@ split into `status_authored` (the hand-set value) and `status_derived` (the
 live derivation) per AC19; a `derived_rung` key (not required by any AC,
 but rendered in the Markdown per AC20's "derived rung" requirement) carries
 `derive_mode_rung(mode)`.
+
+**2026-09-03 — AC1's "no heavy import" clause reworded; the hand-back above
+stands as history, not as the current test names.** The hand-back entry
+above is left as originally written — it is the provenance trail for *why*
+`src/segfacet/__init__.py` cannot be touched here — but its cited test,
+`test_ac1_import_performs_no_heavy_import`, asserted something no
+implementation confined to `src/segfacet/failure_modes.py` can make true: a
+bare `import segfacet.X` in a fresh process always runs
+`src/segfacet/__init__.py` first, which imports `segfacet.features.
+fragmentation`, which imports `nibabel` at module level — so *any* `segfacet`
+submodule import, not only this one, already fails that assertion before
+`failure_modes.py`'s own body runs at all. AC1's text above is reworded to
+what this item can actually attest and test honestly: no top-level
+(module-scope) `numpy`/`scipy`/`nibabel` import **in
+`failure_modes.py`'s own source** — checked by parsing the module's AST,
+never by asserting on `sys.modules` after a bare `import segfacet.X`, which
+measures the package init's cost, not this module's. The committed test
+(`tests/test_144_failure_mode_specification.py`) is renamed to
+`test_ac1_no_module_level_heavy_import` and now additionally asserts (a) the
+AST helper actually flags a positive control (an inline snippet with a
+top-level `import numpy`), so the check cannot vacuously pass by always
+returning "clean", and (b) in two subprocesses, that the set of heavy
+modules in `sys.modules` after `import segfacet.failure_modes` equals the
+set already loaded by a bare `import segfacet` alone — i.e. this module adds
+no heavy module *beyond* what the package init already loads, which is the
+one guarantee actually available without touching
+`src/segfacet/__init__.py`. Deferring `segfacet/__init__.py`'s own eager
+import remains a separate item's authorised path, not this one's; the
+hand-back is not withdrawn, only reconciled with what the test now checks.
