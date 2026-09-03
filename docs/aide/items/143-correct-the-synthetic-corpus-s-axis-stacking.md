@@ -662,3 +662,17 @@ ratchet pins its baseline after this item, not before.
   seeded texture is painted at fixed voxel positions); the 15th
   (`corpus/fixtures/base_scan.nii.gz`, a ramp over `shape[2]` only) is
   byte-unchanged, consistent with its own `unmoved` corpus-fixture row.
+
+- **Round 3: the round-2 reconciliation record is prose, because
+  `docs/corpus-s-axis-correction.md` may hold exactly one pipe-table.**
+  `tests/test_143_s_axis_correction.py::_parse_markdown_table` collects every
+  `|`-prefixed line in the *whole file*, treats the first as the header
+  (`path | compared by | verdict | detail`) and asserts a 4-cell width on all
+  the rest, so the round-2 fix's second table ("Round-2 reconciled tests",
+  3 columns) made AC16–AC19 fail with a cell-count mismatch. Widening it to
+  4 columns would not have worked either: AC16 asserts the row-path set
+  *equals* the required artifact set, so extra rows are as fatal as missing
+  ones. The three reconciled-test corrections are therefore recorded as
+  bullet prose in that section, carrying the same before/after values, and
+  the section states the one-table constraint so a later editor does not
+  reintroduce a second one.
