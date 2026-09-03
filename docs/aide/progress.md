@@ -1503,7 +1503,7 @@ sources onto it, and closes with a maintainer sign-off that gates the remainder 
   fields; `implemented`/`validated` derived, `proposed`/`specified` authored) and its
   byte-reproducible, LF-pinned rendering `docs/aide/failure_modes.generated.{md,json}`.
   *(Item 144)*
-- 🔍 **D2** The eight hypothesised modes specified with discriminators; gate 3's decisions
+- ✅ **D2** The eight hypothesised modes specified with discriminators; gate 3's decisions
   encoded as data — `mode6_crop_at_border` expects `{border, mislabel}` with reason,
   evidence rungs authored per mode ↔ rule edge with the mode's rung derived, mode 8
   structurally-unobservable, mode 7's single-descent cap recorded. *(Item 145)*
