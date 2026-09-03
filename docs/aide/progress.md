@@ -1,7 +1,8 @@
 # FACET — Progress Tracker
 
-> **Status:** Draft v2 · **Created:** 2026-06-24 · **Re-issued:** 2026-07-02
-> (structure per `.aide/templates/progress.md`; all statuses carried over)
+> **Status:** v3 · **Created:** 2026-06-24 · **Re-issued:** 2026-09-03 against
+> [`roadmap.md`](roadmap.md) v3 (incremental: Stage 30 added, summary rows for Stages
+> 28–30 added, every existing status and attestation carried over unchanged)
 > Step 3 of the AIDE loop. Derived from [`vision.md`](vision.md) and
 > [`roadmap.md`](roadmap.md). **Single source of truth for implementation
 > status** per stage, deliverable, and acceptance criterion — machine-parsed per
@@ -52,6 +53,9 @@
 | 25    | *(placeholder)* Segmenter-Native Perturbations                        | G2              | 📋     |
 | 26    | Carried-Defect Remediation (pre-real-data)*(runs next)*               | G2, G7          | ✅     |
 | 27    | Feature Schema Taxonomy & Coordinate System                             | G8              | 📋     |
+| 28    | Spinal Curve Model: Formulation, Offset & Orientation                   | G2, G7          | ✅     |
+| 29    | Golden Retirement & Test-Artifact Hygiene                               | G2, G7          | ✅     |
+| 30    | Failure-Mode Specification: the §6 catalogue as an authored source *(runs next)* | G2, G7, G8 | 📋     |
 
 > **Supersession 2026-07-25.** Stages 0–14 are history and are not reopened. Stage 15 is
 > `❌ Excluded` (deployment left scope — see [`vision.md`](vision.md) §0). Stages 17–21
@@ -80,6 +84,16 @@
 > queue 017 recorded — including `consistency.py`'s mode-4 monotonicity, which closes
 > Stage 28's one unticked non-adjudication acceptance half. Run order from here:
 > **29 → 20 → 27 → 21 → 16**.
+
+> **Stage 30 scoped 2026-09-03** (queue-019 boundary feedback loop; human gate 3), the
+> same construction as Stages 26–29: numbered for stability, **runs next, ahead of the
+> remainder of Stage 20**. Queue-019 was cut after item 138 because its remaining items
+> each rested on a definition of the §6 failure modes that existed in five partial sources
+> and no specification. Stage 30 authors that specification per [`vision.md`](vision.md)
+> v3 §6 and re-points the generated matrix at it as a conformance report; Stage 20's
+> items 139–142 are re-specified against it and re-queued after its maintainer sign-off.
+> Full statement in [`roadmap.md`](roadmap.md), which also states the run order once at
+> its top: **30 → 20 (remainder) → 27 → 21 → 16**.
 
 ## Two kinds of "done" — implementation vs. validation
 
@@ -110,13 +124,13 @@ shipped"). See "Two kinds of done" above._
 | Objective                                    | Delivered by                                             | Status |
 | -------------------------------------------- | -------------------------------------------------------- | ------ |
 | G1 Detect empty / trivially-failed           | Stage 1                                                  | ✅     |
-| G2 Detect catalogued failure modes (§6)     | Stages 4, 5*(synthetic only; real failures: Stage 16)* | 🚧     |
+| G2 Detect catalogued failure modes (§6)     | Stages 4, 5, 18, 28*(specification: Stage 30; traceability and specificity: Stage 20; synthetic only — real failures: Stage 16)* | 🚧     |
 | G3 Distinguish failure from variation        | Stages 6, 7, 12*(real grounding: Stage 14)*            | 🚧     |
-| G4 Per-case QC report (JSON + human)         | Stage 1 (ext. 2–4)                                      | ✅     |
+| G4 Per-case and cohort reports               | Stage 1 (ext. 2–4); cohort characterisation: Stage 18   | ✅     |
 | G5 Deploy on XNAT*(deferred)*              | Stage 9*(real session data: Stage 15)*                 | 🚧     |
 | G6 Portable / GPU*(deferred)*              | Stage 10                                                 | ✅     |
-| G7 Evaluable & regression-testable           | Stages 5, 7*(real data: Stages 14, 16)*                | 🚧     |
-| G8 Extensible / classification*(deferred)* | Stage 11                                                 | 📋     |
+| G7 Evaluable & regression-testable           | Stages 5, 7, 29*(real data: Stages 14, 16)*            | 🚧     |
+| G8 Extensible / classification               | Stages 19, 27, 30 (the add-a-mode path); classification arm: Stage 11*(deferred)* | 🚧     |
 
 **Why each 🚧 objective is not yet ✅** _(one line each — the detail lives in the
 linked row/stage, not here):_
@@ -131,6 +145,11 @@ linked row/stage, not here):_
 - **G7** — the real-GT **sensitivity** target is **❌ Not met**, *and* the curated
   challenging-case corpus is unbuilt. → [Outcome targets](#outcome-targets) ·
   Stages 14 (sensitivity) / 16 (corpus).
+- **G8** — the catalogue is generated (Stage 19 ✅), but the add-a-mode path — an
+  authored specification a new mode enters through, with the conformance artifacts
+  regenerated — is Stage 30's, and the schema taxonomy is Stage 27's; neither has
+  shipped. The classification arm (Stage 11) stays deferred and is not what holds
+  this at 🚧.
 
 ## Environment-Gated Capability Verification
 
@@ -204,7 +223,7 @@ may resolve one._
 |------|--------|--------|---------------------|
 | Real segmenter output on real CT handed over to this repo — SPINEPS (primary) and/or TotalSegmentator label maps + manifest, produced in the programme repo, sufficient to build the real candidate-vs-GT cohort | stage 16 | ⏳ Awaiting | Blocks the whole of Stage 16, and transitively Stage 25, whose deliverables are "deliberately unspecified until Stage 16 has characterised real failures". Closes the "Real automatic-segmentation failure corpus" Environment-Gated row and the G2 Outcome target. Not the same prerequisite as the Stage 21 rung-2 corpus, which needs only real VerSe GT — already ✅ Verified and **not** gated. |
 | Access approved for the curated challenging-case source data — real pathology / post-op / atypical anatomy ([`vision.md`](vision.md) §8), `VerSe_fracture_grading.xlsx` a natural seed, plus any clinical cohort requiring an ethics/data-sharing sign-off | stage 16 | ⏳ Awaiting | Independent of the row above: real *segmenter output* does not supply the *challenging cases*, and either arriving alone leaves a Stage 16 deliverable unbuildable. Kept a separate row so approving one does not silently read as approving both. |
-| §6 failure-mode taxonomy — the modes need a specification before the rest of Stage 20 can be built. Six decisions are owed, listed in [`failure-mode-taxonomy-handover.md`](failure-mode-taxonomy-handover.md) §10: the anchor semantics for modes 4 and 7, whether mode 6's `mislabel` firing is a true positive or cross-talk, whether the evidence rung attaches to the mode or the edge, the per-mode schema and lifecycle, whether this becomes a new stage or a Stage 20 rescope, and the `vision.md` §6 wording that currently forbids a `proposed` mode | 139, 140, 141, 142 | ⏳ Awaiting | Raised 2026-09-03 on cutting queue-019 short after item 138. Queue-019 produced three defects of one class in four items — a factual claim authored as prose and accepted by a check testing its shape, not its truth (items 137 and 138; corrections `b1c593c`, `0db0fca`, `b090822`). Two of the five corrected mechanism sentences are provably uncatchable by any such check. The root cause is that no document defines the eight modes: they exist in five partial sources, none of which states what distinguishes one mode from its neighbours or what evidence constitutes a detection. Items 136–138's machinery is unaffected and becomes the conformance check once a specification exists. |
+| §6 failure-mode taxonomy — the modes need a specification before the rest of Stage 20 can be built. Six decisions are owed, listed in [`failure-mode-taxonomy-handover.md`](failure-mode-taxonomy-handover.md) §10: the anchor semantics for modes 4 and 7, whether mode 6's `mislabel` firing is a true positive or cross-talk, whether the evidence rung attaches to the mode or the edge, the per-mode schema and lifecycle, whether this becomes a new stage or a Stage 20 rescope, and the `vision.md` §6 wording that currently forbids a `proposed` mode | 139, 140, 141, 142 | ✅ Approved (2026-09-03) | Adopted failure-mode-taxonomy-handover.md section 12 (2026-09-03) in full. (1) Modes 4 and 7 keep the Stage-18 metric path as anchor and the rule's read path as a separate, separately-labelled column. (2) Mode 6 firing mislabel is a true co-detection: expected_firing = {border, mislabel} for mode6_crop_at_border, with the mode-1 / mode-6 discriminator (a border-touching face) written into the specification. (3) The evidence rung attaches to each mode-to-rule edge, authored; the mode's rung is derived as the strongest edge. (4) The section 6 schema and four-state lifecycle are adopted, with expected_firing authored per corpus case and implemented / validated derived from live state. (5) A new Stage 30 authors the specification and runs before the remainder of Stage 20; items 139-142 are re-specced against it in the queue after Stage 30's. (6) vision.md section 6 is reworded as part of a re-issued vision v3 now, not a point edit: a mode is claimed covered only with the rule(s) that detect it, and a proposed mode is not a claim of coverage. Items 139-142 remain held until Stage 30's specification is signed off. |
 | Spinal curve model — the deformity envelope the fit must represent without flagging it. How much scoliotic / kyphotic curvature is normal anatomy the model must follow, versus deviation it must report; and the accepted false-negative cost of a stiffer fit | 119, 120, 121, 123, 125 | ✅ Approved (2026-08-27) | Adopt item 118's proposal: smoothing_spline at s = n_points, chord-length u, leave-one-out evaluation, and max_offset_mm raised 15.0 -> 25.0. Envelope set above the 21.073357 mm leave-one-out ceiling measured across VerSe19 GT including the most coronally-deviated cases, and below the ~5 mm leave-one-out separation a small displacement produces. Accepted cost: a genuine displacement smaller than the envelope may be missed. Expected to be revised into separate normal and scoliotic envelopes later -- see docs/spinal-curve-model.md. *(Superseded 2026-08-29 by a second human decision during item 123: terminal vertebrae (first/last of each subject's ordered sequence) are excluded from the mislabel rule and threshold derivation, and the shipped threshold is `max_offset_mm = 13.0` (interior-only p99 12.91 mm at T10, real 80-subject VerSe19 cohort). Full record in `docs/reference-build.md`'s rebuild records and item 123's spec Decisions log.)* |
 
 ---
@@ -871,6 +890,7 @@ verifies they agree, and no document records which failure mode each feature ser
   `per_label.{label}.geometry.zzz_drift_probe`; `git checkout --` restored a
   clean, green tree. See item 106's spec, "### Real-source drift rehearsal".)*
 - [x] Every feature carries a status and a named failure mode, or is marked `unwired`
+  - **2026-09-03** → Re-measured 2026-09-03 on the committed docs/aide/feature_catalogue.generated.json after items 136-138: the artifact now holds 138 entries (not 111), and the 72-entry statused-but-mode-unmapped bucket (mode_evidence == rule_unmapped) is empty - 0 entries. Split: 86 entries carry no mode evidence, 52 carry some (48 name at least one failure mode); 12 are attributed through a rule's recorded mode-less declaration (rule_mode_less: intensity, intensity_reference_delta). Status split: 66 retune, 34 keep, 30 unwired, 8 retire. The bucket shrank first because items 110/120/124/131/132 added leaf paths and moved attributions (138 entries, 18 rule_unmapped measured 2026-09-02 while specifying item 136), then closed because item 137 dispositioned the four mode-less rules. Stage 20's honest-count item should quote this split, not the attestation's.
   (**G8**). *(Measured on the committed artifact, `N = 111`: every entry
   carries a status from `{keep, retune, retire, unwired}`. Three-way partition:
   **35 moded** (statused, `failure_modes` non-empty), **4 unwired**, **72
@@ -1433,3 +1453,89 @@ per-deliverable provenance.
   `docs/aide/items/129-coincident-centroids-in-the-pipeline.md`'s Decisions log and
   `src/segfacet/features/spline_offset.py`'s docstring limitation block for the standing
   evidence. No agent resolves that gate.)*
+
+---
+
+# Stage scoped 2026-09-03 (queue-019 boundary feedback loop)
+
+> Same construction as Stages 26–29: numbered for stability, **runs next, ahead of the
+> remainder of Stage 20**. Full statement in [`roadmap.md`](roadmap.md).
+
+---
+
+## Stage 30 — Failure-Mode Specification: the §6 catalogue as an authored source (G2, G7, G8) — 📋
+
+**Goal.** Queue-019 produced three defects of one class in four items — a factual claim
+about the failure modes authored as prose, shipped into a committed artifact, and accepted
+by a check that tested the claim's shape rather than its truth — because no document
+defines the modes: they exist as five partial sources (`vision.md` §6's list,
+`FAILURE_MODE_NAMES`, `MODE_ANCHOR_PATHS`, the `Expectation` literals, `MODE_RUNGS`) that
+the generated matrix cross-checks without being able to adjudicate. This stage authors the
+specification [`vision.md`](vision.md) v3 §6 describes — one authored source per mode,
+from which every generated artifact becomes a conformance report — collapses the five
+sources onto it, and closes with a maintainer sign-off that gates the remainder of Stage
+20. It writes no new rules and adds no corpus cases beyond what the ninth mode needs.
+
+**Deliverables.**
+
+- 📋 **D0** Synthetic corpus S-axis stacking corrected before anything is measured
+  (`build_clean_spine` advances caudally like real VerSe input), every committed corpus
+  value and both reference artifacts regenerated, expected firing sets recorded only
+  after it. Carried defect recorded 2026-08-31 (spec 131).
+- 📋 **D1** The specification module (one frozen declaration per mode with vision §6's
+  fields; `implemented`/`validated` derived, `proposed`/`specified` authored) and its
+  byte-reproducible, LF-pinned rendering `docs/aide/failure_modes.generated.{md,json}`.
+- 📋 **D2** The eight hypothesised modes specified with discriminators; gate 3's decisions
+  encoded as data — `mode6_crop_at_border` expects `{border, mislabel}` with reason,
+  evidence rungs authored per mode ↔ rule edge with the mode's rung derived, mode 8
+  structurally-unobservable, mode 7's single-descent cap recorded.
+- 📋 **D3** The ninth mode, implausible tissue under a label, entered through the lifecycle
+  (`intensity` / `intensity_reference_delta` declare it; the intensity manifest gains
+  `failure_mode` and expected firing fields; the intensity sibling of
+  `pipeline_findings` built in `synth/regression.py`), plus the catalogue's first
+  `proposed` entry — collapsed or duplicated label set, candidate feature
+  `stage3_unavailable`, no rule (carried defect, spec 129).
+- 📋 **D4** The five partial sources collapsed onto the specification; `Expectation` and
+  `RuleModeDeclaration` checked against it in both directions; the three declaration-seam
+  defects (the `"corpus"` tag membership test, the untyped `evidence`/`modes`, the
+  corpus-to-declaration blindness; `insights.md`, spec 136) closed by replacement, and
+  the rule-granular attribution (`insights.md`, spec 138) given a per-detector or
+  per-path form the catalogue renders.
+- 📋 **D5** The traceability `build_matrix` (spec 138) re-pointed at the specification as primary: derived
+  status, per-edge rungs, expected beside measured firing per corpus case with agreement
+  scored, metric anchor path and rule read paths as two labelled columns; the
+  `build_matrix` fixture discipline set and the `no-float-leaf` guard ground added. The
+  exercise columns stay Stage 20's.
+- 📋 **D6** Maintainer sign-off of `failure_modes.generated.md`, entry by entry, with date
+  and outcome recorded in the specification module's docstring. Until recorded, the
+  remainder of Stage 20 is not queued.
+- 📋 **D7** Stage validation: both artifacts regenerated from a clean tree, every corpus
+  case across both corpora driven and expected equals measured confirmed, derived
+  statuses checked against live state, the per-status / per-rung count recorded here as a
+  measured number.
+
+**Acceptance.**
+
+- [ ] Every mode in the specification carries every schema field, a status from the
+  four-state vocabulary and a provenance; `implemented` and `validated` are derived from
+  live state, and a hand-set status that disagrees with the registry or the corpus fails
+  a test naming the mode (**G8**).
+- [ ] For every corpus case across both committed corpora, the measured firing set equals
+  the specification's expected firing set, and `mode6_crop_at_border` expects
+  `{border, mislabel}` with a recorded reason (**G2**).
+- [ ] Every mode ↔ rule edge carries an authored evidence rung and every mode's rung is
+  derived from its edges; the analytic-only edges are rendered as such, and mode 8's rung
+  names the single-channel mechanism (**G2**).
+- [ ] `failure_modes.generated.{md,json}` and the traceability matrix regenerate
+  byte-identically from a clean tree, name the specification as their primary source, and
+  render the metric anchor path and the rule's read paths as separately labelled columns.
+- [ ] The ninth mode (implausible tissue) is present at `implemented` or `validated`, with
+  `intensity` and `intensity_reference_delta` declaring it and the intensity corpus cases
+  carrying expected firing sets; `FAILURE_MODE_NAMES` and `MODE_RUNGS` are derived from or
+  replaced by the specification, and the eight seed names equal `vision.md` §6's list
+  (**G8**).
+- [ ] The specification's rendering is signed off by the maintainer, with the date and
+  outcome recorded in the module (**G8**).
+- [ ] `build_clean_spine` stacks labels caudally along +S like real VerSe input, every
+  committed corpus value and both reference artifacts were regenerated after the
+  correction, and no expected firing set in the specification predates it (**G7**).
