@@ -375,12 +375,12 @@ queue of code is too much to review as first contact, so the review runs
 - **Open the queue PR as a draft as soon as the first item lands** on the
   pushed queue branch — head `aide/queue-NNN`, base `main` — not when the
   queue completes. Opening the PR is a human-gated action, once per queue.
-- **After each `aide merge NNN` returns an item to the queue branch**, launch
-  the per-item review from the routing table below and push the queue branch.
-  The review runs in the background while the next item's spec and tests
-  start — review latency does not block the loop. Review the item's slice of
-  the diff (the merge commit against its first parent), not the accumulated
-  queue diff.
+- **One item's diff is the review round.** After `aide merge NNN` returns an
+  item to the queue branch, push it and review that slice — the merge commit
+  against its first parent — not the accumulated queue diff. The review runs
+  in the background while the next item's spec and tests start, so review
+  latency does not block the loop. Which reviewer reads a given round is a
+  spending decision, and the table below is what there is to spend.
 - **Triage findings where they arrive**: a finding in scope for the running
   queue becomes a fix commit on the queue branch (or a queued item); a true
   finding out of scope becomes one line in
@@ -397,19 +397,25 @@ CLAUDE.md, so hand it `REVIEW.md` in the prompt. Keep the three files from
 drifting: `AGENTS.md` restates only `REVIEW.md` highlights, and nothing here
 restates either.
 
-Reviewer routing is **budget-ranked** — the reviewers draw on three
-independent quotas (ChatGPT subscription, Copilot premium requests, Claude),
-and Claude also drives the development loop itself, so it reviews last:
+**Reviewer capacity is the binding constraint, so this table offers tools
+rather than prescribing a routine.** Both hosted reviewers run on quotas a
+single queue can exhaust; the local `/code-review` subagent is the only one
+with no hosted quota, which makes it the ordinary path and often the only one
+still available. Nothing below is mandatory and no round is owed two
+reviewers — an item read once by whichever reviewer is affordable beats a
+policy that stalls when the budget is gone. The rows are ordered scarcest
+first:
 
-| Rank | Reviewer | Trigger | Budget / notes |
+| Reviewer | Trigger | Capacity | Spend it on |
 |---|---|---|---|
-| 1 | Codex CLI (local) | `codex review --commit <merge sha>` on the queue branch, custom instructions naming the item's spec; non-interactive, run in the background after each item merges | ChatGPT-subscription quota, independent of Copilot's. Reads `AGENTS.md` for the repo rules; depth is steerable via the instructions argument, unlike the cloud `@codex review`, which reports only P0/P1 findings by documented design |
-| 2 | Copilot code review | re-request on the draft queue PR after each item, via the GraphQL `requestReviews` mutation with `botIds` (the REST reviewers endpoint returns 200 and silently does nothing; verify via the PR's timeline events) | strongest reviewer, but the monthly premium-request pool empties within days and it declines queue-sized diffs — per-item rounds keep each request small; quota exhaustion mid-queue is expected, not a failure, because rank 1 is the primary |
-| 3 | Claude review subagent | `/code-review high` on the item's diff, prompt must include `REVIEW.md` — fallback when ranks 1–2 are exhausted or unavailable | cap at two rounds; round two re-asks the same agent whether the fix is complete and hunts regressions the fix introduced |
+| Copilot code review | re-request on the draft queue PR after each item, via the GraphQL `requestReviews` mutation with `botIds` (the REST reviewers endpoint returns 200 and silently does nothing; verify via the PR's timeline events) | **Smallest budget, and the first to run out** — the monthly premium-request pool empties within days. GitHub-managed; not configurable per repo | Broad coverage across both severity tiers while it lasts — the readiest source of Nit-tier findings. It declines queue-sized diffs, so keep each request to one item. Exhaustion mid-queue is expected, not a failure |
+| Codex CLI (local) | `codex review --commit <merge sha>` on the queue branch, custom instructions naming the item's spec; non-interactive, run in the background | Finite ChatGPT-subscription quota, independent of Copilot's; this repo has not measured how fast it empties. Reads `AGENTS.md` for the repo rules | A diff where a second opinion is worth the spend. Depth is steerable via the instructions argument, unlike the cloud `@codex review`, which reports only P0/P1 findings by documented design |
+| Claude review subagent | `/code-review high` on the item's diff, prompt must include `REVIEW.md` | **No hosted quota** — it draws on the same Claude budget as the loop it runs beside | The default round, and the one to reach for once the hosted budgets are spent. Cap at two rounds; round two re-asks the same agent whether the fix is complete and hunts regressions the fix introduced |
 
 `/code-review ultra` (multi-agent cloud review, billed) is user-triggered
 only — never launched by an agent on its own. The `codex` CLI is a
 per-machine prerequisite (install + ChatGPT login), like `gh` — see "What is
-committed vs. per-machine"; when a machine lacks it, start at rank 2.
+committed vs. per-machine"; on a machine without it that row is simply
+unavailable.
 
 @.aide/AGENT-CONTEXT.md
