@@ -1,11 +1,16 @@
 # Review instructions
 
-Review contract for pull requests in this repo. Copilot code review and
-Claude Code Review read this file directly; Codex — the cloud reviewer
-and the `codex review` CLI alike — applies it via the Code Review Rules
-section of `AGENTS.md`; a local Claude `/code-review` subagent does
-**not** read it on its own, so its prompt must hand it this file.
-Reviewer routing — who reviews, and when — lives in `CLAUDE.md` under
+Review contract for this repo. It binds whoever is reading the diff — a
+hosted reviewer on a pull request, or a local `/code-review` run on a
+branch — and none of it depends on which. How each one receives it does
+differ: Copilot code review and Claude Code Review read this file
+directly, Codex — the cloud reviewer and the `codex review` CLI alike —
+applies it via the Code Review Rules section of `AGENTS.md`, and a local
+Claude `/code-review` subagent reads only `CLAUDE.md`, so its prompt must
+hand it this file. That last path has no hosted quota behind it, so it is
+the one most likely to be doing the reading; the handover is a mechanical
+step, not a mark of a lesser review. Which reviewer to spend on a given
+round — and why the hosted ones are rationed — is `CLAUDE.md` under
 "Code review".
 
 ## The unit of review is the item, not the PR
