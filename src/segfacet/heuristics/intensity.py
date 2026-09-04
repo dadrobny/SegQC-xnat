@@ -153,12 +153,7 @@ class IntensityRule(Rule):
             "(implausible_metal, implausible_soft_tissue, "
             "degenerate_uniform) drive this rule end-to-end and now carry "
             "failure_mode 9; clean_hu is the negative control at "
-            "failure_mode 0. The reserved 'corpus' evidence tag is "
-            "deliberately NOT bound: it is an exact-element membership test "
-            "against catalogue._scan_synth_rule_mode_map(), which AST-scans "
-            "the GEOMETRIC corpus's Expectation(...) literals only, so "
-            "tagging it here would report a false conflict (item 146 A6; "
-            "item 147 retires the tag)."
+            "failure_mode 0."
         ),
         consumed_paths=(
             ConsumedPath(

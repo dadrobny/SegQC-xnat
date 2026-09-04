@@ -147,10 +147,7 @@ class IntensityReferenceDeltaRule(Rule):
             "against no reference distribution and the item-146 harness "
             "attaches none, so this rule's mode-9 edge sits at the "
             "needs-real-data rung -- the same analytic-only shape item 137 "
-            "recorded for reference_delta. The reserved 'corpus' evidence "
-            "tag is deliberately NOT bound (item 146 A6): it is checked "
-            "against the GEOMETRIC corpus scan only, so tagging it here "
-            "would report a false conflict."
+            "recorded for reference_delta."
         ),
         consumed_paths=(
             ConsumedPath(
