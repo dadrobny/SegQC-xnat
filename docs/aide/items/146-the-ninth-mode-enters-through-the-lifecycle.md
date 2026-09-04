@@ -763,6 +763,29 @@ gets a comment naming item 146 and the reason, as items 137/145 did):
     it and `rule_to_mode` stays complete. Move the stub to a mode absent from
     both `SPECIFICATION` and `MODE_ANCHOR_PATHS` (e.g. `99`) and assert that
     absence live rather than by literal.
+  - Round-2 fix reconciliation (2026-09-04, test-writer pass): eight further
+    tests, red as the documented, direct consequence of `build_matrix`'s
+    known-mode source moving to `failure_modes.SPECIFICATION`'s keys (the
+    2026-09-04 Decisions-log entry above) —
+    `test_ac5_markdown_rows_agree_with_json_for_every_mode_and_rule`,
+    `test_ac8_mode_set_equals_mode_anchor_paths_keys`,
+    `test_ac9_mode_titles_match_the_hand_transcribed_vision_literals`,
+    `test_ac9_mode_titles_are_transcribed_from_vision_section_six`,
+    `test_ac10_mode_to_rule_direction_complete_and_every_mode_has_a_rule`,
+    `test_ac19_every_mode_to_rule_edge_is_attributed_from_the_corpus_map`,
+    `test_ac31_named_feature_path_is_consumed_by_one_of_the_modes_declared_rules`
+    and `test_ac20_analytic_edges_equal_edges_of_rules_the_corpus_map_never_
+    designates` (only its dated `witness` literal, extended with `(9,
+    "intensity")` / `(9, "intensity_reference_delta")` and redated
+    2026-09-04; its two live-derived assertions already passed unchanged) —
+    each rescoped to the state the fix creates (mode set ==
+    `SPECIFICATION` keys with `MODE_ANCHOR_PATHS` as a live subset; the
+    eight seed modes' titles still equal vision §6, modes 9/10 checked
+    against the live specification instead; mode 10, having no declaring
+    rule, treated as an explicit zero-edges/zero-consumed-paths case rather
+    than skipped; the mode-to-rule hole set derived live from
+    `derive_status` instead of assumed complete), never weakened for modes
+    1–8.
 - `tests/test_136_rule_mode_declarations.py`, `tests/test_058_intensity_fixtures.py`
   and `tests/test_106_stage19_validation.py` were checked and need **no**
   change: every relevant assertion there is derived from live declaration state

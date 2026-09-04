@@ -324,7 +324,13 @@ def test_ac5_markdown_rows_agree_with_json_for_every_mode_and_rule():
     for mode, record in modes.items():
         row = _row_for_mode(lines, mode)
         assert row is not None, mode
-        assert record["rules"], mode
+        # Reconciled (item 146, 2026-09-04): a bare non-empty-rules
+        # requirement pinned the pre-146 shape, where every catalogued mode
+        # declared >=1 rule. Mode 10 (the first `proposed` entry) legitimately
+        # declares none (AC27) -- completeness of the rules a mode *does*
+        # carry is AC10's claim, not this row-agreement one, so this loop
+        # only asserts what it is actually about: every rule the JSON lists
+        # for a mode is also present in that mode's markdown row.
         for rule_id in record["rules"]:
             assert rule_id in row, (mode, rule_id)
         assert record["rung"] in row, mode
@@ -374,13 +380,24 @@ def test_ac7_gitattributes_pins_both_new_paths_eol_lf():
 
 
 def test_ac8_mode_set_equals_mode_anchor_paths_keys():
+    """Reconciled (item 146, 2026-09-04): before this item, ``build_matrix``
+    enumerated modes from ``feature_docs.MODE_ANCHOR_PATHS``' key set (then
+    exactly the mode set), so the two were trivially equal. Item 146's
+    round-2 fix moves the enumeration to ``failure_modes.SPECIFICATION``'s
+    key set (1-10, ``feature_docs.py``'s Asserts-against entry) while
+    ``MODE_ANCHOR_PATHS`` itself deliberately stays at 1-8. The live claim
+    this test now makes is the correct superset relationship: the matrix's
+    mode set equals the specification's keys, and every anchor-paths key is
+    one of them."""
+    import segfacet.failure_modes as failure_modes_module
     import segfacet.feature_docs as feature_docs_module
     import segfacet.traceability as traceability
 
     d = traceability.matrix_to_dict(traceability.build_matrix())
     modes = _mode_records(d)
     assert modes, "expected at least one mode record"
-    assert set(modes.keys()) == set(feature_docs_module.MODE_ANCHOR_PATHS.keys())
+    assert set(modes.keys()) == set(failure_modes_module.SPECIFICATION.keys())
+    assert set(feature_docs_module.MODE_ANCHOR_PATHS.keys()) <= set(modes.keys())
 
 
 # =========================================================================== #
@@ -413,30 +430,54 @@ def test_ac9_mode_titles_match_the_hand_transcribed_vision_literals():
     """Independent ground truth: compares the built titles directly against
     literals transcribed by hand from vision.md §6, not against another
     parse of the same section -- this is the assertion that can actually
-    catch a parser bug shared by the builder and this test module."""
+    catch a parser bug shared by the builder and this test module.
+
+    Reconciled (item 146, 2026-09-04): rescoped to the eight seed modes,
+    which is what this hand-transcribed-literals dict has ever covered --
+    §6 was not and is not edited to add modes 9/10 (A13/A4: mode 9 is
+    deliberately *not* one of §6's numbered eight, and mode 10 is the first
+    `proposed` entry). Modes 9 and 10 entered through the specification
+    instead, so their ground-truth name lives in
+    ``failure_modes.SPECIFICATION[id].name``, read live, not in this
+    vision-derived dict; ``build_matrix``'s title field is sourced from
+    ``_vision_mode_titles()`` alone (unchanged by item 146) and carries no
+    entry for either id, so both render empty rather than the
+    specification's name -- asserted here live rather than silently
+    dropped, so a future fix that starts threading the specification's name
+    through the title field is what turns this into a real "()" failure to
+    react to, not a silent pass."""
+    import segfacet.failure_modes as failure_modes_module
     import segfacet.traceability as traceability
 
     d = traceability.matrix_to_dict(traceability.build_matrix())
     modes = _mode_records(d)
     assert modes
-    assert set(modes.keys()) == set(VISION_SECTION_SIX_MODE_TITLES.keys())
-    for mode, record in modes.items():
-        assert record["title"] == VISION_SECTION_SIX_MODE_TITLES[mode], mode
+    for mode, expected_title in VISION_SECTION_SIX_MODE_TITLES.items():
+        assert modes[mode]["title"] == expected_title, mode
+
+    for mode in (9, 10):
+        assert modes[mode]["title"] == "", mode
+        assert failure_modes_module.SPECIFICATION[mode].name, mode
 
 
 def test_ac9_mode_titles_are_transcribed_from_vision_section_six():
     """Complementary derived check: still useful as a live-document guard
     (it fails loudly if §6 is edited and the hand-transcribed literals above
     are not updated to match), but it is not the AC9 ground-truth check --
-    see test_ac9_mode_titles_match_the_hand_transcribed_vision_literals."""
+    see test_ac9_mode_titles_match_the_hand_transcribed_vision_literals.
+
+    Reconciled (item 146, 2026-09-04): iterate ``_vision_mode_titles()``'s
+    own keys (the eight seed modes) rather than the matrix's now-larger mode
+    set, so this stays a live-document guard over exactly the modes §6
+    actually names -- modes 9 and 10 have no §6 entry to compare against."""
     import segfacet.traceability as traceability
 
     d = traceability.matrix_to_dict(traceability.build_matrix())
     modes = _mode_records(d)
     vision_titles = _vision_mode_titles()
     assert modes and vision_titles
-    for mode, record in modes.items():
-        assert record["title"] == vision_titles[mode], mode
+    for mode, expected_title in vision_titles.items():
+        assert modes[mode]["title"] == expected_title, mode
 
 
 # =========================================================================== #
@@ -445,17 +486,37 @@ def test_ac9_mode_titles_are_transcribed_from_vision_section_six():
 
 
 def test_ac10_mode_to_rule_direction_complete_and_every_mode_has_a_rule():
+    """Reconciled (item 146, 2026-09-04): mode 10 is the catalogue's first
+    `proposed` entry -- listed, defined, deliberately unimplemented (AC27) --
+    so it legitimately carries zero rules and is now the direction's one
+    hole. Which mode(s) that is stays live-derived from
+    ``failure_modes.derive_status`` (never hardcoded to "10" alone): every
+    mode whose live-derived status is not "proposed" must still carry >=1
+    rule, exactly as before."""
+    import segfacet.failure_modes as failure_modes_module
     import segfacet.traceability as traceability
 
     d = traceability.matrix_to_dict(traceability.build_matrix())
     modes = _mode_records(d)
     assert modes
+
+    proposed_mode_ids = {
+        str(mode_id)
+        for mode_id, spec in failure_modes_module.SPECIFICATION.items()
+        if failure_modes_module.derive_status(spec) == "proposed"
+    }
+    assert proposed_mode_ids, "expected >=1 live-derived proposed mode on this tree"
+
     for mode, record in modes.items():
-        assert record["rules"], mode
+        if str(mode) in proposed_mode_ids:
+            assert record["rules"] == [], mode
+        else:
+            assert record["rules"], mode
 
     direction = d["directions"]["mode_to_rule"]
-    assert direction["complete"] is True
-    assert direction["holes"] == []
+    assert direction["complete"] is False
+    assert set(direction["holes"]) == proposed_mode_ids
+    assert proposed_mode_ids == {"10"}
 
 
 # =========================================================================== #
@@ -671,6 +732,17 @@ def test_ac18_rule_record_carries_modes_xor_mode_less_reason(rule_id):
 
 
 def test_ac19_every_mode_to_rule_edge_is_attributed_from_the_corpus_map():
+    """Reconciled (item 146, 2026-09-04): the matrix now enumerates modes 9
+    and 10 too. Mode 10 (the first `proposed` entry) declares no rules, so
+    it carries zero edges and zero consumed feature paths -- asserted
+    explicitly below rather than let the empty ``rule_attribution`` dict
+    fall out of the generic loop silently. Mode 9's two edges are attributed
+    "analytic" because neither ``intensity`` nor ``intensity_reference_delta``
+    is designated by any synth ``Expectation()`` literal (``scan_synth_rule_
+    mode_map`` only scans the geometric corpus, item 146 A6) -- the same
+    corpus-map derivation the generic loop below already exercises for every
+    other mode, asserted here once more explicitly against the two live
+    edges."""
     import segfacet.catalogue as catalogue_module
     import segfacet.traceability as traceability
 
@@ -679,8 +751,23 @@ def test_ac19_every_mode_to_rule_edge_is_attributed_from_the_corpus_map():
     modes = _mode_records(d)
     assert modes
 
+    mode10 = modes[10]
+    assert mode10["rules"] == [], mode10
+    assert mode10["rule_attribution"] == {}, mode10
+    assert mode10["feature_paths"] == [], mode10
+
+    assert "intensity" not in corpus_map, corpus_map
+    assert "intensity_reference_delta" not in corpus_map, corpus_map
+    mode9 = modes[9]
+    assert mode9["rule_attribution"] == {
+        "intensity": "analytic",
+        "intensity_reference_delta": "analytic",
+    }, mode9
+
     checked = False
     for mode, record in modes.items():
+        if mode == 10:
+            continue
         attribution = record["rule_attribution"]
         assert attribution, mode
         for rule_id, tag in attribution.items():
@@ -738,9 +825,20 @@ def test_ac20_analytic_edges_equal_edges_of_rules_the_corpus_map_never_designate
     assert actual_all_edges == expected_total_edges
     assert actual_analytic == expected_analytic
 
-    # 2026-09-02, item 138: what the derivation above currently evaluates to
-    # on this tree -- a dated witness, not a floor a future change must match.
-    witness = {(1, "reference_delta"), (2, "bounds"), (2, "reference_delta")}
+    # 2026-09-04, item 146: what the derivation above currently evaluates to
+    # on this tree -- a dated witness, not a floor a future change must
+    # match. Extended (item 146) with mode 9's two edges: intensity and
+    # intensity_reference_delta both moved from mode-less to declaring mode
+    # 9 (AC9), and neither is designated by any synth Expectation() literal
+    # (scan_synth_rule_mode_map scans the geometric corpus only, A6), so both
+    # attribute "analytic".
+    witness = {
+        (1, "reference_delta"),
+        (2, "bounds"),
+        (2, "reference_delta"),
+        (9, "intensity"),
+        (9, "intensity_reference_delta"),
+    }
     assert actual_analytic == witness
 
     expected_corpus = expected_total_edges - expected_analytic
@@ -1260,6 +1358,16 @@ def test_ac31_named_feature_path_is_consumed_by_one_of_the_modes_declared_rules(
     for mode, record in modes.items():
         mechanism = record["mechanism"]
         declared_rules = set(record["rules"])
+        if mode == 10:
+            # Reconciled (item 146, 2026-09-04): mode 10 is the first
+            # `proposed` entry -- no declared rules, no authored mechanism
+            # (MODE_RUNGS carries no entry for it either) -- so it has
+            # nothing to name and nothing that could consume a named path.
+            # Assert that zero state explicitly rather than let the empty
+            # declared_rules set trip the non-empty assertion below.
+            assert declared_rules == set(), mode
+            assert mechanism == "", mode
+            continue
         assert declared_rules, mode
 
         search_universe = set(record["anchor_paths"]) | all_rule_consumed_paths
