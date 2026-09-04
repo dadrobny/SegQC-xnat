@@ -23,9 +23,25 @@ numerical residue, which is still noise at six significant digits (measured
 2026-08-30, PR #56). ``segfacet.observed_range.emission_range`` is the shipped
 example: a covered-but-not-informative population emits
 ``(0.0, 0.0, 0.0, 0.0)`` while ``PopulationRange`` keeps the raw measurement
-for every caller that classifies on it. Four other grounds make byte
+for every caller that classifies on it. Five other grounds make byte
 comparison legitimate -- see :data:`GROUNDS` -- and every :data:`ALLOWLIST`
 entry names its ground and carries a one-line reason.
+
+Standing rule: the no-float-leaf ground
+-----------------------------------------
+Item 149 adds a sixth ground, ``"no-float-leaf"``: an artifact whose payload
+tree (walked to every leaf, JSON object values included) carries **zero**
+``float`` instances is byte-safe to compare fresh-vs-committed
+unconditionally -- there is no floating-point representation or platform
+arithmetic residue for a byte comparison to be fragile against, only integers,
+strings, booleans and ``null``. This ground is discharged by a dedicated test
+that walks the payload and asserts the float count is zero, never by an
+assertion in the reason string (the guard itself performs no float walk --
+it is a static AST classifier, same as every other ground): see
+``tests/test_149_conformance_report.py``'s
+``test_ac21_traceability_matrix_has_no_float_leaf`` and
+``test_ac21_failure_modes_specification_has_no_float_leaf``, which the
+:data:`ALLOWLIST` entries below name directly.
 
 Standing rule: the consumer-survey requirement
 ------------------------------------------------
@@ -83,6 +99,7 @@ GROUNDS: Tuple[str, ...] = (
     "hand-written-literals",
     "binary-fixture",
     "integrity-pin",
+    "no-float-leaf",
 )
 
 
@@ -169,6 +186,30 @@ ALLOWLIST: Tuple[AllowlistEntry, ...] = (
         reason="A released production artifact compared against a recorded "
         "digest; there is no freshly computed side, so a change must be "
         "deliberate.",
+    ),
+    AllowlistEntry(
+        path="docs/aide/traceability_matrix.generated.json",
+        ground="no-float-leaf",
+        reason="Zero float leaves, discharged by test_149_conformance_report."
+        "py::test_ac21_traceability_matrix_has_no_float_leaf.",
+    ),
+    AllowlistEntry(
+        path="docs/aide/traceability_matrix.generated.md",
+        ground="no-float-leaf",
+        reason="The rendered form of the same float-free payload, same "
+        "discharging test.",
+    ),
+    AllowlistEntry(
+        path="docs/aide/failure_modes.generated.json",
+        ground="no-float-leaf",
+        reason="Zero float leaves, discharged by test_149_conformance_report."
+        "py::test_ac21_failure_modes_specification_has_no_float_leaf.",
+    ),
+    AllowlistEntry(
+        path="docs/aide/failure_modes.generated.md",
+        ground="no-float-leaf",
+        reason="The rendered form of the same float-free payload, same "
+        "discharging test.",
     ),
 )
 

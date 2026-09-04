@@ -1,4 +1,177 @@
 {
+  "classification_conflicts": [],
+  "conformance": {
+    "agree_count": 13,
+    "cases": [
+      {
+        "agrees": true,
+        "case_id": "clean_control",
+        "corpus": "geometric",
+        "expected_firing": [],
+        "expected_source": "manifest-clean-control",
+        "measured_firing": [],
+        "mode": 0
+      },
+      {
+        "agrees": true,
+        "case_id": "mode1_displace",
+        "corpus": "geometric",
+        "expected_firing": [
+          "mislabel"
+        ],
+        "expected_source": "specification",
+        "measured_firing": [
+          "mislabel"
+        ],
+        "mode": 1
+      },
+      {
+        "agrees": true,
+        "case_id": "mode2_fragment",
+        "corpus": "geometric",
+        "expected_firing": [
+          "fragmentation"
+        ],
+        "expected_source": "specification",
+        "measured_firing": [
+          "fragmentation"
+        ],
+        "mode": 2
+      },
+      {
+        "agrees": true,
+        "case_id": "mode3_inject_islands",
+        "corpus": "geometric",
+        "expected_firing": [
+          "fragmentation"
+        ],
+        "expected_source": "specification",
+        "measured_firing": [
+          "fragmentation"
+        ],
+        "mode": 3
+      },
+      {
+        "agrees": true,
+        "case_id": "mode4_relabel_swap",
+        "corpus": "geometric",
+        "expected_firing": [
+          "mislabel"
+        ],
+        "expected_source": "specification",
+        "measured_firing": [
+          "mislabel"
+        ],
+        "mode": 4
+      },
+      {
+        "agrees": true,
+        "case_id": "mode5_remove_level",
+        "corpus": "geometric",
+        "expected_firing": [
+          "coverage"
+        ],
+        "expected_source": "specification",
+        "measured_firing": [
+          "coverage"
+        ],
+        "mode": 5
+      },
+      {
+        "agrees": true,
+        "case_id": "mode6_crop_at_border",
+        "corpus": "geometric",
+        "expected_firing": [
+          "border",
+          "mislabel"
+        ],
+        "expected_source": "specification",
+        "measured_firing": [
+          "border",
+          "mislabel"
+        ],
+        "mode": 6
+      },
+      {
+        "agrees": true,
+        "case_id": "mode7_sequence_break",
+        "corpus": "geometric",
+        "expected_firing": [
+          "sequence"
+        ],
+        "expected_source": "specification",
+        "measured_firing": [
+          "sequence"
+        ],
+        "mode": 7
+      },
+      {
+        "agrees": true,
+        "case_id": "mode8_force_overlap",
+        "corpus": "geometric",
+        "expected_firing": [
+          "overlap"
+        ],
+        "expected_source": "specification",
+        "measured_firing": [
+          "overlap"
+        ],
+        "mode": 8
+      },
+      {
+        "agrees": true,
+        "case_id": "clean_hu",
+        "corpus": "intensity",
+        "expected_firing": [],
+        "expected_source": "manifest-clean-control",
+        "measured_firing": [],
+        "mode": 0
+      },
+      {
+        "agrees": true,
+        "case_id": "degenerate_uniform",
+        "corpus": "intensity",
+        "expected_firing": [
+          "intensity"
+        ],
+        "expected_source": "specification",
+        "measured_firing": [
+          "intensity"
+        ],
+        "mode": 9
+      },
+      {
+        "agrees": true,
+        "case_id": "implausible_metal",
+        "corpus": "intensity",
+        "expected_firing": [
+          "intensity"
+        ],
+        "expected_source": "specification",
+        "measured_firing": [
+          "intensity"
+        ],
+        "mode": 9
+      },
+      {
+        "agrees": true,
+        "case_id": "implausible_soft_tissue",
+        "corpus": "intensity",
+        "expected_firing": [
+          "intensity"
+        ],
+        "expected_source": "specification",
+        "measured_firing": [
+          "intensity"
+        ],
+        "mode": 9
+      }
+    ],
+    "conformant": true,
+    "disagree_count": 0,
+    "disagreements": [],
+    "unspecified_cases": []
+  },
   "corpus_designated_unregistered_rule_ids": [],
   "directions": {
     "mode_to_rule": {
@@ -39,38 +212,40 @@
       "anchor_paths": [
         "stage3.per_label_offsets[].offset_mm"
       ],
+      "authored_status": "specified",
       "cases": [
         {
           "case_id": "mode1_displace",
           "detection": "pipeline"
         }
       ],
-      "feature_paths": [
-        "per_label",
-        "reference_delta.lower_pct",
-        "reference_delta.upper_pct",
-        "reference_delta.{label}.available",
+      "edge_rungs": [
+        [
+          "mislabel",
+          "Vertebra misaligned from spinal curve:",
+          "synthetic-demonstrable"
+        ],
+        [
+          "reference_delta",
+          "",
+          "needs-real-data"
+        ]
+      ],
+      "granularity": "signal",
+      "mechanism": "Item 120's held-out spline-offset measurement demonstrates label displacement end-to-end on the committed corpus case mode1_displace; under plain run_qc (no reference attached) it is caught solely by mislabel's Detector A via stage3.per_label_offsets[].offset_mm (measured: findings == ['mislabel']). reference_delta additionally scores spline_offset_mm, but only once a reference is attached, which this corpus case's plain-pipeline detection is not.",
+      "mode": 1,
+      "pipeline_detected": true,
+      "read_paths": [
         "reference_delta.{label}.distribution_distance",
-        "reference_delta.{label}.features.physical_volume_mm3.percentile_rank",
         "reference_delta.{label}.features.physical_volume_mm3.robust_z",
-        "reference_delta.{label}.features.physical_volume_mm3.value",
-        "reference_delta.{label}.label",
-        "reference_delta.{label}.level_name",
         "reference_delta.{label}.out_of_range_features[]",
         "stage3.monotonic_consistency.non_monotonic_pairs[]",
         "stage3.per_label_offsets[].dx_mm",
         "stage3.per_label_offsets[].dy_mm",
         "stage3.per_label_offsets[].dz_mm",
-        "stage3.per_label_offsets[].is_terminal",
-        "stage3.per_label_offsets[].label",
-        "stage3.per_label_offsets[].level_name",
         "stage3.per_label_offsets[].offset_mm"
       ],
-      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
-      "granularity": "rule",
-      "mechanism": "Item 120's held-out spline-offset measurement demonstrates label displacement end-to-end on the committed corpus case mode1_displace; under plain run_qc (no reference attached) it is caught solely by mislabel's Detector A via stage3.per_label_offsets[].offset_mm (measured: findings == ['mislabel']). reference_delta additionally scores spline_offset_mm, but only once a reference is attached, which this corpus case's plain-pipeline detection is not.",
-      "mode": 1,
-      "pipeline_detected": true,
+      "read_paths_qualifier": "mode -> read_paths is signal-classified: a path's presence in a mode row's read_paths means a rule declaring this mode classifies that path \"signal\" (segfacet.heuristics.rule.RuleModeDeclaration.consumed_paths, item 148), not that this path alone evidences this mode. The Stage-18 metric anchor (anchor_paths) is a separate column that is never merged in.",
       "rule_attribution": {
         "mislabel": "corpus",
         "reference_delta": "analytic"
@@ -80,36 +255,59 @@
         "reference_delta"
       ],
       "rung": "synthetic-demonstrable",
-      "rung_label": "Demonstrated end-to-end on a synthetic corpus case",
+      "status": "validated",
       "title": "Label not aligned with the anatomical vertebra it names"
     },
     "10": {
       "anchor_paths": [],
+      "authored_status": "proposed",
       "cases": [],
-      "feature_paths": [],
-      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
-      "granularity": "rule",
+      "edge_rungs": [],
+      "granularity": "signal",
       "mechanism": "No rule exists for this mode yet, which is what `proposed` means: the failure is the silence, and silence is not something a detector can be pointed at without first deciding what the record should carry in place of the stage3 block. The candidate feature this mode names, stage3_unavailable.reason, is the one field a future detector would read -- it is populated today (item 129) and read by no rule, so the mode is listed, defined and deliberately unimplemented rather than hypothetical.",
       "mode": 10,
       "pipeline_detected": false,
+      "read_paths": [],
+      "read_paths_qualifier": "mode -> read_paths is signal-classified: a path's presence in a mode row's read_paths means a rule declaring this mode classifies that path \"signal\" (segfacet.heuristics.rule.RuleModeDeclaration.consumed_paths, item 148), not that this path alone evidences this mode. The Stage-18 metric anchor (anchor_paths) is a separate column that is never merged in.",
       "rule_attribution": {},
       "rules": [],
       "rung": null,
-      "rung_label": "",
+      "status": "proposed",
       "title": "Collapsed or duplicated label set"
     },
     "2": {
       "anchor_paths": [
         "per_label.{label}.components.fragmentation_index"
       ],
+      "authored_status": "specified",
       "cases": [
         {
           "case_id": "mode2_fragment",
           "detection": "pipeline"
         }
       ],
-      "feature_paths": [
-        "per_label",
+      "edge_rungs": [
+        [
+          "fragmentation",
+          "Fragmentation:",
+          "synthetic-demonstrable"
+        ],
+        [
+          "bounds",
+          "",
+          "needs-real-data"
+        ],
+        [
+          "reference_delta",
+          "",
+          "needs-real-data"
+        ]
+      ],
+      "granularity": "signal",
+      "mechanism": "The corpus case mode2_fragment demonstrates over-/under-segmentation end-to-end; under plain run_qc (no reference attached) it is caught solely by fragmentation's component-count checks (measured: findings == ['fragmentation']). bounds and reference_delta fire only once a reference is attached, and then fire identically on clean_control -- the documented uncalibrated-baseline noise (CLAUDE.md Gotchas, item 125) -- not evidence of mode-2-specific detection.",
+      "mode": 2,
+      "pipeline_detected": true,
+      "read_paths": [
         "per_label.{label}.components.component_count",
         "per_label.{label}.components.component_sizes[]",
         "per_label.{label}.components.fragmentation_index",
@@ -119,23 +317,11 @@
         "per_label.{label}.geometry.extent_y_mm",
         "per_label.{label}.geometry.extent_z_mm",
         "per_label.{label}.geometry.physical_volume_mm3",
-        "per_label.{label}.level_name",
-        "reference_delta.lower_pct",
-        "reference_delta.upper_pct",
-        "reference_delta.{label}.available",
         "reference_delta.{label}.distribution_distance",
-        "reference_delta.{label}.features.physical_volume_mm3.percentile_rank",
         "reference_delta.{label}.features.physical_volume_mm3.robust_z",
-        "reference_delta.{label}.features.physical_volume_mm3.value",
-        "reference_delta.{label}.label",
-        "reference_delta.{label}.level_name",
         "reference_delta.{label}.out_of_range_features[]"
       ],
-      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
-      "granularity": "rule",
-      "mechanism": "The corpus case mode2_fragment demonstrates over-/under-segmentation end-to-end; under plain run_qc (no reference attached) it is caught solely by fragmentation's component-count checks (measured: findings == ['fragmentation']). bounds and reference_delta fire only once a reference is attached, and then fire identically on clean_control -- the documented uncalibrated-baseline noise (CLAUDE.md Gotchas, item 125) -- not evidence of mode-2-specific detection.",
-      "mode": 2,
-      "pipeline_detected": true,
+      "read_paths_qualifier": "mode -> read_paths is signal-classified: a path's presence in a mode row's read_paths means a rule declaring this mode classifies that path \"signal\" (segfacet.heuristics.rule.RuleModeDeclaration.consumed_paths, item 148), not that this path alone evidences this mode. The Stage-18 metric anchor (anchor_paths) is a separate column that is never merged in.",
       "rule_attribution": {
         "bounds": "analytic",
         "fragmentation": "corpus",
@@ -147,33 +333,39 @@
         "reference_delta"
       ],
       "rung": "synthetic-demonstrable",
-      "rung_label": "Demonstrated end-to-end on a synthetic corpus case",
+      "status": "validated",
       "title": "Over-/under-segmentation — fused or fragmented vertebra segments"
     },
     "3": {
       "anchor_paths": [
         "per_label.{label}.components.stray_component_sizes[]"
       ],
+      "authored_status": "specified",
       "cases": [
         {
           "case_id": "mode3_inject_islands",
           "detection": "pipeline"
         }
       ],
-      "feature_paths": [
-        "per_label",
+      "edge_rungs": [
+        [
+          "fragmentation",
+          "Rogue island(s):",
+          "synthetic-demonstrable"
+        ]
+      ],
+      "granularity": "signal",
+      "mechanism": "The corpus case mode3_inject_islands demonstrates disconnected rogue-island segments end-to-end, detected by the fragmentation rule's stray-component checks.",
+      "mode": 3,
+      "pipeline_detected": true,
+      "read_paths": [
         "per_label.{label}.components.component_count",
         "per_label.{label}.components.component_sizes[]",
         "per_label.{label}.components.fragmentation_index",
         "per_label.{label}.components.largest_component_fraction",
-        "per_label.{label}.components.stray_component_sizes[]",
-        "per_label.{label}.level_name"
+        "per_label.{label}.components.stray_component_sizes[]"
       ],
-      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
-      "granularity": "rule",
-      "mechanism": "The corpus case mode3_inject_islands demonstrates disconnected rogue-island segments end-to-end, detected by the fragmentation rule's stray-component checks.",
-      "mode": 3,
-      "pipeline_detected": true,
+      "read_paths_qualifier": "mode -> read_paths is signal-classified: a path's presence in a mode row's read_paths means a rule declaring this mode classifies that path \"signal\" (segfacet.heuristics.rule.RuleModeDeclaration.consumed_paths, item 148), not that this path alone evidences this mode. The Stage-18 metric anchor (anchor_paths) is a separate column that is never merged in.",
       "rule_attribution": {
         "fragmentation": "corpus"
       },
@@ -181,36 +373,39 @@
         "fragmentation"
       ],
       "rung": "synthetic-demonstrable",
-      "rung_label": "Demonstrated end-to-end on a synthetic corpus case",
+      "status": "validated",
       "title": "Disconnected components / islands, especially tiny rogue segments"
     },
     "4": {
       "anchor_paths": [
         "stage3.monotonic_consistency.is_monotonic"
       ],
+      "authored_status": "specified",
       "cases": [
         {
           "case_id": "mode4_relabel_swap",
           "detection": "pipeline"
         }
       ],
-      "feature_paths": [
-        "per_label",
-        "stage3.monotonic_consistency.is_monotonic",
+      "edge_rungs": [
+        [
+          "mislabel",
+          "Vertebra ordering inconsistent with label:",
+          "synthetic-demonstrable"
+        ]
+      ],
+      "granularity": "signal",
+      "mechanism": "Item 132 closed the interpolating-spline-fit defect for semantic mislabelling, and the corpus case mode4_relabel_swap demonstrates a relabel-swap end-to-end, caught by mislabel's Detector B via stage3.monotonic_consistency.non_monotonic_pairs[] -- the field Detector B actually reads; MODE_ANCHOR_PATHS anchors this mode instead on the neighbouring is_monotonic field by design (feature_docs.py), not on the field the rule reads.",
+      "mode": 4,
+      "pipeline_detected": true,
+      "read_paths": [
         "stage3.monotonic_consistency.non_monotonic_pairs[]",
         "stage3.per_label_offsets[].dx_mm",
         "stage3.per_label_offsets[].dy_mm",
         "stage3.per_label_offsets[].dz_mm",
-        "stage3.per_label_offsets[].is_terminal",
-        "stage3.per_label_offsets[].label",
-        "stage3.per_label_offsets[].level_name",
         "stage3.per_label_offsets[].offset_mm"
       ],
-      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
-      "granularity": "rule",
-      "mechanism": "Item 132 closed the interpolating-spline-fit defect for semantic mislabelling, and the corpus case mode4_relabel_swap demonstrates a relabel-swap end-to-end, caught by mislabel's Detector B via stage3.monotonic_consistency.non_monotonic_pairs[] -- the field Detector B actually reads; MODE_ANCHOR_PATHS anchors this mode instead on the neighbouring is_monotonic field by design (feature_docs.py), not on the field the rule reads.",
-      "mode": 4,
-      "pipeline_detected": true,
+      "read_paths_qualifier": "mode -> read_paths is signal-classified: a path's presence in a mode row's read_paths means a rule declaring this mode classifies that path \"signal\" (segfacet.heuristics.rule.RuleModeDeclaration.consumed_paths, item 148), not that this path alone evidences this mode. The Stage-18 metric anchor (anchor_paths) is a separate column that is never merged in.",
       "rule_attribution": {
         "mislabel": "corpus"
       },
@@ -218,30 +413,36 @@
         "mislabel"
       ],
       "rung": "synthetic-demonstrable",
-      "rung_label": "Demonstrated end-to-end on a synthetic corpus case",
+      "status": "validated",
       "title": "Semantic mislabelling (wrong vertebra identification)"
     },
     "5": {
       "anchor_paths": [
         "relationships.present_levels[]"
       ],
+      "authored_status": "specified",
       "cases": [
         {
           "case_id": "mode5_remove_level",
           "detection": "pipeline"
         }
       ],
-      "feature_paths": [
-        "per_label",
-        "relationships",
-        "relationships.missing_levels[]",
-        "relationships.present_levels[]"
+      "edge_rungs": [
+        [
+          "coverage",
+          "Missing interior level(s):",
+          "synthetic-demonstrable"
+        ]
       ],
-      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
-      "granularity": "rule",
+      "granularity": "signal",
       "mechanism": "The corpus case mode5_remove_level demonstrates a missing vertebra end-to-end, caught by the coverage rule against relationships.missing_levels[] -- the field the rule actually reads; relationships.present_levels[] is read only by coverage's opt-in expected-levels span check, which ships disabled (expected_levels=[]).",
       "mode": 5,
       "pipeline_detected": true,
+      "read_paths": [
+        "relationships.missing_levels[]",
+        "relationships.present_levels[]"
+      ],
+      "read_paths_qualifier": "mode -> read_paths is signal-classified: a path's presence in a mode row's read_paths means a rule declaring this mode classifies that path \"signal\" (segfacet.heuristics.rule.RuleModeDeclaration.consumed_paths, item 148), not that this path alone evidences this mode. The Stage-18 metric anchor (anchor_paths) is a separate column that is never merged in.",
       "rule_attribution": {
         "coverage": "corpus"
       },
@@ -249,35 +450,40 @@
         "coverage"
       ],
       "rung": "synthetic-demonstrable",
-      "rung_label": "Demonstrated end-to-end on a synthetic corpus case",
+      "status": "validated",
       "title": "Not all vertebrae in the image are segmented"
     },
     "6": {
       "anchor_paths": [
         "per_label.{label}.geometry.touches_left"
       ],
+      "authored_status": "specified",
       "cases": [
         {
           "case_id": "mode6_crop_at_border",
           "detection": "pipeline"
         }
       ],
-      "feature_paths": [
-        "per_label",
+      "edge_rungs": [
+        [
+          "border",
+          "Partial vertebra clipped by FOV:",
+          "synthetic-demonstrable"
+        ]
+      ],
+      "granularity": "signal",
+      "mechanism": "The corpus case mode6_crop_at_border demonstrates a border-cropped vertebra end-to-end -- the corpus operator crops the anterior face -- caught by the border rule reading per_label.{label}.geometry.touches_anterior.",
+      "mode": 6,
+      "pipeline_detected": true,
+      "read_paths": [
         "per_label.{label}.geometry.touches_anterior",
         "per_label.{label}.geometry.touches_inferior",
         "per_label.{label}.geometry.touches_left",
         "per_label.{label}.geometry.touches_posterior",
         "per_label.{label}.geometry.touches_right",
-        "per_label.{label}.geometry.touches_superior",
-        "per_label.{label}.level_name",
-        "relationships.present_levels[]"
+        "per_label.{label}.geometry.touches_superior"
       ],
-      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
-      "granularity": "rule",
-      "mechanism": "The corpus case mode6_crop_at_border demonstrates a border-cropped vertebra end-to-end -- the corpus operator crops the anterior face -- caught by the border rule reading per_label.{label}.geometry.touches_anterior.",
-      "mode": 6,
-      "pipeline_detected": true,
+      "read_paths_qualifier": "mode -> read_paths is signal-classified: a path's presence in a mode row's read_paths means a rule declaring this mode classifies that path \"signal\" (segfacet.heuristics.rule.RuleModeDeclaration.consumed_paths, item 148), not that this path alone evidences this mode. The Stage-18 metric anchor (anchor_paths) is a separate column that is never merged in.",
       "rule_attribution": {
         "border": "corpus"
       },
@@ -285,32 +491,35 @@
         "border"
       ],
       "rung": "synthetic-demonstrable",
-      "rung_label": "Demonstrated end-to-end on a synthetic corpus case",
+      "status": "validated",
       "title": "Partial vertebra at the image border whose appearance changes"
     },
     "7": {
       "anchor_paths": [
         "relationships.is_continuous"
       ],
+      "authored_status": "specified",
       "cases": [
         {
           "case_id": "mode7_sequence_break",
           "detection": "pipeline"
         }
       ],
-      "feature_paths": [
-        "per_label",
-        "per_label.{label}.label",
-        "per_label.{label}.level_name",
-        "relationships",
-        "relationships.is_continuous",
-        "relationships.out_of_order_labels[]"
+      "edge_rungs": [
+        [
+          "sequence",
+          "Non-continuous label sequence:",
+          "needs-real-data"
+        ]
       ],
-      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
-      "granularity": "rule",
+      "granularity": "signal",
       "mechanism": "segfacet.labels.CANONICAL_ORDER inserts the transitional label T13 at index 19, so a lumbar label's canonical rank equals its integer value (L1 = 20 → rank 20 ... L5 = 24 → rank 24) while a thoracic label's rank is its value minus one (T12 = 19 → rank 18); section 6.7's own L1 → T12 → L2 → L5 example is therefore a SINGLE rank descent (ranks 20, 18, 21, 24), not the two descents §6 and the retired constant both called it. The sequence rule caps nothing: it raises exactly one finding whenever relationships.out_of_order_labels is non-empty, on a one-descent and on a two-descent record alike, as measured. The single-relabel cap belongs to the fixture generator synth/identity_ordering_alignment.py's SequenceBreakPerturbation, which relabels exactly one vertebra -- the tail, to T13 -- so the committed case mode7_sequence_break can express only a single-relabel break and a multi-relabel scramble needs real data, which is why this edge stays one rung below its case's pipeline detection.",
       "mode": 7,
       "pipeline_detected": true,
+      "read_paths": [
+        "relationships.out_of_order_labels[]"
+      ],
+      "read_paths_qualifier": "mode -> read_paths is signal-classified: a path's presence in a mode row's read_paths means a rule declaring this mode classifies that path \"signal\" (segfacet.heuristics.rule.RuleModeDeclaration.consumed_paths, item 148), not that this path alone evidences this mode. The Stage-18 metric anchor (anchor_paths) is a separate column that is never merged in.",
       "rule_attribution": {
         "sequence": "corpus"
       },
@@ -318,32 +527,35 @@
         "sequence"
       ],
       "rung": "needs-real-data",
-      "rung_label": "Needs real data, or a corpus the fixtures cannot express",
+      "status": "validated",
       "title": "Non-continuous label sequence (e.g. L1 → T12 → L2 → L5)"
     },
     "8": {
       "anchor_paths": [
         "overlaps[].overlap_voxels"
       ],
+      "authored_status": "specified",
       "cases": [
         {
           "case_id": "mode8_force_overlap",
           "detection": "reconstructed_record"
         }
       ],
-      "feature_paths": [
-        "overlaps[]",
-        "overlaps[].label_a",
-        "overlaps[].label_b",
-        "overlaps[].name_a",
-        "overlaps[].name_b",
-        "overlaps[].overlap_voxels"
+      "edge_rungs": [
+        [
+          "overlap",
+          "Overlapping segments:",
+          "structurally-unobservable"
+        ]
       ],
-      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
-      "granularity": "rule",
+      "granularity": "signal",
       "mechanism": "A single-channel integer label map cannot assign two labels to one voxel, so overlaps[] populates only on a case deliberately corrupted to violate that invariant, which no real segmenter output can be; mode8_force_overlap therefore stays detection=\"reconstructed_record\" rather than pipeline-detected, while the overlap rule and the paths it reads remain correct and fully wired.",
       "mode": 8,
       "pipeline_detected": false,
+      "read_paths": [
+        "overlaps[].overlap_voxels"
+      ],
+      "read_paths_qualifier": "mode -> read_paths is signal-classified: a path's presence in a mode row's read_paths means a rule declaring this mode classifies that path \"signal\" (segfacet.heuristics.rule.RuleModeDeclaration.consumed_paths, item 148), not that this path alone evidences this mode. The Stage-18 metric anchor (anchor_paths) is a separate column that is never merged in.",
       "rule_attribution": {
         "overlap": "corpus"
       },
@@ -351,33 +563,49 @@
         "overlap"
       ],
       "rung": "structurally-unobservable",
-      "rung_label": "Structurally unobservable in the supported input format",
+      "status": "validated",
       "title": "Overlapping segments"
     },
     "9": {
       "anchor_paths": [],
-      "cases": [],
-      "feature_paths": [
-        "image_features.available",
-        "image_features.per_label.{label}.first_order.median",
-        "image_features.per_label.{label}.first_order.std",
-        "image_features.per_label.{label}.label",
-        "per_label",
-        "reference_delta.lower_pct",
-        "reference_delta.upper_pct",
-        "reference_delta.{label}.distribution_distance",
-        "reference_delta.{label}.features.physical_volume_mm3.percentile_rank",
-        "reference_delta.{label}.features.physical_volume_mm3.robust_z",
-        "reference_delta.{label}.features.physical_volume_mm3.value",
-        "reference_delta.{label}.out_of_range_features[]"
+      "authored_status": "specified",
+      "cases": [
+        {
+          "case_id": "implausible_metal",
+          "detection": "intensity_pipeline"
+        },
+        {
+          "case_id": "implausible_soft_tissue",
+          "detection": "intensity_pipeline"
+        },
+        {
+          "case_id": "degenerate_uniform",
+          "detection": "intensity_pipeline"
+        }
       ],
-      "feature_paths_qualifier": "mode -> feature is rule-granular: a path's presence in a mode row means a rule that targets this mode reads this path, not that this path alone evidences this mode.",
-      "granularity": "rule",
+      "edge_rungs": [
+        [
+          "intensity",
+          "Implausible intensity (too low): / (too high): / (degenerate/uniform):",
+          "synthetic-demonstrable"
+        ],
+        [
+          "intensity_reference_delta",
+          "",
+          "needs-real-data"
+        ]
+      ],
+      "granularity": "signal",
       "mechanism": "The committed intensity corpus demonstrates mode 9 end-to-end three times over: implausible_metal (label 22's median reads 2999 HU, above the plausible bone band's ceiling), implausible_soft_tissue (40 HU, below its floor) and degenerate_uniform (a constant fill, zero spread) each drive the intensity rule through segfacet.synth.regression.intensity_pipeline_findings, which is why that edge sits at the strongest rung. intensity_reference_delta stays a rung below: the synthetic intensity corpus is built against no reference distribution and the harness attaches none, so nothing in the committed corpus can exercise it.",
       "mode": 9,
-      "pipeline_detected": false,
+      "pipeline_detected": true,
+      "read_paths": [
+        "image_features.per_label.{label}.first_order.median",
+        "image_features.per_label.{label}.first_order.std"
+      ],
+      "read_paths_qualifier": "mode -> read_paths is signal-classified: a path's presence in a mode row's read_paths means a rule declaring this mode classifies that path \"signal\" (segfacet.heuristics.rule.RuleModeDeclaration.consumed_paths, item 148), not that this path alone evidences this mode. The Stage-18 metric anchor (anchor_paths) is a separate column that is never merged in.",
       "rule_attribution": {
-        "intensity": "analytic",
+        "intensity": "corpus",
         "intensity_reference_delta": "analytic"
       },
       "rules": [
@@ -385,11 +613,12 @@
         "intensity_reference_delta"
       ],
       "rung": "synthetic-demonstrable",
-      "rung_label": "Demonstrated end-to-end on a synthetic corpus case",
+      "status": "validated",
       "title": "Implausible tissue under a label"
     }
   },
-  "note": "Generated by `python -m segfacet.traceability` (item 138). Do not hand-edit this document -- edit the authored failure-mode specification in src/segfacet/failure_modes.py (every mode's title, per-edge evidence rung and mechanism sentence is read live from it since item 147) or the underlying rule/catalogue sources this matrix derives from, then regenerate. mode -> rule and rule -> mode each report their own completeness and name every hole: read the `complete`/`holes` fields rather than assuming either is complete. Since item 146 a mode may legitimately carry no rule -- a `proposed` entry in segfacet.failure_modes.SPECIFICATION is listed and defined but deliberately unimplemented -- and it appears as a mode -> rule hole. feature -> rule is deliberately incomplete -- see the `features.read_by_no_rule.qualifier` field.",
+  "note": "Generated by `python -m segfacet.traceability` (item 138; re-pointed at src/segfacet/failure_modes.py as its primary source by item 149). Do not hand-edit this document -- edit the authored failure-mode specification in src/segfacet/failure_modes.py (every mode's title, status, per-edge evidence rung, mechanism sentence and per-corpus-case expected firing set is read live from it) or the underlying rule/catalogue sources this matrix also derives from, then regenerate. mode -> rule and rule -> mode each report their own completeness and name every hole: read the `complete`/`holes` fields rather than assuming either is complete. Since item 146 a mode may legitimately carry no rule -- a `proposed` entry in segfacet.failure_modes.SPECIFICATION is listed and defined but deliberately unimplemented -- and it appears as a mode -> rule hole. feature -> rule is deliberately incomplete -- see the `features.read_by_no_rule.qualifier` field. The `conformance` section (item 149) drives every corpus case in both committed manifests through the specification's expected firing set and the live measured firing set: read `conformance.disagreements` and `conformance.unspecified_cases` for the live answer, never assume `conformant`.",
+  "primary_source": "src/segfacet/failure_modes.py",
   "rules": {
     "border": {
       "declaration_state": "declared",
@@ -615,5 +844,5 @@
       "rule_id": "sequence"
     }
   },
-  "schema_version": "1.0"
+  "schema_version": "1.1"
 }

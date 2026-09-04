@@ -592,5 +592,44 @@ the new definition **exactly one** cell moves (mode 9's `intensity`,
 makes the change auditable rather than a re-derivation of unknown blast radius.
 The scan is still read, for `corpus_designated_unregistered_rule_ids` only.
 
-**D3 — the remaining entries are updated during implementation.** To be updated
-during implementation.
+**D3 — Implementation Step 2's guard-visibility check, measured on this
+branch (2026-09-04, before step 8).** With the root-idiom normalisation
+already landed by the test-writer (all six named modules already read
+`Path(__file__).resolve().parent.parent`) and the allowlist still
+five-ground, `iter_violations(tests/)` reported exactly three
+previously-invisible comparisons: `tests/test_143_s_axis_correction.py:599`
+and `tests/test_149_conformance_report.py:915` (both naming
+`docs/aide/traceability_matrix.generated.md`), and
+`tests/test_145_eight_hypothesised_modes.py:793` (naming
+`docs/aide/failure_modes.generated.md`). This is the evidence AC25's
+non-vacuity proof rests on: dropping the four new `no-float-leaf` allowlist
+entries reproduces the same two committed paths in `iter_violations`'
+output (`docs/aide/traceability_matrix.generated.md` and
+`docs/aide/failure_modes.generated.md`), confirming the guard's blind spot
+from items 143/144 is closed and the sixth ground is enforced, not vacuous.
+
+**D4 — `rung_label` is dropped from the mode record rather than carried
+forward.** Item 138's mode record carried both a machine `rung` and a
+human-readable `rung_label` (`failure_modes.RUNG_LABELS.get(rung, "")`), a
+convenience no AC in this item's Testing Strategy or test module reads.
+`test_ac3_retired_names_appear_only_in_comments` forbids the bare token
+`RUNG_LABELS` anywhere in `traceability.py`'s non-comment source — including
+a live `failure_modes_module.RUNG_LABELS` attribute read, which is exactly
+what a carried-forward `rung_label` field would require. Rather than route
+around AC3 (e.g. via `getattr`), the field is retired: nothing downstream
+reads it, and the label vocabulary is still reachable directly from
+`failure_modes.RUNG_LABELS` by any future consumer that needs it. Neither
+artifact regresses — both artifacts' committed byte stream already excludes
+it after this item's regeneration.
+
+**D5 — `ModeRecord.rules` (registry-declared) and `edge_rungs`
+(specification-declared) are kept as two independently-derived fields,
+never reconciled.** `rules`/`rule_attribution` continue to read the live
+rule registry's `RuleModeDeclaration.modes` (unchanged from item 138) so the
+mode → rule / rule → mode completeness directions keep detecting a
+declaration drift; `edge_rungs` reads `SPECIFICATION[mode].intended_rules`
+verbatim (AC6). The two can diverge (a rule's live declaration adding or
+dropping a mode before the specification's `intended_rules` is updated to
+match) and the matrix renders both without silently preferring one --
+exactly the same conformance discipline AC17 applies to expected vs.
+measured firing, applied here to declared vs. specified edges.
