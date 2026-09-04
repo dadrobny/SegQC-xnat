@@ -555,15 +555,22 @@ _RULE_MODE_MAP = {
 def test_ac13_rule_mode_map_effect_on_failure_modes(
     full_catalogue, feature_docs_module, rule_id, modes
 ):
+    """Reconciled (item 148, 2026-09-04): "an entry consumed only by rule R
+    carries R's corpus modes" now holds only for entries R classifies
+    ``"signal"`` -- e.g. ``per_label.{label}.label``, consumed only by
+    ``sequence``, is ``bookkeeping`` and carries ``()``. Restrict the match
+    set to this rule's signal-classified paths."""
     anchor_paths = {
         p for paths in feature_docs_module.MODE_ANCHOR_PATHS.values() for p in paths
     }
     matches = [
         e
         for e in full_catalogue.entries
-        if set(e.consuming_rules) == {rule_id} and e.path not in anchor_paths
+        if set(e.consuming_rules) == {rule_id}
+        and e.path not in anchor_paths
+        and dict(e.mode_roles).get(rule_id) == "signal"
     ]
-    assert matches, f"expected a non-anchor entry consumed only by {rule_id!r}"
+    assert matches, f"expected a non-anchor, signal-classified entry consumed only by {rule_id!r}"
     for entry in matches:
         assert set(entry.failure_modes) == set(modes), entry.path
 
@@ -628,7 +635,17 @@ def test_ac15_declared_mode_less_rule_only_entry_is_honestly_mode_less(
     state that now exists. What ``mode_evidence == ("rule_unmapped",)``
     means -- a consuming rule with no declaration at all -- is exercised by
     ``tests/test_137_mode_less_rule_disposition.py``'s adversarial stub-rule
-    test, since no such rule ships on this tree (item 137 AC1)."""
+    test, since no such rule ships on this tree (item 137 AC1).
+
+    Reconciled again (item 148, 2026-09-04): the per-path classification
+    narrows the intensity-only, non-anchor bucket further. An entry either
+    rule reaches only ``"signal"`` (the two ``first_order`` paths) still
+    carries ``failure_modes == (9,)`` with ``("rule_declaration",)``; an
+    entry either rule reaches only ``"bookkeeping"`` (e.g.
+    ``image_features.available``, ``image_features.per_label.{label}.label``)
+    is now honestly ``failure_modes == ()`` with ``("rule_bookkeeping",)`` --
+    the new, more precise honest form. Both restatements are checked, split
+    by role rather than lumped together."""
     intensity_rules = {"intensity", "intensity_reference_delta"}
     anchor_paths = {
         p for paths in feature_docs_module.MODE_ANCHOR_PATHS.values() for p in paths
@@ -641,9 +658,22 @@ def test_ac15_declared_mode_less_rule_only_entry_is_honestly_mode_less(
         and e.path not in anchor_paths
     ]
     assert candidates, "expected at least one intensity-rule-only, non-anchor entry"
+
+    signal_checked = 0
+    bookkeeping_checked = 0
     for entry in candidates:
-        assert entry.failure_modes == (9,), entry.path
-        assert entry.mode_evidence == ("rule_declaration",), entry.path
+        role_by_rule = dict(entry.mode_roles)
+        roles = {role_by_rule[rid] for rid in entry.consuming_rules}
+        if roles == {"signal"}:
+            assert entry.failure_modes == (9,), entry.path
+            assert entry.mode_evidence == ("rule_declaration",), entry.path
+            signal_checked += 1
+        elif roles == {"bookkeeping"}:
+            assert entry.failure_modes == (), entry.path
+            assert entry.mode_evidence == ("rule_bookkeeping",), entry.path
+            bookkeeping_checked += 1
+    assert signal_checked, "expected >=1 signal-only intensity entry"
+    assert bookkeeping_checked, "expected >=1 bookkeeping-only intensity entry"
 
 
 # =========================================================================== #
@@ -930,12 +960,15 @@ _MD_COLUMNS = (
     "units",
     "scale sensitivity",
     "§6 mode(s)",
+    "§6 mode role(s)",
     "consuming rules",
     "status",
 )
 
 
 def test_ac24_markdown_has_exact_columns_and_row_count(catalogue_module, full_catalogue):
+    """Reconciled (item 148, 2026-09-04): ``render_markdown`` gains a
+    "§6 mode role(s)" column carrying the per-path classification."""
     md = catalogue_module.render_markdown(full_catalogue)
     lines = md.splitlines()
 

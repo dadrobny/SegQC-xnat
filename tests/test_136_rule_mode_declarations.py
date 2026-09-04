@@ -122,8 +122,18 @@ def test_ac1_is_frozen_dataclass():
 
 
 def test_ac1_field_names():
+    """Reconciled (item 148, 2026-09-04): ``RuleModeDeclaration`` gains
+    ``consumed_paths`` (the per-path signal/bookkeeping/not-read
+    classification), additively -- see
+    ``tests/test_148_per_path_mode_attribution.py``'s own AC2."""
     names = {f.name for f in dataclasses.fields(rule_mod.RuleModeDeclaration)}
-    assert names == {"modes", "evidence", "mode_less_reason", "pending_reason"}
+    assert names == {
+        "modes",
+        "evidence",
+        "mode_less_reason",
+        "pending_reason",
+        "consumed_paths",
+    }
 
 
 def test_ac1_unset_fields_default_empty():
@@ -440,12 +450,19 @@ def test_ac9_checker_reports_the_undeclared_rule(isolated_registry):
 
 
 def test_ac11_rule_declaration_tag_present_iff_declared_modes_contributed():
+    """Reconciled (item 148, 2026-09-04): "contributed" now means "through a
+    ``signal``-classified path" -- a rule declaring modes still leaves no
+    ``rule_declaration`` tag on a path it only reaches ``bookkeeping`` or
+    ``not-read``."""
     catalogue = _catalogue()
     cat = catalogue.build_catalogue(strict=True)
     assert cat.entries, "expected a non-empty catalogue"
     for entry in cat.entries:
+        role_by_rule = dict(entry.mode_roles)
         has_declared_modes = any(
-            (decl := rule_mod.declaration_for(rid)) is not None and decl.modes
+            role_by_rule.get(rid) == "signal"
+            and (decl := rule_mod.declaration_for(rid)) is not None
+            and decl.modes
             for rid in entry.consuming_rules
         )
         assert ("rule_declaration" in entry.mode_evidence) == has_declared_modes, entry.path
@@ -460,10 +477,22 @@ def test_ac11_mode_evidence_is_canonical_order_subsequence():
     disposition, layered on top of any declared-mode attribution). The
     invariant that still holds -- and is the one item 137's own AC11 states
     -- is that mode_evidence is always a subsequence of the canonical
-    four-tag order (per_mode_metric, rule_mode_map, rule_declaration,
-    rule_mode_less), or exactly ("rule_unmapped",)."""
+    tag order (per_mode_metric, rule_mode_map, rule_declaration,
+    rule_mode_less), or exactly ("rule_unmapped",).
+
+    Reconciled again (item 148, 2026-09-04): the canonical order grows two
+    more tags, "rule_bookkeeping" and "rule_not_read", appended last -- the
+    per-path classification's own evidence sources, layered on top of
+    whichever mode-level tags already applied."""
     catalogue = _catalogue()
-    canonical_order = ("per_mode_metric", "rule_mode_map", "rule_declaration", "rule_mode_less")
+    canonical_order = (
+        "per_mode_metric",
+        "rule_mode_map",
+        "rule_declaration",
+        "rule_mode_less",
+        "rule_bookkeeping",
+        "rule_not_read",
+    )
     cat = catalogue.build_catalogue(strict=True)
     tagged = [e for e in cat.entries if "rule_declaration" in e.mode_evidence]
     assert tagged, "expected at least one entry tagged with rule_declaration"
@@ -518,7 +547,13 @@ def test_ac12_failure_modes_recomputed_independently_matches():
     item 137's two analytic declarations (``bounds``, ``reference_delta``)
     contribute mode 2 to ``failure_modes`` with no corpus case behind them
     (A6) -- the two-term recomputation from item 136 under-counts those
-    paths after this item."""
+    paths after this item.
+
+    Reconciled again (item 148, 2026-09-04): a rule's corpus-derived and
+    declared modes now reach ``failure_modes`` only through a path this rule
+    classifies ``"signal"`` (``CatalogueEntry.mode_roles``) -- the per-path
+    role gate this item adds. A ``bookkeeping``/``not-read`` path no longer
+    inherits its consuming rule's whole mode tuple."""
     catalogue = _catalogue()
     import segfacet.feature_docs as feature_docs_module
 
@@ -532,10 +567,13 @@ def test_ac12_failure_modes_recomputed_independently_matches():
 
     assert cat.entries, "expected a non-empty catalogue"
     for entry in cat.entries:
+        role_by_rule = dict(entry.mode_roles)
         anchor_modes = anchor_modes_by_path.get(entry.path, set())
         corpus_rule_modes: set = set()
         declared_rule_modes: set = set()
         for rule_id in entry.consuming_rules:
+            if role_by_rule.get(rule_id) != "signal":
+                continue
             corpus_rule_modes.update(corpus_map.get(rule_id, ()))
             decl = rule_mod.declaration_for(rule_id)
             if decl is not None:
@@ -550,6 +588,8 @@ def test_ac12_failure_modes_recomputed_independently_matches():
 
 
 def test_ac13_catalogue_artifacts_regenerate_byte_identically(tmp_path):
+    """Reconciled (item 148, 2026-09-04): ``schema_version`` moves
+    ``"1.1"`` -> ``"1.2"`` with the ``mode_roles`` shape."""
     catalogue = _catalogue()
     json_dest = tmp_path / "feature_catalogue.generated.json"
     md_dest = tmp_path / "feature_catalogue.generated.md"
@@ -567,7 +607,7 @@ def test_ac13_catalogue_artifacts_regenerate_byte_identically(tmp_path):
     assert fresh_md_bytes == committed_md.read_bytes()
 
     payload = json.loads(fresh_json_bytes)
-    assert payload["schema_version"] == "1.1"
+    assert payload["schema_version"] == "1.2"
 
 
 def test_adv_expected_artifact_movement_counts_from_spec():
@@ -582,7 +622,14 @@ def test_adv_expected_artifact_movement_counts_from_spec():
     0 remain ("rule_unmapped",) (measured 2026-09-02, item 137's "Expected
     artifact movement"). Both measurements are of the same artifact at two
     points in its history; this test now pins item 137's figures, which
-    supersede item 136's above."""
+    supersede item 136's above.
+
+    Reconciled again (item 148, 2026-09-04): the per-path classification
+    moves 25 of 138 entries' ``failure_modes``/``mode_evidence`` (item 148's
+    A5), but neither of the two figures this test still pins: the 86-entry
+    ``()`` bucket and the 0-entry ``("rule_unmapped",)`` bucket are untouched
+    by that movement (measured against item 148's own regenerated artifact) --
+    this test re-verifies both hold, it does not re-measure them."""
     catalogue = _catalogue()
     cat = catalogue.build_catalogue(strict=True)
     entries = cat.entries

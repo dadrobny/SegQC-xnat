@@ -1200,6 +1200,12 @@ def test_ac33_traceability_matrix_matches_committed_structurally(tmp_path):
 
 
 def test_ac34_mode9_catalogue_attribution_equals_declaring_rules_reach():
+    """Reconciled (item 148, 2026-09-04): item 148 is the narrowing this
+    docstring anticipates. "Reached" now means "reached by a mode-9
+    declarer that classifies this path 'signal'" -- a mode-9 declarer's
+    bookkeeping/not-read paths no longer inherit mode 9, so the mode-9 path
+    set drops from the declarers' whole reach (12 paths, pre-148) to
+    exactly the two ``first_order`` paths either rule classifies signal."""
     import segfacet.catalogue as catalogue
     from segfacet.heuristics.rule import iter_rule_declarations
 
@@ -1215,8 +1221,9 @@ def test_ac34_mode9_catalogue_attribution_equals_declaring_rules_reach():
     checked = 0
     for entry in cat.entries:
         has_mode9 = 9 in entry.failure_modes
-        reached_by_declarer = bool(set(entry.consuming_rules) & mode9_declarers)
-        assert has_mode9 == reached_by_declarer, entry.path
+        role_by_rule = dict(entry.mode_roles)
+        reached_as_signal = any(role_by_rule.get(rid) == "signal" for rid in mode9_declarers)
+        assert has_mode9 == reached_as_signal, entry.path
         checked += 1
     assert checked > 0
 

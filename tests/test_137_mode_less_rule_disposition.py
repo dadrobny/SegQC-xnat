@@ -125,11 +125,18 @@ _INTENSITY_RULES = ("intensity", "intensity_reference_delta")
 # are still dispositioned; only their disposition changed.
 _DISPOSITIONED = _ANALYTIC_RULES + _INTENSITY_RULES
 
+# Reconciled (item 148, 2026-09-04): the per-path classification appends two
+# more evidence tags -- "rule_bookkeeping" and "rule_not_read" -- last, so
+# AC11's canonical-order check does not raise ValueError on a shipped entry
+# (e.g. the top-level "per_label" container) that now legitimately carries
+# either.
 _CANONICAL_TAG_ORDER = (
     "per_mode_metric",
     "rule_mode_map",
     "rule_declaration",
     "rule_mode_less",
+    "rule_bookkeeping",
+    "rule_not_read",
 )
 
 
@@ -420,7 +427,15 @@ def test_adv_shared_reference_delta_and_intensity_entry_carries_declaration_tag(
     both rules' declared modes: (1, 2, 9) -- reference_delta's own (1, 2)
     plus mode 9. Item 148 narrows this rule-granular bookkeeping; until then
     every path either rule reaches carries every mode either declares (the
-    item 146 spec's stated, temporary state)."""
+    item 146 spec's stated, temporary state).
+
+    Reconciled (item 148, 2026-09-04): item 148 is the narrowing this
+    docstring named. A shared reference_delta.* entry now carries the union
+    of only the *signal*-classified declarers' modes -- (1, 2, 9) where both
+    reference_delta and an intensity rule classify the path signal, a
+    narrower subset where only one does, and () where neither does even
+    though a consuming rule still declares modes (the not-read/bookkeeping
+    honesty this item adds)."""
     catalogue = _catalogue()
     cat = catalogue.build_catalogue(strict=True)
 
@@ -435,10 +450,23 @@ def test_adv_shared_reference_delta_and_intensity_entry_carries_declaration_tag(
         "expected at least one reference_delta.* entry shared between an "
         "analytic and an intensity (mode-9-declaring) rule"
     )
+    signal_checked = 0
     for entry in candidates:
-        assert "rule_declaration" in entry.mode_evidence, entry.path
+        role_by_rule = dict(entry.mode_roles)
         assert "rule_mode_less" not in entry.mode_evidence, entry.path
-        assert entry.failure_modes == (1, 2, 9), entry.path
+        signal_modes: set = set()
+        for rule_id in set(entry.consuming_rules) & (set(_ANALYTIC_RULES) | set(_INTENSITY_RULES)):
+            if role_by_rule.get(rule_id) != "signal":
+                continue
+            decl = _RULES[rule_id].mode_declaration
+            signal_modes |= set(decl.modes)
+        if signal_modes:
+            assert "rule_declaration" in entry.mode_evidence, entry.path
+            assert set(entry.failure_modes) == signal_modes, entry.path
+            signal_checked += 1
+        else:
+            assert entry.failure_modes == (), entry.path
+    assert signal_checked, "expected >=1 shared entry with a signal-classified declarer"
 
 
 def test_adv_per_label_container_keeps_corpus_modes_and_gains_declaration_last():
@@ -447,15 +475,27 @@ def test_adv_per_label_container_keeps_corpus_modes_and_gains_declaration_last()
     no longer carry 'rule_mode_less' -- but the same rules still reach the
     same underlying per-label paths, so the container still aggregates a
     'rule_declaration' tag from them, appended last (the aggregation order
-    this container's construction has always used)."""
+    this container's construction has always used).
+
+    Reconciled (item 148, 2026-09-04): the top-level ``per_label`` entry is a
+    container every rule iterates or, for the three that read a differently-
+    named ``per_label`` block (``intensity``, ``reference_delta``,
+    ``intensity_reference_delta``), reaches only through mechanism B's
+    last-segment match -- ``bookkeeping`` for the six that actually iterate
+    it, ``not-read`` for those three (item 148's Description, A2). No rule
+    classifies it ``signal``, so it now honestly carries
+    ``failure_modes == ()`` with both rule-sourced tags, restating the
+    "keeps its corpus-derived modes" claim in the honest, narrower form."""
     catalogue = _catalogue()
     cat = catalogue.build_catalogue(strict=True)
     entry = next((e for e in cat.entries if e.path == "per_label"), None)
     assert entry is not None, "expected a per_label container entry"
-    assert entry.failure_modes, "expected per_label to still carry corpus-derived modes"
+    assert entry.consuming_rules, "expected per_label to still have consuming rules"
+    assert entry.failure_modes == (), entry.mode_evidence
     assert "rule_mode_less" not in entry.mode_evidence, entry.mode_evidence
-    assert "rule_declaration" in entry.mode_evidence
-    assert entry.mode_evidence[-1] == "rule_declaration", entry.mode_evidence
+    assert "rule_declaration" not in entry.mode_evidence, entry.mode_evidence
+    assert "rule_bookkeeping" in entry.mode_evidence, entry.mode_evidence
+    assert "rule_not_read" in entry.mode_evidence, entry.mode_evidence
 
 
 # =========================================================================== #
@@ -495,12 +535,18 @@ def test_ac12_no_entry_reports_rule_unmapped_on_this_tree():
 
 
 def test_ac13_bounds_or_reference_delta_consumers_carry_mode_two():
+    """Reconciled (item 148, 2026-09-04): restricted to entries ``bounds``
+    or ``reference_delta`` classify ``"signal"`` -- a path either rule only
+    reaches ``bookkeeping`` (e.g. ``per_label``, ``per_label.{label}.level_name``)
+    no longer inherits mode 2."""
     catalogue = _catalogue()
     cat = catalogue.build_catalogue(strict=True)
     candidates = [
-        e for e in cat.entries if set(e.consuming_rules) & set(_ANALYTIC_RULES)
+        e
+        for e in cat.entries
+        if any(dict(e.mode_roles).get(rid) == "signal" for rid in set(e.consuming_rules) & set(_ANALYTIC_RULES))
     ]
-    assert candidates, "expected at least one entry consumed by bounds/reference_delta"
+    assert candidates, "expected at least one entry signal-classified by bounds/reference_delta"
     for entry in candidates:
         assert 2 in entry.failure_modes, entry.path
 
@@ -514,7 +560,14 @@ def test_ac14_intensity_only_non_anchor_entries_are_honestly_mode_less():
     """Rescoped (item 146, 2026-09-03): the honesty claim survives in a new
     form -- an intensity-only, non-anchor entry now carries failure_modes ==
     (9,) and a 'rule_declaration' tag, which is *more* honest than the
-    previous mode-less disposition, not less."""
+    previous mode-less disposition, not less.
+
+    Reconciled again (item 148, 2026-09-04): the per-path classification
+    splits this bucket further. A signal-only entry still carries
+    ``(9,)``/``("rule_declaration",)``; a bookkeeping-only entry (e.g.
+    ``image_features.available``) is now even more honest --
+    ``()``/``("rule_bookkeeping",)``, since a rule reading a path only to
+    gate or identify cannot evidence the mode it declares elsewhere."""
     catalogue = _catalogue()
     import segfacet.feature_docs as feature_docs_module
 
@@ -528,9 +581,21 @@ def test_ac14_intensity_only_non_anchor_entries_are_honestly_mode_less():
         and e.path not in anchor_paths
     ]
     assert candidates, "expected at least one intensity-only, non-anchor entry"
+    signal_checked = 0
+    bookkeeping_checked = 0
     for entry in candidates:
-        assert entry.failure_modes == (9,), entry.path
-        assert entry.mode_evidence == ("rule_declaration",), entry.path
+        role_by_rule = dict(entry.mode_roles)
+        roles = {role_by_rule[rid] for rid in entry.consuming_rules}
+        if roles == {"signal"}:
+            assert entry.failure_modes == (9,), entry.path
+            assert entry.mode_evidence == ("rule_declaration",), entry.path
+            signal_checked += 1
+        elif roles == {"bookkeeping"}:
+            assert entry.failure_modes == (), entry.path
+            assert entry.mode_evidence == ("rule_bookkeeping",), entry.path
+            bookkeeping_checked += 1
+    assert signal_checked, "expected >=1 signal-only intensity entry"
+    assert bookkeeping_checked, "expected >=1 bookkeeping-only intensity entry"
 
 
 # =========================================================================== #
@@ -539,6 +604,8 @@ def test_ac14_intensity_only_non_anchor_entries_are_honestly_mode_less():
 
 
 def test_ac15_catalogue_artifacts_regenerate_byte_identically(tmp_path):
+    """Reconciled (item 148, 2026-09-04): ``schema_version`` moves
+    ``"1.1"`` -> ``"1.2"`` with the ``mode_roles`` shape."""
     catalogue = _catalogue()
     json_dest = tmp_path / "feature_catalogue.generated.json"
     md_dest = tmp_path / "feature_catalogue.generated.md"
@@ -556,7 +623,7 @@ def test_ac15_catalogue_artifacts_regenerate_byte_identically(tmp_path):
     assert fresh_md_bytes == committed_md.read_bytes()
 
     payload = json.loads(fresh_json_bytes)
-    assert payload["schema_version"] == "1.1"
+    assert payload["schema_version"] == "1.2"
 
 
 def test_adv_measured_artifact_movement_counts_from_spec():
@@ -577,28 +644,43 @@ def test_adv_measured_artifact_movement_counts_from_spec():
           -> folds into ("rule_mode_map", "rule_declaration")
     giving ("rule_declaration",): 7 + 4 + 7 = 18 and
     ("rule_mode_map", "rule_declaration"): 25 + 1 = 26; the other three
-    combinations (unreached by either intensity rule) are untouched."""
+    combinations (unreached by either intensity rule) are untouched.
+
+    Reconciled again (item 148, 2026-09-04): the per-path classification
+    moves 25 of 138 entries' failure_modes/mode_evidence (item 148's A5,
+    measured against the committed catalogue at this item's base). The
+    per-mode path counts move 1: 19->8, 2: 21->12, 9: 12->2 (this test's own
+    three), and the mode_evidence distribution moves from the five-bucket
+    table above to the nine-bucket table below (item 148's Implementation
+    Steps step 6); the 86-entry () bucket and the 2-entry
+    ("per_mode_metric",) bucket do not move. Figures re-verified from item
+    148's spec, not re-measured here (the classification itself does not
+    exist on this tree until the builder implements it)."""
     catalogue = _catalogue()
     cat = catalogue.build_catalogue(strict=True)
     entries = cat.entries
     assert len(entries) == 138
 
     mode2_count = sum(1 for e in entries if 2 in e.failure_modes)
-    assert mode2_count == 21
+    assert mode2_count == 12
 
     mode1_count = sum(1 for e in entries if 1 in e.failure_modes)
-    assert mode1_count == 19
+    assert mode1_count == 8
 
     mode9_count = sum(1 for e in entries if 9 in e.failure_modes)
-    assert mode9_count == 12
+    assert mode9_count == 2
 
     distribution = Counter(e.mode_evidence for e in entries)
     expected = {
         (): 86,
-        ("rule_mode_map", "rule_declaration"): 26,
-        ("rule_declaration",): 18,
-        ("per_mode_metric", "rule_mode_map", "rule_declaration"): 6,
+        ("rule_bookkeeping",): 16,
+        ("rule_mode_map", "rule_declaration"): 14,
+        ("rule_declaration",): 6,
+        ("per_mode_metric", "rule_mode_map", "rule_declaration"): 5,
+        ("rule_bookkeeping", "rule_not_read"): 5,
+        ("rule_declaration", "rule_not_read"): 3,
         ("per_mode_metric",): 2,
+        ("per_mode_metric", "rule_mode_map", "rule_declaration", "rule_bookkeeping"): 1,
     }
     for key, count in expected.items():
         assert distribution.get(key, 0) == count, (key, distribution)
