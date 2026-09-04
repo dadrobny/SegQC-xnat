@@ -828,3 +828,20 @@ over-reaching what its AC actually requires, not a shipped defect:
 
 No implementation changes; `tests/test_147_specification_is_the_record.py` is
 amended to match, per the AC wording above.
+
+**D12 — item 146's follow-up review docstring restatement merged and
+reconciled with AC2 (2026-09-04).** `aide/queue-020` commit `835878d`
+restated `src/segfacet/traceability.py`'s module docstring so the `mode ->
+rule` and `rule -> mode` bullets no longer claim "complete, always", and
+added two pinning tests to
+`tests/test_146_ninth_mode_and_first_proposed.py`. Merging that into this
+item's branch conflicted with nothing in practice: the restated bullets
+cite `segfacet.failure_modes.SPECIFICATION`, not the `MODE_RUNGS` /
+`ModeRung` constants AC2 forbids, so both sides survive verbatim and
+`traceability` carries no `MODE_RUNGS`, `ModeRung`, `RUNGS` or
+`RUNG_LABELS` attribute. This item's rewritten `_NOTE` needed no change —
+it contains `complete` and `holes` and none of the four banned phrasings —
+and all three committed artifact pairs regenerate byte-identically to
+committed after the merge, since the docstring is not rendered into any of
+them. `docs/aide/insights.md` keeps both sides' entries, item 146's before
+this item's.

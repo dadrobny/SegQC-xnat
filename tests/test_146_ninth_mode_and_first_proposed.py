@@ -1654,3 +1654,91 @@ def test_review_derive_status_requires_a_declaring_rule_for_validated():
     # reaches the corpus-agreement clause is declared.
     assert fm.derive_status(fm.SPECIFICATION[3]) == "validated"
     assert fm.derive_status(fm.SPECIFICATION[9]) == "validated"
+
+
+# --------------------------------------------------------------------------- #
+# Round two of the same review (2026-09-04): the note fix left the module's own
+# docstring making the claim the note retracted.
+# --------------------------------------------------------------------------- #
+
+# Phrasings that assert a matrix direction is complete *by construction* --
+# a standing guarantee rather than a value the reader must go and read. The
+# matrix has scored, not guaranteed, both directions since item 146 entered
+# the first `proposed` mode, so none of these may reappear in either prose
+# source. The list is the ban, not a whitelist: any new phrasing that makes
+# the same standing claim belongs here.
+_UNCONDITIONAL_COMPLETENESS_PHRASES = (
+    "complete by construction",
+    "complete, always",
+    "always complete",
+    "a hole in either fails loudly",
+)
+
+
+def test_review_traceability_prose_never_claims_unconditional_completeness():
+    """``_NOTE`` -- rendered verbatim into the head of both committed
+    artifacts -- said "mode -> rule and rule -> mode are complete by
+    construction (a hole in either fails loudly)" while the same document
+    reported ``Direction complete: False. Holes: 10`` three lines below.
+    The note was restated; the module docstring three screens above it still
+    said "complete, always" for both directions, which is the same retracted
+    claim in the more authoritative of the two places.
+
+    Both prose sources are now checked together, so a fix to one that
+    forgets the other fails here."""
+    import segfacet.traceability as traceability
+
+    sources = {
+        "traceability.__doc__": traceability.__doc__ or "",
+        "traceability._NOTE": traceability._NOTE,
+    }
+    assert all(sources.values()), sources.keys()
+
+    for name, text in sources.items():
+        lowered = text.lower()
+        for phrase in _UNCONDITIONAL_COMPLETENESS_PHRASES:
+            assert phrase not in lowered, (name, phrase)
+
+    # The positive half: the note must point the reader at the live fields it
+    # replaced the guarantee with, or "read the fields" is nowhere written.
+    assert "complete" in traceability._NOTE
+    assert "holes" in traceability._NOTE
+
+
+def test_review_mode_to_rule_holes_are_exactly_the_proposed_modes():
+    """The note's replacement claim -- "a mode may legitimately carry no rule
+    -- a ``proposed`` entry ... appears as a mode -> rule hole" -- pinned to
+    what ``build_matrix`` actually computes, so the excuse cannot outlive the
+    state that justifies it.
+
+    ``build_matrix`` grants ``proposed`` no exemption: every known mode with
+    no declaring rule becomes a hole regardless of status. That is correct
+    only while the holes *are* the proposed modes. A ``specified`` mode that
+    lost its last declaring rule would be a genuine mode -> rule defect
+    (``roadmap.md`` Stage 20: "a catalogued §6 failure mode nothing can
+    detect ... a defect"), silently excused by the note's wording -- this
+    test is what makes that loud."""
+    import segfacet.failure_modes as fm
+    import segfacet.traceability as traceability
+
+    matrix = traceability.build_matrix()
+
+    # Holes carry mode ids as strings and, separately, rule ids designated by
+    # the corpus but never registered; only the numeric entries are modes.
+    hole_mode_ids = sorted(
+        int(hole) for hole in matrix.mode_to_rule.holes if hole.isdigit()
+    )
+    proposed_mode_ids = sorted(
+        mode_id
+        for mode_id, mode in fm.SPECIFICATION.items()
+        if fm.derive_status(mode) == "proposed"
+    )
+    assert hole_mode_ids == proposed_mode_ids, (hole_mode_ids, proposed_mode_ids)
+
+    # ... and the direction's own boolean agrees with its holes, in both the
+    # live matrix and the committed markdown the reader actually opens.
+    assert matrix.mode_to_rule.complete is (not matrix.mode_to_rule.holes)
+    rendered = _COMMITTED_TRACEABILITY_MD.read_text(encoding="utf-8")
+    assert (
+        f"Direction complete: {matrix.mode_to_rule.complete}." in rendered
+    ), matrix.mode_to_rule

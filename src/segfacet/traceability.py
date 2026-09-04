@@ -10,12 +10,18 @@ Assembles item 103's generated feature catalogue
 manifest (:func:`segfacet.synth.corpus.load_manifest`) into one committed
 matrix, over **three directions scored separately**:
 
-- **mode -> rule** -- complete, always: every catalogued section-6 mode must
-  have >=1 declaring rule, or the direction is reported ``complete: False``
-  with the mode named as a hole.
-- **rule -> mode** -- complete, always: every registered rule must carry
-  either a targeted or a mode-less declaration, or the direction is reported
-  ``complete: False`` with the rule named as a hole.
+- **mode -> rule** -- *scored*, not guaranteed: a mode in
+  :data:`segfacet.failure_modes.SPECIFICATION` that no registered rule
+  declares is named as a hole and sets the direction's ``complete`` field
+  ``False``. Since item 146 such a hole is not automatically a defect -- a
+  ``proposed`` mode is listed and defined but **deliberately** unimplemented,
+  so it carries no declaring rule by design and surfaces here as a hole.
+  Read the ``complete``/``holes`` fields for the live answer; neither this
+  docstring nor the artifacts' ``note`` makes a standing claim about either.
+- **rule -> mode** -- scored the same way: a registered rule carrying neither
+  a targeted nor a mode-less declaration -- or one whose declared modes all
+  sit outside :data:`segfacet.failure_modes.SPECIFICATION`'s key set -- is
+  named as a hole and sets ``complete`` ``False``.
 - **feature -> rule** -- deliberately **not** complete. The feature record is
   an over-broad vector rules select from; a leaf path read by no rule is
   *inventory, not a gap*. The matrix carries that qualifier beside the count
