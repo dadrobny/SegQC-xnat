@@ -1544,7 +1544,7 @@ sources onto it, and closes with a maintainer sign-off that gates the remainder 
   four-state vocabulary and a provenance; `implemented` and `validated` are derived from
   live state, and a hand-set status that disagrees with the registry or the corpus fails
   a test naming the mode (**G8**).
-- [ ] For every corpus case across both committed corpora, the measured firing set equals
+- [x] For every corpus case across both committed corpora, the measured firing set equals *(Validation round 2 (2026-09-04): committed docs/aide/traceability_matrix.generated.json conformance block shows agree_count=13, disagree_count=0, conformant=true across all 13 cases (9 geometric + 4 intensity manifests); full suite green including tests/test_149_conformance_report.py::test_ac16_committed_tree_agrees_thirteen_of_thirteen_and_is_conformant and test_ac13_conformance_carries_thirteen_rows_across_both_corpora.)*
   the specification's expected firing set, and `mode6_crop_at_border` expects
   `{border, mislabel}` with a recorded reason (**G2**).
 - [ ] Every mode ↔ rule edge carries an authored evidence rung and every mode's rung is
