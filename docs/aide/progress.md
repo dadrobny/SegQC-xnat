@@ -1525,7 +1525,7 @@ sources onto it, and closes with a maintainer sign-off that gates the remainder 
   corpus-to-declaration blindness; `insights.md`, spec 136) closed by replacement, and
   the rule-granular attribution (`insights.md`, spec 138) given a per-detector or
   per-path form the catalogue renders. *(Item 148)*
-- 🔍 **D5** The traceability `build_matrix` (spec 138) re-pointed at the specification as primary: derived
+- ✅ **D5** The traceability `build_matrix` (spec 138) re-pointed at the specification as primary: derived
   status, per-edge rungs, expected beside measured firing per corpus case with agreement
   scored, metric anchor path and rule read paths as two labelled columns; the
   `build_matrix` fixture discipline set and the `no-float-leaf` guard ground added. The
