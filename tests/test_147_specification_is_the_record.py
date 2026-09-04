@@ -915,18 +915,33 @@ def _evidence_elements(call: ast.Call):
 
 def test_ac20_reserved_corpus_evidence_tag_is_gone_from_the_tree():
     offenders = []
+    calls_seen = 0
     for path in _all_src_py_files() + _all_test_py_files():
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for call in _rule_mode_declaration_calls(tree):
+            calls_seen += 1
             if "corpus" in set(_evidence_elements(call)):
                 offenders.append(_rel(path))
+    # Non-vacuity guard: an empty `offenders` list only means "no declaration
+    # passes 'corpus'" if the walker actually found declarations to inspect.
+    # Renaming ``RuleModeDeclaration``, or moving the shipped declarations out
+    # of ``src/segfacet/`` and ``tests/``, would otherwise turn this check into
+    # a silent pass rather than a failure naming what moved. Measured on this
+    # tree, 2026-09-04: 42 calls across both trees.
+    assert calls_seen >= 10, (
+        f"expected the AST walker to find the shipped RuleModeDeclaration "
+        f"calls across src/segfacet/ and tests/, found {calls_seen}"
+    )
     assert offenders == [], offenders
 
     membership_offenders = []
+    scanned = 0
     for path in _all_src_py_files():
+        scanned += 1
         text = path.read_text(encoding="utf-8")
         if re.search(r'"corpus"\s+(?:not\s+)?in\s+\S*evidence', text):
             membership_offenders.append(_rel(path))
+    assert scanned, "expected >=1 src/segfacet/ module to scan"
     assert membership_offenders == [], membership_offenders
 
 
