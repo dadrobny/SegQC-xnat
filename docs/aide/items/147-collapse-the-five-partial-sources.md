@@ -115,13 +115,17 @@ rebase cleanly onto it.
   `feature_docs.MODE_ANCHOR_PATHS`'s key set is exactly `{1,…,8}`; every
   `SPECIFICATION` candidate feature with `role == "stage18-metric-anchor"`
   resolves against `MODE_ANCHOR_PATHS[mode.id]`; the set of `src/segfacet/`
-  modules referencing the name `MODE_ANCHOR_PATHS` is exactly
-  `{feature_docs.py, catalogue.py, traceability.py, failure_modes.py}`; and the
-  matrix renders it under a column whose header names it an **anchor** path,
-  distinct from the rule read-path column item 149 adds.
+  modules **referencing** the name `MODE_ANCHOR_PATHS` — an AST `Name`,
+  `Attribute` or `ImportFrom` use of it, never a comment or docstring mention
+  — is exactly `{feature_docs.py, catalogue.py, traceability.py,
+  failure_modes.py}`; and the matrix renders it under a column whose header
+  names it an **anchor** path, distinct from the rule read-path column item
+  149 adds.
 - [ ] **AC4: the vision §6 parse has one home.** `failure_modes.vision_seed_titles()`
   returns the parsed §6 titles, and `docs/aide/vision.md` is read by no other
-  module under `src/segfacet/` (grep over the tree for `vision.md`).
+  module under `src/segfacet/` — an AST scan over the tree for a non-docstring
+  string constant containing `vision.md` (a docstring or comment mentioning
+  the file's name, without reading it, does not count).
 - [ ] **AC5: the eight seed names still equal vision §6's list.** For each of
   modes 1–8, `SPECIFICATION[id].name` equals `vision_seed_titles()[id]`,
   recomputed live from `docs/aide/vision.md` — the one kept conformance check in
@@ -144,14 +148,21 @@ rebase cleanly onto it.
 - [ ] **AC9: every mode's mechanism sentence names something that resolves
   live.** For each of the ten modes, `ModeSpec.mechanism` is non-empty and
   contains at least one token that resolves against live state — an element of
-  that mode's `MODE_ANCHOR_PATHS` entry, a `case_id` of one of its
-  `corpus_cases`, or a `rule_id` of one of its `intended_rules` — recomputed per
-  mode, never a length floor. (Item 138's AC31 check, carried across the
-  retirement of `MODE_RUNGS` rather than dropped with it.)
+  that mode's `MODE_ANCHOR_PATHS` entry, a `path` of one of its
+  `candidate_features` (Implementation step 2's mode-10 route, since
+  `MODE_ANCHOR_PATHS` has no entry for a `proposed` mode), a `case_id` of one
+  of its `corpus_cases`, or a `rule_id` of one of its `intended_rules` —
+  recomputed per mode, never a length floor. (Item 138's AC31 check, carried
+  across the retirement of `MODE_RUNGS` rather than dropped with it.)
 - [ ] **AC10: mode 7's corrected sentence, measured.** `SPECIFICATION[7].mechanism`
-  is the only place in `src/segfacet/` carrying the mode-7 rung rationale, the
-  literal `rank(v) == v - 1` appears nowhere under `src/segfacet/`, and the
-  sentence's claims are recomputed in the test from
+  is the only place in `src/segfacet/` carrying the mode-7 rung rationale, and
+  the literal `rank(v) == v - 1` appears nowhere under the sources this item
+  collapses onto the specification — `src/segfacet/failure_modes.py`,
+  `src/segfacet/traceability.py`, `src/segfacet/heuristics/` and
+  `src/segfacet/synth/perturbation.py` — the same claim the pre-existing
+  `src/segfacet/eval/severity_ladder.py` (item 141, Stage 21) still carries and
+  is out of this item's authorised paths (`insights.md`, item 147, 2026-09-04).
+  The sentence's claims are recomputed in the test from
   `segfacet.labels.CANONICAL_ORDER` and `segfacet.labels.DEFAULT_LABEL_MAP`:
   every lumbar label `L1`–`L5` has canonical rank equal to its integer value,
   `T12` has rank equal to its value minus one, and the rank sequence of §6.7's
@@ -781,3 +792,39 @@ unsatisfiable by construction: it builds mode 10's candidate-token set from
 and `intended_rules` (empty by design), omitting the `candidate_features`
 path that Implementation step 2 tells this item to name. Every other check
 in the module passes.
+
+**D11 — the four checks D10 named are a test-writer/spec call, resolved by
+narrowing the AC wording rather than the implementation (2026-09-04).**
+Reviewed against D10's own diagnosis, each of the four is the test
+over-reaching what its AC actually requires, not a shipped defect:
+
+- AC3/AC4 asked for a bare substring grep over file text, which cannot tell a
+  real reference from a comment or docstring naming the same identifier. Both
+  are amended to name what they always meant — an actual code reference
+  (`MODE_ANCHOR_PATHS`: an AST `Name`/`Attribute`/`ImportFrom` use; `vision.md`:
+  a non-docstring string constant) — so `heuristics/reference_delta.py`'s
+  comment and `__init__.py` / `heuristics/intensity.py`'s docstring/comment
+  mentions stop being false positives, while the real references
+  (`feature_docs.py`'s assignment, `catalogue.py`'s and `traceability.py`'s
+  attribute reads, `failure_modes.py`'s `vision_seed_titles()` read) still
+  resolve, and a planted real reference is still caught (each test keeps a
+  positive control proving the narrower walker is not vacuous).
+- AC10's sweep is narrowed to the sources this item collapses onto the
+  specification (`failure_modes.py`, `traceability.py`, `heuristics/`,
+  `synth/perturbation.py`) rather than all of `src/segfacet/`.
+  `eval/severity_ladder.py`'s copy of the same false claim (item 141, Stage
+  21 — already recorded in `insights.md`, item 147, 2026-09-04) is a real,
+  separate latent defect, but correcting it is outside this item's authorised
+  paths and is a Stage-21 question per that entry, not this item's AC10 to
+  absorb by over-scoping its own tree-wide check.
+- AC9's resolving-token set is completed rather than narrowed: Implementation
+  step 2 already told this item that mode 10's mechanism names its
+  `candidate_features` path (`stage3_unavailable.reason`, since a `proposed`
+  mode has no `MODE_ANCHOR_PATHS` entry, no `corpus_cases` and no
+  `intended_rules`), but the AC's resolving-token list omitted
+  `candidate_features` paths. Adding them (for every mode, matching item
+  138's AC31 precedent of resolving anchor paths by substring) is the fix;
+  mode 10's mechanism already names the token verbatim.
+
+No implementation changes; `tests/test_147_specification_is_the_record.py` is
+amended to match, per the AC wording above.

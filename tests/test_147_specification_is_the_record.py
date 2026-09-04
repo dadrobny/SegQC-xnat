@@ -7,8 +7,10 @@ AC -> test map (house style, items 144-146):
         test_adv_ac1_walker_flags_a_planted_mode_name_literal
 - AC2:  test_ac2_one_source_for_rung_vocabulary,
         test_adv_ac2_walker_flags_a_planted_mode_rungs_shaped_dict
-- AC3:  test_ac3_mode_anchor_paths_stays_under_its_own_metric_label
-- AC4:  test_ac4_vision_parse_has_one_home
+- AC3:  test_ac3_mode_anchor_paths_stays_under_its_own_metric_label,
+        test_adv_ac3_walker_flags_a_planted_real_reference
+- AC4:  test_ac4_vision_parse_has_one_home,
+        test_adv_ac4_walker_flags_a_planted_real_read
 - AC5:  test_ac5_eight_seed_names_equal_vision_titles
 - AC6:  test_ac6_matrix_titles_come_from_the_specification
 - AC7:  test_ac7_mode_rungs_are_derived_from_the_specification
@@ -184,6 +186,61 @@ def _row_for_mode(markdown: str, mode: int):
     return None
 
 
+def _references_name(tree: ast.AST, name: str) -> bool:
+    """True if *tree* contains an actual code reference to *name* -- an AST
+    ``Name``/``Attribute`` use or an ``ImportFrom`` import -- never a comment
+    (outside the AST entirely) or a string that merely mentions the name."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id == name:
+            return True
+        if isinstance(node, ast.Attribute) and node.attr == name:
+            return True
+        if isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                if alias.name == name or alias.asname == name:
+                    return True
+    return False
+
+
+def _docstring_constant_ids(tree: ast.AST) -> set:
+    """``id()`` of every ``ast.Constant`` string node sitting in docstring
+    position (module, class or function body's first statement)."""
+    ids = set()
+
+    def _mark(node):
+        body = getattr(node, "body", None)
+        if (
+            body
+            and isinstance(body[0], ast.Expr)
+            and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)
+        ):
+            ids.add(id(body[0].value))
+
+    _mark(tree)
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            _mark(node)
+    return ids
+
+
+def _references_vision_md(tree: ast.AST) -> bool:
+    """True if *tree* contains a non-docstring string constant naming
+    ``vision.md`` -- a docstring or comment mentioning the file's name,
+    without reading it, does not count (comments are not part of the AST at
+    all; a docstring is excluded explicitly)."""
+    docstring_ids = _docstring_constant_ids(tree)
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and id(node) not in docstring_ids
+            and "vision.md" in node.value
+        ):
+            return True
+    return False
+
+
 def _aide_module():
     import importlib.util
 
@@ -284,7 +341,8 @@ def test_ac3_mode_anchor_paths_stays_under_its_own_metric_label(matrix):
 
     referencing = set()
     for path in _all_src_py_files():
-        if "MODE_ANCHOR_PATHS" in path.read_text(encoding="utf-8"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        if _references_name(tree, "MODE_ANCHOR_PATHS"):
             referencing.add(_rel(path, root=_SRC_ROOT))
     assert referencing == {
         "feature_docs.py",
@@ -299,6 +357,30 @@ def test_ac3_mode_anchor_paths_stays_under_its_own_metric_label(matrix):
     assert anchor_headers, headers
     read_path_headers = [h for h in headers if "read" in h.lower() and "path" in h.lower()]
     assert set(anchor_headers).isdisjoint(read_path_headers), headers
+
+
+def test_adv_ac3_walker_flags_a_planted_real_reference(tmp_path):
+    """Positive control: the same reference walker used above must flag a
+    planted real use (an Attribute read), so a clean AC3 result is not
+    vacuous -- and must not flag a planted comment-only mention."""
+    planted_real = tmp_path / "planted_real_reference.py"
+    planted_real.write_text(
+        "import segfacet.feature_docs as feature_docs_module\n"
+        "\n"
+        "anchors = feature_docs_module.MODE_ANCHOR_PATHS\n",
+        encoding="utf-8",
+    )
+    tree = ast.parse(planted_real.read_text(encoding="utf-8"))
+    assert _references_name(tree, "MODE_ANCHOR_PATHS")
+
+    planted_comment = tmp_path / "planted_comment_mention.py"
+    planted_comment.write_text(
+        "# see feature_docs.MODE_ANCHOR_PATHS for the per-mode metric path\n"
+        "x = 1\n",
+        encoding="utf-8",
+    )
+    tree_comment = ast.parse(planted_comment.read_text(encoding="utf-8"))
+    assert not _references_name(tree_comment, "MODE_ANCHOR_PATHS")
 
 
 # =========================================================================== #
@@ -317,9 +399,42 @@ def test_ac4_vision_parse_has_one_home():
     for path in _all_src_py_files():
         if path.name == "failure_modes.py":
             continue
-        if "vision.md" in path.read_text(encoding="utf-8"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        if _references_vision_md(tree):
             offenders.append(_rel(path))
     assert offenders == [], offenders
+
+
+def test_adv_ac4_walker_flags_a_planted_real_read(tmp_path):
+    """Positive control: the same walker must flag a planted real read (a
+    non-docstring string constant naming vision.md), so a clean AC4 result
+    is not vacuous -- and must not flag a planted docstring/comment-only
+    mention."""
+    planted_real = tmp_path / "planted_real_read.py"
+    planted_real.write_text(
+        'text = open("docs/aide/vision.md").read()\n',
+        encoding="utf-8",
+    )
+    tree = ast.parse(planted_real.read_text(encoding="utf-8"))
+    assert _references_vision_md(tree)
+
+    planted_docstring = tmp_path / "planted_docstring_mention.py"
+    planted_docstring.write_text(
+        '"""See docs/aide/vision.md for background."""\n'
+        "x = 1\n",
+        encoding="utf-8",
+    )
+    tree_docstring = ast.parse(planted_docstring.read_text(encoding="utf-8"))
+    assert not _references_vision_md(tree_docstring)
+
+    planted_comment = tmp_path / "planted_comment_mention.py"
+    planted_comment.write_text(
+        "# see docs/aide/vision.md for background\n"
+        "y = 1\n",
+        encoding="utf-8",
+    )
+    tree_comment = ast.parse(planted_comment.read_text(encoding="utf-8"))
+    assert not _references_vision_md(tree_comment)
 
 
 # =========================================================================== #
@@ -416,18 +531,22 @@ def test_ac9_every_mechanism_names_a_token_that_resolves_live(mode_id):
     mode = fm.SPECIFICATION[mode_id]
     assert mode.mechanism, mode_id
 
-    candidates = set(feature_docs_module.MODE_ANCHOR_PATHS.get(mode_id, ()))
+    anchors = set(feature_docs_module.MODE_ANCHOR_PATHS.get(mode_id, ()))
+    candidate_feature_paths = {feature.path for feature in mode.candidate_features}
+    candidates = set(anchors)
+    candidates |= candidate_feature_paths
     candidates |= {case.case_id for case in mode.corpus_cases}
     candidates |= {rule.rule_id for rule in mode.intended_rules}
     assert candidates, (mode_id, "expected >=1 live-resolving candidate token")
 
-    # Anchor paths (dotted -- plain substring is specific enough, matching
-    # item 138's precedent); case/rule ids (bare identifiers -- word
-    # boundary, so a one-character-off near-miss does not count).
-    anchors = set(feature_docs_module.MODE_ANCHOR_PATHS.get(mode_id, ()))
-    resolved = any(path in mode.mechanism for path in anchors) or any(
+    # Anchor / candidate-feature paths (dotted -- plain substring is
+    # specific enough, matching item 138's AC31 precedent); case/rule ids
+    # (bare identifiers -- word boundary, so a one-character-off near-miss
+    # does not count).
+    path_like = anchors | candidate_feature_paths
+    resolved = any(path in mode.mechanism for path in path_like) or any(
         _token_in_mechanism(token, mode.mechanism)
-        for token in (candidates - anchors)
+        for token in (candidates - path_like)
     )
     assert resolved, (mode_id, mode.mechanism, candidates)
 
@@ -453,9 +572,21 @@ def test_ac10_mode7_corrected_sentence_is_measured():
     descents = sum(1 for a, b in zip(ranks, ranks[1:]) if b < a)
     assert descents == 1, ranks
 
+    # Scoped to the sources this item collapses onto the specification
+    # (spec AC10) -- src/segfacet/eval/severity_ladder.py (item 141, Stage
+    # 21) carries the same false claim but is out of this item's authorised
+    # paths; that is a recorded, separate defect (insights.md, item 147,
+    # 2026-09-04), not this AC's to absorb.
+    _AC10_SWEPT_PATHS = (
+        _SRC_ROOT / "failure_modes.py",
+        _SRC_ROOT / "traceability.py",
+        _SRC_ROOT / "synth" / "perturbation.py",
+    )
+    swept_paths = list(_AC10_SWEPT_PATHS) + sorted((_SRC_ROOT / "heuristics").rglob("*.py"))
+    assert swept_paths, "expected >=1 path to sweep"
     offending = [
         _rel(path)
-        for path in _all_src_py_files()
+        for path in swept_paths
         if "rank(v) == v - 1" in path.read_text(encoding="utf-8")
     ]
     assert offending == [], offending
