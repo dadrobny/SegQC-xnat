@@ -70,7 +70,8 @@ record):
         test_ac33_traceability_matrix_matches_committed_structurally
 - AC34: test_ac34_mode9_catalogue_attribution_equals_declaring_rules_reach
 - AC35: test_ac35_module_docstring_records_the_change_with_resolvable_paths
-- AC36: test_ac36_aide_check_is_clean_at_the_pinned_baseline
+- AC36: test_ac36_aide_check_reports_no_error_and_no_new_warning_class,
+        test_ac36_no_warning_names_a_path_this_item_writes
 
 Adversarial / edge cases beyond the one-per-AC set are grouped at the bottom,
 in the item spec's Testing Strategy order.
@@ -1241,21 +1242,90 @@ def test_ac35_module_docstring_records_the_change_with_resolvable_paths():
 
 # =========================================================================== #
 # AC36: aide check is clean
+#
+# AC36 is worded as "exactly the seven baseline warnings of A10", and the
+# count was 7 when this item merged (re-measured 2026-09-04 on
+# `review/146-findings`: still 7). The count itself is not what the AC is
+# about, and pinning it is the repo's number-one recurring defect class
+# (`REVIEW.md`, "What Important means here": *a test asserting state the
+# loop's own verbs are built to move ... `aide check`'s warning set*). Two of
+# A10's seven are `human gate N ... is awaiting a decision`, which
+# `aide gate approve` clears the moment a person decides -- so approving a
+# gate would turn this test red for a correct action, and item 150 raising
+# its own sign-off gate would turn it red for an eighth warning that is the
+# stage working as designed. Branch-state warnings ("stale claim branch",
+# emitted transiently *during* `aide merge`'s own post-merge re-test) move it
+# in the other direction on any developer clone.
+#
+# What A10 actually claims -- "a new warning class is a finding, not a
+# baseline update" -- is preserved by classifying each warning by shape and
+# rejecting any class outside the recorded baseline, plus the item-specific
+# negatives AC36 names by hand. This is the mechanism the sibling module
+# `test_145_eight_hypothesised_modes.py::test_ac24_...` already uses for the
+# identical AC, with the same reasoning recorded there.
+#
+# `run_checks` is called in-process rather than through a subprocess for the
+# reason `test_114`'s `_aide_check_warnings` records: the subprocess form
+# returned `proc.stdout is None` on the Windows CI runner despite
+# `capture_output=True`, and structured `(errors, warnings)` needs no stdout,
+# no encoding and no re-parse.
 # =========================================================================== #
 
+_BRANCH_STATE_WARNING_PREFIXES = ("stale claim branch", "unrecognised branch")
 
-def test_ac36_aide_check_is_clean_at_the_pinned_baseline():
-    result = run_utf8(
-        [sys.executable, str(_AIDE_SCRIPT), "check"],
-        cwd=_REPO_ROOT,
-        timeout=180,
+_BASELINE_WARNING_CLASSES = (
+    "assumptions-block",
+    "awaiting-a-decision",
+    "branch-state",
+    "retracted-criterion",
+)
+
+
+def _aide_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("_aide_cli_146", _AIDE_SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    return module
+
+
+def _classify_warning(message: str) -> str:
+    """Classify by *shape*, so a genuinely new instance of a tolerated class
+    still classifies as that class while an unseen shape reports
+    ``"unclassified"`` and fails the check."""
+    if message.startswith(_BRANCH_STATE_WARNING_PREFIXES):
+        return "branch-state"
+    if re.search(r"criterion \d+ was retracted on \d{4}-\d{2}-\d{2}", message):
+        return "retracted-criterion"
+    if "assumptions" in message.lower():
+        return "assumptions-block"
+    if "awaiting a decision" in message.lower():
+        return "awaiting-a-decision"
+    return "unclassified"
+
+
+def test_ac36_aide_check_reports_no_error_and_no_new_warning_class():
+    aide = _aide_module()
+    errors, warnings = aide.run_checks(_REPO_ROOT, aide.load_config(_REPO_ROOT))
+    assert errors == [], errors
+    # A plumbing failure must fail loudly, not pass an empty loop vacuously:
+    # this repo always reports the baseline warnings.
+    assert warnings, "run_checks returned no warnings at all -- expected the baseline"
+
+    classes = {_classify_warning(warning) for warning in warnings}
+    assert classes <= set(_BASELINE_WARNING_CLASSES), (
+        f"aide check reports a warning class outside the recorded baseline: "
+        f"{classes - set(_BASELINE_WARNING_CLASSES)}"
     )
-    assert result.returncode == 0, result.stderr
-    assert result.stdout, "expected stdout from `aide check`"
 
-    lines = result.stdout.splitlines()
-    warning_lines = [line for line in lines if line.startswith("warning:")]
-    assert warning_lines, "expected >=1 pinned baseline warning"
+
+def test_ac36_no_warning_names_a_path_this_item_writes():
+    """The negatives AC36 names by hand: no `.gitattributes` lint for any
+    path this item regenerated, no `insights.md` entry-shape warning, and no
+    warning naming any file the item wrote."""
+    aide = _aide_module()
+    _errors, warnings = aide.run_checks(_REPO_ROOT, aide.load_config(_REPO_ROOT))
     written_paths = (
         "src/segfacet/failure_modes.py",
         "src/segfacet/synth/regression.py",
@@ -1265,18 +1335,28 @@ def test_ac36_aide_check_is_clean_at_the_pinned_baseline():
         "src/segfacet/heuristics/intensity_reference_delta.py",
         "tests/corpus/intensity/manifest.json",
     )
-    for line in warning_lines:
-        assert "insights.md" not in line, line
-        assert ".gitattributes" not in line, line
+    for warning in warnings:
+        assert "insights.md" not in warning, warning
+        assert ".gitattributes" not in warning, warning
         for written_path in written_paths:
-            assert written_path not in line, (written_path, line)
+            assert written_path not in warning, (written_path, warning)
 
-    ok_lines = [line for line in lines if line.startswith("aide check: OK")]
-    assert ok_lines, result.stdout
-    match = re.search(r"OK \((\d+) warning", ok_lines[0])
-    assert match, ok_lines[0]
-    assert int(match.group(1)) == 7, ok_lines[0]
-    assert int(match.group(1)) == len(warning_lines)
+
+def test_adv_unclassified_warning_would_be_caught():
+    """The classifier must be able to detect a new class -- otherwise the
+    AC36 check above passes on anything."""
+    assert _classify_warning("a brand new kind of warning nobody has seen") == "unclassified"
+
+
+def test_adv_aide_check_exits_zero():
+    """The other half of AC36: `aide check` must still *exit 0*, which the
+    in-process `run_checks` call above cannot observe."""
+    result = run_utf8(
+        [sys.executable, str(_AIDE_SCRIPT), "check"],
+        cwd=_REPO_ROOT,
+        timeout=180,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 # =========================================================================== #
@@ -1464,3 +1544,113 @@ def test_adv_harness_two_calls_leave_committed_manifest_file_unchanged():
     intensity_pipeline_findings(case)
     after = _INTENSITY_MANIFEST_PATH.read_bytes()
     assert before == after
+
+
+# =========================================================================== #
+# Review fixes (rank-3 per-item review of item 146, 2026-09-04)
+# =========================================================================== #
+
+
+@pytest.mark.parametrize("rule_id", ["intensity", "intensity_reference_delta"])
+@pytest.mark.parametrize("case_id", ["implausible_metal", "degenerate_uniform"])
+def test_review_declaration_replacement_invariant_on_a_case_the_rule_fires_on(
+    rule_id, case_id, monkeypatch
+):
+    """AC13's ``run_rules``-invariance test drives ``_fixed_record()`` -- a
+    clean spine with no ``image_features`` key at all -- on which
+    ``run_rules`` returns ``[]`` and neither intensity rule can produce a
+    finding (measured 2026-09-04: 0 findings, record keys are
+    ``features_version``/``overlaps``/``per_label``/``relationships``/
+    ``stage3``). ``after == before`` there is ``[] == []``: it would hold
+    just as well if the declaration *did* reach ``evaluate``, so it cannot
+    distinguish "the engine never reads the declaration" from "these two
+    rules never fire on this record".
+
+    This drives the same invariance claim through the item's own public
+    intensity harness on a case where ``intensity`` demonstrably fires, and
+    compares the full finding sequence (rule id, severity label, labels,
+    reason) rather than a list identity -- so a declaration that reached
+    any part of either rule's output would show up."""
+    from segfacet.heuristics.rule import RuleModeDeclaration, _RULES
+    from segfacet.synth.regression import intensity_pipeline_findings
+
+    def _tupled(findings):
+        return tuple(
+            (f.rule_id, f.severity.label, tuple(f.labels), f.reason) for f in findings
+        )
+
+    case = _intensity_manifest_case(case_id)
+    before = _tupled(intensity_pipeline_findings(case))
+    assert before, (case_id, "expected >=1 finding to compare")
+    assert any(entry[0] == "intensity" for entry in before), (case_id, before)
+
+    replacement = RuleModeDeclaration(
+        mode_less_reason=(
+            "review-fix adversarial replacement -- must not affect evaluate()"
+        )
+    )
+    monkeypatch.setattr(_RULES[rule_id], "mode_declaration", replacement)
+
+    after = _tupled(intensity_pipeline_findings(case))
+    assert after == before, (rule_id, case_id, before, after)
+
+
+def test_review_derive_status_requires_a_declaring_rule_for_validated():
+    """The declaring-rule precondition this item added to ``derive_status``
+    (the item-145 review finding, ``docs/aide/insights.md`` 2026-09-03) had
+    no test: every shipped mode that reaches the corpus-agreement clause is
+    also declared, and ``test_144``'s
+    ``test_adv_empty_corpus_cases_and_intended_rules_derives_specified_not_validated``
+    empties the registry only for a mode with *no* corpus cases. Deleting
+    the ``declared and`` guard therefore left the whole suite green.
+
+    The state the guard is about is a mode whose corpus cases **agree** and
+    which **no registered rule declares**. It is reachable without touching
+    the registry, by giving the probe a mode id nothing declares while its
+    case still names a rule that really fires: pre-fix this derived
+    ``"validated"`` (the corpus-agreement clause was tested first), post-fix
+    it derives the authored ``"specified"`` -- vision.md section 6's ladder
+    is cumulative, so validated implies implemented."""
+    import segfacet.failure_modes as fm
+    from segfacet.heuristics.rule import iter_rule_declarations
+
+    undeclared_mode_id = 1
+    declared_anywhere = {
+        mode_id
+        for _rule_id, decl in iter_rule_declarations()
+        if decl is not None
+        for mode_id in decl.modes
+    }
+    while undeclared_mode_id in declared_anywhere or undeclared_mode_id in fm.SPECIFICATION:
+        undeclared_mode_id += 1
+    assert fm._registry_declares(undeclared_mode_id) is False, undeclared_mode_id
+
+    agreeing_case = fm.CorpusCaseExpectation(
+        case_id="mode3_inject_islands",
+        corpus="geometric",
+        expected_firing=("fragmentation",),
+        reason="review-fix probe: an agreeing case under an undeclared mode id",
+    )
+    assert fm.case_agrees(agreeing_case) is True
+
+    probe = fm.ModeSpec(
+        id=undeclared_mode_id,
+        name="review-fix probe mode",
+        definition="A probe mode no registered rule declares.",
+        discriminator="Distinguishes from mode 3 by being a test probe.",
+        observability="single-channel-observable",
+        candidate_features=(fm.CandidateFeature(path="per_label", role="hypothesised"),),
+        intended_rules=(),
+        corpus_cases=(agreeing_case,),
+        severity="flagged-for-review",
+        status="specified",
+        provenance="hypothesised",
+    )
+
+    assert fm.derive_status(probe) != "validated", fm.derive_status(probe)
+    assert fm.derive_status(probe) == "specified", fm.derive_status(probe)
+
+    # The shipped modes are unmoved by the guard: every one of them that
+    # reaches the corpus-agreement clause is declared.
+    assert fm.derive_status(fm.SPECIFICATION[3]) == "validated"
+    assert fm.derive_status(fm.SPECIFICATION[9]) == "validated"
