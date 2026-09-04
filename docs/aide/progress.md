@@ -1513,12 +1513,18 @@ sources onto it, and closes with a maintainer sign-off that gates the remainder 
   `pipeline_findings` built in `synth/regression.py`), plus the catalogue's first
   `proposed` entry — collapsed or duplicated label set, candidate feature
   `stage3_unavailable`, no rule (carried defect, spec 129). *(Item 146)*
+- 🚧 **D4** The five partial sources collapsed onto the specification; `Expectation` and
+  `RuleModeDeclaration` checked against it in both directions; the three declaration-seam
+  defects (the `"corpus"` tag membership test, the untyped `evidence`/`modes`, the
+  corpus-to-declaration blindness; `insights.md`, spec 136) closed by replacement, and
+  the rule-granular attribution (`insights.md`, spec 138) given a per-detector or
+  per-path form the catalogue renders. *(Item 147)*
 - 📋 **D4** The five partial sources collapsed onto the specification; `Expectation` and
   `RuleModeDeclaration` checked against it in both directions; the three declaration-seam
   defects (the `"corpus"` tag membership test, the untyped `evidence`/`modes`, the
   corpus-to-declaration blindness; `insights.md`, spec 136) closed by replacement, and
   the rule-granular attribution (`insights.md`, spec 138) given a per-detector or
-  per-path form the catalogue renders. *(Items 147, 148)*
+  per-path form the catalogue renders. *(Item 148)*
 - 📋 **D5** The traceability `build_matrix` (spec 138) re-pointed at the specification as primary: derived
   status, per-edge rungs, expected beside measured firing per corpus case with agreement
   scored, metric anchor path and rule read paths as two labelled columns; the
