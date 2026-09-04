@@ -50,8 +50,8 @@ duplicated here):
   naming the case id and both numbers, and the signed document is
   byte-unchanged before and after.
 - AC16: `committed_artifact_guard.iter_violations()` is empty over `tests/`,
-  its five-member `GROUNDS` is unchanged, and its `ALLOWLIST` gains no entry
-  for the companion.
+  its `GROUNDS` (six members as of item 149, 2026-09-04) is otherwise
+  unchanged, and its `ALLOWLIST` gains no entry for the companion.
 - AC17: no numeric leaf in the companion is a `float`, and its text carries
   no date, drive-letter prefix, absolute path or this machine's hostname.
 - AC18: `test_105`'s post-retirement inventory count (20) still holds.
@@ -520,7 +520,11 @@ def test_ac15_stale_companion_fails_drift_naming_case_and_both_numbers():
 # =========================================================================== #
 
 
-def test_ac16_committed_artifact_guard_clean_and_vocabulary_unextended():
+def test_ac16_committed_artifact_guard_clean_and_vocabulary_at_six_members():
+    # Reconciled (item 149, 2026-09-04): GROUNDS gains its sixth member,
+    # "no-float-leaf" -- this item's companion is untouched by that change,
+    # so the guard-clean and no-new-allowlist-entry claims stand unchanged;
+    # only the vocabulary pin moves from five to six.
     import committed_artifact_guard as guard
 
     violations = list(guard.iter_violations(_TESTS_DIR))
@@ -532,9 +536,10 @@ def test_ac16_committed_artifact_guard_clean_and_vocabulary_unextended():
         "hand-written-literals",
         "binary-fixture",
         "integrity-pin",
+        "no-float-leaf",
     }
     assert set(guard.GROUNDS) == expected_grounds
-    assert len(guard.GROUNDS) == 5
+    assert len(guard.GROUNDS) == 6
 
     assert not any(
         entry.path == "docs/aide/golden_evidence.generated.json" for entry in guard.ALLOWLIST

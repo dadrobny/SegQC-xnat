@@ -82,17 +82,23 @@ Fixtures and cost (Testing Strategy): ``measured`` wraps
 ``case_id`` -- ``run_qc_with_intensity`` over four cases is the expensive part
 of this module, so nothing may call it per-parametrisation without the cache.
 
-AC32/AC33's fresh-vs-committed comparisons: no ``committed_artifact_guard.py``
-``ALLOWLIST`` ground exists yet for ``failure_modes.generated.*`` or
-``traceability_matrix.generated.*`` (item 149 is where a ``no-float-leaf``
-ground would be added), so -- mirroring test_144/145's own precedent -- those
-four comparisons go through ``json.loads()``/a live rebuild and a plain
-markdown string equality rather than a raw ``read_bytes()`` comparison of the
-two committed paths. ``feature_catalogue.generated.json`` already carries an
-``emission-clamped`` ground, so its comparison goes through
-``segfacet.synth.golden.assert_matches_committed_artifact`` instead; its
-``.md`` counterpart is allowlisted too, so a direct byte comparison is used
-for it, matching ``tests/test_103_feature_catalogue.py``'s own pattern.
+AC32/AC33's fresh-vs-committed comparisons: reconciled (item 149, 2026-09-04)
+-- ``failure_modes.generated.*`` and ``traceability_matrix.generated.*`` now
+carry a ``committed_artifact_guard.py`` ``ALLOWLIST`` entry under the sixth
+``GROUNDS`` member, ``"no-float-leaf"``, added in
+``tests/committed_artifact_guard.py`` directly, not by this module. This
+module's own four comparisons are unchanged by that: mirroring test_144/145's
+own precedent, they still go through ``json.loads()``/a live rebuild and a
+plain markdown string-decode equality rather than a raw ``read_bytes()``
+comparison of the two committed paths (see
+``test_ac33_traceability_matrix_matches_committed_structurally``'s own
+``.decode("utf-8")`` wrapping, which keeps it outside what the guard's AST
+classifier resolves regardless of the allowlist). ``feature_catalogue.
+generated.json`` already carries an ``emission-clamped`` ground, so its
+comparison goes through ``segfacet.synth.golden.assert_matches_committed_
+artifact`` instead; its ``.md`` counterpart is allowlisted too, so a direct
+byte comparison is used for it, matching ``tests/test_103_feature_catalogue.
+py``'s own pattern.
 """
 
 from __future__ import annotations
@@ -109,7 +115,7 @@ import pytest
 
 from run_process import run_utf8
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 _AIDE_SCRIPT = _REPO_ROOT / ".aide" / "scripts" / "aide.py"
 
 _COMMITTED_FM_JSON = _REPO_ROOT / "docs" / "aide" / "failure_modes.generated.json"

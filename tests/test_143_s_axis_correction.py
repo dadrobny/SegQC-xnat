@@ -65,8 +65,7 @@ import committed_artifact_guard as guard
 from test_098_stray_components import _PRE_098_GOLDEN_VERDICT_AND_FINDINGS
 from test_131_tangent_direction_normalisation import _PRE_ITEM_TANGENT_ANGLES_DEG
 
-_TESTS_DIR = Path(__file__).resolve().parent
-_REPO_ROOT = _TESTS_DIR.parent
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 # =========================================================================== #
@@ -106,22 +105,18 @@ def _ordered_centroids_for_case(case: dict) -> List:
 
 
 # AC15 requires a byte-for-byte fresh-vs-committed comparison of
-# ``docs/aide/traceability_matrix.generated.md``, which -- unlike
-# ``docs/aide/feature_catalogue.generated.md`` -- carries no entry in
-# ``tests/committed_artifact_guard.ALLOWLIST``. The comparison is legitimate
-# on its merits: the traceability artifact has **zero float leaves**
-# (measured 2026-09-03 over ``traceability_matrix.generated.json``), so there
-# is no computed measurement for a NumPy/platform difference to move; it is
-# pure rule/feature wiring structure, rendered deterministically and pinned
-# ``text eol=lf``. What is *not* established here is an allowlist ground for
-# it: AC14 forbids this item growing the allowlist, so the justification lives
-# in this comment rather than in the guard's own data, and
-# ``test_ac14_this_module_produces_no_guard_violation`` below is silent about
-# this comparison rather than clearing it -- the classifier cannot resolve a
-# committed path reached through the ``_TESTS_DIR`` -> ``_REPO_ROOT`` two-hop
-# root this module uses, one of the shapes its docstring says it skips in
-# silence. A follow-up that adds the allowlist entry (with a named ground)
-# is the durable fix.
+# ``docs/aide/traceability_matrix.generated.md``. Reconciled (item 149,
+# 2026-09-04): this module's root idiom is now the normalised
+# ``Path(__file__).resolve().parent.parent`` chain the guard's classifier
+# resolves, and ``tests/committed_artifact_guard.GROUNDS`` gained its sixth
+# member, ``"no-float-leaf"`` -- the traceability artifact has **zero float
+# leaves** (measured 2026-09-03 over ``traceability_matrix.generated.json``),
+# so there is no computed measurement for a NumPy/platform difference to
+# move; it is pure rule/feature wiring structure, rendered deterministically
+# and pinned ``text eol=lf``. ``ALLOWLIST`` now carries an entry for it under
+# ``"no-float-leaf"``, so this comparison is both visible to the guard and
+# covered, and ``test_ac14_this_module_produces_no_guard_violation`` below
+# clears it rather than staying silent about it.
 
 
 # =========================================================================== #
@@ -598,9 +593,9 @@ def test_ac15_traceability_matrix_markdown_matches_committed_byte_for_byte(tmp_p
     json_dest, md_dest = tmp_path / "tm.json", tmp_path / "tm.md"
     assert traceability_module.main(["--json", str(json_dest), "--md", str(md_dest)]) == 0
     committed = _REPO_ROOT / "docs" / "aide" / "traceability_matrix.generated.md"
-    # Byte-exact against a committed artifact with no ALLOWLIST entry -- see
-    # this module's "Shared helpers" section for the ground (zero float
-    # leaves) and why the guard is silent rather than clearing it.
+    # Byte-exact against a committed artifact allowlisted under
+    # "no-float-leaf" (item 149) -- see this module's "Shared helpers"
+    # section for the ground (zero float leaves).
     assert md_dest.read_bytes() == committed.read_bytes()
 
 

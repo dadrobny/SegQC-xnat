@@ -14,14 +14,18 @@ Corpus-driven tests (AC8-AC18, AC20, AC21) share two module-scoped fixtures
 pipeline / ``measured_firing`` at most once and cache the result by
 ``case_id`` -- the expensive part of this module.
 
-AC23 -- ``docs/aide/failure_modes.generated.{json,md}`` carry no
-``tests/committed_artifact_guard.py`` ``ALLOWLIST`` ground yet (item 149 adds
-the ``no-float-leaf`` ground), so the fresh-vs-committed comparison here goes
-through ``json.loads()``/``specification_to_dict()`` and a plain
-``render_markdown()`` string equality rather than a ``read_bytes()``
-comparison of the two committed paths, which would need an ``ALLOWLIST``
-entry this item does not add. The byte-exact comparison stays run-to-run only
-(two ``tmp_path`` renders), matching item 144's own AC18 pattern.
+AC23 -- reconciled (item 149, 2026-09-04): ``docs/aide/failure_modes.generated.
+{json,md}`` now carry a ``tests/committed_artifact_guard.py`` ``ALLOWLIST``
+entry under the sixth ``GROUNDS`` member, ``"no-float-leaf"``, added by item
+149 in ``tests/committed_artifact_guard.py`` directly (not by this module).
+This module's own fresh-vs-committed comparison still goes through
+``json.loads()``/``specification_to_dict()`` and a plain ``render_markdown()``
+string equality rather than a ``read_bytes()`` comparison of the two
+committed paths -- that pattern was never contingent on the allowlist ground
+existing, so it is unchanged; item 149's own module,
+``tests/test_149_conformance_report.py``, is what exercises the new
+byte-exact/allowlisted path. The byte-exact comparison here stays run-to-run
+only (two ``tmp_path`` renders), matching item 144's own AC18 pattern.
 """
 
 from __future__ import annotations
@@ -34,7 +38,7 @@ from pathlib import Path
 
 import pytest
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 _COMMITTED_JSON = _REPO_ROOT / "docs" / "aide" / "failure_modes.generated.json"
 _COMMITTED_MD = _REPO_ROOT / "docs" / "aide" / "failure_modes.generated.md"
 _MANIFEST_PATH = _REPO_ROOT / "tests" / "corpus" / "manifest.json"
@@ -759,9 +763,12 @@ def test_ac23_regeneration_is_byte_reproducible_run_to_run(tmp_path):
 
 
 def test_ac23_fresh_matches_committed_structurally_and_carries_all_eight_ids():
-    """No ``committed_artifact_guard.py`` ALLOWLIST ground exists yet for
-    these two paths (item 149 adds ``no-float-leaf``), so this compares
-    fresh-vs-committed structurally rather than via ``read_bytes()``."""
+    """Reconciled (item 149, 2026-09-04): an ``ALLOWLIST`` ground
+    (``"no-float-leaf"``) now exists for these two committed paths, added in
+    ``tests/committed_artifact_guard.py`` directly. This test's own
+    fresh-vs-committed comparison is unchanged by that -- it still compares
+    structurally rather than via ``read_bytes()``, the same pattern item
+    144's AC18 uses."""
     import segfacet.failure_modes as fm
 
     committed_payload = json.loads(_COMMITTED_JSON.read_text(encoding="utf-8"))

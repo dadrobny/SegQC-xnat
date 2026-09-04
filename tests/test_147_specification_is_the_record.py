@@ -60,7 +60,7 @@ from pathlib import Path
 
 import pytest
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 _SRC_ROOT = _REPO_ROOT / "src" / "segfacet"
 _TESTS_ROOT = _REPO_ROOT / "tests"
 

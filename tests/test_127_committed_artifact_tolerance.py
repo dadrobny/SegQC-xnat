@@ -466,7 +466,11 @@ def test_ac12_allowlist_entries_are_fully_populated():
         )
 
 
-def test_ac12_ground_vocabulary_is_closed_at_five_members():
+def test_ac12_ground_vocabulary_is_closed_at_six_members():
+    # Reconciled (item 149, 2026-09-04): the closed vocabulary grows its
+    # sixth member, "no-float-leaf" -- the traceability matrix and
+    # failure-mode specification artifacts are both float-free, so their
+    # byte-exact fresh-vs-committed comparisons are unconditionally safe.
     import committed_artifact_guard as guard
 
     assert set(guard.GROUNDS) == {
@@ -475,7 +479,9 @@ def test_ac12_ground_vocabulary_is_closed_at_five_members():
         "hand-written-literals",
         "binary-fixture",
         "integrity-pin",
+        "no-float-leaf",
     }
+    assert len(guard.GROUNDS) == 6
 
 
 def test_ac13_no_stale_allowlist_entry():

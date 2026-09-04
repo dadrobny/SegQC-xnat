@@ -51,14 +51,24 @@ but leaves several container shapes unstated (e.g. whether ``modes``/
 module's ``_mode_records``/``_rule_records`` helpers accept either shape;
 the field *names* it reads (``rung``, ``mechanism``, ``rules``,
 ``rule_attribution``, ``pipeline_detected``, ``cases``, ``anchor_paths``,
-``feature_paths``, ``granularity``, ``modes``, ``declaration_state``,
-``mode_less_reason``, ``feature_paths_qualifier``) are this test module's own
+``read_paths``, ``granularity``, ``modes``, ``declaration_state``,
+``mode_less_reason``, ``read_paths_qualifier``) are this test module's own
 executable statement of the contract, derived from the spec's prose and
 Implementation Steps.
+
+Reconciled (item 149, 2026-09-04): the mode record's conflated
+``feature_paths`` field (anchors unioned with every leaf path every
+declaring rule consumed, regardless of classification) is retired --
+``anchor_paths`` and ``read_paths`` are now two separate, separately
+labelled fields, and ``granularity`` moves from ``"rule"`` to ``"signal"``.
+The rule-level record's own ``feature_paths`` field (a rule's full
+catalogue-derived consumption set, AC23) is unaffected -- item 149 touches
+only the mode record's conflated union, not the rule record.
 """
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 import json
 import re
@@ -66,7 +76,7 @@ from pathlib import Path
 
 import pytest
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 
 RUNGS = ("synthetic-demonstrable", "needs-real-data", "structurally-unobservable")
 MODES = tuple(range(1, 9))
@@ -85,6 +95,15 @@ RULE_IDS = (
 
 _COMMITTED_JSON = _REPO_ROOT / "docs" / "aide" / "traceability_matrix.generated.json"
 _COMMITTED_MD = _REPO_ROOT / "docs" / "aide" / "traceability_matrix.generated.md"
+
+#: AC28/AC29 (item 149, 2026-09-04): every ``build_matrix()`` call site in
+#: this module must sit lexically inside a function decorated
+#: ``@pytest.fixture`` -- see the "House fixtures / helpers" section below --
+#: and the AST-counted total must equal this constant and be ``<= 20``
+#: (down from the 47 uncached call sites measured at this item's base). The
+#: budget is asserted by ``test_ac28_ac29_...`` near the bottom of this
+#: module.
+_BUILD_MATRIX_CALL_SITE_BUDGET = 16
 
 
 # =========================================================================== #
@@ -217,11 +236,266 @@ def _patch_derive_mode_rung(monkeypatch, failure_modes_module, mode: int, rung):
 
 
 # =========================================================================== #
+# build_matrix() call-site fixtures (item 149 AC28/AC29): one module-scoped
+# unpatched fixture, and one function-scoped fixture per monkeypatch group.
+# No ``build_matrix()`` call appears in a test body anywhere in this module
+# -- every call site below sits inside a function decorated
+# ``@pytest.fixture``. Never a cache inside the generator itself (AC30) --
+# each adversarial fixture below calls ``build_matrix()`` fresh.
+# =========================================================================== #
+
+
+@pytest.fixture(scope="module")
+def raw_matrix():
+    """One unpatched ``build_matrix()`` call, shared module-wide."""
+    import segfacet.traceability as traceability
+
+    return traceability.build_matrix()
+
+
+@pytest.fixture(scope="module")
+def matrix(raw_matrix):
+    """``matrix_to_dict()`` of the shared unpatched build -- no additional
+    ``build_matrix()`` call site (``matrix_to_dict`` never calls it)."""
+    import segfacet.traceability as traceability
+
+    return traceability.matrix_to_dict(raw_matrix)
+
+
+@pytest.fixture
+def matrix_mode8_rung_stale(monkeypatch):
+    import segfacet.failure_modes as failure_modes_module
+    import segfacet.traceability as traceability
+
+    _patch_derive_mode_rung(monkeypatch, failure_modes_module, 8, "not-a-real-rung")
+    return traceability.matrix_to_dict(traceability.build_matrix())
+
+
+@pytest.fixture
+def matrix_mode8_rung_synthetic(monkeypatch):
+    import segfacet.failure_modes as failure_modes_module
+    import segfacet.traceability as traceability
+
+    _patch_derive_mode_rung(monkeypatch, failure_modes_module, 8, "synthetic-demonstrable")
+    return traceability.matrix_to_dict(traceability.build_matrix())
+
+
+@pytest.fixture
+def matrix_unregistered_designated_rule(monkeypatch):
+    import segfacet.catalogue as catalogue_module
+    import segfacet.traceability as traceability
+
+    real_map = catalogue_module.scan_synth_rule_mode_map()
+
+    def _patched():
+        mapping = dict(real_map)
+        mapping["boundary"] = (6,)
+        return mapping
+
+    monkeypatch.setattr(catalogue_module, "scan_synth_rule_mode_map", _patched)
+    return traceability.matrix_to_dict(traceability.build_matrix())
+
+
+@pytest.fixture
+def matrix_overlap_mode_less(monkeypatch):
+    from segfacet.heuristics.rule import _RULES
+    import segfacet.heuristics.rule as rule_mod
+    import segfacet.traceability as traceability
+
+    rule = _RULES["overlap"]
+    replacement = rule_mod.RuleModeDeclaration(
+        mode_less_reason="AC138-adversarial: mode 8 hole test, overlap made mode-less"
+    )
+    monkeypatch.setattr(rule, "mode_declaration", replacement)
+    return traceability.matrix_to_dict(traceability.build_matrix())
+
+
+@pytest.fixture
+def matrix_undeclared_rule_registered(isolated_registry):
+    from segfacet.heuristics.rule import Rule, register_rule
+    import segfacet.traceability as traceability
+
+    class _NoDeclarationRule(Rule):
+        rule_id = "__item138_no_declaration__"
+
+        def evaluate(self, record, config):
+            return []
+
+    register_rule(_NoDeclarationRule)  # must not raise
+    return traceability.matrix_to_dict(traceability.build_matrix())
+
+
+@pytest.fixture
+def raw_matrix_bounds_bare_evidence(monkeypatch):
+    """Reconciled (item 147, 2026-09-04): ``RuleModeDeclaration``'s
+    ``__post_init__`` now rejects a bare-str ``evidence`` at construction, so
+    the item-136 weakness this fixture reproduces can no longer be reached
+    through normal construction. The defence-in-depth coverage stays: force
+    the malformed value past ``__post_init__`` with ``object.__setattr__``
+    (the frozen dataclass's own escape hatch) so
+    ``traceability._normalise_evidence``'s own guard against a bare str
+    stays exercised. Returns the **raw** (non-dict) matrix, for
+    ``render_markdown``."""
+    from segfacet.heuristics.rule import _RULES
+    import segfacet.heuristics.rule as rule_mod
+    import segfacet.traceability as traceability
+
+    rule = _RULES["bounds"]
+    replacement = rule_mod.RuleModeDeclaration(modes=(2,), evidence=("placeholder",))
+    object.__setattr__(replacement, "evidence", "corpus-derived")
+    monkeypatch.setattr(rule, "mode_declaration", replacement)
+    return traceability.build_matrix()
+
+
+@pytest.fixture
+def matrix_bounds_mistagged_evidence(monkeypatch):
+    from segfacet.heuristics.rule import _RULES
+    import segfacet.heuristics.rule as rule_mod
+    import segfacet.traceability as traceability
+
+    rule = _RULES["bounds"]
+    replacement = rule_mod.RuleModeDeclaration(modes=(2,), evidence=("mistagged-note",))
+    monkeypatch.setattr(rule, "mode_declaration", replacement)
+    return traceability.matrix_to_dict(traceability.build_matrix())
+
+
+@pytest.fixture
+def matrix_mode8_bogus_mechanism(monkeypatch):
+    import segfacet.failure_modes as failure_modes_module
+    import segfacet.traceability as traceability
+
+    bogus_mechanism = (
+        "This sentence is deliberately long and describes nothing that "
+        "lives in the codebase or the corpus at all, on purpose, for a test."
+    )
+    _patch_specification_mode(monkeypatch, failure_modes_module, 8, mechanism=bogus_mechanism)
+    return traceability.matrix_to_dict(traceability.build_matrix())
+
+
+@pytest.fixture
+def matrix_mode8_typo_mechanism(monkeypatch):
+    import segfacet.failure_modes as failure_modes_module
+    import segfacet.traceability as traceability
+
+    typo_mechanism = (
+        "The mechanism names mode8_force_overlaps, one character off the "
+        "real case id, on purpose, for a test."
+    )
+    _patch_specification_mode(monkeypatch, failure_modes_module, 8, mechanism=typo_mechanism)
+    return traceability.matrix_to_dict(traceability.build_matrix())
+
+
+@pytest.fixture
+def matrix_mode4_bogus_mechanism(monkeypatch, matrix):
+    """Reproduces the pre-fix mode-4 defect: names the mode's own anchor
+    path (which mislabel never actually consumes) from ``matrix``'s
+    already-built mode-4 record, then re-derives with the mechanism
+    patched to name it."""
+    import segfacet.failure_modes as failure_modes_module
+    import segfacet.traceability as traceability
+
+    mode4_before = _mode_record(matrix, 4)
+    bogus_path = mode4_before["anchor_paths"][0]
+    bogus_mechanism = f"caught by mislabel's Detector B via {bogus_path}, on purpose, for a test."
+    _patch_specification_mode(monkeypatch, failure_modes_module, 4, mechanism=bogus_mechanism)
+    return traceability.matrix_to_dict(traceability.build_matrix())
+
+
+@pytest.fixture
+def matrix_uncatalogued_mode_rule_registered(isolated_registry):
+    """Reconciled (item 146, 2026-09-03): the stub moves to a mode absent
+    from both ``SPECIFICATION`` and ``MODE_ANCHOR_PATHS``, derived live
+    rather than assumed by literal. Returns ``(d, uncatalogued_mode)``."""
+    import segfacet.failure_modes as failure_modes_module
+    import segfacet.feature_docs as feature_docs_module
+    from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
+    import segfacet.traceability as traceability
+
+    uncatalogued_mode = 1
+    while (
+        uncatalogued_mode in failure_modes_module.SPECIFICATION
+        or uncatalogued_mode in feature_docs_module.MODE_ANCHOR_PATHS
+    ):
+        uncatalogued_mode += 1
+
+    class _UncataloguedModeRule(Rule):
+        rule_id = "__item138_uncatalogued_mode__"
+        mode_declaration = RuleModeDeclaration(
+            modes=(uncatalogued_mode,),
+            evidence=("analytic", "AC-adjacent: this mode is outside the catalogue"),
+        )
+
+        def evaluate(self, record, config):
+            return []
+
+    register_rule(_UncataloguedModeRule)
+    d = traceability.matrix_to_dict(traceability.build_matrix())
+    return d, uncatalogued_mode
+
+
+@pytest.fixture
+def matrix_reference_delta_renarrowed(monkeypatch):
+    from segfacet.heuristics.rule import _RULES
+    import segfacet.heuristics.rule as rule_mod
+    import segfacet.traceability as traceability
+
+    rule = _RULES["reference_delta"]
+    narrowed = rule_mod.RuleModeDeclaration(
+        modes=(2,), evidence=("analytic", "AC32 adversarial: re-narrowed back to modes=(2,)")
+    )
+    monkeypatch.setattr(rule, "mode_declaration", narrowed)
+    return traceability.matrix_to_dict(traceability.build_matrix())
+
+
+@pytest.fixture
+def matrix_zero_read_rule_registered(isolated_registry):
+    from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
+    import segfacet.traceability as traceability
+
+    class _ZeroReadRule(Rule):
+        rule_id = "__item138_zero_read__"
+        mode_declaration = RuleModeDeclaration(
+            modes=(1,), evidence=("analytic", "AC-adjacent: consumes no catalogued path")
+        )
+
+        def evaluate(self, record, config):
+            return []
+
+    register_rule(_ZeroReadRule)
+    return traceability.matrix_to_dict(traceability.build_matrix())
+
+
+@pytest.fixture
+def inertness_probe():
+    """AC30's whole mechanism in one fixture: ``run_rules`` before and after
+    two fresh, unpatched ``build_matrix()`` calls -- proving both inertness
+    (the rule engine is unaffected) and determinism (the two builds agree)
+    without either build call sitting in a test body."""
+    from segfacet.config import bundled_default_config
+    from segfacet.heuristics.runner import run_rules
+    from segfacet.pipeline import extract_feature_record
+    from segfacet.synth.clean_gt import build_clean_spine
+    import segfacet.traceability as traceability
+
+    config = bundled_default_config()
+    clean = build_clean_spine()
+    record = extract_feature_record(clean.seg_img, config)
+
+    before = run_rules(record, config)
+    matrix_one = traceability.build_matrix()
+    d1 = traceability.matrix_to_dict(matrix_one)
+    after = run_rules(record, config)
+    matrix_two = traceability.build_matrix()
+    d2 = traceability.matrix_to_dict(matrix_two)
+    return before, after, d1, d2
+
+
+# =========================================================================== #
 # AC1: stable public surface
 # =========================================================================== #
 
 
-def test_ac1_public_surface_and_zero_argument_build_matrix():
+def test_ac1_public_surface_and_zero_argument_build_matrix(raw_matrix):
     import segfacet.traceability as traceability
 
     for name in ("build_matrix", "matrix_to_dict", "render_markdown", "main"):
@@ -229,8 +503,7 @@ def test_ac1_public_surface_and_zero_argument_build_matrix():
         assert name in traceability.__all__, name
         assert callable(getattr(traceability, name)), name
 
-    matrix = traceability.build_matrix()
-    assert matrix is not None
+    assert raw_matrix is not None
 
 
 # =========================================================================== #
@@ -305,15 +578,12 @@ def test_ac3_artifacts_are_byte_reproducible_run_to_run(tmp_path):
 # =========================================================================== #
 
 
-def test_ac4_committed_json_parses_to_a_fresh_build():
-    import segfacet.traceability as traceability
-
+def test_ac4_committed_json_parses_to_a_fresh_build(matrix):
     committed_text = _COMMITTED_JSON.read_text(encoding="utf-8")
     committed_payload = json.loads(committed_text)
     assert committed_payload, "expected a non-empty committed JSON payload"
 
-    fresh_payload = traceability.matrix_to_dict(traceability.build_matrix())
-    normalised_fresh = json.loads(json.dumps(fresh_payload, sort_keys=True))
+    normalised_fresh = json.loads(json.dumps(matrix, sort_keys=True))
     assert normalised_fresh == committed_payload
 
 
@@ -392,7 +662,7 @@ def test_ac7_gitattributes_pins_both_new_paths_eol_lf():
 # =========================================================================== #
 
 
-def test_ac8_mode_set_equals_mode_anchor_paths_keys():
+def test_ac8_mode_set_equals_mode_anchor_paths_keys(matrix):
     """Reconciled (item 146, 2026-09-04): before this item, ``build_matrix``
     enumerated modes from ``feature_docs.MODE_ANCHOR_PATHS``' key set (then
     exactly the mode set), so the two were trivially equal. Item 146's
@@ -404,9 +674,8 @@ def test_ac8_mode_set_equals_mode_anchor_paths_keys():
     one of them."""
     import segfacet.failure_modes as failure_modes_module
     import segfacet.feature_docs as feature_docs_module
-    import segfacet.traceability as traceability
 
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix
     modes = _mode_records(d)
     assert modes, "expected at least one mode record"
     assert set(modes.keys()) == set(failure_modes_module.SPECIFICATION.keys())
@@ -439,7 +708,7 @@ VISION_SECTION_SIX_MODE_TITLES = {
 }
 
 
-def test_ac9_mode_titles_match_the_hand_transcribed_vision_literals():
+def test_ac9_mode_titles_match_the_hand_transcribed_vision_literals(matrix):
     """Independent ground truth: compares the built titles directly against
     literals transcribed by hand from vision.md §6, not against another
     parse of the same section -- this is the assertion that can actually
@@ -458,9 +727,8 @@ def test_ac9_mode_titles_match_the_hand_transcribed_vision_literals():
     and 10, which render an empty title no longer -- asserted here as the
     live equality it now is, not the deliberate absence it used to be."""
     import segfacet.failure_modes as failure_modes_module
-    import segfacet.traceability as traceability
 
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix
     modes = _mode_records(d)
     assert modes
     for mode, expected_title in VISION_SECTION_SIX_MODE_TITLES.items():
@@ -471,7 +739,7 @@ def test_ac9_mode_titles_match_the_hand_transcribed_vision_literals():
         assert modes[mode]["title"], mode
 
 
-def test_ac9_mode_titles_are_transcribed_from_vision_section_six():
+def test_ac9_mode_titles_are_transcribed_from_vision_section_six(matrix):
     """Complementary derived check: still useful as a live-document guard
     (it fails loudly if §6 is edited and the hand-transcribed literals above
     are not updated to match), but it is not the AC9 ground-truth check --
@@ -487,9 +755,8 @@ def test_ac9_mode_titles_are_transcribed_from_vision_section_six():
     test no longer maintains its own independent regex parse of
     ``vision.md``."""
     import segfacet.failure_modes as failure_modes_module
-    import segfacet.traceability as traceability
 
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix
     modes = _mode_records(d)
     vision_titles = failure_modes_module.vision_seed_titles()
     assert modes and vision_titles
@@ -502,7 +769,7 @@ def test_ac9_mode_titles_are_transcribed_from_vision_section_six():
 # =========================================================================== #
 
 
-def test_ac10_mode_to_rule_direction_complete_and_every_mode_has_a_rule():
+def test_ac10_mode_to_rule_direction_complete_and_every_mode_has_a_rule(matrix):
     """Reconciled (item 146, 2026-09-04): mode 10 is the catalogue's first
     `proposed` entry -- listed, defined, deliberately unimplemented (AC27) --
     so it legitimately carries zero rules and is now the direction's one
@@ -511,9 +778,8 @@ def test_ac10_mode_to_rule_direction_complete_and_every_mode_has_a_rule():
     mode whose live-derived status is not "proposed" must still carry >=1
     rule, exactly as before."""
     import segfacet.failure_modes as failure_modes_module
-    import segfacet.traceability as traceability
 
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix
     modes = _mode_records(d)
     assert modes
 
@@ -541,9 +807,8 @@ def test_ac10_mode_to_rule_direction_complete_and_every_mode_has_a_rule():
 # =========================================================================== #
 
 
-def test_ac11_mode_rule_lists_are_derived_from_shipped_declarations():
+def test_ac11_mode_rule_lists_are_derived_from_shipped_declarations(matrix):
     from segfacet.heuristics.rule import iter_rules
-    import segfacet.traceability as traceability
 
     expected_by_mode: dict = {}
     for rule in iter_rules():
@@ -554,7 +819,7 @@ def test_ac11_mode_rule_lists_are_derived_from_shipped_declarations():
             expected_by_mode.setdefault(mode, set()).add(rule.rule_id)
     assert expected_by_mode, "expected at least one rule to declare at least one mode"
 
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix
     modes = _mode_records(d)
     for mode, record in modes.items():
         expected = sorted(expected_by_mode.get(mode, set()))
@@ -567,22 +832,13 @@ def test_ac11_mode_rule_lists_are_derived_from_shipped_declarations():
 
 
 @pytest.mark.parametrize("mode", MODES)
-def test_ac12_mode_rung_is_member_of_closed_vocabulary(mode):
-    import segfacet.traceability as traceability
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    record = _mode_record(d, mode)
+def test_ac12_mode_rung_is_member_of_closed_vocabulary(mode, matrix):
+    record = _mode_record(matrix, mode)
     assert record["rung"] in RUNGS, record["rung"]
 
 
-def test_adv_ac12_stale_rung_outside_vocabulary_is_detectable(monkeypatch):
-    import segfacet.failure_modes as failure_modes_module
-    import segfacet.traceability as traceability
-
-    _patch_derive_mode_rung(monkeypatch, failure_modes_module, 8, "not-a-real-rung")
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    record = _mode_record(d, 8)
+def test_adv_ac12_stale_rung_outside_vocabulary_is_detectable(matrix_mode8_rung_stale):
+    record = _mode_record(matrix_mode8_rung_stale, 8)
     assert record["rung"] not in RUNGS, record["rung"]
 
 
@@ -591,11 +847,8 @@ def test_adv_ac12_stale_rung_outside_vocabulary_is_detectable(monkeypatch):
 # =========================================================================== #
 
 
-def test_ac13_mode8_rung_and_mechanism_name_the_single_channel_mechanism():
-    import segfacet.traceability as traceability
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    mode8 = _mode_record(d, 8)
+def test_ac13_mode8_rung_and_mechanism_name_the_single_channel_mechanism(matrix):
+    mode8 = _mode_record(matrix, 8)
     assert mode8["rung"] == "structurally-unobservable"
     assert "single-channel" in mode8["mechanism"]
     assert "label map" in mode8["mechanism"]
@@ -606,14 +859,11 @@ def test_ac13_mode8_rung_and_mechanism_name_the_single_channel_mechanism():
 # =========================================================================== #
 
 
-def test_ac14_mode8_not_pipeline_detected_names_reconstructed_case():
-    import segfacet.traceability as traceability
-
+def test_ac14_mode8_not_pipeline_detected_names_reconstructed_case(matrix):
     manifest_detection = _manifest_detection_by_case_id()
     assert "mode8_force_overlap" in manifest_detection
 
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    mode8 = _mode_record(d, 8)
+    mode8 = _mode_record(matrix, 8)
     assert mode8["pipeline_detected"] is False
 
     cases = mode8["cases"]
@@ -631,25 +881,18 @@ def test_ac14_mode8_not_pipeline_detected_names_reconstructed_case():
 
 
 @pytest.mark.parametrize("mode", MODES)
-def test_ac15_rung_and_pipeline_detected_cross_check(mode):
-    import segfacet.traceability as traceability
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    record = _mode_record(d, mode)
+def test_ac15_rung_and_pipeline_detected_cross_check(mode, matrix):
+    record = _mode_record(matrix, mode)
     if record["rung"] == "synthetic-demonstrable":
         assert record["pipeline_detected"] is True, mode
     elif record["rung"] == "structurally-unobservable":
         assert record["pipeline_detected"] is False, mode
 
 
-def test_adv_ac15_cross_check_violation_when_mode8_rung_monkeypatched_synthetic(monkeypatch):
-    import segfacet.failure_modes as failure_modes_module
-    import segfacet.traceability as traceability
-
-    _patch_derive_mode_rung(monkeypatch, failure_modes_module, 8, "synthetic-demonstrable")
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    mode8 = _mode_record(d, 8)
+def test_adv_ac15_cross_check_violation_when_mode8_rung_monkeypatched_synthetic(
+    matrix_mode8_rung_synthetic,
+):
+    mode8 = _mode_record(matrix_mode8_rung_synthetic, 8)
     # AC15 requires pipeline_detected True whenever rung is
     # synthetic-demonstrable; mode 8 is still (correctly) reconstructed, so
     # the two facts below jointly demonstrate the cross-check now fails.
@@ -663,14 +906,11 @@ def test_adv_ac15_cross_check_violation_when_mode8_rung_monkeypatched_synthetic(
 
 
 @pytest.mark.parametrize("mode, case_id", [(1, "mode1_displace"), (4, "mode4_relabel_swap")])
-def test_ac16_modes_one_and_four_are_synthetic_demonstrable(mode, case_id):
-    import segfacet.traceability as traceability
-
+def test_ac16_modes_one_and_four_are_synthetic_demonstrable(mode, case_id, matrix):
     manifest_detection = _manifest_detection_by_case_id()
     assert case_id in manifest_detection
 
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    record = _mode_record(d, mode)
+    record = _mode_record(matrix, mode)
     assert record["rung"] == "synthetic-demonstrable"
     assert record["pipeline_detected"] is True
 
@@ -683,14 +923,11 @@ def test_ac16_modes_one_and_four_are_synthetic_demonstrable(mode, case_id):
     assert named["detection"] == "pipeline"
 
 
-def test_adv_ac16_mode1_rung_unmoved_by_reference_delta_joining_its_rule_list():
+def test_adv_ac16_mode1_rung_unmoved_by_reference_delta_joining_its_rule_list(matrix):
     """A rung is a property of the mode, independent of how many rules
     declare it -- mode 1 gaining reference_delta (b1c593c) must not move
     it."""
-    import segfacet.traceability as traceability
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    mode1 = _mode_record(d, 1)
+    mode1 = _mode_record(matrix, 1)
     assert "reference_delta" in mode1["rules"], mode1["rules"]
     assert "mislabel" in mode1["rules"], mode1["rules"]
     assert mode1["rung"] == "synthetic-demonstrable"
@@ -702,7 +939,7 @@ def test_adv_ac16_mode1_rung_unmoved_by_reference_delta_joining_its_rule_list():
 # =========================================================================== #
 
 
-def test_ac17_mode7_rung_records_its_own_cap():
+def test_ac17_mode7_rung_records_its_own_cap(matrix):
     """Reconciled (item 147, 2026-09-04): this test pinned the claim
     ``rank(v) == v - 1``, which is **false** across exactly the lumbar range
     §6.7's example uses (``docs/aide/insights.md``, item 145, 2026-09-03) --
@@ -714,10 +951,7 @@ def test_ac17_mode7_rung_records_its_own_cap():
     ``tests/test_147_specification_is_the_record.py::test_ac10_...``. What
     stays here is this module's own claim: mode 7's row records its rung and
     a mechanism naming the live tokens the correction rests on."""
-    import segfacet.traceability as traceability
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    mode7 = _mode_record(d, 7)
+    mode7 = _mode_record(matrix, 7)
     assert mode7["rung"] == "needs-real-data"
     assert "rank(v) == v - 1" not in mode7["mechanism"]
     for token in ("CANONICAL_ORDER", "T13"):
@@ -730,14 +964,13 @@ def test_ac17_mode7_rung_records_its_own_cap():
 # =========================================================================== #
 
 
-def test_ac18_rule_to_mode_direction_complete_with_one_record_per_rule():
+def test_ac18_rule_to_mode_direction_complete_with_one_record_per_rule(matrix):
     from segfacet.heuristics.rule import iter_rules
-    import segfacet.traceability as traceability
 
     rule_ids = {r.rule_id for r in iter_rules()}
     assert rule_ids
 
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix
     rules = _rule_records(d)
     assert set(rules.keys()) == rule_ids
 
@@ -747,11 +980,8 @@ def test_ac18_rule_to_mode_direction_complete_with_one_record_per_rule():
 
 
 @pytest.mark.parametrize("rule_id", RULE_IDS)
-def test_ac18_rule_record_carries_modes_xor_mode_less_reason(rule_id):
-    import segfacet.traceability as traceability
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    record = _rule_records(d)[rule_id]
+def test_ac18_rule_record_carries_modes_xor_mode_less_reason(rule_id, matrix):
+    record = _rule_records(matrix)[rule_id]
     has_modes = bool(record["modes"])
     has_reason = bool(record.get("mode_less_reason"))
     assert has_modes != has_reason, (rule_id, record)
@@ -763,38 +993,43 @@ def test_ac18_rule_record_carries_modes_xor_mode_less_reason(rule_id):
 # =========================================================================== #
 
 
-def test_ac19_every_mode_to_rule_edge_is_attributed_from_the_corpus_map():
-    """Reconciled (item 146, 2026-09-04): the matrix now enumerates modes 9
-    and 10 too. Mode 10 (the first `proposed` entry) declares no rules, so
-    it carries zero edges and zero consumed feature paths -- asserted
-    explicitly below rather than let the empty ``rule_attribution`` dict
-    fall out of the generic loop silently. Mode 9's two edges are attributed
-    "analytic" because neither ``intensity`` nor ``intensity_reference_delta``
-    is designated by any synth ``Expectation()`` literal (``scan_synth_rule_
-    mode_map`` only scans the geometric corpus, item 146 A6) -- the same
-    corpus-map derivation the generic loop below already exercises for every
-    other mode, asserted here once more explicitly against the two live
-    edges."""
-    import segfacet.catalogue as catalogue_module
-    import segfacet.traceability as traceability
+def test_ac19_every_mode_to_rule_edge_is_attributed_from_the_specification(matrix):
+    """Reconciled (item 149, 2026-09-04, D2): attribution moved from
+    ``catalogue.scan_synth_rule_mode_map()`` (a geometric-corpus-only AST
+    scan) to ``failure_modes.SPECIFICATION``'s own ``corpus_cases``, which
+    span both corpora by construction (AC19). A ``(mode, rule)`` edge is
+    ``"corpus"`` iff at least one of that mode's ``corpus_cases`` lists the
+    rule in its ``expected_firing``, else ``"analytic"``. Mode 10 (the first
+    `proposed` entry) still declares no rules, so it carries zero edges and
+    zero read paths. Mode 9's ``intensity`` now attributes ``"corpus"``
+    (three intensity-corpus cases list it in ``expected_firing``);
+    ``intensity_reference_delta`` stays ``"analytic"`` (no committed case
+    designates it -- A9/A1's analytic-only class). This is the **one** cell
+    D2 measures moving; every mode 1-8 attribution is unchanged from the
+    base artifact."""
+    import segfacet.failure_modes as failure_modes_module
 
-    corpus_map = catalogue_module.scan_synth_rule_mode_map()
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix
     modes = _mode_records(d)
     assert modes
 
     mode10 = modes[10]
     assert mode10["rules"] == [], mode10
     assert mode10["rule_attribution"] == {}, mode10
-    assert mode10["feature_paths"] == [], mode10
+    assert mode10["read_paths"] == [], mode10
 
-    assert "intensity" not in corpus_map, corpus_map
-    assert "intensity_reference_delta" not in corpus_map, corpus_map
     mode9 = modes[9]
     assert mode9["rule_attribution"] == {
-        "intensity": "analytic",
+        "intensity": "corpus",
         "intensity_reference_delta": "analytic",
     }, mode9
+
+    expected_corpus_edges = set()
+    for mode_id, mode_spec in failure_modes_module.SPECIFICATION.items():
+        for case in mode_spec.corpus_cases:
+            for rule_id in case.expected_firing:
+                expected_corpus_edges.add((mode_id, rule_id))
+    assert expected_corpus_edges, "expected at least one specification-designated edge"
 
     checked = False
     for mode, record in modes.items():
@@ -805,7 +1040,7 @@ def test_ac19_every_mode_to_rule_edge_is_attributed_from_the_corpus_map():
         for rule_id, tag in attribution.items():
             checked = True
             assert tag in ("corpus", "analytic"), (mode, rule_id, tag)
-            expected = "corpus" if mode in corpus_map.get(rule_id, ()) else "analytic"
+            expected = "corpus" if (mode, rule_id) in expected_corpus_edges else "analytic"
             assert tag == expected, (mode, rule_id, tag, expected)
     assert checked, "expected at least one mode-to-rule edge"
 
@@ -816,20 +1051,24 @@ def test_ac19_every_mode_to_rule_edge_is_attributed_from_the_corpus_map():
 # =========================================================================== #
 
 
-def test_ac20_analytic_edges_equal_edges_of_rules_the_corpus_map_never_designates():
-    """A9 -- the total edge count and the corpus/analytic split are both
-    derived here from ``iter_rules()`` directly (the same source
-    ``build_matrix`` reads), never pinned as a bare integer: a legitimate
-    future declaration change (a rule gaining or losing a mode) must redden
-    this test only via the derivation disagreeing with the matrix, not via a
-    stale magic number. ``witness`` stays as a dated, human-readable record
-    of what the derivation currently evaluates to -- informative, not the
-    assertion."""
+def test_ac20_analytic_edges_equal_edges_the_specification_never_designates_corpus(matrix):
+    """Reconciled (item 149, 2026-09-04, D2): the total edge count and the
+    corpus/analytic split are both derived here from ``iter_rules()`` (edges)
+    and ``failure_modes.SPECIFICATION`` (corpus designation) directly -- the
+    same sources ``build_matrix`` now reads -- never pinned as a bare
+    integer. ``witness`` stays as a dated, human-readable record of what the
+    derivation currently evaluates to -- informative, not the assertion.
+    D2 measures exactly one cell moving from the pre-149 witness: mode 9's
+    ``intensity`` from ``analytic`` to ``corpus``."""
     from segfacet.heuristics.rule import iter_rules
-    import segfacet.catalogue as catalogue_module
-    import segfacet.traceability as traceability
+    import segfacet.failure_modes as failure_modes_module
 
-    corpus_map = catalogue_module.scan_synth_rule_mode_map()
+    corpus_designated = set()
+    for mode_id, mode_spec in failure_modes_module.SPECIFICATION.items():
+        for case in mode_spec.corpus_cases:
+            for rule_id in case.expected_firing:
+                corpus_designated.add((mode_id, rule_id))
+
     expected_total_edges = set()
     expected_analytic = set()
     for rule in iter_rules():
@@ -837,13 +1076,12 @@ def test_ac20_analytic_edges_equal_edges_of_rules_the_corpus_map_never_designate
         if decl is None:
             continue
         for mode in decl.modes:
-            expected_total_edges.add((mode, rule.rule_id))
-        if rule.rule_id in corpus_map:
-            continue
-        for mode in decl.modes:
-            expected_analytic.add((mode, rule.rule_id))
+            edge = (mode, rule.rule_id)
+            expected_total_edges.add(edge)
+            if edge not in corpus_designated:
+                expected_analytic.add(edge)
 
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix
     modes = _mode_records(d)
     actual_all_edges = set()
     actual_analytic = set()
@@ -857,18 +1095,14 @@ def test_ac20_analytic_edges_equal_edges_of_rules_the_corpus_map_never_designate
     assert actual_all_edges == expected_total_edges
     assert actual_analytic == expected_analytic
 
-    # 2026-09-04, item 146: what the derivation above currently evaluates to
+    # 2026-09-04, item 149: what the derivation above currently evaluates to
     # on this tree -- a dated witness, not a floor a future change must
-    # match. Extended (item 146) with mode 9's two edges: intensity and
-    # intensity_reference_delta both moved from mode-less to declaring mode
-    # 9 (AC9), and neither is designated by any synth Expectation() literal
-    # (scan_synth_rule_mode_map scans the geometric corpus only, A6), so both
-    # attribute "analytic".
+    # match. mode 9's intensity moved out of this set (D2): three intensity-
+    # corpus cases now designate it, so it attributes "corpus".
     witness = {
         (1, "reference_delta"),
         (2, "bounds"),
         (2, "reference_delta"),
-        (9, "intensity"),
         (9, "intensity_reference_delta"),
     }
     assert actual_analytic == witness
@@ -885,25 +1119,17 @@ def test_ac20_analytic_edges_equal_edges_of_rules_the_corpus_map_never_designate
         assert tags in ({"analytic"}, {"corpus"}), (rule_id, tags)
 
 
-def test_adv_ac20_mistagged_corpus_evidence_changes_no_attribution(monkeypatch):
-    """A6: attribution is derived from the corpus map, never from the
-    declaration's own free-form evidence tag -- retagging bounds' evidence
-    leaves the (2, bounds) edge attributed 'analytic' regardless of the
-    tag's text.
+def test_adv_ac20_mistagged_corpus_evidence_changes_no_attribution(matrix_bounds_mistagged_evidence):
+    """A6: attribution is derived from the specification's corpus cases,
+    never from the declaration's own free-form evidence tag -- retagging
+    bounds' evidence leaves the (2, bounds) edge attributed 'analytic'
+    regardless of the tag's text (no committed corpus case designates bounds
+    for mode 2).
 
     Reconciled (item 147, 2026-09-04): the reserved ``"corpus"`` literal is
     retired (AC20) -- any non-reserved evidence string demonstrates the
     same "attribution ignores the tag" claim just as well."""
-    from segfacet.heuristics.rule import _RULES
-    import segfacet.heuristics.rule as rule_mod
-    import segfacet.traceability as traceability
-
-    rule = _RULES["bounds"]
-    replacement = rule_mod.RuleModeDeclaration(modes=(2,), evidence=("mistagged-note",))
-    monkeypatch.setattr(rule, "mode_declaration", replacement)
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    mode2 = _mode_record(d, 2)
+    mode2 = _mode_record(matrix_bounds_mistagged_evidence, 2)
     assert "bounds" in mode2["rule_attribution"], mode2["rule_attribution"]
     assert mode2["rule_attribution"]["bounds"] == "analytic"
 
@@ -913,9 +1139,8 @@ def test_adv_ac20_mistagged_corpus_evidence_changes_no_attribution(monkeypatch):
 # =========================================================================== #
 
 
-def test_ac21_feature_direction_counts_match_a_fresh_catalogue():
+def test_ac21_feature_direction_counts_match_a_fresh_catalogue(matrix):
     import segfacet.catalogue as catalogue_module
-    import segfacet.traceability as traceability
 
     cat = catalogue_module.build_catalogue(strict=True)
     assert cat.entries, "expected a non-empty catalogue"
@@ -925,7 +1150,7 @@ def test_ac21_feature_direction_counts_match_a_fresh_catalogue():
     read_by_no_rule = total - read_by_rule
     unwired = sum(1 for e in cat.entries if e.status == "unwired")
 
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix
     features = d["features"]
     assert features["total_paths"] == total
     assert features["read_by_rule"] == read_by_rule
@@ -938,11 +1163,8 @@ def test_ac21_feature_direction_counts_match_a_fresh_catalogue():
 # =========================================================================== #
 
 
-def test_ac22_inventory_not_a_gap_qualifier_sits_with_the_count():
-    import segfacet.traceability as traceability
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    read_by_no_rule = d["features"]["read_by_no_rule"]
+def test_ac22_inventory_not_a_gap_qualifier_sits_with_the_count(matrix):
+    read_by_no_rule = matrix["features"]["read_by_no_rule"]
     assert isinstance(read_by_no_rule, dict)
     assert "count" in read_by_no_rule
     assert read_by_no_rule["required"] is False
@@ -969,42 +1191,43 @@ def test_ac22_committed_markdown_prints_qualifier_beside_the_count():
 
 
 @pytest.mark.parametrize("rule_id", RULE_IDS)
-def test_ac23_rule_feature_paths_are_derived_from_the_catalogue(rule_id):
+def test_ac23_rule_feature_paths_are_derived_from_the_catalogue(rule_id, matrix):
     import segfacet.catalogue as catalogue_module
-    import segfacet.traceability as traceability
 
     cat = catalogue_module.build_catalogue(strict=True)
     assert cat.entries
 
     expected = sorted(e.path for e in cat.entries if rule_id in e.consuming_rules)
 
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    record = _rule_records(d)[rule_id]
+    record = _rule_records(matrix)[rule_id]
     assert record["feature_paths"] == expected, rule_id
 
 
 # =========================================================================== #
-# AC24: per-mode feature sets are the union of the mode's rules' paths plus
-# its anchors
+# AC24: reconciled (item 149, 2026-09-04, AC8/AC10) -- the conflated
+# ``feature_paths`` union (anchors unioned with every leaf path every
+# declaring rule consumes, regardless of classification) is gone from the
+# mode record. In its place: ``anchor_paths`` and ``read_paths`` are two
+# separate, separately-labelled fields, and neither one is ever unioned with
+# the other. ``read_paths`` is the sorted union, over the mode's declaring
+# rules, of the leaf paths each rule classifies "signal" -- item 149's own
+# ``tests/test_149_conformance_report.py`` carries the full per-rule
+# derivation proof (its own AC10); this reconciliation asserts the shape
+# survives here: the field exists, is disjoint in *purpose* from
+# anchor_paths (never unioned), and mode 10 -- the one mode with zero
+# declaring rules -- carries an empty read_paths.
 # =========================================================================== #
 
 
 @pytest.mark.parametrize("mode", MODES)
-def test_ac24_mode_feature_paths_are_the_union_of_rule_paths_plus_anchors(mode):
-    import segfacet.feature_docs as feature_docs_module
-    import segfacet.traceability as traceability
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    modes = _mode_records(d)
-    rules = _rule_records(d)
+def test_ac24_mode_read_paths_and_anchor_paths_are_two_separate_fields(mode, matrix):
+    modes = _mode_records(matrix)
     record = modes[mode]
     assert record["rules"], mode
-
-    expected = set(feature_docs_module.MODE_ANCHOR_PATHS[mode])
-    for rule_id in record["rules"]:
-        expected |= set(rules[rule_id]["feature_paths"])
-
-    assert record["feature_paths"] == sorted(expected), mode
+    assert "feature_paths" not in record, record
+    assert "anchor_paths" in record, record
+    assert "read_paths" in record, record
+    assert isinstance(record["read_paths"], list), record["read_paths"]
 
 
 # =========================================================================== #
@@ -1012,46 +1235,23 @@ def test_ac24_mode_feature_paths_are_the_union_of_rule_paths_plus_anchors(mode):
 # =========================================================================== #
 
 
-def test_ac25_no_unregistered_designated_rule_id_on_this_tree():
-    import segfacet.traceability as traceability
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    assert d["corpus_designated_unregistered_rule_ids"] == []
+def test_ac25_no_unregistered_designated_rule_id_on_this_tree(matrix):
+    assert matrix["corpus_designated_unregistered_rule_ids"] == []
 
 
-def test_ac25_unregistered_designated_rule_id_is_reported_and_fails_completeness(monkeypatch):
-    import segfacet.catalogue as catalogue_module
-    import segfacet.traceability as traceability
-
-    real_map = catalogue_module.scan_synth_rule_mode_map()
-
-    def _patched():
-        mapping = dict(real_map)
-        mapping["boundary"] = (6,)
-        return mapping
-
-    monkeypatch.setattr(catalogue_module, "scan_synth_rule_mode_map", _patched)
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+def test_ac25_unregistered_designated_rule_id_is_reported_and_fails_completeness(
+    matrix_unregistered_designated_rule,
+):
+    d = matrix_unregistered_designated_rule
     assert "boundary" in d["corpus_designated_unregistered_rule_ids"]
     assert d["directions"]["mode_to_rule"]["complete"] is False
 
 
-def test_adv_mode_to_rule_hole_when_a_declaration_is_monkeypatched_mode_less(monkeypatch):
+def test_adv_mode_to_rule_hole_when_a_declaration_is_monkeypatched_mode_less(matrix_overlap_mode_less):
     """Adversarial -- mode -> rule hole. Monkeypatching the live declaration
     of ``overlap`` to a mode-less one makes mode 8 a hole naming the mode,
     with complete: false."""
-    from segfacet.heuristics.rule import _RULES
-    import segfacet.heuristics.rule as rule_mod
-    import segfacet.traceability as traceability
-
-    rule = _RULES["overlap"]
-    replacement = rule_mod.RuleModeDeclaration(
-        mode_less_reason="AC138-adversarial: mode 8 hole test, overlap made mode-less"
-    )
-    monkeypatch.setattr(rule, "mode_declaration", replacement)
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix_overlap_mode_less
     assert d["directions"]["mode_to_rule"]["complete"] is False
     holes = d["directions"]["mode_to_rule"]["holes"]
     assert holes, "expected at least one hole"
@@ -1066,19 +1266,8 @@ def test_adv_mode_to_rule_hole_when_a_declaration_is_monkeypatched_mode_less(mon
 # =========================================================================== #
 
 
-def test_ac26_undeclared_registered_rule_makes_rule_to_mode_fail_loudly(isolated_registry):
-    from segfacet.heuristics.rule import Rule, register_rule
-    import segfacet.traceability as traceability
-
-    class _NoDeclarationRule(Rule):
-        rule_id = "__item138_no_declaration__"
-
-        def evaluate(self, record, config):
-            return []
-
-    register_rule(_NoDeclarationRule)  # must not raise
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+def test_ac26_undeclared_registered_rule_makes_rule_to_mode_fail_loudly(matrix_undeclared_rule_registered):
+    d = matrix_undeclared_rule_registered
     assert d["directions"]["rule_to_mode"]["complete"] is False
     holes = d["directions"]["rule_to_mode"]["holes"]
     assert holes, "expected at least one hole"
@@ -1090,7 +1279,7 @@ def test_ac26_undeclared_registered_rule_makes_rule_to_mode_fail_loudly(isolated
 # =========================================================================== #
 
 
-def test_ac27_bare_string_evidence_renders_as_one_cell_not_per_character(monkeypatch):
+def test_ac27_bare_string_evidence_renders_as_one_cell_not_per_character(raw_matrix_bounds_bare_evidence):
     """Reconciled (item 147, 2026-09-04): ``RuleModeDeclaration``'s
     ``__post_init__`` now rejects a bare-str ``evidence`` at construction
     (AC18), so the item-136 weakness this test reproduced can no longer be
@@ -1098,18 +1287,10 @@ def test_ac27_bare_string_evidence_renders_as_one_cell_not_per_character(monkeyp
     stays: force the malformed value past ``__post_init__`` with
     ``object.__setattr__`` (the frozen dataclass's own escape hatch) so
     ``traceability._normalise_evidence``'s own guard against a bare str
-    stays exercised."""
-    from segfacet.heuristics.rule import _RULES
-    import segfacet.heuristics.rule as rule_mod
+    stays exercised -- see ``raw_matrix_bounds_bare_evidence``."""
     import segfacet.traceability as traceability
 
-    rule = _RULES["bounds"]
-    replacement = rule_mod.RuleModeDeclaration(modes=(2,), evidence=("placeholder",))
-    object.__setattr__(replacement, "evidence", "corpus-derived")
-    monkeypatch.setattr(rule, "mode_declaration", replacement)
-
-    matrix = traceability.build_matrix()
-    md = traceability.render_markdown(matrix)
+    md = traceability.render_markdown(raw_matrix_bounds_bare_evidence)
     lines = md.splitlines()
     row = _row_for_rule(lines, "bounds")
     assert row is not None, "expected a rendered row for bounds"
@@ -1157,19 +1338,26 @@ def test_ac28_committed_artifacts_carry_nothing_environment_dependent():
 
 
 # =========================================================================== #
-# AC29: the committed-artifact guard stays clean and unextended
+# AC29 (item 138): the committed-artifact guard stays clean, six-ground.
+# Reconciled (item 149, 2026-09-04, AC27): GROUNDS grows to six (the
+# "unextended" pin moves from five to six), and the "no allowlist entry
+# mentions traceability_matrix" assertion inverts -- item 149 adds exactly
+# that entry, under "no-float-leaf" (AC24). This also proves this item's
+# root-idiom normalisation (Implementation Step 1) actually landed: before
+# it, ``iter_violations`` could not see the comparisons this module's own
+# AC15-equivalent byte checks make (item 149's AC25 is the dedicated
+# non-vacuity proof; this is the "guard is clean now" half).
 # =========================================================================== #
 
 
-def test_ac29_committed_artifact_guard_clean_and_grounds_unextended():
+def test_ac29_committed_artifact_guard_clean_and_grounds_at_six_members():
     import committed_artifact_guard as guard
 
     violations = list(guard.iter_violations(_REPO_ROOT / "tests"))
     assert violations == [], [guard.violation_message([v]) for v in violations]
-    assert len(guard.GROUNDS) == 5
+    assert len(guard.GROUNDS) == 6
 
-    for entry in guard.ALLOWLIST:
-        assert "traceability_matrix" not in entry.path, entry.path
+    assert any("traceability_matrix" in entry.path for entry in guard.ALLOWLIST), guard.ALLOWLIST
 
 
 # =========================================================================== #
@@ -1177,40 +1365,25 @@ def test_ac29_committed_artifact_guard_clean_and_grounds_unextended():
 # =========================================================================== #
 
 
-def test_ac30_build_matrix_is_inert_and_deterministic_at_evaluation_time():
-    from segfacet.config import bundled_default_config
-    from segfacet.heuristics.runner import run_rules
-    from segfacet.pipeline import extract_feature_record
-    from segfacet.synth.clean_gt import build_clean_spine
-    import segfacet.traceability as traceability
-
-    config = bundled_default_config()
-    clean = build_clean_spine()
-    record = extract_feature_record(clean.seg_img, config)
-
-    before = run_rules(record, config)
+def test_ac30_build_matrix_is_inert_and_deterministic_at_evaluation_time(inertness_probe):
+    """Item 149 (2026-09-04): still true now that the builder drives 13
+    corpus cases through the pipeline (AC32) -- the mechanism itself is
+    unchanged, only ``inertness_probe`` now houses the two ``build_matrix()``
+    calls (AC28)."""
+    before, after, d1, d2 = inertness_probe
     assert isinstance(before, list)
-
-    matrix_one = traceability.build_matrix()
-    d1 = traceability.matrix_to_dict(matrix_one)
-
-    after = run_rules(record, config)
     assert after == before
-
-    matrix_two = traceability.build_matrix()
-    d2 = traceability.matrix_to_dict(matrix_two)
     assert d1 == d2
 
 
-def test_adv_matrix_to_dict_mutation_does_not_leak_into_a_later_call():
+def test_adv_matrix_to_dict_mutation_does_not_leak_into_a_later_call(raw_matrix):
     import segfacet.traceability as traceability
 
-    matrix = traceability.build_matrix()
-    d1 = traceability.matrix_to_dict(matrix)
+    d1 = traceability.matrix_to_dict(raw_matrix)
     assert d1, "expected a non-empty dict"
 
     d1["modes"] = "deliberately corrupted by this test"
-    d2 = traceability.matrix_to_dict(matrix)
+    d2 = traceability.matrix_to_dict(raw_matrix)
     assert d2["modes"] != "deliberately corrupted by this test"
 
 
@@ -1221,14 +1394,12 @@ def test_adv_matrix_to_dict_mutation_does_not_leak_into_a_later_call():
 
 
 @pytest.mark.parametrize("mode", MODES)
-def test_ac31_mode_mechanism_names_a_resolvable_live_token(mode):
+def test_ac31_mode_mechanism_names_a_resolvable_live_token(mode, matrix):
     import segfacet.feature_docs as feature_docs_module
-    import segfacet.traceability as traceability
 
     case_ids_for_mode = {c["case_id"] for c in _manifest_cases() if c.get("failure_mode") == mode}
 
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    record = _mode_record(d, mode)
+    record = _mode_record(matrix, mode)
     mechanism = record["mechanism"]
     assert mechanism, mode
 
@@ -1275,20 +1446,12 @@ def test_ac31_no_character_count_threshold_assertions_in_this_module():
     assert offenders == [], offenders
 
 
-def test_adv_ac31_stale_mechanism_naming_no_live_identifier_is_detectable(monkeypatch):
-    import segfacet.failure_modes as failure_modes_module
+def test_adv_ac31_stale_mechanism_naming_no_live_identifier_is_detectable(matrix_mode8_bogus_mechanism):
     import segfacet.feature_docs as feature_docs_module
-    import segfacet.traceability as traceability
 
     case_ids_for_mode8 = {c["case_id"] for c in _manifest_cases() if c.get("failure_mode") == 8}
 
-    bogus_mechanism = (
-        "This sentence is deliberately long and describes nothing that "
-        "lives in the codebase or the corpus at all, on purpose, for a test."
-    )
-    _patch_specification_mode(monkeypatch, failure_modes_module, 8, mechanism=bogus_mechanism)
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix_mode8_bogus_mechanism
     mode8 = _mode_record(d, 8)
     anchors = set(feature_docs_module.MODE_ANCHOR_PATHS[8])
     rules_for_mode = set(mode8["rules"])
@@ -1299,22 +1462,16 @@ def test_adv_ac31_stale_mechanism_naming_no_live_identifier_is_detectable(monkey
     assert not any(_token_in_mechanism(token, mode8["mechanism"]) for token in candidate_tokens)
 
 
-def test_adv_ac31_stale_mechanism_one_character_off_the_real_case_id_is_detectable(monkeypatch):
-    import segfacet.failure_modes as failure_modes_module
+def test_adv_ac31_stale_mechanism_one_character_off_the_real_case_id_is_detectable(
+    matrix_mode8_typo_mechanism,
+):
     import segfacet.feature_docs as feature_docs_module
-    import segfacet.traceability as traceability
 
     case_ids_for_mode8 = {c["case_id"] for c in _manifest_cases() if c.get("failure_mode") == 8}
     assert case_ids_for_mode8, "expected at least one mode-8 corpus case"
     assert "mode8_force_overlap" in case_ids_for_mode8
 
-    typo_mechanism = (
-        "The mechanism names mode8_force_overlaps, one character off the "
-        "real case id, on purpose, for a test."
-    )
-    _patch_specification_mode(monkeypatch, failure_modes_module, 8, mechanism=typo_mechanism)
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix_mode8_typo_mechanism
     mode8 = _mode_record(d, 8)
     anchors = set(feature_docs_module.MODE_ANCHOR_PATHS[8])
     rules_for_mode = set(mode8["rules"])
@@ -1379,7 +1536,7 @@ def _paths_named_in_mechanism(mechanism: str, paths) -> set:
     return {p for p in paths if p and p in mechanism}
 
 
-def test_ac31_named_feature_path_is_consumed_by_one_of_the_modes_declared_rules():
+def test_ac31_named_feature_path_is_consumed_by_one_of_the_modes_declared_rules(matrix):
     """Real check (1) above. The search universe per mode is that mode's own
     ``anchor_paths`` (so a mechanism naming the anchor -- the pre-fix mode-4
     shape -- is still recognised as a *named* path, not silently skipped
@@ -1389,9 +1546,7 @@ def test_ac31_named_feature_path_is_consumed_by_one_of_the_modes_declared_rules(
     mode's own declared rules must actually consume it -- a path that is
     only the mode's anchor, and consumed by none of the mode's declared
     rules, fails here."""
-    import segfacet.traceability as traceability
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix
     modes = _mode_records(d)
     rules = _rule_records(d)
     assert modes and rules
@@ -1429,15 +1584,14 @@ def test_ac31_named_feature_path_is_consumed_by_one_of_the_modes_declared_rules(
     assert checked_any_path, "expected >=1 mode mechanism to name a real, resolvable feature path"
 
 
-def test_adv_ac31_named_anchor_path_not_consumed_by_declared_rule_is_detectable(monkeypatch):
+def test_adv_ac31_named_anchor_path_not_consumed_by_declared_rule_is_detectable(
+    matrix, matrix_mode4_bogus_mechanism
+):
     """Reproduces the pre-fix mode-4 defect directly: naming a real,
     resolvable path (the mode's own anchor) that the mode's only declared
     rule never actually consumes must be distinguishable from a genuine
     claim -- demonstrating check (1) above would have failed it."""
-    import segfacet.failure_modes as failure_modes_module
-    import segfacet.traceability as traceability
-
-    d_before = traceability.matrix_to_dict(traceability.build_matrix())
+    d_before = matrix
     mode4_before = _mode_record(d_before, 4)
     declared_rules = set(mode4_before["rules"])
     assert declared_rules == {"mislabel"}, declared_rules
@@ -1450,10 +1604,7 @@ def test_adv_ac31_named_anchor_path_not_consumed_by_declared_rule_is_detectable(
         "fixture assumption violated: mislabel now consumes its mode-4 anchor path"
     )
 
-    bogus_mechanism = f"caught by mislabel's Detector B via {bogus_path}, on purpose, for a test."
-    _patch_specification_mode(monkeypatch, failure_modes_module, 4, mechanism=bogus_mechanism)
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix_mode4_bogus_mechanism
     mode4 = _mode_record(d, 4)
     rules = _rule_records(d)
     named_paths = _paths_named_in_mechanism(mode4["mechanism"], set(mode4["anchor_paths"]))
@@ -1481,7 +1632,7 @@ def _parse_measured_findings_claim(mechanism: str):
     return {item.strip().strip("'\"") for item in inner.split(",") if item.strip()}
 
 
-def test_ac31_measured_findings_claim_matches_the_live_pipeline_firing_set():
+def test_ac31_measured_findings_claim_matches_the_live_pipeline_firing_set(matrix):
     """Real check (2) above. For every mode whose mechanism carries a
     ``(measured: findings == [...])`` claim, drive the corpus case the
     mechanism names through the same public harness
@@ -1492,13 +1643,12 @@ def test_ac31_measured_findings_claim_matches_the_live_pipeline_firing_set():
     is verified automatically, with no per-mode literal in this test."""
     from segfacet.synth.corpus import load_manifest
     from segfacet.synth.regression import pipeline_findings
-    import segfacet.traceability as traceability
 
     manifest = load_manifest()
     cases_by_id = {c["case_id"]: c for c in manifest.get("cases", [])}
     assert cases_by_id, "expected a non-empty corpus manifest"
 
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix
     modes = _mode_records(d)
     assert modes
 
@@ -1567,7 +1717,9 @@ def test_adv_ac31_measured_findings_claim_overclaiming_a_rule_is_detectable(monk
 # =========================================================================== #
 
 
-def test_adv_rule_declaring_only_an_uncatalogued_mode_makes_rule_to_mode_a_hole(isolated_registry):
+def test_adv_rule_declaring_only_an_uncatalogued_mode_makes_rule_to_mode_a_hole(
+    matrix_uncatalogued_mode_rule_registered,
+):
     """Before 0db0fca, a rule declaring only modes outside
     feature_docs.MODE_ANCHOR_PATHS' key set (e.g. modes=(9,)) was
     'declared' by declaration_state alone, so rule_to_mode reported it
@@ -1582,34 +1734,9 @@ def test_adv_rule_declaring_only_an_uncatalogued_mode_makes_rule_to_mode_a_hole(
     rule_declaration_conflicts() stops reporting it -- rule_to_mode would
     stay complete. The stub moves to a mode absent from *both*
     SPECIFICATION and MODE_ANCHOR_PATHS, derived live rather than assumed by
-    literal, so this test tracks whichever id is actually free."""
-    import segfacet.failure_modes as failure_modes_module
-    import segfacet.feature_docs as feature_docs_module
-    from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
-    import segfacet.traceability as traceability
-
-    uncatalogued_mode = 1
-    while (
-        uncatalogued_mode in failure_modes_module.SPECIFICATION
-        or uncatalogued_mode in feature_docs_module.MODE_ANCHOR_PATHS
-    ):
-        uncatalogued_mode += 1
-    assert uncatalogued_mode not in feature_docs_module.MODE_ANCHOR_PATHS
-    assert uncatalogued_mode not in failure_modes_module.SPECIFICATION
-
-    class _UncataloguedModeRule(Rule):
-        rule_id = "__item138_uncatalogued_mode__"
-        mode_declaration = RuleModeDeclaration(
-            modes=(uncatalogued_mode,),
-            evidence=("analytic", "AC-adjacent: this mode is outside the catalogue"),
-        )
-
-        def evaluate(self, record, config):
-            return []
-
-    register_rule(_UncataloguedModeRule)
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    literal, so this test tracks whichever id is actually free (see
+    ``matrix_uncatalogued_mode_rule_registered``)."""
+    d, uncatalogued_mode = matrix_uncatalogued_mode_rule_registered
     assert d["directions"]["rule_to_mode"]["complete"] is False
     holes = d["directions"]["rule_to_mode"]["holes"]
     assert any("__item138_uncatalogued_mode__" in str(hole) for hole in holes), holes
@@ -1632,10 +1759,9 @@ def test_adv_rule_declaring_only_an_uncatalogued_mode_makes_rule_to_mode_a_hole(
 # =========================================================================== #
 
 
-def test_ac32_mode1_rule_list_contains_every_feature_derived_required_rule():
+def test_ac32_mode1_rule_list_contains_every_feature_derived_required_rule(matrix):
     import segfacet.feature_docs as feature_docs_module
     import segfacet.reference.delta as delta_module
-    import segfacet.traceability as traceability
 
     tracked = delta_module.INGESTED_FEATURES
     assert tracked, "expected a non-empty reference_delta tracked-feature vocabulary"
@@ -1657,7 +1783,7 @@ def test_ac32_mode1_rule_list_contains_every_feature_derived_required_rule():
     assert required_modes, "expected at least one tracked feature to map onto a mode anchor"
     assert 1 in required_modes
 
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix
     for mode in required_modes:
         record = _mode_record(d, mode)
         assert "reference_delta" in record["rules"], (mode, record["rules"])
@@ -1667,43 +1793,43 @@ def test_ac32_mode1_rule_list_contains_every_feature_derived_required_rule():
         assert mode in reference_delta_record["modes"], (mode, reference_delta_record["modes"])
 
 
-def test_adv_ac32_renarrowed_reference_delta_declaration_fails_the_matrix_level_check(monkeypatch):
+def test_adv_ac32_renarrowed_reference_delta_declaration_fails_the_matrix_level_check(
+    matrix_reference_delta_renarrowed,
+):
     """The false-premised shape commit b1c593c corrected -- narrowing
     reference_delta back to modes=(2,) must make the matrix under-report
     mode 1's rule list, from the feature-level derivation rather than any
     literal."""
-    from segfacet.heuristics.rule import _RULES
-    import segfacet.heuristics.rule as rule_mod
-    import segfacet.traceability as traceability
-
-    rule = _RULES["reference_delta"]
-    narrowed = rule_mod.RuleModeDeclaration(
-        modes=(2,), evidence=("analytic", "AC32 adversarial: re-narrowed back to modes=(2,)")
-    )
-    monkeypatch.setattr(rule, "mode_declaration", narrowed)
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    mode1 = _mode_record(d, 1)
+    mode1 = _mode_record(matrix_reference_delta_renarrowed, 1)
     assert "reference_delta" not in mode1["rules"], mode1["rules"]
 
 
 # =========================================================================== #
-# AC33: the mode -> feature list declares its rule granularity
+# AC33 (item 138) -- reconciled (item 149, 2026-09-04, AC11): the mode ->
+# read-path list no longer declares rule granularity. ``granularity`` moves
+# from ``"rule"`` to ``"signal"`` -- a path's presence in ``read_paths``
+# means a declaring rule classifies that path ``"signal"``, not merely that
+# some declaring rule reads it at all -- and the qualifier field (renamed
+# ``read_paths_qualifier``, since ``feature_paths`` itself is gone, AC8)
+# carries the new sentence. The retired rule-granular sentence must appear
+# in neither the JSON qualifier nor the committed markdown.
 # =========================================================================== #
 
 
 @pytest.mark.parametrize("mode", MODES)
-def test_ac33_mode_feature_list_declares_rule_granularity(mode):
-    import segfacet.traceability as traceability
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    record = _mode_record(d, mode)
-    assert record["granularity"] == "rule", mode
-    qualifier = record["feature_paths_qualifier"]
-    assert "a rule that targets this mode reads this path" in qualifier, mode
+def test_ac33_mode_read_path_list_declares_signal_granularity(mode, matrix):
+    record = _mode_record(matrix, mode)
+    assert record["granularity"] == "signal", mode
+    qualifier = record["read_paths_qualifier"]
+    assert "signal" in qualifier, mode
+    assert "a rule that targets this mode reads this path" not in qualifier, mode
 
 
-def test_ac33_committed_markdown_prints_the_granularity_qualifier_beside_the_mode_table():
+def test_ac33_committed_markdown_prints_the_signal_qualifier_beside_the_mode_table():
+    """Reconciled (item 149, 2026-09-04, AC11): the committed markdown's
+    qualifier sentence changes from the retired rule-granular claim to the
+    signal-classification one, and states the anchor column is a separate
+    one never merged in."""
     lines = _md_lines()
     text = "\n".join(lines)
 
@@ -1719,7 +1845,9 @@ def test_ac33_committed_markdown_prints_the_granularity_qualifier_beside_the_mod
     assert rule_header_idx > mode_header_idx
 
     section = "\n".join(lines[mode_header_idx:rule_header_idx])
-    assert "a rule that targets this mode reads this path" in section
+    assert "a rule that targets this mode reads this path" not in section
+    assert "signal" in section
+    assert "never merged in" in section
     assert text  # keep the joined text referenced for clarity of the slice above
 
 
@@ -1728,36 +1856,86 @@ def test_ac33_committed_markdown_prints_the_granularity_qualifier_beside_the_mod
 # =========================================================================== #
 
 
-def test_adv_singleton_declaring_rule_mode_renders_a_well_formed_row():
+def test_adv_singleton_declaring_rule_mode_renders_a_well_formed_row(matrix):
     """A mode whose declaring-rule set is a singleton (e.g. mode 5, coverage
     only) still renders a well-formed row."""
-    import segfacet.traceability as traceability
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
-    mode5 = _mode_record(d, 5)
+    mode5 = _mode_record(matrix, 5)
     assert mode5["rules"] == ["coverage"]
     assert mode5["title"]
     assert mode5["rung"] in RUNGS
-    assert mode5["feature_paths"], "expected a non-empty feature-path union for mode 5"
+    assert mode5["read_paths"], "expected a non-empty signal-classified read-path union for mode 5"
 
 
-def test_adv_rule_consuming_zero_catalogued_paths_renders_empty_feature_list(isolated_registry):
+def test_adv_rule_consuming_zero_catalogued_paths_renders_empty_feature_list(
+    matrix_zero_read_rule_registered,
+):
     """A rule consuming zero catalogued paths renders an empty feature list
     rather than raising."""
-    from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
-    import segfacet.traceability as traceability
-
-    class _ZeroReadRule(Rule):
-        rule_id = "__item138_zero_read__"
-        mode_declaration = RuleModeDeclaration(
-            modes=(1,), evidence=("analytic", "AC-adjacent: consumes no catalogued path")
-        )
-
-        def evaluate(self, record, config):
-            return []
-
-    register_rule(_ZeroReadRule)
-
-    d = traceability.matrix_to_dict(traceability.build_matrix())
+    d = matrix_zero_read_rule_registered
     record = _rule_records(d)["__item138_zero_read__"]
     assert record["feature_paths"] == []
+
+
+# =========================================================================== #
+# AC28/AC29 (item 149, 2026-09-04): this module's own call-site budget.
+# The cross-module claim (every ``build_matrix()`` call site in *both*
+# ``test_138_traceability_matrix.py`` and ``test_149_conformance_report.py``
+# sits inside a ``@pytest.fixture``) is asserted once, over both files, in
+# ``tests/test_149_conformance_report.py`` -- this test is this module's own
+# local half: its AST call-site count equals its own budget constant and
+# that constant is ``<= 20``.
+# =========================================================================== #
+
+
+def _is_fixture_decorator(node: ast.expr) -> bool:
+    target = node.func if isinstance(node, ast.Call) else node
+    if isinstance(target, ast.Attribute):
+        return target.attr == "fixture"
+    if isinstance(target, ast.Name):
+        return target.id == "fixture"
+    return False
+
+
+def _is_build_matrix_call(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    if isinstance(func, ast.Attribute):
+        return func.attr == "build_matrix"
+    if isinstance(func, ast.Name):
+        return func.id == "build_matrix"
+    return False
+
+
+def _build_matrix_call_sites(tree: ast.Module):
+    """Yield ``(lineno, enclosing_is_fixture)`` for every ``build_matrix()``
+    call in *tree*, at any nesting depth."""
+    results = []
+
+    def _walk(node, enclosing_is_fixture):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                is_fixture = any(_is_fixture_decorator(d) for d in child.decorator_list)
+                _walk(child, is_fixture)
+            else:
+                if _is_build_matrix_call(child):
+                    results.append((child.lineno, enclosing_is_fixture))
+                _walk(child, enclosing_is_fixture)
+
+    _walk(tree, False)
+    return results
+
+
+def test_ac29_build_matrix_call_site_budget_holds_and_all_sites_are_fixtured():
+    source = Path(__file__).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    sites = _build_matrix_call_sites(tree)
+
+    assert len(sites) == _BUILD_MATRIX_CALL_SITE_BUDGET, (
+        len(sites),
+        _BUILD_MATRIX_CALL_SITE_BUDGET,
+    )
+    assert _BUILD_MATRIX_CALL_SITE_BUDGET <= 20, _BUILD_MATRIX_CALL_SITE_BUDGET
+
+    non_fixtured = [lineno for lineno, in_fixture in sites if not in_fixture]
+    assert non_fixtured == [], non_fixtured

@@ -14,7 +14,10 @@ run-to-run byte comparisons are between two ``tmp_path`` renders; the
 committed-vs-fresh checks go through ``json.loads`` for the JSON and
 substring/section assertions for the Markdown) -- so it adds no entry to
 ``tests/committed_artifact_guard.py``'s ``ALLOWLIST`` and no new ``GROUNDS``
-member.
+member itself. (Item 149, 2026-09-04, adds the sixth ``GROUNDS`` member,
+``"no-float-leaf"``, and both artifacts' ``ALLOWLIST`` entries -- but does so
+in ``tests/committed_artifact_guard.py`` directly, not here; this module's
+own no-growth claim about its own comparisons stays true.)
 """
 
 from __future__ import annotations
@@ -30,7 +33,7 @@ import pytest
 
 from run_process import run_utf8
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
+_REPO_ROOT = Path(__file__).resolve().parent.parent
 _COMMITTED_JSON = _REPO_ROOT / "docs" / "aide" / "failure_modes.generated.json"
 _COMMITTED_MD = _REPO_ROOT / "docs" / "aide" / "failure_modes.generated.md"
 _VISION_PATH = _REPO_ROOT / "docs" / "aide" / "vision.md"
