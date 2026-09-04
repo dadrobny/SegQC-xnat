@@ -1513,7 +1513,7 @@ sources onto it, and closes with a maintainer sign-off that gates the remainder 
   `pipeline_findings` built in `synth/regression.py`), plus the catalogue's first
   `proposed` entry — collapsed or duplicated label set, candidate feature
   `stage3_unavailable`, no rule (carried defect, spec 129). *(Item 146)*
-- 🚧 **D4** The five partial sources collapsed onto the specification; `Expectation` and
+- 🔍 **D4** The five partial sources collapsed onto the specification; `Expectation` and
   `RuleModeDeclaration` checked against it in both directions; the three declaration-seam
   defects (the `"corpus"` tag membership test, the untyped `evidence`/`modes`, the
   corpus-to-declaration blindness; `insights.md`, spec 136) closed by replacement, and
