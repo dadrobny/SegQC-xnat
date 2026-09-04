@@ -362,8 +362,10 @@ def test_ac2_field_names_are_exactly_section_six_fields():
     assert names == (
         "id",
         "name",
+        "short_name",
         "definition",
         "discriminator",
+        "mechanism",
         "observability",
         "candidate_features",
         "intended_rules",

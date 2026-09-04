@@ -55,8 +55,12 @@ Covers Acceptance Criteria AC1-AC18:
 Adversarial / edge-case scenarios included: ``rule_unmapped`` narrowed but
 still reachable (an undeclared stub rule, and a declaration monkeypatched
 back to ``pending``); a future corpus case still binds an analytic
-declaration (the escape-hatch guard); a ``"corpus"``-tagged analytic
-declaration is rejected by ``rule_declaration_conflicts()``; the measured
+declaration (the escape-hatch guard); an analytic declaration claiming a
+mode outside the specification is still rejected by
+``catalogue.rule_declaration_conflicts()`` -- reconciled by item 147
+(2026-09-04), which retires the reserved ``"corpus"`` evidence tag and the
+declared -> corpus direction this scenario originally (also) exercised
+through the same checker; the measured
 artifact-movement counts from the item spec, including the corrected
 mode-1-carrying-entry count; determinism of ``build_catalogue()`` and
 ``rule_declaration_conflicts()``; frozen-instance immutability; an entry
@@ -229,17 +233,27 @@ def test_ac4_analytic_declaration_is_analytic_with_named_mechanism(rule_id):
     assert any(len(e) >= 40 for e in mechanism_elements), decl.evidence
 
 
-def test_adv_corpus_tagged_analytic_declaration_is_rejected(monkeypatch):
-    """AC4's "not corpus" is load-bearing, not cosmetic: retagging bounds'
-    declaration as corpus-backed makes rule_declaration_conflicts() fire,
-    since no committed corpus case designates it."""
+def test_adv_analytic_declaration_claiming_an_unlisted_mode_is_rejected(monkeypatch):
+    """Reconciled (item 147, 2026-09-04): the retired branch this test
+    exercised (``catalogue.rule_declaration_conflicts()``'s declared ->
+    corpus direction, gated on the now-retired ``"corpus"`` evidence tag)
+    is deleted outright, not hardened -- retagging bounds as corpus-backed
+    is no longer rejected by anything (AC20: the tag is inert). What
+    survives this test's intent -- that an over-claimed mode on an
+    analytic declaration is still reported, not silently accepted -- is
+    the checker's other, untouched direction: a declared mode outside
+    ``segfacet.failure_modes.SPECIFICATION``'s key set is still reported by
+    ``rule_declaration_conflicts()`` regardless of evidence tag (AC12's
+    shape)."""
     catalogue = _catalogue()
     rule = _RULES["bounds"]
-    replacement = rule_mod.RuleModeDeclaration(modes=(2,), evidence=("corpus",))
+    replacement = rule_mod.RuleModeDeclaration(
+        modes=(999,), evidence=("analytic", "test-evidence-item147")
+    )
     monkeypatch.setattr(rule, "mode_declaration", replacement)
 
     conflicts = catalogue.rule_declaration_conflicts()
-    assert any("bounds" in msg for msg in conflicts), conflicts
+    assert any("bounds" in msg and "999" in msg for msg in conflicts), conflicts
 
 
 # =========================================================================== #

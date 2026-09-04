@@ -220,11 +220,14 @@ def test_ac3_names_match_vision_section_six_parsed_titles():
     §6's list" -- item 147's one kept conformance check in the
     vision->specification direction. Modes 9/10 are deliberately not in
     §6's numbered list (that is the point of item 146), so this iterates
-    ``_EXPECTED_MODE_IDS`` rather than ``iter_modes()``."""
-    import segfacet.failure_modes as fm
-    import segfacet.traceability as traceability
+    ``_EXPECTED_MODE_IDS`` rather than ``iter_modes()``.
 
-    titles = traceability._vision_mode_titles()
+    Reconciled (item 147, 2026-09-04): the vision §6 parse moved to
+    ``failure_modes.vision_seed_titles()`` -- its one public home (AC4);
+    ``segfacet.traceability`` no longer reads ``vision.md`` at all."""
+    import segfacet.failure_modes as fm
+
+    titles = fm.vision_seed_titles()
     assert titles, "expected >=1 title parsed from vision.md section 6"
     for mode_id in _EXPECTED_MODE_IDS:
         mode = fm.SPECIFICATION[mode_id]
@@ -403,16 +406,30 @@ def test_ac10a_mode7_rung_needs_real_data_while_its_case_measurably_fires(measur
 
 
 def test_ac10b_mode7_records_the_single_rank_descent_cap():
+    """Reconciled (item 147, 2026-09-04): the false claim this test pinned
+    (``rank(v) == v - 1`` as a general per-pair cap) is corrected in
+    ``SPECIFICATION[7].mechanism`` -- item 147's own AC10 test recomputes
+    the corrected claim live from ``segfacet.labels.CANONICAL_ORDER`` /
+    ``DEFAULT_LABEL_MAP``. What survives here is the narrower, still-true
+    assertion: the corrected sentence lives in ``mechanism`` (not
+    ``case.reason``, which now carries only the measured detection fact),
+    names the live tokens this item's mechanism must resolve against, and
+    the retired false claim is gone from both fields."""
     import segfacet.failure_modes as fm
 
     mode = _mode(fm, 7)
     case = _case(mode, "mode7_sequence_break")
     assert case.reason.strip()
-    assert "rank(v)" in case.reason, case.reason
-    assert ("v - 1" in case.reason) or ("v-1" in case.reason), case.reason
-    lowered = case.reason.lower()
+    assert "rank(v) == v - 1" not in case.reason, case.reason
+
+    mechanism = mode.mechanism
+    assert mechanism.strip()
+    assert "rank(v) == v - 1" not in mechanism, mechanism
+    for token in ("CANONICAL_ORDER", "T13"):
+        assert token in mechanism, (token, mechanism)
+    lowered = mechanism.lower()
     for token in ("l1", "t12", "l2", "l5"):
-        assert token in lowered, (token, case.reason)
+        assert token in lowered, (token, mechanism)
 
 
 # =========================================================================== #

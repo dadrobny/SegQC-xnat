@@ -13,7 +13,9 @@ Covers Acceptance Criteria AC1-AC14:
 - AC3:  the seam is total over the shipped registry -- ten rules, every one
         carrying a ``RuleModeDeclaration`` instance.
 - AC4:  the six corroborated rules declare exactly the corpus-designated
-        modes, tagged ``"corpus"``.
+        modes, with non-empty free-form evidence -- reconciled by item 147,
+        which retires the reserved ``"corpus"`` evidence tag (evidence is
+        provenance prose now, not a validated membership test).
 - AC5:  the four contested rules are declared, not pending -- reconciled by
         item 137, which dispositioned all four (two analytic mode-2, two
         mode-less); see the reconciliation notes on the affected tests below.
@@ -38,9 +40,8 @@ Covers Acceptance Criteria AC1-AC14:
 
 Adversarial / edge-case scenarios included: the full ill-formed-construction
 table (all-empty, multi-state, unordered/duplicate/out-of-range/non-int
-modes, empty/non-string evidence elements); a ``"corpus"``-tagged declaration
-carrying an extra free-form evidence tag still binds the declared->corpus
-direction; an entry with no consuming rules gains no ``"rule_declaration"``
+modes, empty/non-string evidence elements); an entry with no consuming rules
+gains no ``"rule_declaration"``
 tag; an anchor path whose consuming rules declare no modes keeps
 ``("per_mode_metric",)`` unchanged; the expected-artifact-movement counts,
 reconciled for item 137 (0 ``rule_unmapped``, 86 empty); determinism of
@@ -229,9 +230,13 @@ def test_ac3_no_rule_inherits_the_abc_none_default():
 
 @pytest.mark.parametrize("rule_id, modes", sorted(_CORROBORATED.items()))
 def test_ac4_corroborated_rule_declares_corpus_modes(rule_id, modes):
+    """Reconciled (item 147, 2026-09-04): the reserved ``"corpus"`` evidence
+    tag is retired -- each corroborated rule's evidence is now free-form
+    provenance naming the manifest/case, asserted here as non-empty rather
+    than matched against the retired literal."""
     decl = _RULES[rule_id].mode_declaration
     assert decl.modes == modes
-    assert "corpus" in decl.evidence
+    assert decl.evidence, (rule_id, decl.evidence)
     assert decl.mode_less_reason == ""
     assert decl.pending_reason == ""
 
@@ -331,24 +336,17 @@ def test_ac8_surplus_declared_mode_is_reported_naming_both(monkeypatch):
     assert any(rule_id in msg and str(surplus_mode) in msg for msg in conflicts), conflicts
 
 
-def test_adv_corpus_tag_plus_other_tag_still_binds_ac8_direction(monkeypatch):
-    """A2: "corpus" plus another free-form tag still binds the declared ->
-    corpus direction -- the reserved tag need not be the only one."""
-    catalogue = _catalogue()
-    corpus_map = catalogue.scan_synth_rule_mode_map()
-    rule_id = "sequence"
-    corpus_modes = set(corpus_map.get(rule_id, ()))
-    surplus_mode = next(m for m in range(1, 9) if m not in corpus_modes)
-    new_modes = tuple(sorted(corpus_modes | {surplus_mode}))
-
-    rule = _RULES[rule_id]
-    replacement = rule_mod.RuleModeDeclaration(
-        modes=new_modes, evidence=("corpus", "analytic-note")
-    )
-    monkeypatch.setattr(rule, "mode_declaration", replacement)
-
-    conflicts = catalogue.rule_declaration_conflicts()
-    assert any(rule_id in msg and str(surplus_mode) in msg for msg in conflicts), conflicts
+# Reconciled (item 147, 2026-09-04): `test_adv_corpus_tag_plus_other_tag_still_
+# binds_ac8_direction` was removed here. It exercised the declared -> corpus
+# direction gated on `if "corpus" in decl.evidence:` in
+# `catalogue.rule_declaration_conflicts()` -- item 147 step 8 deletes that
+# branch outright (the reserved "corpus" tag is retired, not hardened), so
+# the direction it proved ("corpus" plus another tag still binds) no longer
+# exists to prove. Its force is carried forward by item 147's own
+# `test_ac13_intended_rule_whose_rule_declares_no_such_mode_is_reported`
+# (`tests/test_147_specification_is_the_record.py`), which is the surviving
+# check that an over-claimed mode is still reported, now from the
+# specification side.
 
 
 # =========================================================================== #
@@ -404,21 +402,17 @@ def test_ac9_checker_reports_the_undeclared_rule(isolated_registry):
 # corpus-designated modes -- is containment for declarations tagged
 # ``"corpus"`` specifically. Item 137's own analytic-vs-corpus distinction is
 # tested in ``tests/test_137_mode_less_rule_disposition.py``.
+#
+# Reconciled again for item 147 (2026-09-04): the reserved ``"corpus"``
+# evidence tag itself is retired -- no shipped declaration carries it any
+# more (AC20), so ``test_ac10_corpus_tagged_declared_modes_subset_of_corpus_
+# map``'s ``checked`` guard would find zero corpus-tagged declarations and
+# fail on its own vacuity check, not on a real regression. Removed here;
+# item 146's `_CORROBORATED` containment claim (every corroborated rule
+# declares exactly the corpus-designated modes) is still exercised by
+# ``test_ac4_corroborated_modes_match_measured_corpus_map`` above, which
+# never depended on the tag.
 # =========================================================================== #
-
-
-def test_ac10_corpus_tagged_declared_modes_subset_of_corpus_map():
-    catalogue = _catalogue()
-    corpus_map = catalogue.scan_synth_rule_mode_map()
-    checked = False
-    for rule in iter_rules():
-        decl = rule.mode_declaration
-        if "corpus" not in decl.evidence:
-            continue
-        checked = True
-        allowed = set(corpus_map.get(rule.rule_id, ()))
-        assert set(decl.modes) <= allowed, (rule.rule_id, decl.modes, allowed)
-    assert checked, "expected at least one corpus-tagged declaration"
 
 
 # =========================================================================== #
