@@ -352,6 +352,7 @@ def build_matrix() -> TraceabilityMatrix:
     two calls return equal matrices. Deferred imports (house style)."""
     import re
 
+    from segfacet import failure_modes as failure_modes_module
     from segfacet import feature_docs as feature_docs_module
     from segfacet.catalogue import (
         build_catalogue,
@@ -362,6 +363,12 @@ def build_matrix() -> TraceabilityMatrix:
     from segfacet.synth.corpus import load_manifest
 
     mode_anchor_paths = feature_docs_module.MODE_ANCHOR_PATHS
+    # The matrix's known-mode source is the authored specification (item
+    # 144), not feature_docs.MODE_ANCHOR_PATHS's key set -- mirrors A7's
+    # move for catalogue.rule_declaration_conflicts (item 146). A mode with
+    # no MODE_ANCHOR_PATHS entry (mode 9) still gets a full mode row; its
+    # anchor_paths render empty via mode_anchor_paths.get(mode, ()).
+    known_modes = set(failure_modes_module.SPECIFICATION.keys())
 
     cat = build_catalogue(strict=True)
     paths_by_rule: Dict[str, Tuple[str, ...]] = {}
@@ -417,17 +424,18 @@ def build_matrix() -> TraceabilityMatrix:
 
     # rule -> mode direction: complete iff every registered rule is
     # "declared" or "mode_less" (AC18, AC26) -- AND, for a "declared" rule,
-    # at least one of its declared modes is actually catalogued. A rule
-    # declaring only modes outside feature_docs.MODE_ANCHOR_PATHS (e.g. a
-    # stub declaring modes=(9,)) is "declared" by declaration_state alone
-    # but targets no catalogued mode, which is exactly a rule -> mode hole
-    # per this module's own completeness contract. catalogue's
-    # rule_declaration_conflicts() already reports this disagreement
-    # (its "declared §6 mode ... is outside MODE_ANCHOR_PATHS's key set"
-    # message); folded in here rather than re-derived, so the artifact's
-    # own completeness claim covers it too, and rules_by_mode (which is
-    # built from declared_modes_by_rule directly) never silently drops it.
-    _known_modes = set(mode_anchor_paths.keys())
+    # at least one of its declared modes is actually known to the
+    # specification (item 146's A7 move: known_modes above, not
+    # feature_docs.MODE_ANCHOR_PATHS's key set). A rule declaring only
+    # modes outside failure_modes.SPECIFICATION's key set is "declared" by
+    # declaration_state alone but targets no known mode, which is exactly a
+    # rule -> mode hole per this module's own completeness contract.
+    # catalogue's rule_declaration_conflicts() already reports this
+    # disagreement (its "declared §6 mode ... is outside
+    # segfacet.failure_modes.SPECIFICATION's key set" message); folded in
+    # here rather than re-derived, so the artifact's own completeness claim
+    # covers it too, and rules_by_mode (which is built from
+    # declared_modes_by_rule directly) never silently drops it.
     _uncatalogued_mode_rule_ids = set()
     _uncatalogued_mode_re = re.compile(
         r"^rule '([^']+)': declared §6 mode \d+ is outside"
@@ -446,7 +454,7 @@ def build_matrix() -> TraceabilityMatrix:
             or (
                 declaration_state_by_rule.get(rule_id) == "declared"
                 and rule_id in _uncatalogued_mode_rule_ids
-                and not (set(declared_modes_by_rule.get(rule_id, ())) & _known_modes)
+                and not (set(declared_modes_by_rule.get(rule_id, ())) & known_modes)
             )
         )
     )
@@ -455,7 +463,7 @@ def build_matrix() -> TraceabilityMatrix:
     # mode -> rule: rules declaring each mode, derived from the shipped
     # declarations (AC11).
     rules_by_mode: Dict[int, Tuple[str, ...]] = {}
-    for mode in mode_anchor_paths:
+    for mode in known_modes:
         rules_by_mode[mode] = tuple(
             sorted(
                 rule_id
@@ -469,7 +477,7 @@ def build_matrix() -> TraceabilityMatrix:
     )
 
     mode_to_rule_holes = tuple(
-        sorted(str(mode) for mode in mode_anchor_paths if not rules_by_mode.get(mode))
+        sorted(str(mode) for mode in known_modes if not rules_by_mode.get(mode))
     ) + unregistered_designated
     mode_to_rule_holes = tuple(sorted(set(mode_to_rule_holes)))
     mode_to_rule = DirectionReport(
@@ -481,7 +489,7 @@ def build_matrix() -> TraceabilityMatrix:
     manifest = load_manifest()
     cases_by_mode: Dict[int, Tuple[Tuple[str, str], ...]] = {}
     pipeline_detected_by_mode: Dict[int, bool] = {}
-    for mode in mode_anchor_paths:
+    for mode in known_modes:
         cases = tuple(
             (c["case_id"], c.get("detection"))
             for c in manifest.get("cases", [])
@@ -493,7 +501,7 @@ def build_matrix() -> TraceabilityMatrix:
     vision_titles = _vision_mode_titles()
 
     modes: list = []
-    for mode in sorted(mode_anchor_paths.keys()):
+    for mode in sorted(known_modes):
         anchors = tuple(mode_anchor_paths.get(mode, ()))
         rules_for_mode = rules_by_mode.get(mode, ())
         feature_union = set(anchors)
@@ -506,7 +514,12 @@ def build_matrix() -> TraceabilityMatrix:
             )
             for rule_id in rules_for_mode
         )
-        mode_rung = MODE_RUNGS[mode]
+        # MODE_RUNGS carries authored rungs only for the modes item 099
+        # anchored (1-8); mode 9 (item 146) has none yet -- item 149
+        # re-points the matrix at the specification's per-edge rungs. Guard
+        # rather than raise, rendering the absent rung the same empty way
+        # title/rung_label already render an absent lookup below.
+        mode_rung = MODE_RUNGS.get(mode) or ModeRung(rung="", mechanism="")
         modes.append(
             ModeRecord(
                 mode=mode,
