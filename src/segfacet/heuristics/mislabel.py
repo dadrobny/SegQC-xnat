@@ -169,7 +169,20 @@ class MislabelRule(Rule):
     # RelabelSwapPerturbation designates mode 4
     # (src/segfacet/synth/identity_ordering_alignment.py), both via
     # Expectation(..., expected_rule_ids={"mislabel"}).
-    mode_declaration = RuleModeDeclaration(modes=(1, 4), evidence=("corpus",))
+    mode_declaration = RuleModeDeclaration(
+        modes=(1, 4),
+        evidence=(
+            "corpus-manifest",
+            "tests/corpus/manifest.json's mode1_displace and "
+            "mode4_relabel_swap designate this rule for §6 modes 1 and 4 "
+            "respectively -- Detector A (position/alignment) for the "
+            "first, Detector B (ordering/identity) for the second. "
+            "Free-form provenance -- item 147 retired the reserved "
+            "'corpus' evidence tag, and the per-mode evidence claims are "
+            "the per-edge rungs in "
+            "segfacet.failure_modes.SPECIFICATION[1] and [4].",
+        ),
+    )
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate mislabel / misalignment signals for *record*.

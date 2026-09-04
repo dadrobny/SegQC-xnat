@@ -271,7 +271,19 @@ class FragmentationRule(Rule):
     # designate mode 2, InjectIslandsPerturbation designates mode 3
     # (src/segfacet/synth/component_shape.py), all via
     # Expectation(..., expected_rule_ids={"fragmentation"}).
-    mode_declaration = RuleModeDeclaration(modes=(2, 3), evidence=("corpus",))
+    mode_declaration = RuleModeDeclaration(
+        modes=(2, 3),
+        evidence=(
+            "corpus-manifest",
+            "tests/corpus/manifest.json's mode2_fragment and "
+            "mode3_inject_islands designate this rule for §6 modes 2 and 3 "
+            "respectively -- the component-count detector for the first, "
+            "the stray-island detector for the second. Free-form "
+            "provenance -- item 147 retired the reserved 'corpus' evidence "
+            "tag, and the per-mode evidence claims are the per-edge rungs "
+            "in segfacet.failure_modes.SPECIFICATION[2] and [3].",
+        ),
+    )
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate fragmentation and island/excess checks for every label in

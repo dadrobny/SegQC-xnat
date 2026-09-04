@@ -340,7 +340,13 @@ def test_ac5_markdown_rows_agree_with_json_for_every_mode_and_rule():
         # for a mode is also present in that mode's markdown row.
         for rule_id in record["rules"]:
             assert rule_id in row, (mode, rule_id)
-        assert record["rung"] in row, mode
+        # Reconciled (item 147, 2026-09-04): an absent rung is `null` in the
+        # JSON and `(none)` in the markdown -- mode 10, the first `proposed`
+        # entry, has no edges to derive a rung from, and both serialisers now
+        # say so explicitly rather than writing a blank indistinguishable
+        # from a failed lookup (AC8). The agreement this test is about is
+        # unchanged; only the pair of tokens it compares.
+        assert (record["rung"] or "(none)") in row, mode
 
     rules = _rule_records(committed_payload)
     assert rules, "expected at least one rule record in committed JSON"
@@ -697,12 +703,25 @@ def test_adv_ac16_mode1_rung_unmoved_by_reference_delta_joining_its_rule_list():
 
 
 def test_ac17_mode7_rung_records_its_own_cap():
+    """Reconciled (item 147, 2026-09-04): this test pinned the claim
+    ``rank(v) == v - 1``, which is **false** across exactly the lumbar range
+    §6.7's example uses (``docs/aide/insights.md``, item 145, 2026-09-03) --
+    ``segfacet.labels.CANONICAL_ORDER`` inserts ``T13`` at index 19, so a
+    lumbar label's rank equals its value. Item 147 corrects the sentence in
+    its one home, ``failure_modes.SPECIFICATION[7].mechanism``, and forbids
+    the false literal anywhere under ``src/segfacet/``; the corrected
+    claim's *measurement* is
+    ``tests/test_147_specification_is_the_record.py::test_ac10_...``. What
+    stays here is this module's own claim: mode 7's row records its rung and
+    a mechanism naming the live tokens the correction rests on."""
     import segfacet.traceability as traceability
 
     d = traceability.matrix_to_dict(traceability.build_matrix())
     mode7 = _mode_record(d, 7)
     assert mode7["rung"] == "needs-real-data"
-    assert "rank(v) == v - 1" in mode7["mechanism"]
+    assert "rank(v) == v - 1" not in mode7["mechanism"]
+    for token in ("CANONICAL_ORDER", "T13"):
+        assert token in mode7["mechanism"], (token, mode7["mechanism"])
     assert "L1 → T12 → L2 → L5" in mode7["mechanism"]
 
 

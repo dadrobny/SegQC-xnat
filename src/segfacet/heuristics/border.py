@@ -120,7 +120,19 @@ class BorderRule(Rule):
     # §6 mode 6 (item 136): CropAtBorderPerturbation
     # (src/segfacet/synth/coverage_border_overlap.py) designates "border" for
     # mode 6 via its Expectation(failure_mode=6, expected_rule_ids={"border"}).
-    mode_declaration = RuleModeDeclaration(modes=(6,), evidence=("corpus",))
+    mode_declaration = RuleModeDeclaration(
+        modes=(6,),
+        evidence=(
+            "corpus-manifest",
+            "tests/corpus/manifest.json's mode6_crop_at_border designates "
+            "this rule for §6 mode 6: the corpus operator crops the "
+            "anterior face, and this rule fires on the resulting "
+            "border-touching label. Free-form provenance -- item 147 "
+            "retired the reserved 'corpus' evidence tag, and the mode 6 <-> "
+            "border evidence claim is the per-edge rung in "
+            "segfacet.failure_modes.SPECIFICATION[6].",
+        ),
+    )
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate border contact for *record*.

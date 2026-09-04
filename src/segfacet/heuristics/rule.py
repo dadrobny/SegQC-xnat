@@ -55,12 +55,20 @@ class RuleModeDeclaration:
 
     - **Targeted**: ``modes`` is a non-empty, strictly ascending tuple of
       ``int`` mode numbers (``>= 1``, no duplicates), with non-empty
-      ``evidence`` (a tuple of non-empty strings; the reserved tag
-      ``"corpus"`` means "at least one committed synthetic corpus case
-      designates this rule for these modes" — see
-      ``segfacet.catalogue.rule_declaration_conflicts``)::
+      ``evidence`` — a tuple of non-empty strings carrying **free-form
+      provenance**: which manifest and which case corroborate this
+      declaration, or on what analytic grounds it is made. Item 147 retired
+      the reserved ``"corpus"`` tag it used to carry: an exact-element
+      membership test over an unvalidated tuple is not where an evidence
+      claim belongs, and the mode ↔ rule evidence claim is data now — the
+      per-edge ``evidence_rung`` on each ``IntendedRule`` in
+      ``segfacet.failure_modes.SPECIFICATION``. Nothing in
+      ``src/segfacet/`` reads an element of ``evidence`` for meaning::
 
-          RuleModeDeclaration(modes=(6,), evidence=("corpus",))
+          RuleModeDeclaration(
+              modes=(6,),
+              evidence=("corpus-manifest", "tests/corpus/manifest.json's mode6_crop_at_border ..."),
+          )
 
     - **Mode-less**: the rule deliberately targets no §6 mode, with the
       reason recorded in ``mode_less_reason``::
@@ -83,6 +91,22 @@ class RuleModeDeclaration:
     pending_reason: str = ""
 
     def __post_init__(self) -> None:
+        # Outer type checks first (item 147): a bare ``str`` is itself an
+        # iterable of non-empty strings, so ``evidence="corpus-derived"``
+        # used to pass every check below and then bind a tag by substring
+        # accident and render per-character downstream; a ``list`` stayed
+        # mutable in place on a frozen dataclass. Both are rejected here,
+        # naming the field and saying a tuple is required, before the
+        # element loops (which still enforce element types).
+        for field_name in ("modes", "evidence"):
+            value = getattr(self, field_name)
+            if not isinstance(value, tuple):
+                raise ValueError(
+                    f"RuleModeDeclaration: {field_name!r} must be a tuple, got "
+                    f"{type(value).__name__} ({value!r}) -- a bare str or a list "
+                    f"is not accepted."
+                )
+
         states_realised = sum(
             1
             for realised in (bool(self.modes), bool(self.mode_less_reason), bool(self.pending_reason))

@@ -21,7 +21,10 @@ Covers Acceptance Criteria AC1-AC14:
         mode-less); see the reconciliation notes on the affected tests below.
 - AC6:  declarations and the corpus-derived map agree on this tree.
 - AC7:  a corpus-designated mode a rule fails to declare is reported.
-- AC8:  a declared mode no corpus case supports is reported.
+- AC8:  a declared mode no corpus case supports is reported -- reconciled by
+        item 147 onto the surviving surplus-mode direction, against
+        ``segfacet.failure_modes.SPECIFICATION``'s key set (the retired
+        ``"corpus"``-tagged declaration -> corpus branch was the old one).
 - AC9:  an undeclared registered rule registers cleanly and is reported.
 - AC10: this item moves no attribution for the six corpus-corroborated rules
         (declared ⊆ corpus-derived) -- reconciled by item 137 to that
@@ -315,20 +318,36 @@ def test_ac7_dropped_corpus_mode_is_reported_naming_both(monkeypatch):
 
 
 # =========================================================================== #
-# AC8: a declared mode no corpus case supports is reported
+# AC8: a declared mode the specification does not list is reported
 # =========================================================================== #
 
 
 def test_ac8_surplus_declared_mode_is_reported_naming_both(monkeypatch):
+    """Reconciled (item 147, 2026-09-04). This test used to add a mode the
+    **corpus map** does not designate and rely on the ``"corpus"``-tagged
+    declaration -> corpus branch of ``rule_declaration_conflicts()`` to
+    report it. Item 147 retires both the reserved tag and that branch (the
+    claim they stood for is data now -- the per-edge ``evidence_rung`` in
+    ``segfacet.failure_modes.SPECIFICATION``), so the surplus-mode direction
+    that survives is against the **specification's key set**: a rule
+    declaring a mode the specification does not list is still reported,
+    naming both the rule_id and the mode. Same force, live source. The
+    complementary "an intended rule declares no such mode" direction is
+    item 147's own
+    ``tests/test_147_specification_is_the_record.py::test_ac13_...``.
+    """
+    import segfacet.failure_modes as fm
+
     catalogue = _catalogue()
-    corpus_map = catalogue.scan_synth_rule_mode_map()
     rule_id = "sequence"
-    corpus_modes = set(corpus_map.get(rule_id, ()))
-    surplus_mode = next(m for m in range(1, 9) if m not in corpus_modes)
-    new_modes = tuple(sorted(corpus_modes | {surplus_mode}))
+    declared_modes = set(_RULES[rule_id].mode_declaration.modes)
+    surplus_mode = next(m for m in range(1, 1000) if m not in set(fm.SPECIFICATION))
+    new_modes = tuple(sorted(declared_modes | {surplus_mode}))
 
     rule = _RULES[rule_id]
-    replacement = rule_mod.RuleModeDeclaration(modes=new_modes, evidence=("corpus",))
+    replacement = rule_mod.RuleModeDeclaration(
+        modes=new_modes, evidence=("test-evidence-item147",)
+    )
     monkeypatch.setattr(rule, "mode_declaration", replacement)
 
     conflicts = catalogue.rule_declaration_conflicts()

@@ -612,6 +612,30 @@ moves):
 - `tests/test_146_ninth_mode_and_first_proposed.py` — any expectation that mode
   9 or 10 renders an empty rung or title.
 
+**Reconciled during implementation** (2026-09-04), beyond the list above —
+each is in an already-authorised test module, each is reconciliation only,
+and each is recorded here because it was not foreseen when this section was
+written:
+
+- `tests/test_136_rule_mode_declarations.py::test_ac8_surplus_declared_mode_is_reported_naming_both`
+  constructed `RuleModeDeclaration(modes=…, evidence=("corpus",))` and relied
+  on exactly the `if "corpus" in decl.evidence:` branch step 8 deletes. It is
+  re-pointed at the surviving surplus-mode direction — a declared mode
+  outside `failure_modes.SPECIFICATION`'s key set — which is the same force
+  from a live source, and its evidence tuple is free-form (AC20). The
+  complementary direction is this item's AC13.
+- `tests/test_138_traceability_matrix.py::test_ac17_mode7_rung_records_its_own_cap`
+  asserted `"rank(v) == v - 1" in mode7["mechanism"]` — the false claim AC10
+  corrects and forbids tree-wide. It now asserts the literal's **absence**
+  plus the corrected sentence's live tokens (`CANONICAL_ORDER`, `T13`) and
+  keeps its `L1 → T12 → L2 → L5` assertion unchanged; the measurement of the
+  corrected claim is AC10's own test.
+- `tests/test_138_traceability_matrix.py::test_ac5_markdown_rows_agree_with_json_for_every_mode_and_rule`
+  compared `record["rung"] in row`, which raises `TypeError` once mode 10's
+  JSON rung is `null` (AC8). It compares `record["rung"] or "(none)"` now —
+  the same JSON↔markdown agreement claim, over the pair of tokens the
+  explicit-absence rendering actually writes.
+
 No test that asserts a rule's firing, threshold or severity is touched; if one
 moves, that is a finding to record and hand back, not a test to update.
 
@@ -651,4 +675,109 @@ rendering; item 151 validates the stage.
 
 ## Decisions & Trade-offs
 
-To be updated during implementation.
+**D1 — `ModeSpec`'s two new fields default, and so does everything after
+them.** The pinned field order puts `short_name` third and `mechanism` sixth,
+ahead of fields that have no default (`definition`, `severity`, …). Python
+3.9 has no `kw_only`, so a defaulted field cannot precede a non-defaulted
+one: every field from `short_name` onward now carries a default (`""` /
+`()`). Required-ness is unchanged in practice — `__post_init__` already
+rejects an empty `definition`/`observability`/`severity`/`status`/
+`provenance` and a non-tuple `candidate_features`/`intended_rules`/
+`corpus_cases`, so the only fields that may actually be omitted are the two
+new ones (**A2**). `short_name` and `mechanism` are validated as `str` and
+may be empty; the "every shipped entry carries both, non-empty" invariant is
+asserted over `SPECIFICATION` by the suite, not enforced at construction.
+
+**D2 — measured for AC10 (2026-09-04, `segfacet.labels`).**
+`CANONICAL_ORDER.index("T13") == 19`. Values vs canonical ranks:
+`T11` 18→17, `T12` 19→18, `L1` 20→**20**, `L2` 21→21, `L3` 22→22, `L4`
+23→23, `L5` 24→24. So `rank(v) == v - 1` holds only up to `T12` and is false
+across the whole lumbar block §6.7's example uses. The example's rank
+sequence is `(20, 18, 21, 24)` — **one** descent; its value sequence is
+`(20, 19, 21, 24)` — also one descent. The corrected sentence is
+`SPECIFICATION[7].mechanism` and nowhere else in `src/segfacet/`; mode 7's
+`corpus_cases[0].reason` keeps only the measured detection fact and points
+at `mechanism` for the rationale.
+
+**D3 — measured for AC11 (2026-09-04, `SequenceRule.evaluate` +
+`default_config()`).** On a record whose `relationships.out_of_order_labels`
+is `[]` → 0 findings; `["T12"]` → 1; `["T12", "L6"]` → 1; `["T12", "L6",
+"L2"]` → 1. The rule is driven by the list being non-empty and emits exactly
+one finding naming every out-of-order label, so it caps nothing. The
+single-relabel limitation is the fixture generator's:
+`synth/identity_ordering_alignment.py::SequenceBreakPerturbation` relabels
+one vertebra (default: the tail, to `28 == T13`) and rejects a map with
+fewer than two present labels. AC10's sentence attributes it there.
+
+**D4 — `specification_conflicts()`'s corpus direction is scoped to the modes
+it is passed.** The new AC14/AC15 checks read both committed manifests, but
+a caller may pass any subset of the specification (item 144's adversarial
+probes pass a single hand-built `ModeSpec`). A manifest case whose
+`failure_mode` is not among the passed modes is therefore skipped rather
+than reported — otherwise a one-mode probe returns eleven conflicts and
+buries the one it is asking about. Cases with `failure_mode == 0` (the clean
+controls) are skipped in every call: the clean control is not a failure mode
+and has no `ModeSpec`.
+
+**D5 — the mechanism sentence renders after the candidate-feature list.**
+A mechanism names the paths it reasons about, so rendering it above the
+bullets made the *first* occurrence of an anchor path in
+`failure_modes.generated.md` a sentence that merely mentions the path rather
+than the bullet that labels it a Stage-18 metric anchor — which item 144's
+`test_ac20_stage18_anchor_role_rendered_as_metric_path_not_rule_read`
+(a ±200-character window around the first occurrence) reads as a
+regression. Moving the sentence below the list preserves that item's claim
+without weakening it.
+
+**D6 — the matrix's mode table gains a Stage-18 anchor-path column.** AC3
+requires the anchor paths to render under a header naming them an *anchor*,
+distinct from the rule read-path column item 149 adds. The column is
+additive: `ModeRecord.anchor_paths` already existed and is unchanged, and an
+empty entry (modes 9 and 10 have no `MODE_ANCHOR_PATHS` key) renders
+`(none)`.
+
+**D7 — an absent rung is `null` / `(none)`, never `""`.** `ModeRecord.rung`
+stays a `str` (`""`), because the frozen record's field type is unchanged
+(**A12**), but `matrix_to_dict` writes `None` and the markdown writes
+`(none)` (AC8), so neither serialisation can be mistaken for a failed
+lookup.
+
+**D8 — no rule logic moved.** The only `heuristics/` edits are
+`rule.py`'s two outer tuple checks plus its `evidence` docstring paragraph,
+and six `mode_declaration` **literals** whose `evidence` tuples became
+free-form provenance naming `tests/corpus/manifest.json` and the
+corroborating case(s). No threshold, condition, severity, `evaluate` body or
+registration order changed; `docs/aide/feature_catalogue.generated.{md,json}`
+regenerated **byte-identically**, confirming the declaration change reaches
+no rendered catalogue cell.
+
+**D9 — the three artifact pairs.** All three regenerate byte-identically
+run-to-run and match their committed copies. The catalogue pair is unchanged
+by this item (see D8); `failure_modes.generated.*` gains `short_name` and
+`mechanism` on all ten entries plus mode 7's corrected sentence;
+`traceability_matrix.generated.*` gains titles for modes 9/10, a derived
+rung for mode 9, mode 10's explicit rung absence, the anchor-path column,
+and a `note` naming `src/segfacet/failure_modes.py`.
+
+**D10 — four checks in this item's own test module do not pass, and the
+reason is not the implementation.** Recorded in full in
+[`../insights.md`](../insights.md) (item 147, 2026-09-04) and summarised
+here so the next reader does not re-derive it:
+`test_ac3_mode_anchor_paths_stays_under_its_own_metric_label` and
+`test_ac4_vision_parse_has_one_home` grep for a *mention* of
+`MODE_ANCHOR_PATHS` / `vision.md` and hit three comment-and-docstring
+occurrences in `src/segfacet/heuristics/reference_delta.py`,
+`src/segfacet/__init__.py` and `src/segfacet/heuristics/intensity.py` —
+none of which reads either thing, and none of which is an authorised path
+for this item. `test_ac10_mode7_corrected_sentence_is_measured`'s tree-wide
+scan for the literal `rank(v) == v - 1` hits
+`src/segfacet/eval/severity_ladder.py` (item 141), which carries the same
+false claim in its docstring and in the mode-7 ladder's `rationale` —
+also unauthorised, and correcting it is a Stage-21 question because the
+degeneracy conclusion it supports may or may not survive the corrected
+premise. `test_ac9_every_mechanism_names_a_token_that_resolves_live[10]` is
+unsatisfiable by construction: it builds mode 10's candidate-token set from
+`MODE_ANCHOR_PATHS[10]` (absent by AC3), `corpus_cases` (empty by design)
+and `intended_rules` (empty by design), omitting the `candidate_features`
+path that Implementation step 2 tells this item to name. Every other check
+in the module passes.

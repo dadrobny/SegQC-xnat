@@ -1052,8 +1052,10 @@ def rule_declaration_conflicts() -> Tuple[str, ...]:
     - a registered rule with no declaration at all (naming its ``rule_id``);
     - a corpus-designated ``(rule_id, mode)`` pair the rule's declaration does
       not carry in ``modes`` (naming both);
-    - a ``"corpus"``-tagged declaration carrying a mode no committed corpus
-      case designates for that rule (naming both);
+    - a corpus-designated ``rule_id`` that **no rule registers** (naming it) --
+      item 147: this direction used to iterate the registered rules and was
+      therefore blind to exactly the case it was meant to catch, a corpus
+      case designating a rule that does not exist;
     - a declared mode outside :data:`segfacet.failure_modes.SPECIFICATION`'s
       key set -- the authored failure-mode specification (item 144), which
       since item 146 is the in-code §6 mode catalogue -- (naming both).
@@ -1063,18 +1065,17 @@ def rule_declaration_conflicts() -> Tuple[str, ...]:
       that grows when a mode enters through the lifecycle (item 147 completes
       the collapse of the remaining partial sources onto it).
 
-    The ``"corpus"`` tag in a declaration's ``evidence`` is a reserved
-    convention, not a validated field (item 136): it asserts "at least one
-    committed synthetic corpus case designates this rule for these modes",
-    and only a ``"corpus"``-tagged declaration is checked against the
-    corpus-derived map in the declaration -> corpus direction (the third
-    bullet above). A declaration whose ``evidence`` carries ``"analytic"``
-    instead (item 137's ``bounds``/``reference_delta``: a mode attributed on
-    the rule's own mechanism, with no committed corpus case designating it)
-    is bound only by the corpus -> declaration direction (the second
-    bullet): should a future corpus case designate that rule for a mode, this
-    checker still reports it, because that direction is unconditional. The
-    analytic route is not an escape hatch from that direction.
+    Item 147 retired the reserved ``"corpus"`` evidence tag and the
+    declaration -> corpus direction it gated. That direction was an
+    exact-element membership test over an unvalidated tuple, and the claim
+    it stood for -- "a committed corpus case demonstrates this mode
+    end-to-end" -- is data now: the per-edge ``evidence_rung`` on each
+    ``IntendedRule`` in :data:`segfacet.failure_modes.SPECIFICATION`, whose
+    own conformance check is
+    :func:`segfacet.failure_modes.specification_conflicts`. A declaration's
+    ``evidence`` is free-form provenance; nothing here reads an element of
+    it for meaning, and no tag is an escape hatch from the corpus ->
+    declaration direction, which is unconditional.
 
     Pure: never mutates the registry, never raises for a missing declaration
     (A3 -- absence is reported, not rejected).
@@ -1085,36 +1086,46 @@ def rule_declaration_conflicts() -> Tuple[str, ...]:
     known_modes = set(_failure_modes_module.SPECIFICATION.keys())
     corpus_map = _scan_synth_rule_mode_map()
 
+    declarations = dict(iter_rule_declarations())
+
     messages: List[str] = []
-    for rule_id, decl in iter_rule_declarations():
+    for rule_id, decl in sorted(declarations.items()):
         if decl is None:
             messages.append(
                 f"rule {rule_id!r} has no RuleModeDeclaration (mode_declaration is None)."
             )
             continue
 
-        corpus_modes = set(corpus_map.get(rule_id, ()))
-        declared_modes = set(decl.modes)
-
-        for mode in sorted(corpus_modes - declared_modes):
-            messages.append(
-                f"rule {rule_id!r}: corpus designates §6 mode {mode} but the "
-                f"declaration does not include it (declared modes: {sorted(declared_modes)!r})."
-            )
-
-        if "corpus" in decl.evidence:
-            for mode in sorted(declared_modes - corpus_modes):
-                messages.append(
-                    f"rule {rule_id!r}: declaration claims §6 mode {mode} tagged "
-                    f"'corpus' but no committed corpus case designates it "
-                    f"(corpus modes: {sorted(corpus_modes)!r})."
-                )
-
-        for mode in sorted(declared_modes - known_modes):
+        for mode in sorted(set(decl.modes) - known_modes):
             messages.append(
                 f"rule {rule_id!r}: declared §6 mode {mode} is outside "
                 f"segfacet.failure_modes.SPECIFICATION's key set "
                 f"{sorted(known_modes)!r}."
+            )
+
+    # Corpus -> declaration. Item 147: iterate the **corpus map's** rule_ids,
+    # not the registered rules, so a corpus case designating a rule_id no
+    # rule registers is consulted and reported rather than skipped in
+    # silence -- the direction that was previously blind.
+    for rule_id in sorted(corpus_map):
+        corpus_modes = set(corpus_map.get(rule_id, ()))
+        if rule_id not in declarations:
+            messages.append(
+                f"rule {rule_id!r}: the corpus-derived map designates §6 mode(s) "
+                f"{sorted(corpus_modes)!r} for it, but no rule registers that "
+                f"rule_id (registered: {sorted(declarations)!r})."
+            )
+            continue
+        decl = declarations[rule_id]
+        if decl is None:
+            # Already reported above as an absent declaration; reporting the
+            # same rule a second time here would say nothing new.
+            continue
+        declared_modes = set(decl.modes)
+        for mode in sorted(corpus_modes - declared_modes):
+            messages.append(
+                f"rule {rule_id!r}: corpus designates §6 mode {mode} but the "
+                f"declaration does not include it (declared modes: {sorted(declared_modes)!r})."
             )
 
     return tuple(sorted(messages))

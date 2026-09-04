@@ -105,7 +105,19 @@ class SequenceRule(Rule):
     # (src/segfacet/synth/identity_ordering_alignment.py) designates
     # "sequence" for mode 7 via its Expectation(failure_mode=7,
     # expected_rule_ids={"sequence"}).
-    mode_declaration = RuleModeDeclaration(modes=(7,), evidence=("corpus",))
+    mode_declaration = RuleModeDeclaration(
+        modes=(7,),
+        evidence=(
+            "corpus-manifest",
+            "tests/corpus/manifest.json's mode7_sequence_break designates "
+            "this rule for §6 mode 7: the fixture relabels one vertebra to "
+            "the transitional label T13, and this rule fires on the "
+            "resulting non-monotonic sequence. Free-form provenance -- item "
+            "147 retired the reserved 'corpus' evidence tag, and the mode 7 "
+            "<-> sequence evidence claim is the per-edge rung in "
+            "segfacet.failure_modes.SPECIFICATION[7].",
+        ),
+    )
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate sequence continuity for *record*.

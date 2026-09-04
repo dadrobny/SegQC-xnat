@@ -6,6 +6,7 @@ Schema version: 1.0.
 
 ## Mode 1: Label not aligned with the anatomical vertebra it names
 
+- Short name (corpus manifests): label not aligned with the vertebra it names
 - Definition: A vertebra segment is present and carries the correct level's label, but its measured position -- the centroid's offset from the fitted spinal curve -- is displaced from where that vertebra actually sits, with the label touching no image border and its identity itself unquestioned.
 - Discriminator: Distinguishes from mode 4 by whether the label's identity is wrong (mode 4, an ordering/identity failure) or only its position along the spine is wrong while the identity stays correct (mode 1); distinguishes from mode 6 by whether a border-touching face explains the displacement (mode 6, a crop) or none does (mode 1).
 - Observability: single-channel-observable
@@ -19,6 +20,8 @@ Candidate features:
 
 - Stage-18 metric anchor path (`stage18-metric-anchor`): `stage3.per_label_offsets[].offset_mm`
 
+Mechanism: Item 120's held-out spline-offset measurement demonstrates label displacement end-to-end on the committed corpus case mode1_displace; under plain run_qc (no reference attached) it is caught solely by mislabel's Detector A via stage3.per_label_offsets[].offset_mm (measured: findings == ['mislabel']). reference_delta additionally scores spline_offset_mm, but only once a reference is attached, which this corpus case's plain-pipeline detection is not.
+
 Intended rules:
 
 - `mislabel` (detector: Vertebra misaligned from spinal curve:) -- evidence rung: synthetic-demonstrable
@@ -30,6 +33,7 @@ Corpus cases:
 
 ## Mode 2: Over-/under-segmentation — fused or fragmented vertebra segments
 
+- Short name (corpus manifests): over-/under-segmentation (fused / fragmented)
 - Definition: A label's physical volume, x/y/z extent, or fragmentation index departs from the plausible range for its level: fusion with a neighbouring vertebra reads over the volume/extent range and produces a fragmentation_index below the intact-body threshold (two comparably-sized components), while an under-segmented or partially-labelled vertebra reads under the range.
 - Discriminator: Distinguishes from mode 3 by whether the dominant body itself stays intact: mode 2's label splits into components of comparable size (fragmentation_index below threshold, largest_component_fraction well under 0.9), while mode 3's dominant body stays largely intact (largest_component_fraction >= 0.9) with only a small stray island splitting off.
 - Observability: single-channel-observable
@@ -43,6 +47,8 @@ Candidate features:
 
 - Stage-18 metric anchor path (`stage18-metric-anchor`): `per_label.{label}.components.fragmentation_index`
 
+Mechanism: The corpus case mode2_fragment demonstrates over-/under-segmentation end-to-end; under plain run_qc (no reference attached) it is caught solely by fragmentation's component-count checks (measured: findings == ['fragmentation']). bounds and reference_delta fire only once a reference is attached, and then fire identically on clean_control -- the documented uncalibrated-baseline noise (CLAUDE.md Gotchas, item 125) -- not evidence of mode-2-specific detection.
+
 Intended rules:
 
 - `fragmentation` (detector: Fragmentation:) -- evidence rung: synthetic-demonstrable
@@ -55,6 +61,7 @@ Corpus cases:
 
 ## Mode 3: Disconnected components / islands, especially tiny rogue segments
 
+- Short name (corpus manifests): disconnected components / rogue islands
 - Definition: A label's foreground voxels split into more than one connected component, with at least one stray component far smaller than the dominant body.
 - Discriminator: Distinguishes from mode 2 by whether the dominant body stays intact: mode 3 keeps its largest component holding largest_component_fraction >= 0.9 of the label's voxels, with a small stray island elsewhere, while mode 2's largest component holds a materially smaller share, reflecting genuine fragmentation rather than a rogue island.
 - Observability: single-channel-observable
@@ -68,6 +75,8 @@ Candidate features:
 
 - Stage-18 metric anchor path (`stage18-metric-anchor`): `per_label.{label}.components.stray_component_sizes[]`
 
+Mechanism: The corpus case mode3_inject_islands demonstrates disconnected rogue-island segments end-to-end, detected by the fragmentation rule's stray-component checks.
+
 Intended rules:
 
 - `fragmentation` (detector: Rogue island(s):) -- evidence rung: synthetic-demonstrable
@@ -78,6 +87,7 @@ Corpus cases:
 
 ## Mode 4: Semantic mislabelling (wrong vertebra identification)
 
+- Short name (corpus manifests): semantic mislabelling (wrong identification)
 - Definition: A vertebra is segmented with the label of a different vertebra level: two adjacent labels are out of the anatomically expected order along the fitted spinal curve, even though each label's own geometry is otherwise plausible -- the labels' identities, not their positions, are wrong.
 - Discriminator: Distinguishes from mode 1 by whether the label's identity is wrong (mode 4, an ordering/identity failure between two adjacent labels) or only its position is wrong while the identity stays correct (mode 1).
 - Observability: single-channel-observable
@@ -91,6 +101,8 @@ Candidate features:
 
 - Stage-18 metric anchor path (`stage18-metric-anchor`): `stage3.monotonic_consistency.is_monotonic`
 
+Mechanism: Item 132 closed the interpolating-spline-fit defect for semantic mislabelling, and the corpus case mode4_relabel_swap demonstrates a relabel-swap end-to-end, caught by mislabel's Detector B via stage3.monotonic_consistency.non_monotonic_pairs[] -- the field Detector B actually reads; MODE_ANCHOR_PATHS anchors this mode instead on the neighbouring is_monotonic field by design (feature_docs.py), not on the field the rule reads.
+
 Intended rules:
 
 - `mislabel` (detector: Vertebra ordering inconsistent with label:) -- evidence rung: synthetic-demonstrable
@@ -101,6 +113,7 @@ Corpus cases:
 
 ## Mode 5: Not all vertebrae in the image are segmented
 
+- Short name (corpus manifests): not all vertebrae segmented (missing levels)
 - Definition: One or more vertebrae expected to be present within the observed span of present levels carry no label at all -- the level is missing from the segmentation entirely, not merely misplaced or malformed.
 - Discriminator: Distinguishes from every other mode by being an absence rather than a defect: no per-label geometry exists at all for the missing level, whereas modes 1-4 and 6 all involve a mislocated, malformed or displaced *existing* label.
 - Observability: single-channel-observable
@@ -114,6 +127,8 @@ Candidate features:
 
 - Stage-18 metric anchor path (`stage18-metric-anchor`): `relationships.present_levels[]`
 
+Mechanism: The corpus case mode5_remove_level demonstrates a missing vertebra end-to-end, caught by the coverage rule against relationships.missing_levels[] -- the field the rule actually reads; relationships.present_levels[] is read only by coverage's opt-in expected-levels span check, which ships disabled (expected_levels=[]).
+
 Intended rules:
 
 - `coverage` (detector: Missing interior level(s):) -- evidence rung: synthetic-demonstrable
@@ -124,6 +139,7 @@ Corpus cases:
 
 ## Mode 6: Partial vertebra at the image border whose appearance changes
 
+- Short name (corpus manifests): partial vertebra at the image border
 - Definition: A vertebra at the edge of the imaging field of view is only partially captured: its label touches an image face, and the missing tissue displaces its measured centroid off the fitted spinal curve, changing both its geometry and its apparent position.
 - Discriminator: Distinguishes from mode 1 by a border-touching face: mode 6's clipped vertebra touches an image face, and that crop is what explains the centroid displacement, while mode 1's displaced vertebra touches no face at all -- the same misalignment detector legitimately co-fires on mode 6's case (co-detection is recorded, not suppressed), but the border-touch face is what identifies mode 6 rather than mode 1.
 - Observability: single-channel-observable
@@ -137,6 +153,8 @@ Candidate features:
 
 - Stage-18 metric anchor path (`stage18-metric-anchor`): `per_label.{label}.geometry.touches_left`
 
+Mechanism: The corpus case mode6_crop_at_border demonstrates a border-cropped vertebra end-to-end -- the corpus operator crops the anterior face -- caught by the border rule reading per_label.{label}.geometry.touches_anterior.
+
 Intended rules:
 
 - `border` (detector: Partial vertebra clipped by FOV:) -- evidence rung: synthetic-demonstrable
@@ -147,6 +165,7 @@ Corpus cases:
 
 ## Mode 7: Non-continuous label sequence (e.g. L1 → T12 → L2 → L5)
 
+- Short name (corpus manifests): non-continuous label sequence
 - Definition: The sequence of labelled vertebra levels departs from anatomical order -- a level appears out of its expected cranio-caudal sequence relative to its neighbours in the labelled sequence, independent of any single label's own position or identity.
 - Discriminator: Distinguishes from mode 4 by scope: mode 4 is a pairwise ordering inconsistency between two adjacent labels along the fitted spinal curve, while mode 7 is a sequence-level discontinuity in the labelled level ordering itself, independent of any single label's spatial position.
 - Observability: single-channel-observable
@@ -160,16 +179,19 @@ Candidate features:
 
 - Stage-18 metric anchor path (`stage18-metric-anchor`): `relationships.is_continuous`
 
+Mechanism: segfacet.labels.CANONICAL_ORDER inserts the transitional label T13 at index 19, so a lumbar label's canonical rank equals its integer value (L1 = 20 → rank 20 ... L5 = 24 → rank 24) while a thoracic label's rank is its value minus one (T12 = 19 → rank 18); section 6.7's own L1 → T12 → L2 → L5 example is therefore a SINGLE rank descent (ranks 20, 18, 21, 24), not the two descents §6 and the retired constant both called it. The sequence rule caps nothing: it raises exactly one finding whenever relationships.out_of_order_labels is non-empty, on a one-descent and on a two-descent record alike, as measured. The single-relabel cap belongs to the fixture generator synth/identity_ordering_alignment.py's SequenceBreakPerturbation, which relabels exactly one vertebra -- the tail, to T13 -- so the committed case mode7_sequence_break can express only a single-relabel break and a multi-relabel scramble needs real data, which is why this edge stays one rung below its case's pipeline detection.
+
 Intended rules:
 
 - `sequence` (detector: Non-continuous label sequence:) -- evidence rung: needs-real-data
 
 Corpus cases:
 
-- `mode7_sequence_break` (geometric): expected firing = [sequence]; agrees with live measurement: True. pipeline-detected; sequence is the sole rule that fires on this corpus case, measured live via segfacet.synth.regression.pipeline_findings on the item-143-corrected corpus (2026-09-03). The rule's rank cap admits only a single rank descent per pair (rank(v) == v - 1 under the TPTBox default), so this fixture is a degraded, single-descent instance -- it does not represent section 6.7's own two-descent example L1 -> T12 -> L2 -> L5, which needs real data to exercise, hence the needs-real-data rung despite this case's pipeline detection (item 145 A4).
+- `mode7_sequence_break` (geometric): expected firing = [sequence]; agrees with live measurement: True. pipeline-detected; sequence is the sole rule that fires on this corpus case, measured live via segfacet.synth.regression.pipeline_findings on the item-143-corrected corpus (2026-09-03). Why this edge's rung sits below that measured detection -- what the fixture generator can and cannot express -- is recorded once, in this mode's mechanism sentence (item 147); it is deliberately not repeated here.
 
 ## Mode 8: Overlapping segments
 
+- Short name (corpus manifests): overlapping segments
 - Definition: Two labels' foreground voxel sets intersect -- the same voxel is claimed by more than one label, a condition impossible in a valid single-channel integer label map.
 - Discriminator: Distinguishes from every other mode by requiring a second label's mask: it is unobservable from any single label's geometry alone, unlike modes 1-7, which are all detectable from one label's own geometry or the whole label map's per-label statistics.
 - Observability: structurally-unobservable
@@ -183,6 +205,8 @@ Candidate features:
 
 - Stage-18 metric anchor path (`stage18-metric-anchor`): `overlaps[].overlap_voxels`
 
+Mechanism: A single-channel integer label map cannot assign two labels to one voxel, so overlaps[] populates only on a case deliberately corrupted to violate that invariant, which no real segmenter output can be; mode8_force_overlap therefore stays detection="reconstructed_record" rather than pipeline-detected, while the overlap rule and the paths it reads remain correct and fully wired.
+
 Intended rules:
 
 - `overlap` (detector: Overlapping segments:) -- evidence rung: structurally-unobservable
@@ -193,6 +217,7 @@ Corpus cases:
 
 ## Mode 9: Implausible tissue under a label
 
+- Short name (corpus manifests): Implausible tissue under a label
 - Definition: On CT, the voxels a vertebra label claims do not carry bone-plausible Hounsfield-unit statistics: the label's median HU is implausibly low (soft tissue or air), implausibly high (metal or an implant), or its intensity spread is degenerate -- a near-zero standard deviation over a uniform region, which no real trabecular/cortical bone produces. The label map's geometry may be entirely well-formed; the failure is that the tissue underneath it is not the tissue the label names.
 - Discriminator: Distinguishes from modes 1-8 by requiring the paired intensity scan: every one of those eight is decidable from the label map alone, whereas mode 9 is invisible without the scan (observability = needs-paired-scan). Distinguishes from mode 1 in particular by what is wrong with an otherwise correctly-shaped, correctly-placed label -- mode 1's centroid is displaced from the fitted curve, while mode 9's label may sit exactly where it belongs and still cover the wrong tissue.
 - Observability: needs-paired-scan
@@ -208,6 +233,8 @@ Candidate features:
 - `hypothesised` candidate path: `image_features.per_label[].std_hu`
 - `hypothesised` candidate path: `intensity_reference_delta.per_label[].robust_z`
 
+Mechanism: The committed intensity corpus demonstrates mode 9 end-to-end three times over: implausible_metal (label 22's median reads 2999 HU, above the plausible bone band's ceiling), implausible_soft_tissue (40 HU, below its floor) and degenerate_uniform (a constant fill, zero spread) each drive the intensity rule through segfacet.synth.regression.intensity_pipeline_findings, which is why that edge sits at the strongest rung. intensity_reference_delta stays a rung below: the synthetic intensity corpus is built against no reference distribution and the harness attaches none, so nothing in the committed corpus can exercise it.
+
 Intended rules:
 
 - `intensity` (detector: Implausible intensity (too low): / (too high): / (degenerate/uniform):) -- evidence rung: synthetic-demonstrable
@@ -221,6 +248,7 @@ Corpus cases:
 
 ## Mode 10: Collapsed or duplicated label set
 
+- Short name (corpus manifests): collapsed or duplicated label set
 - Definition: Two or more labels share an exact centroid -- the degenerate case a collapsed or duplicated label set produces. The Stage 3 spline fit cannot be computed over coincident centroids, so the record carries a stage3_unavailable reason instead of a stage3 block, every stage3-reading rule short-circuits on the missing block, and no finding of any kind is raised: the case passes silently (carried defect, item 129, 2026-08-31). The failure is the silence, not any single rule's verdict.
 - Discriminator: Distinguishes from mode 2 (fused or fragmented segments) by what the labels do rather than what the components do: mode 2's labels keep distinct centroids and its detectors fire, whereas mode 10's labels collapse onto one point and every stage3 detector goes quiet. Distinguishes from mode 8 (overlapping segments) by not requiring any shared voxel -- two disjoint labels can still share a centroid.
 - Observability: single-channel-observable
@@ -233,6 +261,8 @@ Corpus cases:
 Candidate features:
 
 - `hypothesised` candidate path: `stage3_unavailable.reason`
+
+Mechanism: No rule exists for this mode yet, which is what `proposed` means: the failure is the silence, and silence is not something a detector can be pointed at without first deciding what the record should carry in place of the stage3 block. The candidate feature this mode names, stage3_unavailable.reason, is the one field a future detector would read -- it is populated today (item 129) and read by no rule, so the mode is listed, defined and deliberately unimplemented rather than hypothetical.
 
 Intended rules:
 

@@ -130,7 +130,19 @@ class CoverageRule(Rule):
     # §6 mode 5 (item 136): RemoveLevelPerturbation
     # (src/segfacet/synth/coverage_border_overlap.py) designates "coverage"
     # for mode 5 via its Expectation(failure_mode=5, expected_rule_ids={"coverage"}).
-    mode_declaration = RuleModeDeclaration(modes=(5,), evidence=("corpus",))
+    mode_declaration = RuleModeDeclaration(
+        modes=(5,),
+        evidence=(
+            "corpus-manifest",
+            "tests/corpus/manifest.json's mode5_remove_level designates "
+            "this rule for §6 mode 5: the corpus operator removes an "
+            "interior level, and this rule fires on the resulting gap in "
+            "relationships.missing_levels[]. Free-form provenance -- item "
+            "147 retired the reserved 'corpus' evidence tag, and the mode "
+            "5 <-> coverage evidence claim is the per-edge rung in "
+            "segfacet.failure_modes.SPECIFICATION[5].",
+        ),
+    )
 
     def evaluate(self, record, config) -> List[Finding]:  # type: ignore[override]
         """Evaluate the coverage checks for *record*.
