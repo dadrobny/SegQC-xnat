@@ -141,25 +141,10 @@ def _manifest_detection_by_case_id() -> dict:
     return {c["case_id"]: c.get("detection") for c in _manifest_cases()}
 
 
-def _vision_mode_titles() -> dict:
-    text = (_REPO_ROOT / "docs" / "aide" / "vision.md").read_text(encoding="utf-8")
-    section_match = re.search(
-        r"^## 6\. Segmentation Failure Modes[^\n]*\n(.*?)(?=^## \d|\Z)",
-        text,
-        flags=re.MULTILINE | re.DOTALL,
-    )
-    assert section_match is not None, "expected a '## 6. Segmentation Failure Modes' section"
-    section_text = section_match.group(1)
-    items = re.findall(r"^\d+\.\s+(.+)$", section_text, flags=re.MULTILINE)
-    assert items, "expected numbered §6 items"
-    titles = {}
-    for index, raw in enumerate(items, start=1):
-        title = raw.strip()
-        if title.endswith("."):
-            title = title[:-1]
-        title = re.sub(r"\s+", " ", title).strip()
-        titles[index] = title
-    return titles
+# Reconciled (item 147, 2026-09-04): the local ``_vision_mode_titles()``
+# parse is retired -- the vision §6 parse has one home now,
+# ``failure_modes.vision_seed_titles()`` (AC4), and every caller here reads
+# that instead of re-parsing ``vision.md`` independently.
 
 
 def _token_in_mechanism(token: str, mechanism: str) -> bool:
@@ -197,16 +182,38 @@ def _row_for_rule(lines: list, rule_id: str):
     return None
 
 
-def _patch_mode_rungs(monkeypatch, traceability_module, mode: int, **replacements):
-    """Replace ``traceability_module.MODE_RUNGS[mode]`` with a
-    ``dataclasses.replace`` of its current value, via ``monkeypatch.setattr``
-    on the whole module attribute (never a container mutation) so this
-    works whether ``MODE_RUNGS`` is a plain dict or an immutable mapping."""
-    original_map = traceability_module.MODE_RUNGS
+def _patch_specification_mode(monkeypatch, failure_modes_module, mode: int, **replacements):
+    """Reconciled (item 147, 2026-09-04): ``MODE_RUNGS`` is retired --
+    the matrix's per-mode rung and mechanism now come from
+    ``failure_modes.SPECIFICATION``. Replace ``SPECIFICATION[mode]`` with a
+    ``dataclasses.replace`` of its current entry carrying *replacements*,
+    via ``monkeypatch.setattr`` on the whole mapping (never a container
+    mutation) so ``build_matrix``'s live read picks it up regardless of
+    ``MappingProxyType`` immutability."""
+    original_map = failure_modes_module.SPECIFICATION
     original_entry = original_map[mode]
     patched_map = dict(original_map)
     patched_map[mode] = dataclasses.replace(original_entry, **replacements)
-    monkeypatch.setattr(traceability_module, "MODE_RUNGS", patched_map)
+    monkeypatch.setattr(failure_modes_module, "SPECIFICATION", patched_map)
+
+
+def _patch_derive_mode_rung(monkeypatch, failure_modes_module, mode: int, rung):
+    """Override ``derive_mode_rung()``'s return for *mode* only.
+
+    Used where the old ``_patch_mode_rungs`` helper injected an
+    out-of-vocabulary rung string directly: ``ModeSpec`` validates every
+    ``IntendedRule.evidence_rung`` against the closed ``EVIDENCE_RUNGS``
+    vocabulary at construction (including inside ``dataclasses.replace``,
+    which re-runs ``__post_init__``), so an invalid rung can only be
+    injected by patching the derivation function itself."""
+    original = failure_modes_module.derive_mode_rung
+
+    def _patched(mode_spec):
+        if mode_spec.id == mode:
+            return rung
+        return original(mode_spec)
+
+    monkeypatch.setattr(failure_modes_module, "derive_mode_rung", _patched)
 
 
 # =========================================================================== #
@@ -406,11 +413,11 @@ def test_ac8_mode_set_equals_mode_anchor_paths_keys():
 
 # Hand-transcribed from docs/aide/vision.md §6 "Segmentation Failure Modes"
 # (lines 279-286 as of this writing), independently of
-# ``_vision_mode_titles()`` / ``traceability._vision_mode_titles()`` -- both
-# of those parse §6 with the identical regex, so comparing the builder's
-# output only to that helper's output would let a shared parsing bug through
-# undetected (both sides would agree with each other while disagreeing with
-# the actual document). These literals are the trailing-period-stripped,
+# ``failure_modes.vision_seed_titles()`` (item 147's one home for the §6
+# parse) -- comparing the builder's output only to that function's own
+# output would let a shared parsing bug through undetected (both sides
+# would agree with each other while disagreeing with the actual document).
+# These literals are the trailing-period-stripped,
 # whitespace-normalised title text exactly as §6 states it, preserving its
 # em dashes and arrows. If §6's wording changes, these must be updated by
 # hand to match -- there is no automated way to keep them in sync.
@@ -438,14 +445,12 @@ def test_ac9_mode_titles_match_the_hand_transcribed_vision_literals():
     deliberately *not* one of §6's numbered eight, and mode 10 is the first
     `proposed` entry). Modes 9 and 10 entered through the specification
     instead, so their ground-truth name lives in
-    ``failure_modes.SPECIFICATION[id].name``, read live, not in this
-    vision-derived dict; ``build_matrix``'s title field is sourced from
-    ``_vision_mode_titles()`` alone (unchanged by item 146) and carries no
-    entry for either id, so both render empty rather than the
-    specification's name -- asserted here live rather than silently
-    dropped, so a future fix that starts threading the specification's name
-    through the title field is what turns this into a real "()" failure to
-    react to, not a silent pass."""
+    ``failure_modes.SPECIFICATION[id].name``.
+
+    Reconciled again (item 147, 2026-09-04): the matrix's title field now
+    sources from ``SPECIFICATION[mode].name`` for every mode, including 9
+    and 10, which render an empty title no longer -- asserted here as the
+    live equality it now is, not the deliberate absence it used to be."""
     import segfacet.failure_modes as failure_modes_module
     import segfacet.traceability as traceability
 
@@ -456,8 +461,8 @@ def test_ac9_mode_titles_match_the_hand_transcribed_vision_literals():
         assert modes[mode]["title"] == expected_title, mode
 
     for mode in (9, 10):
-        assert modes[mode]["title"] == "", mode
-        assert failure_modes_module.SPECIFICATION[mode].name, mode
+        assert modes[mode]["title"] == failure_modes_module.SPECIFICATION[mode].name, mode
+        assert modes[mode]["title"], mode
 
 
 def test_ac9_mode_titles_are_transcribed_from_vision_section_six():
@@ -466,15 +471,21 @@ def test_ac9_mode_titles_are_transcribed_from_vision_section_six():
     are not updated to match), but it is not the AC9 ground-truth check --
     see test_ac9_mode_titles_match_the_hand_transcribed_vision_literals.
 
-    Reconciled (item 146, 2026-09-04): iterate ``_vision_mode_titles()``'s
-    own keys (the eight seed modes) rather than the matrix's now-larger mode
-    set, so this stays a live-document guard over exactly the modes §6
-    actually names -- modes 9 and 10 have no §6 entry to compare against."""
+    Reconciled (item 146, 2026-09-04): iterate the parsed titles' own keys
+    (the eight seed modes) rather than the matrix's now-larger mode set, so
+    this stays a live-document guard over exactly the modes §6 actually
+    names -- modes 9 and 10 have no §6 entry to compare against.
+
+    Reconciled again (item 147, 2026-09-04): the parse itself moved to its
+    one public home, ``failure_modes.vision_seed_titles()`` (AC4) -- this
+    test no longer maintains its own independent regex parse of
+    ``vision.md``."""
+    import segfacet.failure_modes as failure_modes_module
     import segfacet.traceability as traceability
 
     d = traceability.matrix_to_dict(traceability.build_matrix())
     modes = _mode_records(d)
-    vision_titles = _vision_mode_titles()
+    vision_titles = failure_modes_module.vision_seed_titles()
     assert modes and vision_titles
     for mode, expected_title in vision_titles.items():
         assert modes[mode]["title"] == expected_title, mode
@@ -559,9 +570,10 @@ def test_ac12_mode_rung_is_member_of_closed_vocabulary(mode):
 
 
 def test_adv_ac12_stale_rung_outside_vocabulary_is_detectable(monkeypatch):
+    import segfacet.failure_modes as failure_modes_module
     import segfacet.traceability as traceability
 
-    _patch_mode_rungs(monkeypatch, traceability, 8, rung="not-a-real-rung")
+    _patch_derive_mode_rung(monkeypatch, failure_modes_module, 8, "not-a-real-rung")
 
     d = traceability.matrix_to_dict(traceability.build_matrix())
     record = _mode_record(d, 8)
@@ -625,9 +637,10 @@ def test_ac15_rung_and_pipeline_detected_cross_check(mode):
 
 
 def test_adv_ac15_cross_check_violation_when_mode8_rung_monkeypatched_synthetic(monkeypatch):
+    import segfacet.failure_modes as failure_modes_module
     import segfacet.traceability as traceability
 
-    _patch_mode_rungs(monkeypatch, traceability, 8, rung="synthetic-demonstrable")
+    _patch_derive_mode_rung(monkeypatch, failure_modes_module, 8, "synthetic-demonstrable")
 
     d = traceability.matrix_to_dict(traceability.build_matrix())
     mode8 = _mode_record(d, 8)
@@ -856,13 +869,18 @@ def test_ac20_analytic_edges_equal_edges_of_rules_the_corpus_map_never_designate
 def test_adv_ac20_mistagged_corpus_evidence_changes_no_attribution(monkeypatch):
     """A6: attribution is derived from the corpus map, never from the
     declaration's own free-form evidence tag -- retagging bounds' evidence
-    as ('corpus',) leaves the (2, bounds) edge attributed 'analytic'."""
+    leaves the (2, bounds) edge attributed 'analytic' regardless of the
+    tag's text.
+
+    Reconciled (item 147, 2026-09-04): the reserved ``"corpus"`` literal is
+    retired (AC20) -- any non-reserved evidence string demonstrates the
+    same "attribution ignores the tag" claim just as well."""
     from segfacet.heuristics.rule import _RULES
     import segfacet.heuristics.rule as rule_mod
     import segfacet.traceability as traceability
 
     rule = _RULES["bounds"]
-    replacement = rule_mod.RuleModeDeclaration(modes=(2,), evidence=("corpus",))
+    replacement = rule_mod.RuleModeDeclaration(modes=(2,), evidence=("mistagged-note",))
     monkeypatch.setattr(rule, "mode_declaration", replacement)
 
     d = traceability.matrix_to_dict(traceability.build_matrix())
@@ -1054,15 +1072,21 @@ def test_ac26_undeclared_registered_rule_makes_rule_to_mode_fail_loudly(isolated
 
 
 def test_ac27_bare_string_evidence_renders_as_one_cell_not_per_character(monkeypatch):
+    """Reconciled (item 147, 2026-09-04): ``RuleModeDeclaration``'s
+    ``__post_init__`` now rejects a bare-str ``evidence`` at construction
+    (AC18), so the item-136 weakness this test reproduced can no longer be
+    reached through normal construction. The defence-in-depth coverage
+    stays: force the malformed value past ``__post_init__`` with
+    ``object.__setattr__`` (the frozen dataclass's own escape hatch) so
+    ``traceability._normalise_evidence``'s own guard against a bare str
+    stays exercised."""
     from segfacet.heuristics.rule import _RULES
     import segfacet.heuristics.rule as rule_mod
     import segfacet.traceability as traceability
 
     rule = _RULES["bounds"]
-    # The known item-136 weakness (A6): __post_init__ iterates `evidence`,
-    # and a bare str is itself iterable-of-non-empty-strings (its
-    # characters), so this construction does not raise.
-    replacement = rule_mod.RuleModeDeclaration(modes=(2,), evidence="corpus-derived")
+    replacement = rule_mod.RuleModeDeclaration(modes=(2,), evidence=("placeholder",))
+    object.__setattr__(replacement, "evidence", "corpus-derived")
     monkeypatch.setattr(rule, "mode_declaration", replacement)
 
     matrix = traceability.build_matrix()
@@ -1233,6 +1257,7 @@ def test_ac31_no_character_count_threshold_assertions_in_this_module():
 
 
 def test_adv_ac31_stale_mechanism_naming_no_live_identifier_is_detectable(monkeypatch):
+    import segfacet.failure_modes as failure_modes_module
     import segfacet.feature_docs as feature_docs_module
     import segfacet.traceability as traceability
 
@@ -1242,7 +1267,7 @@ def test_adv_ac31_stale_mechanism_naming_no_live_identifier_is_detectable(monkey
         "This sentence is deliberately long and describes nothing that "
         "lives in the codebase or the corpus at all, on purpose, for a test."
     )
-    _patch_mode_rungs(monkeypatch, traceability, 8, mechanism=bogus_mechanism)
+    _patch_specification_mode(monkeypatch, failure_modes_module, 8, mechanism=bogus_mechanism)
 
     d = traceability.matrix_to_dict(traceability.build_matrix())
     mode8 = _mode_record(d, 8)
@@ -1256,6 +1281,7 @@ def test_adv_ac31_stale_mechanism_naming_no_live_identifier_is_detectable(monkey
 
 
 def test_adv_ac31_stale_mechanism_one_character_off_the_real_case_id_is_detectable(monkeypatch):
+    import segfacet.failure_modes as failure_modes_module
     import segfacet.feature_docs as feature_docs_module
     import segfacet.traceability as traceability
 
@@ -1267,7 +1293,7 @@ def test_adv_ac31_stale_mechanism_one_character_off_the_real_case_id_is_detectab
         "The mechanism names mode8_force_overlaps, one character off the "
         "real case id, on purpose, for a test."
     )
-    _patch_mode_rungs(monkeypatch, traceability, 8, mechanism=typo_mechanism)
+    _patch_specification_mode(monkeypatch, failure_modes_module, 8, mechanism=typo_mechanism)
 
     d = traceability.matrix_to_dict(traceability.build_matrix())
     mode8 = _mode_record(d, 8)
@@ -1359,14 +1385,18 @@ def test_ac31_named_feature_path_is_consumed_by_one_of_the_modes_declared_rules(
         mechanism = record["mechanism"]
         declared_rules = set(record["rules"])
         if mode == 10:
-            # Reconciled (item 146, 2026-09-04): mode 10 is the first
-            # `proposed` entry -- no declared rules, no authored mechanism
-            # (MODE_RUNGS carries no entry for it either) -- so it has
-            # nothing to name and nothing that could consume a named path.
-            # Assert that zero state explicitly rather than let the empty
-            # declared_rules set trip the non-empty assertion below.
+            # Reconciled (item 147, 2026-09-04): mode 10 now carries an
+            # authored mechanism sentence (naming its candidate feature,
+            # features.stage3_unavailable, and why no rule exists yet --
+            # AC9) even though it still has zero declared rules -- it
+            # remains the catalogue's first `proposed` entry, by design.
+            # "Check (1)" above (a named path must be consumed by one of
+            # the mode's declared rules) is therefore structurally
+            # inapplicable here: skip the consumption check, but assert
+            # the mechanism is non-empty now rather than the empty-string
+            # absence this test asserted before item 147 authored one.
             assert declared_rules == set(), mode
-            assert mechanism == "", mode
+            assert mechanism, mode
             continue
         assert declared_rules, mode
 
@@ -1385,6 +1415,7 @@ def test_adv_ac31_named_anchor_path_not_consumed_by_declared_rule_is_detectable(
     resolvable path (the mode's own anchor) that the mode's only declared
     rule never actually consumes must be distinguishable from a genuine
     claim -- demonstrating check (1) above would have failed it."""
+    import segfacet.failure_modes as failure_modes_module
     import segfacet.traceability as traceability
 
     d_before = traceability.matrix_to_dict(traceability.build_matrix())
@@ -1401,7 +1432,7 @@ def test_adv_ac31_named_anchor_path_not_consumed_by_declared_rule_is_detectable(
     )
 
     bogus_mechanism = f"caught by mislabel's Detector B via {bogus_path}, on purpose, for a test."
-    _patch_mode_rungs(monkeypatch, traceability, 4, mechanism=bogus_mechanism)
+    _patch_specification_mode(monkeypatch, failure_modes_module, 4, mechanism=bogus_mechanism)
 
     d = traceability.matrix_to_dict(traceability.build_matrix())
     mode4 = _mode_record(d, 4)
