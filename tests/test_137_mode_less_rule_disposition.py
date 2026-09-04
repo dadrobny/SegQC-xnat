@@ -44,7 +44,8 @@ Covers Acceptance Criteria AC1-AC18:
 - AC14: every intensity-only, non-anchor entry is honestly mode-less
         (``failure_modes == ()``, ``mode_evidence == ("rule_mode_less",)``).
 - AC15: both committed catalogue artifacts regenerate byte-identically,
-        ``schema_version`` still ``"1.1"``.
+        ``schema_version`` still ``"1.1"`` (``"1.2"`` since item 148,
+        2026-09-04).
 - AC16: the catalogue-gap finding is captured durably in the insight inbox
         (or one of its archives).
 - AC17: §6 stays at exactly eight numbered modes; ``MODE_ANCHOR_PATHS``'s key

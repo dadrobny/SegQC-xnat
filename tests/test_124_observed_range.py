@@ -28,7 +28,8 @@ Covers Acceptance Criteria AC1-AC23:
 - AC16: two same-session regenerations are byte-identical.
 - AC17: the committed artifacts match a fresh regeneration.
 - AC18: the regenerated leaf-path set is unchanged (138 paths).
-- AC19: ``schema_version`` is bumped to ``"1.1"``.
+- AC19: ``schema_version`` is bumped to ``"1.1"`` (reconciled to ``"1.2"`` by
+        item 148, 2026-09-04, which added the ``mode_roles`` shape).
 - AC20: ``aide_status_report.py``'s loader accepts the bumped schema.
 - AC21: a missing/unparseable/mis-versioned reference degrades, never raises.
 - AC22: ``--reference PATH`` is accepted and steers the reference population.
