@@ -129,11 +129,23 @@ def isolated_registry():
 
 
 def _status_report_module():
+    """Load ``scripts/aide_status_report.py`` in isolation. The script uses
+    ``from __future__ import annotations``, so its dataclasses resolve
+    string annotations through ``sys.modules`` at class-definition time --
+    without registering the module there first, that lookup finds nothing
+    and ``dataclasses`` raises. Mirror the model at
+    ``tests/test_103_feature_catalogue.py``'s module-scoped ``asr`` fixture
+    (register before ``exec_module``), and remove the registration
+    afterwards so nothing leaks into later tests."""
     import importlib.util
 
     spec = importlib.util.spec_from_file_location("aide_status_report_148", _ASR_MODULE_PATH)
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)  # type: ignore[union-attr]
+    finally:
+        sys.modules.pop(spec.name, None)
     return module
 
 

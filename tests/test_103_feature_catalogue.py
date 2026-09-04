@@ -559,17 +559,40 @@ def test_ac13_rule_mode_map_effect_on_failure_modes(
     carries R's corpus modes" now holds only for entries R classifies
     ``"signal"`` -- e.g. ``per_label.{label}.label``, consumed only by
     ``sequence``, is ``bookkeeping`` and carries ``()``. Restrict the match
-    set to this rule's signal-classified paths."""
+    set to this rule's signal-classified paths.
+
+    ``overlap``'s only ``"signal"`` path, ``overlaps[].overlap_voxels``, is
+    also ``MODE_ANCHOR_PATHS[8]``'s sole member, so filtering it out as an
+    anchor leaves nothing to match against. For a rule whose every signal
+    path is an anchor path, assert that fact directly (the signal set is a
+    non-empty subset of the anchor paths) and check the rule-mode-map's
+    effect on the anchor entry instead: its ``failure_modes`` carries both
+    this rule's mapped modes and the anchor's own mode (identical for
+    ``overlap``, since mode 8 is both)."""
     anchor_paths = {
         p for paths in feature_docs_module.MODE_ANCHOR_PATHS.values() for p in paths
     }
-    matches = [
-        e
+    signal_paths = {
+        e.path
         for e in full_catalogue.entries
         if set(e.consuming_rules) == {rule_id}
-        and e.path not in anchor_paths
         and dict(e.mode_roles).get(rule_id) == "signal"
-    ]
+    }
+    assert signal_paths, f"expected at least one signal-classified entry consumed only by {rule_id!r}"
+    non_anchor = signal_paths - anchor_paths
+    if not non_anchor:
+        assert signal_paths <= anchor_paths and signal_paths, rule_id
+        for path in signal_paths:
+            anchor_mode = next(
+                mode
+                for mode, paths in feature_docs_module.MODE_ANCHOR_PATHS.items()
+                if path in paths
+            )
+            entry = _entry(full_catalogue, path)
+            assert set(modes).issubset(set(entry.failure_modes)), entry.path
+            assert anchor_mode in entry.failure_modes, entry.path
+        return
+    matches = [e for e in full_catalogue.entries if e.path in non_anchor]
     assert matches, f"expected a non-anchor, signal-classified entry consumed only by {rule_id!r}"
     for entry in matches:
         assert set(entry.failure_modes) == set(modes), entry.path
