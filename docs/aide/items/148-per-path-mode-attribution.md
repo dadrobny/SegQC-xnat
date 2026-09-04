@@ -473,6 +473,8 @@ non-`.py` fixture under `tests/` (**A7**).
 - `tests/test_136_rule_mode_declarations.py` — reconciliation only.
 - `tests/test_137_mode_less_rule_disposition.py` — reconciliation only.
 - `tests/test_146_ninth_mode_and_first_proposed.py` — reconciliation only.
+- `tests/test_124_observed_range.py` — reconciliation only, per **D11**: this
+  item's own **A4** `SCHEMA_VERSION` bump breaks item 124's AC19 pins.
 
 **Asserts against:**
 
@@ -808,3 +810,18 @@ Recorded at authoring time; the builder appends what it learns.
   honest fix is a per-rule exemption in the test, not a wider `overlap`
   classification: calling `overlaps[]` or `overlaps[].label_a` `signal` would
   ship the false claim this item exists to remove.
+
+- **D11 (2026-09-04) — item 124's AC19 pins reconciled to `"1.2"`.** This
+  item's **A4** bumps `SCHEMA_VERSION` from `"1.1"` to `"1.2"`, following item
+  124's own precedent of bumping it as part of a feature-catalogue schema
+  change (item 124: `"1.0"` → `"1.1"`). `tests/test_124_observed_range.py`'s
+  `test_ac19_schema_version_is_1_1` and
+  `test_ac19_committed_schema_version_is_1_1` pin the prior literal `"1.1"`
+  against the live and committed catalogue respectively, so both now fail
+  against this item's own change and not against a defect. Reconciled to the
+  literal `"1.2"` in both (the committed-artifact half stays a literal pin,
+  not a read of `segfacet.catalogue.SCHEMA_VERSION`, so a silent future bump
+  is still caught); the AC19 reference each test name carries is unchanged,
+  only the version suffix moves. Added to **Authorised paths** as
+  reconciliation-only, matching the four other AC19-adjacent test files
+  already listed there.

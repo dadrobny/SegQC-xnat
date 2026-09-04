@@ -552,12 +552,12 @@ def test_ac18_committed_entry_set_matches_regenerated(full_catalogue, committed_
 # =========================================================================== #
 
 
-def test_ac19_schema_version_is_1_1(catalogue_dict):
-    assert catalogue_dict["schema_version"] == "1.1"
+def test_ac19_schema_version_is_1_2(catalogue_dict):
+    assert catalogue_dict["schema_version"] == "1.2"
 
 
-def test_ac19_committed_schema_version_is_1_1(committed_json_dict):
-    assert committed_json_dict["schema_version"] == "1.1"
+def test_ac19_committed_schema_version_is_1_2(committed_json_dict):
+    assert committed_json_dict["schema_version"] == "1.2"
 
 
 # =========================================================================== #
