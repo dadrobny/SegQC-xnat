@@ -93,8 +93,13 @@ _NOTE = (
     "hand-edit this document -- edit MODE_RUNGS in "
     "src/segfacet/traceability.py (the authored evidence rungs) or the "
     "underlying rule/catalogue sources it derives from, then regenerate. "
-    "mode -> rule and rule -> mode are complete by construction (a hole in "
-    "either fails loudly); feature -> rule is deliberately incomplete -- see "
+    "mode -> rule and rule -> mode each report their own completeness and "
+    "name every hole: read the `complete`/`holes` fields rather than "
+    "assuming either is complete. Since item 146 a mode may legitimately "
+    "carry no rule -- a `proposed` entry in "
+    "segfacet.failure_modes.SPECIFICATION is listed and defined but "
+    "deliberately unimplemented -- and it appears as a mode -> rule hole. "
+    "feature -> rule is deliberately incomplete -- see "
     "the `features.read_by_no_rule.qualifier` field."
 )
 
