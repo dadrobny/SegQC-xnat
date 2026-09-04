@@ -28,7 +28,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
+from segfacet.heuristics.rule import (
+    ConsumedPath,
+    Rule,
+    RuleModeDeclaration,
+    register_rule,
+)
 from segfacet.labels import CANONICAL_ORDER
 from segfacet.verdict import Severity
 
@@ -307,6 +312,41 @@ class BoundsRule(Rule):
             "over the maximum and an under-segmented or partially-labelled "
             "vertebra reads under the minimum, which is §6 mode 2's own "
             "definition (over-/under-segmentation).",
+        ),
+        consumed_paths=(
+            ConsumedPath(
+                path="per_label",
+                role="bookkeeping",
+                reason=(
+                    "container: iterated to reach each label's geometry "
+                    "block"
+                ),
+            ),
+            ConsumedPath(
+                path="per_label.{label}.geometry.extent_x_mm",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.geometry.extent_y_mm",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.geometry.extent_z_mm",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.geometry.physical_volume_mm3",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.level_name",
+                role="bookkeeping",
+                reason=(
+                    "gate: selects the level's expected band (or reference "
+                    "stratum); the deviation is carried by the geometry "
+                    "values"
+                ),
+            ),
         ),
     )
 

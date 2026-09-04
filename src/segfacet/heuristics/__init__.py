@@ -40,6 +40,13 @@ Public API
     disposition is pending a named downstream item. Metadata only; never read
     during ``evaluate``.
 
+``ConsumedPath`` / ``PATH_ROLES``
+    Frozen dataclass and closed vocabulary (item 148) behind a declaration's
+    ``consumed_paths``: each catalogued leaf path the rule consumes, tagged
+    ``"signal"``, ``"bookkeeping"`` or ``"not-read"``. Only a ``"signal"``
+    pair lets the catalogue attribute the rule's §6 modes to that path.
+    Metadata only; never read during ``evaluate``.
+
 ``declaration_for(rule_or_id)`` / ``iter_rule_declarations()``
     Look up a registered rule's ``RuleModeDeclaration`` (item 136), by
     instance or ``rule_id``, or iterate ``(rule_id, declaration)`` pairs in
@@ -80,6 +87,8 @@ Usage example::
 
 from segfacet.heuristics.finding import Finding
 from segfacet.heuristics.rule import (
+    PATH_ROLES,
+    ConsumedPath,
     Rule,
     RuleModeDeclaration,
     declaration_for,
@@ -108,6 +117,8 @@ __all__ = [
     "iter_rules",
     "run_rules",
     "RuleModeDeclaration",
+    "ConsumedPath",
+    "PATH_ROLES",
     "declaration_for",
     "iter_rule_declarations",
 ]

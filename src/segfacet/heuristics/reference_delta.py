@@ -52,7 +52,12 @@ from __future__ import annotations
 from typing import Dict, List
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
+from segfacet.heuristics.rule import (
+    ConsumedPath,
+    Rule,
+    RuleModeDeclaration,
+    register_rule,
+)
 from segfacet.verdict import Severity
 
 __all__ = ["ReferenceDeltaRule"]
@@ -141,6 +146,87 @@ class ReferenceDeltaRule(Rule):
             "stage3.per_label_offsets[].offset_mm), which is §6 mode 1's own "
             "anchor feature, so an out-of-distribution verdict on that "
             "feature alone is a mode 1 detection.",
+        ),
+        consumed_paths=(
+            ConsumedPath(
+                path="per_label",
+                role="not-read",
+                reason=(
+                    "mechanism B last-path-segment match only: this rule "
+                    "reads record['reference_delta']['per_label'], never "
+                    "the top-level record['per_label']"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.lower_pct",
+                role="bookkeeping",
+                reason=(
+                    "message interpolation: the band's lower percentile, "
+                    "printed in the finding; the firing decision is "
+                    "out_of_range_features[]'s membership"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.upper_pct",
+                role="bookkeeping",
+                reason=(
+                    "message interpolation: the band's upper percentile, "
+                    "printed in the finding"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.{label}.available",
+                role="bookkeeping",
+                reason=(
+                    "gate: skips a label the reference distribution does "
+                    "not cover; availability is not a deviation"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.{label}.distribution_distance",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="reference_delta.{label}.features.physical_volume_mm3.percentile_rank",
+                role="bookkeeping",
+                reason=(
+                    "message interpolation: printed alongside the "
+                    "out-of-range feature; the firing decision is "
+                    "out_of_range_features[]'s membership"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.{label}.features.physical_volume_mm3.robust_z",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="reference_delta.{label}.features.physical_volume_mm3.value",
+                role="bookkeeping",
+                reason=(
+                    "message interpolation: the raw measured value printed "
+                    "beside the deviation"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.{label}.label",
+                role="bookkeeping",
+                reason=(
+                    "identity: the label id carried into the finding's "
+                    "labels set"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.{label}.level_name",
+                role="bookkeeping",
+                reason=(
+                    "identity and message interpolation: names the level "
+                    "in the finding"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.{label}.out_of_range_features[]",
+                role="signal",
+            ),
         ),
     )
 

@@ -54,7 +54,12 @@ from typing import Dict, List, Optional
 
 from segfacet.heuristics.finding import Finding
 from segfacet.heuristics.fov import derive_fov_coverage
-from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
+from segfacet.heuristics.rule import (
+    ConsumedPath,
+    Rule,
+    RuleModeDeclaration,
+    register_rule,
+)
 from segfacet.labels import CANONICAL_ORDER
 from segfacet.verdict import Severity
 
@@ -141,6 +146,32 @@ class CoverageRule(Rule):
             "147 retired the reserved 'corpus' evidence tag, and the mode "
             "5 <-> coverage evidence claim is the per-edge rung in "
             "segfacet.failure_modes.SPECIFICATION[5].",
+        ),
+        consumed_paths=(
+            ConsumedPath(
+                path="per_label",
+                role="bookkeeping",
+                reason=(
+                    "container: iterated for the border-aware exemption; "
+                    "the missing/present level lists carry the evidence"
+                ),
+            ),
+            ConsumedPath(
+                path="relationships",
+                role="bookkeeping",
+                reason=(
+                    "container: the block the two level lists are read "
+                    "from"
+                ),
+            ),
+            ConsumedPath(
+                path="relationships.missing_levels[]",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="relationships.present_levels[]",
+                role="signal",
+            ),
         ),
     )
 

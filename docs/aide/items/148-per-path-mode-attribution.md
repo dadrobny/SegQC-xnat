@@ -737,3 +737,74 @@ Recorded at authoring time; the builder appends what it learns.
   shape chosen is per-path (D1), so the spec's title says so. The queue's own
   text already allows both ("Whichever of the two shapes is chosen"), and the
   deliverable — the catalogue stops painting bookkeeping paths — is unchanged.
+
+- **D7 (builder, 2026-09-04) — the classification was authored from the
+  Implementation-Steps table and then measured; the table was right in nine
+  places out of ten.** `build_catalogue()`'s measured `consuming_rules` reach
+  matched step 2's authored path lists exactly for all ten rules (border 9,
+  bounds 6, coverage 4, fragmentation 7, intensity 5,
+  `intensity_reference_delta` 8, mislabel 9, overlap 6, `reference_delta` 11,
+  sequence 5 — 70 pairs). One **role** in the table is wrong and was corrected
+  against the rule body per **A5**: `mislabel`'s `per_label` is `bookkeeping`,
+  not `not-read`. `MislabelRule.evaluate` reads `record["per_label"]` at
+  `src/segfacet/heuristics/mislabel.py:407` and scans it through
+  `_label_for_level` to resolve a non-monotonic pair's level names back to
+  integer label ids for the finding's `labels` set — so a `not-read` claim
+  there would have been false, and AC7 would not have caught it (the pair
+  carries mechanism-B `"static"` evidence, not mechanism-A `"observed"`). The
+  table's other two `per_label` `not-read` claims (`intensity` reads
+  `image_features.per_label`, `reference_delta` reads
+  `reference_delta.per_label`) were verified and stand.
+
+- **D8 (builder, 2026-09-04) — every measured figure in A5 held.** The
+  regenerated catalogue reproduces the predicted per-mode path counts exactly
+  — 1: 19→**8**, 2: 21→**12**, 3: 7→**5**, 4: 10→**6**, 5: 4→**2**,
+  6: 9→**6**, 7: 6→**2**, 8: 6→**1**, 9: 12→**2** — and step 7's nine-bucket
+  `mode_evidence` distribution exactly, including the unmoved 86-entry `()`
+  bucket and 2-entry `("per_mode_metric",)` bucket, with no entry becoming
+  `("rule_unmapped",)`. Mode 9 lands on exactly the two
+  `image_features.per_label.{label}.first_order.*` paths (AC12), and each of
+  modes 1–8 keeps at least one. `path_classification_conflicts()`,
+  `rule_declaration_conflicts()` and `failure_modes.specification_conflicts()`
+  are all `()` on the shipped tree, and both catalogue artifacts regenerate
+  byte-identically across two runs.
+
+- **D9 (builder, 2026-09-04) — the item-147 review's `evidence`-string fix was
+  attempted and reverted: it is out of this item's authorised paths.** The
+  finding (`insights.md`, item 147, 2026-09-04) is that
+  `heuristics/intensity.py` and `heuristics/intensity_reference_delta.py`
+  still describe the retired `"corpus"`-tag mechanism as live in their
+  declaration `evidence`. Restating both as plain provenance moves the
+  Evidence column of `docs/aide/traceability_matrix.generated.{json,md}` —
+  measured: 4 changed lines across the pair, the Evidence cells alone, nothing
+  else. Those two artifacts are listed under **Asserts against** as
+  pinned-not-changed (AC18), so `aide scope 148 --base aide/queue-020` failed
+  with four errors naming them. Widening the item's own authorised paths to
+  admit the regeneration is exactly the silent scope creep the fence exists to
+  prevent, so the edit was reverted, both artifacts regenerate byte-identical
+  to their committed copies again (AC18 holds), and the insight stays
+  **unticked** for a follow-up item that authorises the matrix pair.
+
+- **D10 (builder, 2026-09-04) — two committed tests fail against this item's
+  own spec; neither is a production defect and the builder does not edit
+  tests.** (1)
+  `tests/test_148_per_path_mode_attribution.py::test_ac15_schema_version_and_status_report_loader`
+  raises `AttributeError: 'NoneType' object has no attribute '__dict__'` from
+  `dataclasses._is_type` while importing `scripts/aide_status_report.py`: the
+  module's `_status_report_module()` helper omits the
+  `sys.modules[spec.name] = module` line that the helper it is modelled on
+  (`tests/test_103_feature_catalogue.py:861`) carries, and that script's
+  `from __future__ import annotations` makes every dataclass field annotation
+  a string the `dataclass` decorator then resolves through `sys.modules`.
+  Independently verified: with the line added, `load_feature_catalog` returns a
+  non-empty tuple of `FeatureGroupSpec` for the regenerated committed artifact,
+  which is what AC15 asserts, and `test_103`'s own
+  `test_ac22_rendered_section_markup_shape` passes against `"1.2"`. (2)
+  `tests/test_103_feature_catalogue.py::test_ac13_rule_mode_map_effect_on_failure_modes[overlap-modes4]`
+  asserts a non-anchor, `signal`-classified entry consumed only by each rule
+  exists; `overlap`'s only `signal` path under this spec's own step-2 table is
+  `overlaps[].overlap_voxels`, which is also `MODE_ANCHOR_PATHS[8]`'s sole
+  member, so the match set is empty by construction for `overlap` alone. The
+  honest fix is a per-rule exemption in the test, not a wider `overlap`
+  classification: calling `overlaps[]` or `overlaps[].label_a` `signal` would
+  ship the false claim this item exists to remove.

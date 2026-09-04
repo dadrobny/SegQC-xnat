@@ -67,7 +67,12 @@ from __future__ import annotations
 from typing import Dict, List
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
+from segfacet.heuristics.rule import (
+    ConsumedPath,
+    Rule,
+    RuleModeDeclaration,
+    register_rule,
+)
 from segfacet.verdict import Severity
 
 __all__ = ["IntensityRule"]
@@ -154,6 +159,42 @@ class IntensityRule(Rule):
             "the GEOMETRIC corpus's Expectation(...) literals only, so "
             "tagging it here would report a false conflict (item 146 A6; "
             "item 147 retires the tag)."
+        ),
+        consumed_paths=(
+            ConsumedPath(
+                path="image_features.available",
+                role="bookkeeping",
+                reason=(
+                    "gate: the rule returns no findings when the intensity "
+                    "block is absent; availability is not mode-9 evidence"
+                ),
+            ),
+            ConsumedPath(
+                path="image_features.per_label.{label}.first_order.median",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="image_features.per_label.{label}.first_order.std",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="image_features.per_label.{label}.label",
+                role="bookkeeping",
+                reason=(
+                    "identity: the label id carried into the finding's "
+                    "labels set"
+                ),
+            ),
+            ConsumedPath(
+                path="per_label",
+                role="not-read",
+                reason=(
+                    "mechanism B attributes it by last-path-segment name "
+                    "match only: this rule reads "
+                    "record['image_features']['per_label'], never the "
+                    "top-level record['per_label']"
+                ),
+            ),
         ),
     )
 

@@ -92,7 +92,12 @@ import math
 from typing import Dict, List, Optional
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
+from segfacet.heuristics.rule import (
+    ConsumedPath,
+    Rule,
+    RuleModeDeclaration,
+    register_rule,
+)
 from segfacet.verdict import Severity
 
 __all__ = ["MislabelRule"]
@@ -181,6 +186,62 @@ class MislabelRule(Rule):
             "'corpus' evidence tag, and the per-mode evidence claims are "
             "the per-edge rungs in "
             "segfacet.failure_modes.SPECIFICATION[1] and [4].",
+        ),
+        consumed_paths=(
+            ConsumedPath(
+                path="per_label",
+                role="bookkeeping",
+                reason=(
+                    "container: scanned by _label_for_level to resolve a "
+                    "non-monotonic pair's level names back to integer label "
+                    "ids for the finding's labels set; the offsets carry the "
+                    "evidence"
+                ),
+            ),
+            ConsumedPath(
+                path="stage3.monotonic_consistency.non_monotonic_pairs[]",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="stage3.per_label_offsets[].dx_mm",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="stage3.per_label_offsets[].dy_mm",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="stage3.per_label_offsets[].dz_mm",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="stage3.per_label_offsets[].is_terminal",
+                role="bookkeeping",
+                reason=(
+                    "gate: detector A's terminal exemption, which "
+                    "suppresses a finding rather than evidencing one"
+                ),
+            ),
+            ConsumedPath(
+                path="stage3.per_label_offsets[].label",
+                role="bookkeeping",
+                reason=(
+                    "identity: the label id carried into the finding's "
+                    "labels set"
+                ),
+            ),
+            ConsumedPath(
+                path="stage3.per_label_offsets[].level_name",
+                role="bookkeeping",
+                reason=(
+                    "identity and message interpolation: names the level "
+                    "in the finding"
+                ),
+            ),
+            ConsumedPath(
+                path="stage3.per_label_offsets[].offset_mm",
+                role="signal",
+            ),
         ),
     )
 

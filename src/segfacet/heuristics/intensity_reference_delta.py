@@ -64,7 +64,12 @@ from __future__ import annotations
 from typing import Dict, List
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
+from segfacet.heuristics.rule import (
+    ConsumedPath,
+    Rule,
+    RuleModeDeclaration,
+    register_rule,
+)
 from segfacet.verdict import Severity
 
 __all__ = ["IntensityReferenceDeltaRule"]
@@ -146,6 +151,83 @@ class IntensityReferenceDeltaRule(Rule):
             "tag is deliberately NOT bound (item 146 A6): it is checked "
             "against the GEOMETRIC corpus scan only, so tagging it here "
             "would report a false conflict."
+        ),
+        consumed_paths=(
+            ConsumedPath(
+                path="per_label",
+                role="not-read",
+                reason=(
+                    "mechanism B last-path-segment match only: this rule "
+                    "reads record['intensity_reference_delta'], never the "
+                    "top-level record['per_label']"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.lower_pct",
+                role="not-read",
+                reason=(
+                    "mechanism B last-path-segment match only: the rule "
+                    "reads "
+                    "record['intensity_reference_delta']['lower_pct'], a "
+                    "block no driver realises, so it has no catalogued "
+                    "leaf path of its own"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.upper_pct",
+                role="not-read",
+                reason=(
+                    "mechanism B last-path-segment match only: the rule "
+                    "reads "
+                    "record['intensity_reference_delta']['upper_pct'], not "
+                    "record['reference_delta']"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.{label}.distribution_distance",
+                role="not-read",
+                reason=(
+                    "mechanism B last-path-segment match only: read from "
+                    "the intensity_reference_delta block, not from "
+                    "reference_delta"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.{label}.features.physical_volume_mm3.percentile_rank",
+                role="not-read",
+                reason=(
+                    "mechanism B last-path-segment match only: "
+                    "'percentile_rank' is read under the "
+                    "intensity_reference_delta block's own per-feature "
+                    "entries"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.{label}.features.physical_volume_mm3.robust_z",
+                role="not-read",
+                reason=(
+                    "mechanism B last-path-segment match only: 'robust_z' "
+                    "is read under the intensity_reference_delta block, "
+                    "never under reference_delta"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.{label}.features.physical_volume_mm3.value",
+                role="not-read",
+                reason=(
+                    "mechanism B last-path-segment match only: 'value' is "
+                    "read under the intensity_reference_delta block"
+                ),
+            ),
+            ConsumedPath(
+                path="reference_delta.{label}.out_of_range_features[]",
+                role="not-read",
+                reason=(
+                    "mechanism B last-path-segment match only: read from "
+                    "the intensity_reference_delta block, not from "
+                    "reference_delta"
+                ),
+            ),
         ),
     )
 

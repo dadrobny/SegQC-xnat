@@ -31,7 +31,12 @@ from __future__ import annotations
 from typing import Dict, List
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
+from segfacet.heuristics.rule import (
+    ConsumedPath,
+    Rule,
+    RuleModeDeclaration,
+    register_rule,
+)
 from segfacet.verdict import Severity
 
 __all__ = ["OverlapRule"]
@@ -107,6 +112,50 @@ class OverlapRule(Rule):
             "the reserved 'corpus' evidence tag, and the mode 8 <-> "
             "overlap evidence claim is the per-edge rung in "
             "segfacet.failure_modes.SPECIFICATION[8].",
+        ),
+        consumed_paths=(
+            ConsumedPath(
+                path="overlaps[]",
+                role="bookkeeping",
+                reason=(
+                    "container: iterated to reach each pair's voxel count"
+                ),
+            ),
+            ConsumedPath(
+                path="overlaps[].label_a",
+                role="bookkeeping",
+                reason=(
+                    "identity: one side of the overlapping pair, carried "
+                    "into the finding's labels set"
+                ),
+            ),
+            ConsumedPath(
+                path="overlaps[].label_b",
+                role="bookkeeping",
+                reason=(
+                    "identity: the other side of the overlapping pair"
+                ),
+            ),
+            ConsumedPath(
+                path="overlaps[].name_a",
+                role="bookkeeping",
+                reason=(
+                    "message interpolation: the level name printed in the "
+                    "finding"
+                ),
+            ),
+            ConsumedPath(
+                path="overlaps[].name_b",
+                role="bookkeeping",
+                reason=(
+                    "message interpolation: the level name printed in the "
+                    "finding"
+                ),
+            ),
+            ConsumedPath(
+                path="overlaps[].overlap_voxels",
+                role="signal",
+            ),
         ),
     )
 

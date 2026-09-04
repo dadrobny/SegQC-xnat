@@ -38,13 +38,49 @@ __all__ = [
     "get_rule",
     "iter_rules",
     "RuleModeDeclaration",
+    "ConsumedPath",
+    "PATH_ROLES",
     "declaration_for",
     "iter_rule_declarations",
 ]
 
+#: The closed vocabulary of per-path roles a rule may declare (item 148).
+#:
+#: - ``"signal"`` — the path carries the mode's evidence: its *value* is what
+#:   a finding from this rule asserts about.
+#: - ``"bookkeeping"`` — the rule reads it, but it cannot evidence a mode:
+#:   label ids, level names, containers iterated, availability gates, band
+#:   values and other message interpolation, context that only gates or
+#:   exempts.
+#: - ``"not-read"`` — the rule does **not** read this path at all; the
+#:   catalogue attributes it by mechanism B's last-path-segment name match
+#:   (see :mod:`segfacet.catalogue`). ``segfacet.catalogue.
+#:   path_classification_conflicts()`` refuses a ``"not-read"`` claim on a
+#:   pair carrying mechanism-A ``"observed"`` evidence, so it cannot be used
+#:   as an escape hatch.
+PATH_ROLES: Tuple[str, ...] = ("signal", "bookkeeping", "not-read")
+
 # Module-level registry: rule_id → Rule instance.
 # Deliberately exposed (not name-mangled) so tests can snapshot/restore it.
 _RULES: Dict[str, "Rule"] = {}
+
+
+@dataclasses.dataclass(frozen=True)
+class ConsumedPath:
+    """One rule's declared role for one catalogued leaf path (item 148).
+
+    ``path`` is a normalised ``segfacet.catalogue`` leaf path (e.g.
+    ``"per_label.{label}.geometry.extent_x_mm"``); ``role`` is a member of
+    :data:`PATH_ROLES`, matched **exactly** (case-sensitive, never by prefix
+    or substring); ``reason`` records why the path cannot evidence a mode and
+    is mandatory for ``"bookkeeping"`` and ``"not-read"``.
+
+    Read-only metadata. No rule may consult it inside ``evaluate``.
+    """
+
+    path: str
+    role: str
+    reason: str = ""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -80,15 +116,32 @@ class RuleModeDeclaration:
 
           RuleModeDeclaration(pending_reason="disposition deferred to item 137: ...")
 
-    All four fields default to empty; constructing a declaration that
+    All four state fields default to empty; constructing a declaration that
     realises none of the three states (or more than one at once) raises
     ``ValueError``. Frozen: an existing instance cannot be mutated in place.
+
+    ``consumed_paths`` (item 148) is the fifth, **additive** field: a tuple of
+    :class:`ConsumedPath`, ascending and unique by ``path``, classifying every
+    catalogued leaf path ``segfacet.catalogue.build_catalogue`` attributes to
+    this rule. It is what lets the catalogue attribute a rule's §6 modes to
+    the paths that can actually evidence them: only a ``"signal"`` pair
+    contributes. It defaults to ``()`` so every pre-item-148 construction
+    still constructs; a *registered* rule with a non-empty ``modes`` and an
+    empty ``consumed_paths`` is reported by
+    ``segfacet.catalogue.path_classification_conflicts()`` and contributes no
+    mode anywhere — never a silent fall-back to the item-136 rule-granular
+    behaviour.
+
+    ``consumed_paths`` is **read-only metadata that no rule may consult
+    inside** ``evaluate``: the whole declaration is a statement *about* the
+    rule, never an input to it (asserted by AST over every rule module).
     """
 
     modes: Tuple[int, ...] = ()
     evidence: Tuple[str, ...] = ()
     mode_less_reason: str = ""
     pending_reason: str = ""
+    consumed_paths: Tuple[ConsumedPath, ...] = ()
 
     def __post_init__(self) -> None:
         # Outer type checks first (item 147): a bare ``str`` is itself an
@@ -98,7 +151,7 @@ class RuleModeDeclaration:
         # mutable in place on a frozen dataclass. Both are rejected here,
         # naming the field and saying a tuple is required, before the
         # element loops (which still enforce element types).
-        for field_name in ("modes", "evidence"):
+        for field_name in ("modes", "evidence", "consumed_paths"):
             value = getattr(self, field_name)
             if not isinstance(value, tuple):
                 raise ValueError(
@@ -151,6 +204,55 @@ class RuleModeDeclaration:
                 raise ValueError(
                     f"RuleModeDeclaration: 'evidence' elements must be non-empty str, got {element!r}."
                 )
+
+        # Per-path classification (item 148). Every message names the field
+        # ('consumed_paths') and the offending path, so a failure points at
+        # the one literal to correct.
+        previous_path: Optional[str] = None
+        for element in self.consumed_paths:
+            if not isinstance(element, ConsumedPath):
+                raise ValueError(
+                    f"RuleModeDeclaration: 'consumed_paths' elements must be "
+                    f"ConsumedPath, got {type(element).__name__} ({element!r})."
+                )
+            if not isinstance(element.path, str) or not element.path:
+                raise ValueError(
+                    f"RuleModeDeclaration: 'consumed_paths' entries must carry a "
+                    f"non-empty str 'path', got {element.path!r}."
+                )
+            if element.role not in PATH_ROLES:
+                raise ValueError(
+                    f"RuleModeDeclaration: 'consumed_paths' entry for path "
+                    f"{element.path!r} has role {element.role!r}, which is not one "
+                    f"of PATH_ROLES {PATH_ROLES!r} (matched exactly, "
+                    f"case-sensitively)."
+                )
+            if element.role in ("bookkeeping", "not-read") and not (
+                isinstance(element.reason, str) and element.reason
+            ):
+                raise ValueError(
+                    f"RuleModeDeclaration: 'consumed_paths' entry for path "
+                    f"{element.path!r} has role {element.role!r} and must carry a "
+                    f"non-empty 'reason', got {element.reason!r}."
+                )
+            if element.role == "signal" and not self.modes:
+                raise ValueError(
+                    f"RuleModeDeclaration: 'consumed_paths' entry for path "
+                    f"{element.path!r} is classified 'signal', but this "
+                    f"declaration's 'modes' is empty -- a signal path must have a "
+                    f"mode to carry."
+                )
+            if previous_path is not None and element.path == previous_path:
+                raise ValueError(
+                    f"RuleModeDeclaration: 'consumed_paths' must not contain "
+                    f"duplicate paths, got {element.path!r} twice."
+                )
+            if previous_path is not None and element.path < previous_path:
+                raise ValueError(
+                    f"RuleModeDeclaration: 'consumed_paths' must be ascending by "
+                    f"'path', but {element.path!r} follows {previous_path!r}."
+                )
+            previous_path = element.path
 
 
 class Rule(abc.ABC):

@@ -43,7 +43,12 @@ from typing import Dict, List
 
 from segfacet.heuristics.finding import Finding
 from segfacet.heuristics.fov import derive_fov_coverage
-from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
+from segfacet.heuristics.rule import (
+    ConsumedPath,
+    Rule,
+    RuleModeDeclaration,
+    register_rule,
+)
 from segfacet.verdict import Severity
 
 __all__ = ["BorderRule"]
@@ -131,6 +136,59 @@ class BorderRule(Rule):
             "retired the reserved 'corpus' evidence tag, and the mode 6 <-> "
             "border evidence claim is the per-edge rung in "
             "segfacet.failure_modes.SPECIFICATION[6].",
+        ),
+        consumed_paths=(
+            ConsumedPath(
+                path="per_label",
+                role="bookkeeping",
+                reason=(
+                    "container: iterated to reach each label's geometry "
+                    "block; the container itself carries no border "
+                    "evidence"
+                ),
+            ),
+            ConsumedPath(
+                path="per_label.{label}.geometry.touches_anterior",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.geometry.touches_inferior",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.geometry.touches_left",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.geometry.touches_posterior",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.geometry.touches_right",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.geometry.touches_superior",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.level_name",
+                role="bookkeeping",
+                reason=(
+                    "gate and message interpolation: compared against "
+                    "derive_fov_coverage's end levels to exempt an "
+                    "expected terminal face; never mode-6 evidence itself"
+                ),
+            ),
+            ConsumedPath(
+                path="relationships.present_levels[]",
+                role="bookkeeping",
+                reason=(
+                    "gate: the same FOV-span derivation that decides which "
+                    "terminal face is expected; the touched face is the "
+                    "evidence"
+                ),
+            ),
         ),
     )
 

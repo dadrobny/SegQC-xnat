@@ -64,7 +64,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 from segfacet.heuristics.finding import Finding
-from segfacet.heuristics.rule import Rule, RuleModeDeclaration, register_rule
+from segfacet.heuristics.rule import (
+    ConsumedPath,
+    Rule,
+    RuleModeDeclaration,
+    register_rule,
+)
 from segfacet.verdict import Severity
 
 if TYPE_CHECKING:  # pragma: no cover - type-only import, no runtime dependency
@@ -282,6 +287,45 @@ class FragmentationRule(Rule):
             "provenance -- item 147 retired the reserved 'corpus' evidence "
             "tag, and the per-mode evidence claims are the per-edge rungs "
             "in segfacet.failure_modes.SPECIFICATION[2] and [3].",
+        ),
+        consumed_paths=(
+            ConsumedPath(
+                path="per_label",
+                role="bookkeeping",
+                reason=(
+                    "container: iterated to reach each label's components "
+                    "block"
+                ),
+            ),
+            ConsumedPath(
+                path="per_label.{label}.components.component_count",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.components.component_sizes[]",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.components.fragmentation_index",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.components.largest_component_fraction",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.components.stray_component_sizes[]",
+                role="signal",
+            ),
+            ConsumedPath(
+                path="per_label.{label}.level_name",
+                role="bookkeeping",
+                reason=(
+                    "identity and message interpolation: names the level "
+                    "in the finding; the components values carry the "
+                    "fragmentation evidence"
+                ),
+            ),
         ),
     )
 
