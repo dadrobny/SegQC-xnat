@@ -1550,7 +1550,7 @@ sources onto it, and closes with a maintainer sign-off that gates the remainder 
 - [ ] Every mode ↔ rule edge carries an authored evidence rung and every mode's rung is
   derived from its edges; the analytic-only edges are rendered as such, and mode 8's rung
   names the single-channel mechanism (**G2**).
-- [x] `failure_modes.generated.{md,json}` and the traceability matrix regenerate *(Validation round 2 (2026-09-04): committed traceability_matrix.generated.json has primary_source='src/segfacet/failure_modes.py', schema_version='1.1'; anchor_paths/read_paths are distinct fields with headers 'Stage-18 metric anchor paths'/'Rule signal read paths' in the markdown; tests/test_149_conformance_report.py::test_ac20_both_artifacts_regenerate_byte_identically_run_to_run and test_ac20_fresh_matches_committed_byte_for_byte pass in the full suite (-n 4, 7559 passed).)*
+- [ ] `failure_modes.generated.{md,json}` and the traceability matrix regenerate
   byte-identically from a clean tree, name the specification as their primary source, and
   render the metric anchor path and the rule's read paths as separately labelled columns.
 - [ ] The ninth mode (implausible tissue) is present at `implemented` or `validated`, with
