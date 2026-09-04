@@ -109,7 +109,17 @@ _ANALYTIC_DECLARED_MODES = {"bounds": (2,), "reference_delta": (1, 2)}
 # their post-item disposition, for the tests that need to select on them.
 _MODE_LESS = ()
 _INTENSITY_RULES = ("intensity", "intensity_reference_delta")
-_DISPOSITIONED = _ANALYTIC_RULES + _MODE_LESS
+# Review fix (rank-3 per-item review of item 146, 2026-09-04): _DISPOSITIONED
+# is the roll call of rules item 137 gave a declaration to -- all four of them.
+# Composing it as `_ANALYTIC_RULES + _MODE_LESS` silently shrank it from four
+# entries to two when item 146 emptied `_MODE_LESS`, dropping `intensity` and
+# `intensity_reference_delta` out of `test_ac18_replacing_a_dispositioned_...`
+# (parametrised), `test_ac18_replacing_all_four_dispositioned_...` (whose name
+# then no longer described what it did) and
+# `test_adv_dispositioned_declarations_are_frozen` -- a narrowing, not the
+# rescoping the item's Testing Strategy called for. The two intensity rules
+# are still dispositioned; only their disposition changed.
+_DISPOSITIONED = _ANALYTIC_RULES + _INTENSITY_RULES
 
 _CANONICAL_TAG_ORDER = (
     "per_mode_metric",
