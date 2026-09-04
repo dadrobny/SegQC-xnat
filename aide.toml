@@ -12,7 +12,12 @@ docs_dir = "docs/aide"       # living documents; scripts derive queue/ items/ fr
 [python]
 venv = ".venv"                                   # venv directory name (per-machine, gitignored)
 bootstrap = "pip install -e .[dev]"              # command to populate a fresh venv
-test_command = "python -m pytest"                # run relative to the resolved venv (aide.py prefixes .venv/Scripts or .venv/bin)
+# `-n auto` matches what every CI step already passes (`-n 4`): the suite is
+# parallel-safe (no shared mutable state; every fixture writes under its own
+# tmp_path) and pytest-xdist is a dev dependency. Without it the loop's own
+# runs -- the validator's gate and `aide merge`'s re-test -- were the only
+# serial ones left, at ~23 min against ~7 min. Measured 2026-09-04, item 149.
+test_command = "python -m pytest -n auto"        # run relative to the resolved venv (aide.py prefixes .venv/Scripts or .venv/bin)
 import_check = "segfacet"                            # module `aide env` imports to prove the venv is live
 
 [git]
