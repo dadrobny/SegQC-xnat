@@ -42,7 +42,7 @@ record):
 - AC16: test_ac16_harness_measures_every_intensity_case
 - AC17: test_ac17_harness_is_deterministic_and_non_mutating
 - AC18: test_ac18_exactly_one_intensity_composition_in_production,
-        test_ac18_traceability_module_references_run_qc_with_intensity_nowhere
+        test_ac18_traceability_module_composes_no_private_run_qc_with_intensity_call
 - AC19: test_ac19_geometric_corpus_case_dispatches_through_geometric_manifest,
         test_ac19_intensity_corpus_case_dispatches_through_intensity_manifest,
         test_ac19_unrecognised_corpus_raises_naming_case_and_corpus
@@ -730,10 +730,18 @@ def test_ac18_exactly_one_intensity_composition_in_production():
     assert offenders == [], offenders
 
 
-def test_ac18_traceability_module_references_run_qc_with_intensity_nowhere():
+def test_ac18_traceability_module_composes_no_private_run_qc_with_intensity_call():
+    # Narrowed by item 149 (spec docs/aide/items/149-*.md, Assumption A3):
+    # item 149 makes traceability.py two-corpora-aware, so it legitimately
+    # says "intensity" throughout (docstring, manifest path, rule ids). What
+    # this test still proves is A3's actual point -- measured firing is
+    # obtained through failure_modes.measured_firing, never a private
+    # pipeline composition of traceability.py's own -- so only the
+    # `run_qc_with_intensity` substring stays forbidden. Do not re-broaden
+    # this to `"intensity" not in text`; that pin predates item 149 and no
+    # longer describes intended behaviour.
     text = (_REPO_ROOT / "src" / "segfacet" / "traceability.py").read_text(encoding="utf-8")
     assert "run_qc_with_intensity" not in text
-    assert "intensity" not in text
 
 
 # =========================================================================== #
